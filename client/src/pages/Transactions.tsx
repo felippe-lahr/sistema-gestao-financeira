@@ -46,7 +46,8 @@ export default function Transactions() {
     paymentMethodId: "",
     notes: "",
     isRecurring: false,
-    recurrenceMonths: "1",
+    recurrenceCount: "1",
+    recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
   });
 
   const utils = trpc.useUtils();
@@ -148,7 +149,8 @@ export default function Transactions() {
       paymentMethodId: "",
       notes: "",
       isRecurring: false,
-      recurrenceMonths: "1",
+      recurrenceCount: "1",
+      recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
     });
   };
 
@@ -168,6 +170,8 @@ export default function Transactions() {
       paymentMethodId: formData.paymentMethodId ? parseInt(formData.paymentMethodId) : undefined,
       notes: formData.notes || undefined,
       isRecurring: formData.isRecurring,
+      recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
+      recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
     });
   };
 
@@ -185,7 +189,8 @@ export default function Transactions() {
       paymentMethodId: transaction.paymentMethodId?.toString() || "",
       notes: transaction.notes || "",
       isRecurring: transaction.isRecurring || false,
-      recurrenceMonths: transaction.recurrenceMonths?.toString() || "1",
+      recurrenceCount: "1",
+      recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
     });
     setIsEditOpen(true);
   };
@@ -705,9 +710,36 @@ function TransactionForm({
       )}
 
       {formData.isRecurring && !isEdit && (
-        <div className="space-y-2">
-          <Label htmlFor="recurrenceMonths">Repetir por quantos meses?</Label>
-          <Input id="recurrenceMonths" type="number" min="1" value={formData.recurrenceMonths} onChange={(e) => setFormData({ ...formData, recurrenceMonths: e.target.value })} />
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="space-y-2 flex-1">
+              <Label htmlFor="recurrenceCount">Repetir por</Label>
+              <Input 
+                id="recurrenceCount" 
+                type="number" 
+                min="1" 
+                value={formData.recurrenceCount} 
+                onChange={(e) => setFormData({ ...formData, recurrenceCount: e.target.value })} 
+              />
+            </div>
+            <div className="space-y-2 flex-1">
+              <Label htmlFor="recurrenceFrequency">Frequência</Label>
+              <Select
+                value={formData.recurrenceFrequency}
+                onValueChange={(value: "DAY" | "WEEK" | "MONTH" | "YEAR") => setFormData({ ...formData, recurrenceFrequency: value })}
+              >
+                <SelectTrigger id="recurrenceFrequency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DAY">Dia(s)</SelectItem>
+                  <SelectItem value="WEEK">Semana(s)</SelectItem>
+                  <SelectItem value="MONTH">Mês(es)</SelectItem>
+                  <SelectItem value="YEAR">Ano(s)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       )}
     </div>

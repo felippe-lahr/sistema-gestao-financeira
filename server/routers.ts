@@ -337,13 +337,8 @@ export const appRouter = router({
           bankAccountId: z.number().optional(),
           paymentMethodId: z.number().optional(),
           isRecurring: z.boolean().optional(),
-          recurrencePattern: z
-            .object({
-              frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
-              interval: z.number().positive(),
-              endDate: z.string().optional(),
-            })
-            .optional(),
+          recurrenceCount: z.number().positive().optional(),
+          recurrenceFrequency: z.enum(["DAY", "WEEK", "MONTH", "YEAR"]).optional(),
           notes: z.string().optional(),
         })
       )
@@ -356,6 +351,54 @@ export const appRouter = router({
         // Convert amount to cents
         const amountInCents = Math.round(input.amount * 100);
 
+        // Se for recorrente, criar múltiplas transações
+        if (input.isRecurring && input.recurrenceCount && input.recurrenceFrequency) {
+          const count = input.recurrenceCount;
+          const frequency = input.recurrenceFrequency;
+          const transactionIds: number[] = [];
+
+          for (let i = 0; i < count; i++) {
+            let newDueDate = new Date(input.dueDate);
+            
+            // Incrementar data conforme frequência
+            switch (frequency) {
+              case "DAY":
+                newDueDate.setDate(newDueDate.getDate() + i);
+                break;
+              case "WEEK":
+                newDueDate.setDate(newDueDate.getDate() + (i * 7));
+                break;
+              case "MONTH":
+                newDueDate.setMonth(newDueDate.getMonth() + i);
+                break;
+              case "YEAR":
+                newDueDate.setFullYear(newDueDate.getFullYear() + i);
+                break;
+            }
+
+            const transactionId = await db.createTransaction({
+              entityId: input.entityId,
+              type: input.type,
+              description: `${input.description} (${i + 1}/${count})`,
+              amount: amountInCents,
+              dueDate: newDueDate,
+              paymentDate: input.paymentDate,
+              status: input.status || "PENDING",
+              categoryId: input.categoryId,
+              bankAccountId: input.bankAccountId,
+              paymentMethodId: input.paymentMethodId,
+              isRecurring: false,
+              recurrencePattern: null,
+              notes: input.notes,
+            });
+
+            transactionIds.push(transactionId);
+          }
+
+          return { id: transactionIds[0], count: transactionIds.length };
+        }
+
+        // Se não for recorrente, criar apenas uma transação
         const transactionId = await db.createTransaction({
           entityId: input.entityId,
           type: input.type,
@@ -367,8 +410,8 @@ export const appRouter = router({
           categoryId: input.categoryId,
           bankAccountId: input.bankAccountId,
           paymentMethodId: input.paymentMethodId,
-          isRecurring: input.isRecurring || false,
-          recurrencePattern: input.recurrencePattern ? JSON.stringify(input.recurrencePattern) : null,
+          isRecurring: false,
+          recurrencePattern: null,
           notes: input.notes,
         });
 

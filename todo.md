@@ -162,3 +162,13 @@
   - [x] Alterações em categorias refletidas nas transações
   - [x] Alterações em contas correntes refletidas nas transações
   - [x] Alterações em meios de pagamento refletidas nas transações
+
+## 20. Sistema de Recorrência Avançado
+- [x] Adicionar toggle "Repetir lançamento?" no formulário de transações
+- [x] Adicionar campo numérico "Repetir por" (quantidade de repetições)
+- [x] Adicionar dropdown "Frequência" com opções: Dia(s), Semana(s), Mês(es), Ano(s)
+- [x] Implementar lógica de criação de múltiplas transações
+- [x] Incrementar datas conforme frequência selecionada
+- [x] Adicionar indicação de parcela na descrição (ex: "1/5", "2/5")
+- [ ] Exibir valor total e valor parcelado no formulário
+- [ ] Validar campos de recorrência antes de criar transações
