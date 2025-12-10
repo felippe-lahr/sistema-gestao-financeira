@@ -6,6 +6,7 @@ export const transactionTypeEnum = pgEnum("transaction_type", ["INCOME", "EXPENS
 export const transactionStatusEnum = pgEnum("transaction_status", ["PENDING", "PAID", "OVERDUE"]);
 export const whatsappStatusEnum = pgEnum("whatsapp_status", ["RECEIVED", "TRANSCRIBED", "EXTRACTED", "CONFIRMED", "REJECTED"]);
 export const paymentMethodTypeEnum = pgEnum("payment_method_type", ["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "OTHER"]);
+export const attachmentTypeEnum = pgEnum("attachment_type", ["NOTA_FISCAL", "DOCUMENTOS", "BOLETO", "COMPROVANTE_PAGAMENTO"]);
 
 /**
  * Core user table backing auth flow.
@@ -95,6 +96,7 @@ export const attachments = pgTable("attachments", {
   blobUrl: text("blobUrl").notNull(), // Vercel Blob URL
   fileSize: integer("fileSize").notNull(), // Size in bytes
   mimeType: varchar("mimeType", { length: 127 }).notNull(),
+  type: attachmentTypeEnum("type").default("DOCUMENTOS").notNull(), // Tipo de documento
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

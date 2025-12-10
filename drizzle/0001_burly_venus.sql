@@ -1,0 +1,2 @@
+CREATE TYPE "public"."attachment_type" AS ENUM('NOTA_FISCAL', 'DOCUMENTOS', 'BOLETO', 'COMPROVANTE_PAGAMENTO');--> statement-breakpoint
+ALTER TABLE "attachments" ADD COLUMN "type" "attachment_type" DEFAULT 'DOCUMENTOS' NOT NULL;

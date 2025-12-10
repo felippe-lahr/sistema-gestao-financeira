@@ -8,6 +8,13 @@
       "when": 1765405450392,
       "tag": "0000_nervous_mauler",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1765409012919,
+      "tag": "0001_burly_venus",
+      "breakpoints": true
     }
   ]
 }
