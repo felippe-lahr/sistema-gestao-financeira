@@ -192,7 +192,30 @@ export async function getTransactionsByEntityId(
   const db = await getDb();
   if (!db) return [];
 
-  let query = db.select().from(transactions).where(eq(transactions.entityId, entityId)).$dynamic();
+  let query = db
+    .select({
+      id: transactions.id,
+      entityId: transactions.entityId,
+      type: transactions.type,
+      description: transactions.description,
+      amount: transactions.amount,
+      dueDate: transactions.dueDate,
+      paymentDate: transactions.paymentDate,
+      status: transactions.status,
+      categoryId: transactions.categoryId,
+      bankAccountId: transactions.bankAccountId,
+      paymentMethodId: transactions.paymentMethodId,
+      isRecurring: transactions.isRecurring,
+      notes: transactions.notes,
+      createdAt: transactions.createdAt,
+      updatedAt: transactions.updatedAt,
+      categoryName: categories.name,
+      categoryColor: categories.color,
+    })
+    .from(transactions)
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(eq(transactions.entityId, entityId))
+    .$dynamic();
 
   if (options?.startDate) {
     query = query.where(gte(transactions.dueDate, options.startDate));

@@ -28,7 +28,7 @@ import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: LayoutDashboard, label: "Início", path: "/" },
   { icon: Building2, label: "Entidades", path: "/entities" },
   { icon: Receipt, label: "Transações", path: "/transactions" },
   { icon: Settings, label: "Configurações", path: "/settings" },

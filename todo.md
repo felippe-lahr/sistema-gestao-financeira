@@ -86,3 +86,10 @@
 - [x] Interface de gerenciamento de contas correntes
 - [x] Interface de gerenciamento de meios de pagamento
 - [x] Interface de gerenciamento de categorias personalizadas
+
+## 14. Melhorias de UX Solicitadas
+- [x] Redesenhar tela inicial como painel de entidades
+- [x] Criar cards clicáveis para cada entidade
+- [x] Mover dashboard atual para visualização por entidade
+- [x] Adicionar tags coloridas de categorias na lista de transações
+- [x] Implementar navegação: Home (entidades) → Dashboard da entidade

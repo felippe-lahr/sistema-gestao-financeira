@@ -2,7 +2,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import DashboardLayout from "@/components/DashboardLayout";
 import NotFound from "@/pages/NotFound";
-import Dashboard from "@/pages/Dashboard";
+import Home from "@/pages/Home";
+import EntityDashboard from "@/pages/EntityDashboard";
 import Entities from "@/pages/Entities";
 import Transactions from "@/pages/Transactions";
 import Settings from "@/pages/Settings";
@@ -13,7 +14,8 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={() => <DashboardLayout><Dashboard /></DashboardLayout>} />
+      <Route path="/" component={() => <DashboardLayout><Home /></DashboardLayout>} />
+      <Route path="/dashboard/:id" component={() => <DashboardLayout><EntityDashboard /></DashboardLayout>} />
       <Route path="/entities" component={() => <DashboardLayout><Entities /></DashboardLayout>} />
       <Route path="/transactions" component={() => <DashboardLayout><Transactions /></DashboardLayout>} />
       <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
