@@ -29,6 +29,13 @@
       "when": 1765367831475,
       "tag": "0003_parallel_nick_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1765380918620,
+      "tag": "0004_square_maximus",
+      "breakpoints": true
     }
   ]
 }

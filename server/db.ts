@@ -1,4 +1,4 @@
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, or, and, isNull, desc, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -148,10 +148,27 @@ export async function deleteEntity(entityId: number) {
 
 // ========== CATEGORY OPERATIONS ==========
 
-export async function getCategoriesByEntityId(entityId: number) {
+export async function getCategoriesByEntityId(entityId: number, userId?: number) {
   const db = await getDb();
   if (!db) return [];
 
+  // Return categories that are either:
+  // 1. Specific to this entity (entityId matches)
+  // 2. Shared categories (entityId is null) belonging to the user
+  if (userId) {
+    return await db
+      .select()
+      .from(categories)
+      .where(
+        or(
+          eq(categories.entityId, entityId),
+          and(isNull(categories.entityId), eq(categories.userId, userId))
+        )
+      )
+      .orderBy(categories.name);
+  }
+
+  // Fallback: only entity-specific categories
   return await db.select().from(categories).where(eq(categories.entityId, entityId)).orderBy(categories.name);
 }
 
@@ -407,10 +424,27 @@ export async function updateWhatsAppMessage(messageId: string, data: Partial<Ins
 
 // ========== BANK ACCOUNT OPERATIONS ==========
 
-export async function getBankAccountsByEntityId(entityId: number) {
+export async function getBankAccountsByEntityId(entityId: number, userId?: number) {
   const db = await getDb();
   if (!db) return [];
 
+  // Return accounts that are either:
+  // 1. Specific to this entity (entityId matches)
+  // 2. Shared accounts (entityId is null) belonging to the user
+  if (userId) {
+    return await db
+      .select()
+      .from(bankAccounts)
+      .where(
+        or(
+          eq(bankAccounts.entityId, entityId),
+          and(isNull(bankAccounts.entityId), eq(bankAccounts.userId, userId))
+        )
+      )
+      .orderBy(bankAccounts.name);
+  }
+
+  // Fallback: only entity-specific accounts
   return await db.select().from(bankAccounts).where(eq(bankAccounts.entityId, entityId)).orderBy(bankAccounts.name);
 }
 
@@ -446,10 +480,27 @@ export async function deleteBankAccount(accountId: number) {
 
 // ========== PAYMENT METHOD OPERATIONS ==========
 
-export async function getPaymentMethodsByEntityId(entityId: number) {
+export async function getPaymentMethodsByEntityId(entityId: number, userId?: number) {
   const db = await getDb();
   if (!db) return [];
 
+  // Return payment methods that are either:
+  // 1. Specific to this entity (entityId matches)
+  // 2. Shared methods (entityId is null) belonging to the user
+  if (userId) {
+    return await db
+      .select()
+      .from(paymentMethods)
+      .where(
+        or(
+          eq(paymentMethods.entityId, entityId),
+          and(isNull(paymentMethods.entityId), eq(paymentMethods.userId, userId))
+        )
+      )
+      .orderBy(paymentMethods.name);
+  }
+
+  // Fallback: only entity-specific methods
   return await db.select().from(paymentMethods).where(eq(paymentMethods.entityId, entityId)).orderBy(paymentMethods.name);
 }
 

@@ -39,7 +39,8 @@ export type InsertEntity = typeof entities.$inferInsert;
  */
 export const categories = mysqlTable("categories", {
   id: int("id").autoincrement().primaryKey(),
-  entityId: int("entityId").notNull(),
+  userId: int("userId").notNull(), // Owner of the category
+  entityId: int("entityId"), // Optional: if set, category is exclusive to this entity
   name: varchar("name", { length: 255 }).notNull(),
   type: mysqlEnum("type", ["INCOME", "EXPENSE"]).notNull(),
   color: varchar("color", { length: 7 }).default("#6B7280"),
@@ -118,7 +119,8 @@ export type InsertWhatsAppMessage = typeof whatsappMessages.$inferInsert;
  */
 export const bankAccounts = mysqlTable("bank_accounts", {
   id: int("id").autoincrement().primaryKey(),
-  entityId: int("entityId").notNull(),
+  userId: int("userId").notNull(), // Owner of the account
+  entityId: int("entityId"), // Optional: if set, account is exclusive to this entity
   name: varchar("name", { length: 255 }).notNull(),
   bank: varchar("bank", { length: 255 }),
   accountNumber: varchar("accountNumber", { length: 50 }),
@@ -137,7 +139,8 @@ export type InsertBankAccount = typeof bankAccounts.$inferInsert;
  */
 export const paymentMethods = mysqlTable("payment_methods", {
   id: int("id").autoincrement().primaryKey(),
-  entityId: int("entityId").notNull(),
+  userId: int("userId").notNull(), // Owner of the payment method
+  entityId: int("entityId"), // Optional: if set, payment method is exclusive to this entity
   name: varchar("name", { length: 255 }).notNull(),
   type: mysqlEnum("type", ["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "OTHER"]).notNull(),
   color: varchar("color", { length: 7 }).default("#6B7280"),

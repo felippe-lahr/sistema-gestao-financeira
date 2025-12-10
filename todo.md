@@ -97,3 +97,28 @@
 ## 15. Bugs Reportados
 - [x] Corrigir erro "Failed to fetch" no dashboard da entidade (ID 30002)
 - [x] Investigar problema nas queries tRPC do dashboard
+
+## 16. Novas Funcionalidades - Filtros e Edição
+- [x] Implementar filtros na lista de transações
+  - [x] Filtro por período personalizado (data início e fim)
+  - [x] Filtro por ano
+  - [x] Filtro por mês do ano
+  - [x] Filtro por categoria
+  - [x] Filtro por tipo (receita/despesa)
+- [x] Implementar edição de transações
+  - [x] Modal de edição com todos os campos
+  - [x] Validação e atualização no backend
+- [ ] Implementar edição de configurações
+  - [ ] Editar contas correntes
+  - [ ] Editar meios de pagamento
+  - [ ] Editar categorias
+- [x] Associação multi-entidade
+  - [x] Permitir vincular contas correntes a múltiplas entidades
+  - [x] Permitir vincular meios de pagamento a múltiplas entidades
+  - [x] Permitir vincular categorias a múltiplas entidades
+  - [x] Atualizar schema do banco de dados
+- [x] Integração no formulário de transações
+  - [x] Adicionar seleção de conta corrente
+  - [x] Adicionar seleção de meio de pagamento
+  - [x] Adicionar seleção de categoria
+  - [x] Carregar opções filtradas por entidade

@@ -113,6 +113,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         const categoryId = await db.createCategory({
+          userId: ctx.user.id,
           entityId: input.entityId,
           name: input.name,
           type: input.type,
@@ -176,11 +177,12 @@ export const appRouter = router({
         const balanceInCents = input.balance ? Math.round(input.balance * 100) : 0;
 
         const accountId = await db.createBankAccount({
+          userId: ctx.user.id,
           entityId: input.entityId,
           name: input.name,
           bank: input.bank,
           accountNumber: input.accountNumber,
-          balance: balanceInCents,
+          balance: (input.balance || 0) * 100, // Convert to cents
           color: input.color,
         });
         return { id: accountId };
@@ -247,6 +249,7 @@ export const appRouter = router({
         }
 
         const methodId = await db.createPaymentMethod({
+          userId: ctx.user.id,
           entityId: input.entityId,
           name: input.name,
           type: input.type,
@@ -331,6 +334,8 @@ export const appRouter = router({
           paymentDate: z.date().optional(),
           status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
           categoryId: z.number().optional(),
+          bankAccountId: z.number().optional(),
+          paymentMethodId: z.number().optional(),
           isRecurring: z.boolean().optional(),
           recurrencePattern: z
             .object({
@@ -360,6 +365,8 @@ export const appRouter = router({
           paymentDate: input.paymentDate,
           status: input.status || "PENDING",
           categoryId: input.categoryId,
+          bankAccountId: input.bankAccountId,
+          paymentMethodId: input.paymentMethodId,
           isRecurring: input.isRecurring || false,
           recurrencePattern: input.recurrencePattern ? JSON.stringify(input.recurrencePattern) : null,
           notes: input.notes,
@@ -372,12 +379,15 @@ export const appRouter = router({
       .input(
         z.object({
           id: z.number(),
+          type: z.enum(["INCOME", "EXPENSE"]).optional(),
           description: z.string().min(1).optional(),
           amount: z.number().positive().optional(),
           dueDate: z.date().optional(),
           paymentDate: z.date().optional(),
           status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
           categoryId: z.number().optional(),
+          bankAccountId: z.number().optional(),
+          paymentMethodId: z.number().optional(),
           notes: z.string().optional(),
         })
       )
@@ -392,11 +402,14 @@ export const appRouter = router({
         }
 
         const updateData: any = {
+          type: input.type,
           description: input.description,
           dueDate: input.dueDate,
           paymentDate: input.paymentDate,
           status: input.status,
           categoryId: input.categoryId,
+          bankAccountId: input.bankAccountId,
+          paymentMethodId: input.paymentMethodId,
           notes: input.notes,
         };
 
