@@ -131,7 +131,7 @@ export async function createEntity(entity: InsertEntity) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(entities).values(entity);
+  const result = await db.insert(entities).values(entity).returning();
   return Number(result[0].id);
 }
 
@@ -179,7 +179,7 @@ export async function createCategory(category: InsertCategory) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(categories).values(category);
+  const result = await db.insert(categories).values(category).returning();
   return Number(result[0].id);
 }
 
@@ -271,7 +271,7 @@ export async function createTransaction(transaction: InsertTransaction) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(transactions).values(transaction);
+  const result = await db.insert(transactions).values(transaction).returning();
   return Number(result[0].id);
 }
 
@@ -389,7 +389,7 @@ export async function createAttachment(attachment: InsertAttachment) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(attachments).values(attachment);
+  const result = await db.insert(attachments).values(attachment).returning();
   return Number(result[0].id);
 }
 
@@ -406,7 +406,7 @@ export async function createWhatsAppMessage(message: InsertWhatsAppMessage) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(whatsappMessages).values(message);
+  const result = await db.insert(whatsappMessages).values(message).returning();
   return Number(result[0].id);
 }
 
@@ -463,7 +463,7 @@ export async function createBankAccount(account: InsertBankAccount) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(bankAccounts).values(account);
+  const result = await db.insert(bankAccounts).values(account).returning();
   return Number(result[0].id);
 }
 
@@ -519,7 +519,7 @@ export async function createPaymentMethod(method: InsertPaymentMethod) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(paymentMethods).values(method);
+  const result = await db.insert(paymentMethods).values(method).returning();
   return Number(result[0].id);
 }
 
