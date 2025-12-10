@@ -102,6 +102,7 @@ export const appRouter = router({
         z.object({
           entityId: z.number(),
           name: z.string().min(1).max(255),
+          type: z.enum(["INCOME", "EXPENSE"]),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
           icon: z.string().max(50).optional(),
         })
@@ -114,6 +115,7 @@ export const appRouter = router({
         const categoryId = await db.createCategory({
           entityId: input.entityId,
           name: input.name,
+          type: input.type,
           color: input.color,
           icon: input.icon,
         });
@@ -140,6 +142,141 @@ export const appRouter = router({
 
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteCategory(input.id);
+      return { success: true };
+    }),
+  }),
+
+  // ========== BANK ACCOUNTS ==========
+  bankAccounts: router({
+    listByEntity: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
+      const entity = await db.getEntityById(input.entityId);
+      if (!entity || entity.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      return await db.getBankAccountsByEntityId(input.entityId);
+    }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          name: z.string().min(1).max(255),
+          bank: z.string().max(255).optional(),
+          accountNumber: z.string().max(50).optional(),
+          balance: z.number().optional(),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const balanceInCents = input.balance ? Math.round(input.balance * 100) : 0;
+
+        const accountId = await db.createBankAccount({
+          entityId: input.entityId,
+          name: input.name,
+          bank: input.bank,
+          accountNumber: input.accountNumber,
+          balance: balanceInCents,
+          color: input.color,
+        });
+        return { id: accountId };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().min(1).max(255).optional(),
+          bank: z.string().max(255).optional(),
+          accountNumber: z.string().max(50).optional(),
+          balance: z.number().optional(),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+          isActive: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const updateData: any = {
+          name: input.name,
+          bank: input.bank,
+          accountNumber: input.accountNumber,
+          color: input.color,
+          isActive: input.isActive,
+        };
+
+        if (input.balance !== undefined) {
+          updateData.balance = Math.round(input.balance * 100);
+        }
+
+        await db.updateBankAccount(input.id, updateData);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteBankAccount(input.id);
+      return { success: true };
+    }),
+  }),
+
+  // ========== PAYMENT METHODS ==========
+  paymentMethods: router({
+    listByEntity: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
+      const entity = await db.getEntityById(input.entityId);
+      if (!entity || entity.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      return await db.getPaymentMethodsByEntityId(input.entityId);
+    }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          name: z.string().min(1).max(255),
+          type: z.enum(["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "OTHER"]),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const methodId = await db.createPaymentMethod({
+          entityId: input.entityId,
+          name: input.name,
+          type: input.type,
+          color: input.color,
+        });
+        return { id: methodId };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().min(1).max(255).optional(),
+          type: z.enum(["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "OTHER"]).optional(),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+          isActive: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await db.updatePaymentMethod(input.id, {
+          name: input.name,
+          type: input.type,
+          color: input.color,
+          isActive: input.isActive,
+        });
+        return { success: true };
+      }),
+
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deletePaymentMethod(input.id);
       return { success: true };
     }),
   }),

@@ -13,6 +13,10 @@ import {
   InsertAttachment,
   whatsappMessages,
   InsertWhatsAppMessage,
+  bankAccounts,
+  InsertBankAccount,
+  paymentMethods,
+  InsertPaymentMethod,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -376,4 +380,82 @@ export async function updateWhatsAppMessage(messageId: string, data: Partial<Ins
   if (!db) throw new Error("Database not available");
 
   await db.update(whatsappMessages).set(data).where(eq(whatsappMessages.messageId, messageId));
+}
+
+// ========== BANK ACCOUNT OPERATIONS ==========
+
+export async function getBankAccountsByEntityId(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(bankAccounts).where(eq(bankAccounts.entityId, entityId)).orderBy(bankAccounts.name);
+}
+
+export async function getBankAccountById(accountId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(bankAccounts).where(eq(bankAccounts.id, accountId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createBankAccount(account: InsertBankAccount) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(bankAccounts).values(account);
+  return Number(result[0].insertId);
+}
+
+export async function updateBankAccount(accountId: number, data: Partial<InsertBankAccount>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(bankAccounts).set(data).where(eq(bankAccounts.id, accountId));
+}
+
+export async function deleteBankAccount(accountId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(bankAccounts).where(eq(bankAccounts.id, accountId));
+}
+
+// ========== PAYMENT METHOD OPERATIONS ==========
+
+export async function getPaymentMethodsByEntityId(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(paymentMethods).where(eq(paymentMethods.entityId, entityId)).orderBy(paymentMethods.name);
+}
+
+export async function getPaymentMethodById(methodId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(paymentMethods).where(eq(paymentMethods.id, methodId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createPaymentMethod(method: InsertPaymentMethod) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(paymentMethods).values(method);
+  return Number(result[0].insertId);
+}
+
+export async function updatePaymentMethod(methodId: number, data: Partial<InsertPaymentMethod>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(paymentMethods).set(data).where(eq(paymentMethods.id, methodId));
+}
+
+export async function deletePaymentMethod(methodId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(paymentMethods).where(eq(paymentMethods.id, methodId));
 }

@@ -41,6 +41,7 @@ export const categories = mysqlTable("categories", {
   id: int("id").autoincrement().primaryKey(),
   entityId: int("entityId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
+  type: mysqlEnum("type", ["INCOME", "EXPENSE"]).notNull(),
   color: varchar("color", { length: 7 }).default("#6B7280"),
   icon: varchar("icon", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -63,6 +64,8 @@ export const transactions = mysqlTable("transactions", {
   paymentDate: timestamp("paymentDate"),
   status: mysqlEnum("status", ["PENDING", "PAID", "OVERDUE"]).default("PENDING").notNull(),
   categoryId: int("categoryId"),
+  bankAccountId: int("bankAccountId"),
+  paymentMethodId: int("paymentMethodId"),
   isRecurring: boolean("isRecurring").default(false).notNull(),
   recurrencePattern: text("recurrencePattern"), // JSON: { frequency: 'daily'|'weekly'|'monthly'|'yearly', interval: number, endDate?: string }
   parentTransactionId: int("parentTransactionId"), // For recurring transactions
@@ -109,3 +112,39 @@ export const whatsappMessages = mysqlTable("whatsapp_messages", {
 
 export type WhatsAppMessage = typeof whatsappMessages.$inferSelect;
 export type InsertWhatsAppMessage = typeof whatsappMessages.$inferInsert;
+
+/**
+ * Bank Accounts table - Contas Correntes por entidade
+ */
+export const bankAccounts = mysqlTable("bank_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  entityId: int("entityId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  bank: varchar("bank", { length: 255 }),
+  accountNumber: varchar("accountNumber", { length: 50 }),
+  balance: int("balance").default(0).notNull(), // Stored in cents
+  color: varchar("color", { length: 7 }).default("#6B7280"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BankAccount = typeof bankAccounts.$inferSelect;
+export type InsertBankAccount = typeof bankAccounts.$inferInsert;
+
+/**
+ * Payment Methods table - Meios de Pagamento por entidade
+ */
+export const paymentMethods = mysqlTable("payment_methods", {
+  id: int("id").autoincrement().primaryKey(),
+  entityId: int("entityId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: mysqlEnum("type", ["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "OTHER"]).notNull(),
+  color: varchar("color", { length: 7 }).default("#6B7280"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type InsertPaymentMethod = typeof paymentMethods.$inferInsert;

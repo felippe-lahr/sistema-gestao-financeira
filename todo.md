@@ -76,3 +76,13 @@
 - [ ] Otimização de performance
 - [ ] Monitoramento e analytics
 - [ ] Documentação final
+
+## 13. Novas Funcionalidades Solicitadas
+- [x] Cadastro de Contas Correntes por entidade
+- [x] Cadastro de Meios de Pagamento por entidade
+- [x] Sistema completo de Categorias personalizadas com cores
+- [x] Vincular transações a contas correntes
+- [x] Vincular transações a meios de pagamento
+- [x] Interface de gerenciamento de contas correntes
+- [x] Interface de gerenciamento de meios de pagamento
+- [x] Interface de gerenciamento de categorias personalizadas

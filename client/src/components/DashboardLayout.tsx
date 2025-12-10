@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Building2, Receipt, Wallet } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Building2, Receipt, Settings } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -31,6 +31,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Building2, label: "Entidades", path: "/entities" },
   { icon: Receipt, label: "Transações", path: "/transactions" },
+  { icon: Settings, label: "Configurações", path: "/settings" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

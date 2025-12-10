@@ -5,6 +5,7 @@ import NotFound from "@/pages/NotFound";
 import Dashboard from "@/pages/Dashboard";
 import Entities from "@/pages/Entities";
 import Transactions from "@/pages/Transactions";
+import Settings from "@/pages/Settings";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={() => <DashboardLayout><Dashboard /></DashboardLayout>} />
       <Route path="/entities" component={() => <DashboardLayout><Entities /></DashboardLayout>} />
       <Route path="/transactions" component={() => <DashboardLayout><Transactions /></DashboardLayout>} />
+      <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
