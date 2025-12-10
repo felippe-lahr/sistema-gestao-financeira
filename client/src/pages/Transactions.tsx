@@ -17,6 +17,7 @@ import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-f
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AttachmentUploader } from "@/components/AttachmentUploader";
 
 export default function Transactions() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -48,6 +49,7 @@ export default function Transactions() {
     isRecurring: false,
     recurrenceCount: "1",
     recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
+    attachments: [] as number[],
   });
 
   const utils = trpc.useUtils();
@@ -698,6 +700,14 @@ function TransactionForm({
       <div className="space-y-2">
         <Label htmlFor="notes">Observações</Label>
         <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="Notas adicionais..." rows={3} />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Documentos</Label>
+        <AttachmentUploader
+          transactionId={null}
+          onAttachmentsChange={(ids) => setFormData({ ...formData, attachments: ids })}
+        />
       </div>
 
       {!isEdit && (
