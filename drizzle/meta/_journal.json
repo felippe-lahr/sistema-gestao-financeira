@@ -1,40 +1,12 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1765366261816,
-      "tag": "0000_furry_green_goblin",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1765366419491,
-      "tag": "0001_oval_morph",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1765367645793,
-      "tag": "0002_absurd_ravenous",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1765367831475,
-      "tag": "0003_parallel_nick_fury",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1765380918620,
-      "tag": "0004_square_maximus",
+      "version": "7",
+      "when": 1765405450392,
+      "tag": "0000_nervous_mauler",
       "breakpoints": true
     }
   ]

@@ -1,1 +1,0 @@
-ALTER TABLE `categories` ADD `type` enum('INCOME','EXPENSE') NOT NULL;
