@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -111,12 +112,28 @@ export default function Transactions() {
     onSuccess: () => {
       utils.transactions.listByEntity.invalidate();
       utils.dashboard.metrics.invalidate();
+      setDeleteDialogOpen(false);
+      setDeletingTransactionId(null);
       toast.success("Transação excluída com sucesso!");
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao excluir transação");
     },
   });
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingTransactionId, setDeletingTransactionId] = useState<number | null>(null);
+
+  const handleDelete = (id: number) => {
+    setDeletingTransactionId(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (deletingTransactionId) {
+      deleteMutation.mutate({ id: deletingTransactionId });
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -485,6 +502,9 @@ export default function Transactions() {
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(transaction)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(transaction.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -500,6 +520,24 @@ export default function Transactions() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

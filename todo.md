@@ -125,3 +125,23 @@
 
 ## 17. Bugs Reportados
 - [x] Corrigir erro de SelectItem com value vazio na página de transações
+
+## 18. Novas Funcionalidades - Remoção e Recorrência
+- [x] Implementar remoção de transações
+  - [x] Botão de excluir na lista de transações
+  - [x] Confirmação antes de remover
+  - [x] Endpoint de delete no backend
+- [x] Implementar remoção de configurações
+  - [x] Remover contas correntes
+  - [x] Remover meios de pagamento
+  - [x] Remover categorias
+- [ ] Implementar edição de configurações
+  - [ ] Editar contas correntes (modal com todos os campos)
+  - [ ] Editar meios de pagamento
+  - [ ] Editar categorias
+- [ ] Sistema de recorrência inteligente
+  - [ ] Criar múltiplas transações ao marcar como recorrente
+  - [ ] Dividir valor total em parcelas
+  - [ ] Mostrar valor total e valor parcelado
+  - [ ] Incrementar datas automaticamente (mensal)
+  - [ ] Adicionar campo de número de parcelas
