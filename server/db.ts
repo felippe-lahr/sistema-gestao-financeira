@@ -293,17 +293,17 @@ export async function getDashboardMetrics(entityId: number) {
   // Get current balance (all paid transactions)
   const balanceResult = await db
     .select({
-      total: sql<number>`SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END)`,
+      total: sql<number>`COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END), 0)`,
     })
     .from(transactions)
     .where(and(eq(transactions.entityId, entityId), eq(transactions.status, "PAID")));
 
-  const currentBalance = balanceResult[0]?.total || 0;
+  const currentBalance = Number(balanceResult[0]?.total) || 0;
 
   // Get month income
   const incomeResult = await db
     .select({
-      total: sql<number>`SUM(amount)`,
+      total: sql<number>`COALESCE(SUM(amount), 0)`,
     })
     .from(transactions)
     .where(
@@ -316,12 +316,12 @@ export async function getDashboardMetrics(entityId: number) {
       )
     );
 
-  const monthIncome = incomeResult[0]?.total || 0;
+  const monthIncome = Number(incomeResult[0]?.total) || 0;
 
   // Get month expenses
   const expenseResult = await db
     .select({
-      total: sql<number>`SUM(amount)`,
+      total: sql<number>`COALESCE(SUM(amount), 0)`,
     })
     .from(transactions)
     .where(
@@ -334,19 +334,19 @@ export async function getDashboardMetrics(entityId: number) {
       )
     );
 
-  const monthExpenses = expenseResult[0]?.total || 0;
+  const monthExpenses = Number(expenseResult[0]?.total) || 0;
 
   // Get pending expenses
   const pendingResult = await db
     .select({
-      total: sql<number>`SUM(amount)`,
+      total: sql<number>`COALESCE(SUM(amount), 0)`,
     })
     .from(transactions)
     .where(
       and(eq(transactions.entityId, entityId), eq(transactions.type, "EXPENSE"), eq(transactions.status, "PENDING"))
     );
 
-  const pendingExpenses = pendingResult[0]?.total || 0;
+  const pendingExpenses = Number(pendingResult[0]?.total) || 0;
 
   return {
     currentBalance,

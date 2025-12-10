@@ -1,0 +1,19 @@
+{
+  "query": "SELECT * FROM entities WHERE id = 30002",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3UvhjMJrUm8EZu6.d649e2e76a5b --database HBtG8JggZWurHcovDQCtLG --execute SELECT * FROM entities WHERE id = 30002",
+  "rows": [
+    {
+      "id": "30002",
+      "userId": "1",
+      "name": "Casa Gaiúba",
+      "description": "Gestão de Locação temporada",
+      "color": "#EC4899",
+      "createdAt": "2025-12-10 11:59:37",
+      "updatedAt": "2025-12-10 14:12:20"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuserId\tname\tdescription\tcolor\tcreatedAt\tupdatedAt\n30002\t1\tCasa Gaiúba\tGestão de Locação temporada\t#EC4899\t2025-12-10 11:59:37\t2025-12-10 14:12:20\n",
+  "stderr": "",
+  "execution_time_ms": 583
+}

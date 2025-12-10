@@ -93,3 +93,7 @@
 - [x] Mover dashboard atual para visualização por entidade
 - [x] Adicionar tags coloridas de categorias na lista de transações
 - [x] Implementar navegação: Home (entidades) → Dashboard da entidade
+
+## 15. Bugs Reportados
+- [x] Corrigir erro "Failed to fetch" no dashboard da entidade (ID 30002)
+- [x] Investigar problema nas queries tRPC do dashboard
