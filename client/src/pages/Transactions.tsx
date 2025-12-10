@@ -304,6 +304,8 @@ export default function Transactions() {
               paymentMethods={paymentMethods || []}
               selectedEntityId={selectedEntityId}
               setSelectedEntityId={setSelectedEntityId}
+              attachments={attachments}
+              setAttachments={setAttachments}
             />
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -333,6 +335,8 @@ export default function Transactions() {
             paymentMethods={paymentMethods || []}
             selectedEntityId={selectedEntityId}
             setSelectedEntityId={setSelectedEntityId}
+            attachments={attachments}
+            setAttachments={setAttachments}
             isEdit
           />
           <DialogFooter>
@@ -563,6 +567,8 @@ function TransactionForm({
   paymentMethods,
   selectedEntityId,
   setSelectedEntityId,
+  attachments,
+  setAttachments,
   isEdit = false,
 }: {
   formData: any;
@@ -573,6 +579,8 @@ function TransactionForm({
   paymentMethods: any[];
   selectedEntityId: number | null;
   setSelectedEntityId: (id: number) => void;
+  attachments: any[];
+  setAttachments: (attachments: any[]) => void;
   isEdit?: boolean;
 }) {
   const incomeCategories = categories.filter((c) => c.type === "INCOME");
