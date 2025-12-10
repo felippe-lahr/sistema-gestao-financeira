@@ -52,6 +52,10 @@ export default function Transactions() {
     attachments: [] as number[],
   });
 
+  // Estado para gerenciar anexos
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [previewAttachment, setPreviewAttachment] = useState<any>(null);
+
   const utils = trpc.useUtils();
   const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery();
 
@@ -705,8 +709,24 @@ function TransactionForm({
       <div className="space-y-2">
         <Label>Documentos</Label>
         <AttachmentUploader
-          transactionId={null}
-          onAttachmentsChange={(ids) => setFormData({ ...formData, attachments: ids })}
+          transactionId={undefined}
+          attachments={attachments}
+          onUpload={async (file, type) => {
+            // Implementação temporária - será conectada à API depois
+            console.log("Upload:", file, type);
+            toast.info("Upload será implementado após salvar a transação");
+          }}
+          onDelete={async (id) => {
+            setAttachments(attachments.filter(a => a.id !== id));
+            toast.success("Anexo removido");
+          }}
+          onUpdateType={async (id, type) => {
+            setAttachments(attachments.map(a => a.id === id ? { ...a, type } : a));
+            toast.success("Tipo atualizado");
+          }}
+          onPreview={(attachment) => {
+            setPreviewAttachment(attachment);
+          }}
         />
       </div>
 
