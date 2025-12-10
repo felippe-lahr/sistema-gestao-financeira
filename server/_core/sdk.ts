@@ -1,5 +1,11 @@
 import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import crypto from "crypto";
 import { ForbiddenError } from "@shared/_core/errors";
+
+// Make crypto available globally for jose library
+if (typeof globalThis.crypto === "undefined") {
+  (globalThis as any).crypto = crypto.webcrypto;
+}
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
