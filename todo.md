@@ -122,3 +122,6 @@
   - [x] Adicionar seleção de meio de pagamento
   - [x] Adicionar seleção de categoria
   - [x] Carregar opções filtradas por entidade
+
+## 17. Bugs Reportados
+- [x] Corrigir erro de SelectItem com value vazio na página de transações

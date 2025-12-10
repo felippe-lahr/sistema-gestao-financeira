@@ -415,7 +415,6 @@ export default function Transactions() {
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
                   {categories?.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id.toString()}>
                       {cat.name}
@@ -609,7 +608,6 @@ function TransactionForm({
             <SelectValue placeholder="Selecione uma categoria" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Nenhuma</SelectItem>
             {relevantCategories.map((cat) => (
               <SelectItem key={cat.id} value={cat.id.toString()}>
                 <div className="flex items-center gap-2">
@@ -629,7 +627,6 @@ function TransactionForm({
             <SelectValue placeholder="Selecione uma conta" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Nenhuma</SelectItem>
             {bankAccounts.map((account) => (
               <SelectItem key={account.id} value={account.id.toString()}>
                 {account.name} {account.bank && `- ${account.bank}`}
@@ -646,7 +643,6 @@ function TransactionForm({
             <SelectValue placeholder="Selecione um meio" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Nenhum</SelectItem>
             {paymentMethods.map((method) => (
               <SelectItem key={method.id} value={method.id.toString()}>
                 {method.name}
