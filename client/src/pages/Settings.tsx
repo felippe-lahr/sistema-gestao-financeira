@@ -110,6 +110,8 @@ export default function Settings() {
 // ========== BANK ACCOUNTS TAB ==========
 function BankAccountsTab({ entityId }: { entityId: number }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
     bank: "",
@@ -130,6 +132,19 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
     },
     onError: (error) => {
       toast.error("Erro ao criar conta: " + error.message);
+    },
+  });
+
+  const updateMutation = trpc.bankAccounts.update.useMutation({
+    onSuccess: () => {
+      utils.bankAccounts.listByEntity.invalidate();
+      setIsEditOpen(false);
+      setEditingAccount(null);
+      resetForm();
+      toast.success("Conta atualizada com sucesso!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar conta: " + error.message);
     },
   });
 
@@ -161,6 +176,34 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
 
     createMutation.mutate({
       entityId,
+      name: formData.name,
+      bank: formData.bank || undefined,
+      accountNumber: formData.accountNumber || undefined,
+      balance: formData.balance ? parseFloat(formData.balance) : undefined,
+      color: formData.color,
+    });
+  };
+
+  const handleEdit = (account: any) => {
+    setEditingAccount(account);
+    setFormData({
+      name: account.name,
+      bank: account.bank || "",
+      accountNumber: account.accountNumber || "",
+      balance: (account.balance / 100).toString(),
+      color: account.color || "#2563EB",
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleUpdate = () => {
+    if (!formData.name.trim()) {
+      toast.error("O nome da conta é obrigatório");
+      return;
+    }
+
+    updateMutation.mutate({
+      id: editingAccount.id,
       name: formData.name,
       bank: formData.bank || undefined,
       accountNumber: formData.accountNumber || undefined,
@@ -304,6 +347,13 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleEdit(account)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => deleteMutation.mutate({ id: account.id })}
                       disabled={deleteMutation.isPending}
                     >
@@ -316,6 +366,77 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
           ))}
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Conta Corrente</DialogTitle>
+            <DialogDescription>Atualize as informações da conta</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Nome da Conta *</Label>
+              <Input
+                id="edit-name"
+                placeholder="Ex: Conta Corrente Principal"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-bank">Banco</Label>
+                <Input
+                  id="edit-bank"
+                  placeholder="Ex: Banco do Brasil"
+                  value={formData.bank}
+                  onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-accountNumber">Número da Conta</Label>
+                <Input
+                  id="edit-accountNumber"
+                  placeholder="Ex: 12345-6"
+                  value={formData.accountNumber}
+                  onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-balance">Saldo</Label>
+                <Input
+                  id="edit-balance"
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  value={formData.balance}
+                  onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-color">Cor</Label>
+                <Input
+                  id="edit-color"
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Atualizando..." : "Atualizar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -323,6 +444,8 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
 // ========== PAYMENT METHODS TAB ==========
 function PaymentMethodsTab({ entityId }: { entityId: number }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingMethod, setEditingMethod] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
     type: "PIX" as "CREDIT_CARD" | "DEBIT_CARD" | "PIX" | "CASH" | "BANK_TRANSFER" | "OTHER",
@@ -341,6 +464,19 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
     },
     onError: (error) => {
       toast.error("Erro ao criar meio de pagamento: " + error.message);
+    },
+  });
+
+  const updateMutation = trpc.paymentMethods.update.useMutation({
+    onSuccess: () => {
+      utils.paymentMethods.listByEntity.invalidate();
+      setIsEditOpen(false);
+      setEditingMethod(null);
+      resetForm();
+      toast.success("Meio de pagamento atualizado com sucesso!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar meio de pagamento: " + error.message);
     },
   });
 
@@ -370,6 +506,30 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
 
     createMutation.mutate({
       entityId,
+      name: formData.name,
+      type: formData.type,
+      color: formData.color,
+    });
+  };
+
+  const handleEdit = (method: any) => {
+    setEditingMethod(method);
+    setFormData({
+      name: method.name,
+      type: method.type,
+      color: method.color || "#10B981",
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleUpdate = () => {
+    if (!formData.name.trim()) {
+      toast.error("O nome do meio de pagamento é obrigatório");
+      return;
+    }
+
+    updateMutation.mutate({
+      id: editingMethod.id,
       name: formData.name,
       type: formData.type,
       color: formData.color,
@@ -493,6 +653,13 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => handleEdit(method)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => deleteMutation.mutate({ id: method.id })}
                     disabled={deleteMutation.isPending}
                   >
@@ -504,6 +671,62 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
           ))}
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Meio de Pagamento</DialogTitle>
+            <DialogDescription>Atualize as informações do meio de pagamento</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Nome *</Label>
+              <Input
+                id="edit-name"
+                placeholder="Ex: Cartão Itaú"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-type">Tipo</Label>
+                <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
+                  <SelectTrigger id="edit-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                    <SelectItem value="DEBIT_CARD">Cartão de Débito</SelectItem>
+                    <SelectItem value="PIX">PIX</SelectItem>
+                    <SelectItem value="CASH">Dinheiro</SelectItem>
+                    <SelectItem value="BANK_TRANSFER">Transferência Bancária</SelectItem>
+                    <SelectItem value="OTHER">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-color">Cor</Label>
+                <Input
+                  id="edit-color"
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Atualizando..." : "Atualizar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -511,6 +734,8 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
 // ========== CATEGORIES TAB ==========
 function CategoriesTab({ entityId }: { entityId: number }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
     type: "EXPENSE" as "INCOME" | "EXPENSE",
@@ -529,6 +754,19 @@ function CategoriesTab({ entityId }: { entityId: number }) {
     },
     onError: (error) => {
       toast.error("Erro ao criar categoria: " + error.message);
+    },
+  });
+
+  const updateMutation = trpc.categories.update.useMutation({
+    onSuccess: () => {
+      utils.categories.listByEntity.invalidate();
+      setIsEditOpen(false);
+      setEditingCategory(null);
+      resetForm();
+      toast.success("Categoria atualizada com sucesso!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar categoria: " + error.message);
     },
   });
 
@@ -560,6 +798,29 @@ function CategoriesTab({ entityId }: { entityId: number }) {
       entityId,
       name: formData.name,
       type: formData.type,
+      color: formData.color,
+    });
+  };
+
+  const handleEdit = (category: any) => {
+    setEditingCategory(category);
+    setFormData({
+      name: category.name,
+      type: category.type,
+      color: category.color || "#EF4444",
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleUpdate = () => {
+    if (!formData.name.trim()) {
+      toast.error("O nome da categoria é obrigatório");
+      return;
+    }
+
+    updateMutation.mutate({
+      id: editingCategory.id,
+      name: formData.name,
       color: formData.color,
     });
   };
@@ -663,14 +924,23 @@ function CategoriesTab({ entityId }: { entityId: number }) {
                       />
                       <span className="font-medium">{category.name}</span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteMutation.mutate({ id: category.id })}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(category)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteMutation.mutate({ id: category.id })}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -699,14 +969,23 @@ function CategoriesTab({ entityId }: { entityId: number }) {
                       />
                       <span className="font-medium">{category.name}</span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteMutation.mutate({ id: category.id })}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(category)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteMutation.mutate({ id: category.id })}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -714,6 +993,50 @@ function CategoriesTab({ entityId }: { entityId: number }) {
           )}
         </div>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Categoria</DialogTitle>
+            <DialogDescription>Atualize as informações da categoria</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Nome *</Label>
+              <Input
+                id="edit-name"
+                placeholder="Ex: Alimentação"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-color">Cor</Label>
+              <Input
+                id="edit-color"
+                type="color"
+                value={formData.color}
+                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo (não editável)</Label>
+              <div className="p-2 bg-muted rounded text-sm">
+                {formData.type === "INCOME" ? "Receita" : "Despesa"}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Atualizando..." : "Atualizar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

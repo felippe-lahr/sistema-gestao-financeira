@@ -145,3 +145,20 @@
   - [ ] Mostrar valor total e valor parcelado
   - [ ] Incrementar datas automaticamente (mensal)
   - [ ] Adicionar campo de número de parcelas
+
+## 19. Melhorias em Configurações - Associação e Edição
+- [ ] Adicionar seleção de entidades no cadastro
+  - [ ] Permitir selecionar múltiplas entidades ao criar conta corrente
+  - [ ] Permitir selecionar múltiplas entidades ao criar meio de pagamento
+  - [ ] Permitir selecionar múltiplas entidades ao criar categoria
+- [x] Implementar edição completa de configurações
+  - [x] Modal de edição de contas correntes com todos os campos
+  - [x] Botão de edição em contas correntes
+  - [x] Modal de edição de meios de pagamento com todos os campos
+  - [x] Botão de edição em meios de pagamento
+  - [x] Modal de edição de categorias com todos os campos
+  - [x] Botão de edição em categorias
+- [x] Garantir propagação de mudanças (automático via JOINs no banco)
+  - [x] Alterações em categorias refletidas nas transações
+  - [x] Alterações em contas correntes refletidas nas transações
+  - [x] Alterações em meios de pagamento refletidas nas transações
