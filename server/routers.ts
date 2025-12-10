@@ -94,7 +94,7 @@ export const appRouter = router({
       if (!entity || entity.userId !== ctx.user.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
-      return await db.getCategoriesByEntityId(input.entityId);
+      return await db.getCategoriesByEntityId(input.entityId, ctx.user.id);
     }),
 
     create: protectedProcedure
@@ -154,7 +154,7 @@ export const appRouter = router({
       if (!entity || entity.userId !== ctx.user.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
-      return await db.getBankAccountsByEntityId(input.entityId);
+      return await db.getBankAccountsByEntityId(input.entityId, ctx.user.id);
     }),
 
     create: protectedProcedure
@@ -230,7 +230,7 @@ export const appRouter = router({
       if (!entity || entity.userId !== ctx.user.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
-      return await db.getPaymentMethodsByEntityId(input.entityId);
+      return await db.getPaymentMethodsByEntityId(input.entityId, ctx.user.id);
     }),
 
     create: protectedProcedure

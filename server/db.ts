@@ -328,8 +328,8 @@ export async function getDashboardMetrics(entityId: number) {
         eq(transactions.entityId, entityId),
         eq(transactions.type, "INCOME"),
         eq(transactions.status, "PAID"),
-        gte(transactions.paymentDate, startOfMonth),
-        lte(transactions.paymentDate, endOfMonth)
+        gte(transactions.dueDate, startOfMonth),
+        lte(transactions.dueDate, endOfMonth)
       )
     );
 
@@ -346,8 +346,8 @@ export async function getDashboardMetrics(entityId: number) {
         eq(transactions.entityId, entityId),
         eq(transactions.type, "EXPENSE"),
         eq(transactions.status, "PAID"),
-        gte(transactions.paymentDate, startOfMonth),
-        lte(transactions.paymentDate, endOfMonth)
+        gte(transactions.dueDate, startOfMonth),
+        lte(transactions.dueDate, endOfMonth)
       )
     );
 
