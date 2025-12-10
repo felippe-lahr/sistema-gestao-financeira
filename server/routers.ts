@@ -1,13 +1,16 @@
+import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import * as db from "./db";
+import { TRPCError } from "@trpc/server";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -17,12 +20,317 @@ export const appRouter = router({
     }),
   }),
 
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  // ========== ENTITIES ==========
+  entities: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getEntitiesByUserId(ctx.user.id);
+    }),
+
+    getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input, ctx }) => {
+      const entity = await db.getEntityById(input.id);
+      if (!entity) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Entity not found" });
+      }
+      if (entity.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      return entity;
+    }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1).max(255),
+          description: z.string().optional(),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entityId = await db.createEntity({
+          userId: ctx.user.id,
+          name: input.name,
+          description: input.description,
+          color: input.color,
+        });
+        return { id: entityId };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().min(1).max(255).optional(),
+          description: z.string().optional(),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.id);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        await db.updateEntity(input.id, {
+          name: input.name,
+          description: input.description,
+          color: input.color,
+        });
+        return { success: true };
+      }),
+
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+      const entity = await db.getEntityById(input.id);
+      if (!entity || entity.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      await db.deleteEntity(input.id);
+      return { success: true };
+    }),
+  }),
+
+  // ========== CATEGORIES ==========
+  categories: router({
+    listByEntity: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
+      const entity = await db.getEntityById(input.entityId);
+      if (!entity || entity.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      return await db.getCategoriesByEntityId(input.entityId);
+    }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          name: z.string().min(1).max(255),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+          icon: z.string().max(50).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const categoryId = await db.createCategory({
+          entityId: input.entityId,
+          name: input.name,
+          color: input.color,
+          icon: input.icon,
+        });
+        return { id: categoryId };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().min(1).max(255).optional(),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+          icon: z.string().max(50).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await db.updateCategory(input.id, {
+          name: input.name,
+          color: input.color,
+          icon: input.icon,
+        });
+        return { success: true };
+      }),
+
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteCategory(input.id);
+      return { success: true };
+    }),
+  }),
+
+  // ========== TRANSACTIONS ==========
+  transactions: router({
+    listByEntity: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          startDate: z.date().optional(),
+          endDate: z.date().optional(),
+          status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
+          type: z.enum(["INCOME", "EXPENSE"]).optional(),
+          limit: z.number().optional(),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.getTransactionsByEntityId(input.entityId, {
+          startDate: input.startDate,
+          endDate: input.endDate,
+          status: input.status,
+          type: input.type,
+          limit: input.limit,
+        });
+      }),
+
+    getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input, ctx }) => {
+      const transaction = await db.getTransactionById(input.id);
+      if (!transaction) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
+      }
+      const entity = await db.getEntityById(transaction.entityId);
+      if (!entity || entity.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      return transaction;
+    }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          type: z.enum(["INCOME", "EXPENSE"]),
+          description: z.string().min(1),
+          amount: z.number().positive(),
+          dueDate: z.date(),
+          paymentDate: z.date().optional(),
+          status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
+          categoryId: z.number().optional(),
+          isRecurring: z.boolean().optional(),
+          recurrencePattern: z
+            .object({
+              frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
+              interval: z.number().positive(),
+              endDate: z.string().optional(),
+            })
+            .optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        // Convert amount to cents
+        const amountInCents = Math.round(input.amount * 100);
+
+        const transactionId = await db.createTransaction({
+          entityId: input.entityId,
+          type: input.type,
+          description: input.description,
+          amount: amountInCents,
+          dueDate: input.dueDate,
+          paymentDate: input.paymentDate,
+          status: input.status || "PENDING",
+          categoryId: input.categoryId,
+          isRecurring: input.isRecurring || false,
+          recurrencePattern: input.recurrencePattern ? JSON.stringify(input.recurrencePattern) : null,
+          notes: input.notes,
+        });
+
+        return { id: transactionId };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          description: z.string().min(1).optional(),
+          amount: z.number().positive().optional(),
+          dueDate: z.date().optional(),
+          paymentDate: z.date().optional(),
+          status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
+          categoryId: z.number().optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const transaction = await db.getTransactionById(input.id);
+        if (!transaction) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
+        }
+        const entity = await db.getEntityById(transaction.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const updateData: any = {
+          description: input.description,
+          dueDate: input.dueDate,
+          paymentDate: input.paymentDate,
+          status: input.status,
+          categoryId: input.categoryId,
+          notes: input.notes,
+        };
+
+        if (input.amount !== undefined) {
+          updateData.amount = Math.round(input.amount * 100);
+        }
+
+        await db.updateTransaction(input.id, updateData);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+      const transaction = await db.getTransactionById(input.id);
+      if (!transaction) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
+      }
+      const entity = await db.getEntityById(transaction.entityId);
+      if (!entity || entity.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      await db.deleteTransaction(input.id);
+      return { success: true };
+    }),
+  }),
+
+  // ========== DASHBOARD ==========
+  dashboard: router({
+    metrics: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
+      const entity = await db.getEntityById(input.entityId);
+      if (!entity || entity.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+
+      const metrics = await db.getDashboardMetrics(input.entityId);
+      if (!metrics) {
+        return {
+          currentBalance: 0,
+          monthIncome: 0,
+          monthExpenses: 0,
+          pendingExpenses: 0,
+        };
+      }
+
+      // Convert from cents to currency
+      return {
+        currentBalance: metrics.currentBalance / 100,
+        monthIncome: metrics.monthIncome / 100,
+        monthExpenses: metrics.monthExpenses / 100,
+        pendingExpenses: metrics.pendingExpenses / 100,
+      };
+    }),
+
+    recentTransactions: protectedProcedure
+      .input(z.object({ entityId: z.number(), limit: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const transactions = await db.getTransactionsByEntityId(input.entityId, {
+          limit: input.limit || 10,
+        });
+
+        // Convert amounts from cents
+        return transactions.map((t) => ({
+          ...t,
+          amount: t.amount / 100,
+        }));
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

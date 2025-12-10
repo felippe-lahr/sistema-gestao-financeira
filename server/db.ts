@@ -1,11 +1,23 @@
-import { eq } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import {
+  InsertUser,
+  users,
+  entities,
+  InsertEntity,
+  categories,
+  InsertCategory,
+  transactions,
+  InsertTransaction,
+  attachments,
+  InsertAttachment,
+  whatsappMessages,
+  InsertWhatsAppMessage,
+} from "../drizzle/schema";
+import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -17,6 +29,8 @@ export async function getDb() {
   }
   return _db;
 }
+
+// ========== USER OPERATIONS ==========
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
@@ -56,8 +70,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.role = user.role;
       updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
+      values.role = "admin";
+      updateSet.role = "admin";
     }
 
     if (!values.lastSignedIn) {
@@ -89,4 +103,277 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ========== ENTITY OPERATIONS ==========
+
+export async function getEntitiesByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(entities).where(eq(entities.userId, userId)).orderBy(desc(entities.createdAt));
+}
+
+export async function getEntityById(entityId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(entities).where(eq(entities.id, entityId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createEntity(entity: InsertEntity) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(entities).values(entity);
+  return Number(result[0].insertId);
+}
+
+export async function updateEntity(entityId: number, data: Partial<InsertEntity>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(entities).set(data).where(eq(entities.id, entityId));
+}
+
+export async function deleteEntity(entityId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(entities).where(eq(entities.id, entityId));
+}
+
+// ========== CATEGORY OPERATIONS ==========
+
+export async function getCategoriesByEntityId(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(categories).where(eq(categories.entityId, entityId)).orderBy(categories.name);
+}
+
+export async function createCategory(category: InsertCategory) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(categories).values(category);
+  return Number(result[0].insertId);
+}
+
+export async function updateCategory(categoryId: number, data: Partial<InsertCategory>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(categories).set(data).where(eq(categories.id, categoryId));
+}
+
+export async function deleteCategory(categoryId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(categories).where(eq(categories.id, categoryId));
+}
+
+// ========== TRANSACTION OPERATIONS ==========
+
+export async function getTransactionsByEntityId(
+  entityId: number,
+  options?: {
+    startDate?: Date;
+    endDate?: Date;
+    status?: "PENDING" | "PAID" | "OVERDUE";
+    type?: "INCOME" | "EXPENSE";
+    limit?: number;
+  }
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select().from(transactions).where(eq(transactions.entityId, entityId)).$dynamic();
+
+  if (options?.startDate) {
+    query = query.where(gte(transactions.dueDate, options.startDate));
+  }
+  if (options?.endDate) {
+    query = query.where(lte(transactions.dueDate, options.endDate));
+  }
+  if (options?.status) {
+    query = query.where(eq(transactions.status, options.status));
+  }
+  if (options?.type) {
+    query = query.where(eq(transactions.type, options.type));
+  }
+
+  query = query.orderBy(desc(transactions.dueDate));
+
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+
+  return await query;
+}
+
+export async function getTransactionById(transactionId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(transactions).where(eq(transactions.id, transactionId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createTransaction(transaction: InsertTransaction) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(transactions).values(transaction);
+  return Number(result[0].insertId);
+}
+
+export async function updateTransaction(transactionId: number, data: Partial<InsertTransaction>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(transactions).set(data).where(eq(transactions.id, transactionId));
+}
+
+export async function deleteTransaction(transactionId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(transactions).where(eq(transactions.id, transactionId));
+}
+
+export async function updateOverdueTransactions() {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const now = new Date();
+  await db
+    .update(transactions)
+    .set({ status: "OVERDUE" })
+    .where(and(eq(transactions.status, "PENDING"), lte(transactions.dueDate, now)));
+}
+
+// ========== DASHBOARD METRICS ==========
+
+export async function getDashboardMetrics(entityId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  // Get current balance (all paid transactions)
+  const balanceResult = await db
+    .select({
+      total: sql<number>`SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END)`,
+    })
+    .from(transactions)
+    .where(and(eq(transactions.entityId, entityId), eq(transactions.status, "PAID")));
+
+  const currentBalance = balanceResult[0]?.total || 0;
+
+  // Get month income
+  const incomeResult = await db
+    .select({
+      total: sql<number>`SUM(amount)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.entityId, entityId),
+        eq(transactions.type, "INCOME"),
+        eq(transactions.status, "PAID"),
+        gte(transactions.paymentDate, startOfMonth),
+        lte(transactions.paymentDate, endOfMonth)
+      )
+    );
+
+  const monthIncome = incomeResult[0]?.total || 0;
+
+  // Get month expenses
+  const expenseResult = await db
+    .select({
+      total: sql<number>`SUM(amount)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.entityId, entityId),
+        eq(transactions.type, "EXPENSE"),
+        eq(transactions.status, "PAID"),
+        gte(transactions.paymentDate, startOfMonth),
+        lte(transactions.paymentDate, endOfMonth)
+      )
+    );
+
+  const monthExpenses = expenseResult[0]?.total || 0;
+
+  // Get pending expenses
+  const pendingResult = await db
+    .select({
+      total: sql<number>`SUM(amount)`,
+    })
+    .from(transactions)
+    .where(
+      and(eq(transactions.entityId, entityId), eq(transactions.type, "EXPENSE"), eq(transactions.status, "PENDING"))
+    );
+
+  const pendingExpenses = pendingResult[0]?.total || 0;
+
+  return {
+    currentBalance,
+    monthIncome,
+    monthExpenses,
+    pendingExpenses,
+  };
+}
+
+// ========== ATTACHMENT OPERATIONS ==========
+
+export async function getAttachmentsByTransactionId(transactionId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(attachments).where(eq(attachments.transactionId, transactionId));
+}
+
+export async function createAttachment(attachment: InsertAttachment) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(attachments).values(attachment);
+  return Number(result[0].insertId);
+}
+
+export async function deleteAttachment(attachmentId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(attachments).where(eq(attachments.id, attachmentId));
+}
+
+// ========== WHATSAPP MESSAGE OPERATIONS ==========
+
+export async function createWhatsAppMessage(message: InsertWhatsAppMessage) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(whatsappMessages).values(message);
+  return Number(result[0].insertId);
+}
+
+export async function getWhatsAppMessageById(messageId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(whatsappMessages).where(eq(whatsappMessages.messageId, messageId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateWhatsAppMessage(messageId: string, data: Partial<InsertWhatsAppMessage>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(whatsappMessages).set(data).where(eq(whatsappMessages.messageId, messageId));
+}
