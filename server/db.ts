@@ -1,5 +1,6 @@
 import { eq, or, and, isNull, desc, gte, lte, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import {
   InsertUser,
   users,
@@ -25,7 +26,8 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const client = postgres(process.env.DATABASE_URL);
+      _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -86,7 +88,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -129,7 +132,7 @@ export async function createEntity(entity: InsertEntity) {
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(entities).values(entity);
-  return Number(result[0].insertId);
+  return Number(result[0].id);
 }
 
 export async function updateEntity(entityId: number, data: Partial<InsertEntity>) {
@@ -177,7 +180,7 @@ export async function createCategory(category: InsertCategory) {
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(categories).values(category);
-  return Number(result[0].insertId);
+  return Number(result[0].id);
 }
 
 export async function updateCategory(categoryId: number, data: Partial<InsertCategory>) {
@@ -269,7 +272,7 @@ export async function createTransaction(transaction: InsertTransaction) {
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(transactions).values(transaction);
-  return Number(result[0].insertId);
+  return Number(result[0].id);
 }
 
 export async function updateTransaction(transactionId: number, data: Partial<InsertTransaction>) {
@@ -387,7 +390,7 @@ export async function createAttachment(attachment: InsertAttachment) {
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(attachments).values(attachment);
-  return Number(result[0].insertId);
+  return Number(result[0].id);
 }
 
 export async function deleteAttachment(attachmentId: number) {
@@ -404,7 +407,7 @@ export async function createWhatsAppMessage(message: InsertWhatsAppMessage) {
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(whatsappMessages).values(message);
-  return Number(result[0].insertId);
+  return Number(result[0].id);
 }
 
 export async function getWhatsAppMessageById(messageId: string) {
@@ -461,7 +464,7 @@ export async function createBankAccount(account: InsertBankAccount) {
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(bankAccounts).values(account);
-  return Number(result[0].insertId);
+  return Number(result[0].id);
 }
 
 export async function updateBankAccount(accountId: number, data: Partial<InsertBankAccount>) {
@@ -517,7 +520,7 @@ export async function createPaymentMethod(method: InsertPaymentMethod) {
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(paymentMethods).values(method);
-  return Number(result[0].insertId);
+  return Number(result[0].id);
 }
 
 export async function updatePaymentMethod(methodId: number, data: Partial<InsertPaymentMethod>) {
