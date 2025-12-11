@@ -852,8 +852,11 @@ function TransactionForm({
               const attachment = attachments.find(a => a.id === id);
               if (!attachment) return;
               
-              // If it's a saved attachment, delete from database and storage
-              if (editingTransaction?.id && typeof id === 'number' && id > 1000000000000) {
+              // Check if it's a temporary attachment
+              const isTemporary = id > 1000000000000;
+              
+              // If it's a saved attachment (not temporary), delete from database and storage
+              if (!isTemporary && editingTransaction?.id) {
                 await utils.client.attachments.delete.mutate({ id });
                 await deleteFile(attachment.blobUrl);
               } else {
@@ -870,10 +873,15 @@ function TransactionForm({
           }}
           onUpdateType={async (id, type) => {
             try {
-              // If it's a saved attachment, update in database
-              if (editingTransaction?.id && typeof id === 'number' && id > 1000000000000) {
+              // Check if it's a temporary attachment (created with Date.now())
+              const isTemporary = id > 1000000000000;
+              
+              // If it's a saved attachment (not temporary), update in database
+              if (!isTemporary && editingTransaction?.id) {
                 await utils.client.attachments.updateType.mutate({ id, type });
               }
+              
+              // Always update local state
               setAttachments(attachments.map(a => a.id === id ? { ...a, type } : a));
               toast.success("Tipo atualizado");
             } catch (error) {
