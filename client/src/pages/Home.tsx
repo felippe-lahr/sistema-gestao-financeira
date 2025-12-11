@@ -13,7 +13,7 @@ export default function Home() {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-    }).format(value / 100);
+    }).format(value);
   };
 
   if (isLoading) {
@@ -91,7 +91,7 @@ function EntityCard({ entity }: { entity: any }) {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-    }).format(value / 100);
+    }).format(value);
   };
 
   const balance = metrics ? metrics.currentBalance : 0;
