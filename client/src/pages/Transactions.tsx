@@ -725,6 +725,7 @@ function TransactionForm({
           transactionId={editingTransaction?.id}
           attachments={attachments}
           onUpload={async (file, type) => {
+            console.log('[DEBUG] onUpload called with file:', file.name, 'type:', type);
             try {
               // Upload file to Supabase Storage
               const blobUrl = await uploadFile(file);
@@ -760,8 +761,10 @@ function TransactionForm({
                 toast.success("Arquivo adicionado! Será salvo ao criar a transação.");
               }
             } catch (error) {
-              console.error("Erro ao fazer upload:", error);
-              toast.error("Erro ao fazer upload do arquivo");
+              console.error("[DEBUG] Erro completo ao fazer upload:", error);
+              console.error("[DEBUG] Error message:", error instanceof Error ? error.message : String(error));
+              console.error("[DEBUG] Error stack:", error instanceof Error ? error.stack : 'No stack');
+              toast.error("Erro ao fazer upload do arquivo: " + (error instanceof Error ? error.message : String(error)));
             }
           }}
           onDelete={async (id) => {
