@@ -155,35 +155,32 @@ export function AttachmentUploader({
           {attachments.map((attachment) => (
             <div
               key={attachment.id}
-              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 max-w-full overflow-hidden"
+              className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-gray-50"
             >
-              {/* Ícone do arquivo */}
-              <div className="flex-shrink-0">
-                {getFileIcon(attachment.mimeType)}
-              </div>
-
               {/* Informações do arquivo */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {attachment.filename}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {formatFileSize(attachment.fileSize)}
-                </p>
+              <div className="flex-1 min-w-0 space-y-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {attachment.filename}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {formatFileSize(attachment.fileSize)}
+                  </p>
+                </div>
+                
+                {/* Dropdown de tipo */}
+                <select
+                  value={attachment.type}
+                  onChange={(e) => onUpdateType(attachment.id, e.target.value as AttachmentType)}
+                  className="text-sm border rounded px-2 py-1 w-full max-w-xs"
+                >
+                  {Object.entries(ATTACHMENT_TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
               </div>
-
-              {/* Dropdown de tipo */}
-              <select
-                value={attachment.type}
-                onChange={(e) => onUpdateType(attachment.id, e.target.value as AttachmentType)}
-                className="text-sm border rounded px-2 py-1 flex-shrink-0"
-              >
-                {Object.entries(ATTACHMENT_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
 
               {/* Botões de ação */}
               <div className="flex items-center gap-1 flex-shrink-0">
