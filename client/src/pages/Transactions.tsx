@@ -317,7 +317,10 @@ export default function Transactions() {
           <h1 className="text-3xl font-bold">Transações</h1>
           <p className="text-muted-foreground">Gerencie receitas e despesas</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={(open) => {
+          setIsCreateOpen(open);
+          if (!open) resetForm();
+        }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
