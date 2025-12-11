@@ -788,7 +788,7 @@ function TransactionForm({
             <SelectValue placeholder="Selecione um meio" />
           </SelectTrigger>
           <SelectContent>
-            {paymentMethods.map((method) => (
+            {paymentMethods?.filter(m => m.transactionType === formData.type).map((method) => (
               <SelectItem key={method.id} value={method.id.toString()}>
                 {method.name}
               </SelectItem>

@@ -449,6 +449,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
   const [formData, setFormData] = useState({
     name: "",
     type: "PIX" as "CREDIT_CARD" | "DEBIT_CARD" | "PIX" | "CASH" | "BANK_TRANSFER" | "OTHER",
+    transactionType: "EXPENSE" as "INCOME" | "EXPENSE",
     color: "#10B981",
   });
 
@@ -494,6 +495,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
     setFormData({
       name: "",
       type: "PIX",
+      transactionType: "EXPENSE",
       color: "#10B981",
     });
   };
@@ -508,6 +510,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
       entityId,
       name: formData.name,
       type: formData.type,
+      transactionType: formData.transactionType,
       color: formData.color,
     });
   };
@@ -517,6 +520,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
     setFormData({
       name: method.name,
       type: method.type,
+      transactionType: method.transactionType || "EXPENSE",
       color: method.color || "#10B981",
     });
     setIsEditOpen(true);
@@ -532,6 +536,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
       id: editingMethod.id,
       name: formData.name,
       type: formData.type,
+      transactionType: formData.transactionType,
       color: formData.color,
     });
   };
@@ -585,6 +590,18 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="transactionType">Usar para *</Label>
+                <Select value={formData.transactionType} onValueChange={(value: any) => setFormData({ ...formData, transactionType: value })}>
+                  <SelectTrigger id="transactionType">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EXPENSE">Despesas (meios que você paga)</SelectItem>
+                    <SelectItem value="INCOME">Receitas (meios que recebe)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -688,6 +705,18 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-transactionType">Usar para *</Label>
+              <Select value={formData.transactionType} onValueChange={(value: any) => setFormData({ ...formData, transactionType: value })}>
+                <SelectTrigger id="edit-transactionType">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EXPENSE">Despesas (meios que você paga)</SelectItem>
+                  <SelectItem value="INCOME">Receitas (meios que recebe)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -798,6 +827,7 @@ function CategoriesTab({ entityId }: { entityId: number }) {
       entityId,
       name: formData.name,
       type: formData.type,
+      transactionType: formData.transactionType,
       color: formData.color,
     });
   };

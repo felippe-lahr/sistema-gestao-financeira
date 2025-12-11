@@ -15,6 +15,13 @@
       "when": 1765409012919,
       "tag": "0001_burly_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765461362189,
+      "tag": "0002_round_nuke",
+      "breakpoints": true
     }
   ]
 }

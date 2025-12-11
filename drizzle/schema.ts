@@ -152,6 +152,7 @@ export const paymentMethods = pgTable("payment_methods", {
   entityId: integer("entityId"), // Optional: if set, payment method is exclusive to this entity
   name: varchar("name", { length: 255 }).notNull(),
   type: paymentMethodTypeEnum("type").notNull(),
+  transactionType: transactionTypeEnum("transactionType").notNull(), // INCOME or EXPENSE
   color: varchar("color", { length: 7 }).default("#6B7280"),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

@@ -239,6 +239,7 @@ export const appRouter = router({
           entityId: z.number(),
           name: z.string().min(1).max(255),
           type: z.enum(["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "OTHER"]),
+          transactionType: z.enum(["INCOME", "EXPENSE"]),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
         })
       )
@@ -253,6 +254,7 @@ export const appRouter = router({
           entityId: input.entityId,
           name: input.name,
           type: input.type,
+          transactionType: input.transactionType,
           color: input.color,
         });
         return { id: methodId };
@@ -264,6 +266,7 @@ export const appRouter = router({
           id: z.number(),
           name: z.string().min(1).max(255).optional(),
           type: z.enum(["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "OTHER"]).optional(),
+          transactionType: z.enum(["INCOME", "EXPENSE"]).optional(),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
           isActive: z.boolean().optional(),
         })
@@ -272,6 +275,7 @@ export const appRouter = router({
         await db.updatePaymentMethod(input.id, {
           name: input.name,
           type: input.type,
+          transactionType: input.transactionType,
           color: input.color,
           isActive: input.isActive,
         });
