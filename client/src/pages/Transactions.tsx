@@ -18,6 +18,7 @@ import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AttachmentUploader } from "@/components/AttachmentUploader";
+import { uploadFile, deleteFile } from "@/lib/supabase";
 
 export default function Transactions() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -717,20 +718,81 @@ function TransactionForm({
       <div className="space-y-2">
         <Label>Documentos</Label>
         <AttachmentUploader
-          transactionId={undefined}
+          transactionId={editingTransaction?.id}
           attachments={attachments}
           onUpload={async (file, type) => {
-            // Implementação temporária - será conectada à API depois
-            console.log("Upload:", file, type);
-            toast.info("Upload será implementado após salvar a transação");
+            try {
+              // Upload file to Supabase Storage
+              const blobUrl = await uploadFile(file);
+              
+              // If editing a transaction, save to database
+              if (editingTransaction?.id) {
+                await utils.client.attachments.create.mutate({
+                  transactionId: editingTransaction.id,
+                  filename: file.name,
+                  blobUrl,
+                  fileSize: file.size,
+                  mimeType: file.type,
+                  type,
+                });
+                // Refresh attachments list
+                const updatedAttachments = await utils.client.attachments.listByTransaction.query({
+                  transactionId: editingTransaction.id,
+                });
+                setAttachments(updatedAttachments);
+                toast.success("Arquivo enviado com sucesso!");
+              } else {
+                // If creating a new transaction, store temporarily
+                const newAttachment = {
+                  id: Date.now(), // temporary ID
+                  filename: file.name,
+                  blobUrl,
+                  fileSize: file.size,
+                  mimeType: file.type,
+                  type,
+                  createdAt: new Date().toISOString(),
+                };
+                setAttachments([...attachments, newAttachment]);
+                toast.success("Arquivo adicionado! Será salvo ao criar a transação.");
+              }
+            } catch (error) {
+              console.error("Erro ao fazer upload:", error);
+              toast.error("Erro ao fazer upload do arquivo");
+            }
           }}
           onDelete={async (id) => {
-            setAttachments(attachments.filter(a => a.id !== id));
-            toast.success("Anexo removido");
+            try {
+              const attachment = attachments.find(a => a.id === id);
+              if (!attachment) return;
+              
+              // If it's a saved attachment, delete from database and storage
+              if (editingTransaction?.id && typeof id === 'number' && id > 1000000000000) {
+                await utils.client.attachments.delete.mutate({ id });
+                await deleteFile(attachment.blobUrl);
+              } else {
+                // If it's a temporary attachment, just delete from storage
+                await deleteFile(attachment.blobUrl);
+              }
+              
+              setAttachments(attachments.filter(a => a.id !== id));
+              toast.success("Anexo removido");
+            } catch (error) {
+              console.error("Erro ao deletar anexo:", error);
+              toast.error("Erro ao deletar anexo");
+            }
           }}
           onUpdateType={async (id, type) => {
-            setAttachments(attachments.map(a => a.id === id ? { ...a, type } : a));
-            toast.success("Tipo atualizado");
+            try {
+              // If it's a saved attachment, update in database
+              if (editingTransaction?.id && typeof id === 'number' && id > 1000000000000) {
+                await utils.client.attachments.updateType.mutate({ id, type });
+              }
+              setAttachments(attachments.map(a => a.id === id ? { ...a, type } : a));
+              toast.success("Tipo atualizado");
+            } catch (error) {
+              console.error("Erro ao atualizar tipo:", error);
+              toast.error("Erro ao atualizar tipo");
+            }
           }}
           onPreview={(attachment) => {
             setPreviewAttachment(attachment);

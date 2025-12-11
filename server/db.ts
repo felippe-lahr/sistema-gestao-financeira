@@ -400,6 +400,21 @@ export async function deleteAttachment(attachmentId: number) {
   await db.delete(attachments).where(eq(attachments.id, attachmentId));
 }
 
+export async function updateAttachmentType(attachmentId: number, type: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(attachments).set({ type }).where(eq(attachments.id, attachmentId));
+}
+
+export async function getAttachmentById(attachmentId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.select().from(attachments).where(eq(attachments.id, attachmentId));
+  return result[0] || null;
+}
+
 // ========== WHATSAPP MESSAGE OPERATIONS ==========
 
 export async function createWhatsAppMessage(message: InsertWhatsAppMessage) {

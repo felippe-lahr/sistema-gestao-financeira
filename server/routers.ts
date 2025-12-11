@@ -524,6 +524,94 @@ export const appRouter = router({
         }));
       }),
   }),
+
+  // ========== ATTACHMENTS ==========
+  attachments: router({
+    listByTransaction: protectedProcedure
+      .input(z.object({ transactionId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        // Verify transaction belongs to user
+        const transaction = await db.getTransactionById(input.transactionId);
+        if (!transaction) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
+        }
+        const entity = await db.getEntityById(transaction.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.getAttachmentsByTransactionId(input.transactionId);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          transactionId: z.number(),
+          filename: z.string(),
+          blobUrl: z.string(),
+          fileSize: z.number(),
+          mimeType: z.string(),
+          type: z.enum(["NOTA_FISCAL", "DOCUMENTOS", "BOLETO", "COMPROVANTE_PAGAMENTO"]),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        // Verify transaction belongs to user
+        const transaction = await db.getTransactionById(input.transactionId);
+        if (!transaction) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
+        }
+        const entity = await db.getEntityById(transaction.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const attachmentId = await db.createAttachment(input);
+        return { id: attachmentId };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        // Verify attachment belongs to user
+        const attachment = await db.getAttachmentById(input.id);
+        if (!attachment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Attachment not found" });
+        }
+        const transaction = await db.getTransactionById(attachment.transactionId);
+        if (!transaction) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
+        }
+        const entity = await db.getEntityById(transaction.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        await db.deleteAttachment(input.id);
+        return { success: true };
+      }),
+
+    updateType: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          type: z.enum(["NOTA_FISCAL", "DOCUMENTOS", "BOLETO", "COMPROVANTE_PAGAMENTO"]),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        // Verify attachment belongs to user
+        const attachment = await db.getAttachmentById(input.id);
+        if (!attachment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Attachment not found" });
+        }
+        const transaction = await db.getTransactionById(attachment.transactionId);
+        if (!transaction) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
+        }
+        const entity = await db.getEntityById(transaction.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        await db.updateAttachmentType(input.id, input.type);
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
