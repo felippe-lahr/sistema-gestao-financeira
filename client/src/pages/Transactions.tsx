@@ -305,7 +305,7 @@ export default function Transactions() {
               Nova Transação
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+          <DialogContent className="max-w-2xl h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nova Transação</DialogTitle>
               <DialogDescription>Cadastre uma nova receita ou despesa</DialogDescription>
@@ -337,7 +337,7 @@ export default function Transactions() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent className="max-w-2xl h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Transação</DialogTitle>
             <DialogDescription>Atualize os dados da transação</DialogDescription>
