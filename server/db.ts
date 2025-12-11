@@ -231,6 +231,7 @@ export async function getTransactionsByEntityId(
       updatedAt: transactions.updatedAt,
       categoryName: categories.name,
       categoryColor: categories.color,
+      attachmentCount: sql<number>`(SELECT COUNT(*) FROM ${attachments} WHERE ${attachments.transactionId} = ${transactions.id})`,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
