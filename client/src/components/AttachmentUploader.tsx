@@ -155,7 +155,7 @@ export function AttachmentUploader({
           {attachments.map((attachment) => (
             <div
               key={attachment.id}
-              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50"
+              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 max-w-full overflow-hidden"
             >
               {/* Ícone do arquivo */}
               <div className="flex-shrink-0">
@@ -176,7 +176,7 @@ export function AttachmentUploader({
               <select
                 value={attachment.type}
                 onChange={(e) => onUpdateType(attachment.id, e.target.value as AttachmentType)}
-                className="text-sm border rounded px-2 py-1"
+                className="text-sm border rounded px-2 py-1 flex-shrink-0"
               >
                 {Object.entries(ATTACHMENT_TYPE_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -186,7 +186,7 @@ export function AttachmentUploader({
               </select>
 
               {/* Botões de ação */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={() => onPreview(attachment)}
                   className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"

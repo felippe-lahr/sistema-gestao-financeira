@@ -91,7 +91,26 @@ export default function Transactions() {
   );
 
   const createMutation = trpc.transactions.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async (data) => {
+      // Salvar anexos se houver
+      if (attachments.length > 0 && data.id) {
+        try {
+          for (const attachment of attachments) {
+            await utils.client.attachments.create.mutate({
+              transactionId: data.id,
+              filename: attachment.filename,
+              blobUrl: attachment.blobUrl,
+              fileSize: attachment.fileSize,
+              mimeType: attachment.mimeType,
+              type: attachment.type,
+            });
+          }
+        } catch (error) {
+          console.error("Erro ao salvar anexos:", error);
+          toast.error("Transação criada mas houve erro ao salvar anexos");
+        }
+      }
+      
       utils.transactions.listByEntity.invalidate();
       utils.dashboard.metrics.invalidate();
       setIsCreateOpen(false);
