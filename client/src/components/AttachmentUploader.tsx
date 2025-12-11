@@ -64,11 +64,6 @@ export function AttachmentUploader({
   };
 
   const handleFiles = async (files: File[]) => {
-    if (!transactionId) {
-      alert("Salve a transação antes de adicionar anexos");
-      return;
-    }
-
     setUploading(true);
 
     for (const file of files) {
