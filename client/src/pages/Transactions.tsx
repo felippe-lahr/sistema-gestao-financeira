@@ -342,6 +342,7 @@ export default function Transactions() {
               setAttachments={setAttachments}
               editingTransaction={undefined}
               utils={utils}
+              setPreviewAttachment={setPreviewAttachment}
             />
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -376,6 +377,7 @@ export default function Transactions() {
             editingTransaction={editingTransaction}
             isEdit
             utils={utils}
+            setPreviewAttachment={setPreviewAttachment}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
@@ -649,6 +651,7 @@ function TransactionForm({
   isEdit = false,
   editingTransaction,
   utils,
+  setPreviewAttachment,
 }: {
   formData: any;
   setFormData: (data: any) => void;
@@ -663,6 +666,7 @@ function TransactionForm({
   isEdit?: boolean;
   editingTransaction?: any;
   utils: any;
+  setPreviewAttachment: (attachment: any) => void;
 }) {
   const incomeCategories = categories.filter((c) => c.type === "INCOME");
   const expenseCategories = categories.filter((c) => c.type === "EXPENSE");
