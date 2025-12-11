@@ -1,5 +1,5 @@
 {
-  "id": "8ef9b476-e008-4562-a0f8-ba45cfd69839",
+  "id": "a5b29f56-5caf-426d-aae1-3f7de082fe98",
   "prevId": "3bbdb19e-8bb3-4116-9b1f-6d74017863c8",
   "version": "7",
   "dialect": "postgresql",
@@ -321,7 +321,8 @@
           "type": "transaction_type",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'EXPENSE'"
         },
         "color": {
           "name": "color",

@@ -22,6 +22,13 @@
       "when": 1765461362189,
       "tag": "0002_round_nuke",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1765462929981,
+      "tag": "0003_wise_wallop",
+      "breakpoints": true
     }
   ]
 }

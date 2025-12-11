@@ -1,0 +1,1 @@
+ALTER TABLE "payment_methods" ADD COLUMN "transactionType" "transaction_type" DEFAULT 'EXPENSE' NOT NULL;
