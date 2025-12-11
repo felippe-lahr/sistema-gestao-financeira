@@ -305,7 +305,7 @@ export default function Transactions() {
               Nova Transação
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nova Transação</DialogTitle>
               <DialogDescription>Cadastre uma nova receita ou despesa</DialogDescription>
@@ -322,6 +322,7 @@ export default function Transactions() {
               attachments={attachments}
               setAttachments={setAttachments}
               editingTransaction={undefined}
+              utils={utils}
             />
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -337,7 +338,7 @@ export default function Transactions() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Transação</DialogTitle>
             <DialogDescription>Atualize os dados da transação</DialogDescription>
@@ -355,6 +356,7 @@ export default function Transactions() {
             setAttachments={setAttachments}
             editingTransaction={editingTransaction}
             isEdit
+            utils={utils}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
@@ -627,6 +629,7 @@ function TransactionForm({
   setAttachments,
   isEdit = false,
   editingTransaction,
+  utils,
 }: {
   formData: any;
   setFormData: (data: any) => void;
@@ -640,6 +643,7 @@ function TransactionForm({
   setAttachments: (attachments: any[]) => void;
   isEdit?: boolean;
   editingTransaction?: any;
+  utils: any;
 }) {
   const incomeCategories = categories.filter((c) => c.type === "INCOME");
   const expenseCategories = categories.filter((c) => c.type === "EXPENSE");
