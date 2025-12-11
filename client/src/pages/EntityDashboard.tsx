@@ -21,6 +21,32 @@ export default function EntityDashboard() {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
 
+  // Calcular datas baseado no filtro
+  const getFilterDates = () => {
+    const now = new Date();
+    switch (filterPeriod) {
+      case "month":
+        return { startDate: startOfMonth(now), endDate: endOfMonth(now) };
+      case "quarter":
+        return { startDate: subMonths(now, 3), endDate: now };
+      case "year":
+        return { startDate: startOfYear(now), endDate: endOfYear(now) };
+      case "custom":
+        if (customStartDate && customEndDate) {
+          return { 
+            startDate: new Date(customStartDate + "T00:00:00"), 
+            endDate: new Date(customEndDate + "T23:59:59") 
+          };
+        }
+        return { startDate: undefined, endDate: undefined };
+      case "all":
+      default:
+        return { startDate: undefined, endDate: undefined };
+    }
+  };
+
+  const { startDate, endDate } = getFilterDates();
+
   const { data: entities } = trpc.entities.list.useQuery();
   const { data: metrics, isLoading: metricsLoading } = trpc.dashboard.metrics.useQuery(
     { entityId: entityId! },
@@ -33,12 +59,12 @@ export default function EntityDashboard() {
   );
   
   const { data: categoryData, isLoading: categoryLoading } = trpc.dashboard.categoryDistribution.useQuery(
-    { entityId: entityId! },
+    { entityId: entityId!, startDate, endDate },
     { enabled: !!entityId }
   );
   
   const { data: recentTransactions, isLoading: transactionsLoading } = trpc.dashboard.recentTransactions.useQuery(
-    { entityId: entityId!, limit: 10 },
+    { entityId: entityId!, limit: 10, startDate, endDate },
     { enabled: !!entityId }
   );
 

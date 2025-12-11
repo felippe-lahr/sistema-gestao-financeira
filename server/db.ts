@@ -582,13 +582,26 @@ export async function getCashFlowData(entityId: number, months: number) {
   }));
 }
 
-export async function getCategoryDistribution(entityId: number) {
+export async function getCategoryDistribution(entityId: number, startDate?: Date, endDate?: Date) {
   const db = await getDb();
   if (!db) return [];
 
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const defaultStartDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+  const defaultEndDate = endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const conditions = [
+    eq(transactions.entityId, entityId),
+    eq(transactions.type, "EXPENSE"),
+    eq(transactions.status, "PAID"),
+  ];
+
+  if (startDate || !startDate) {
+    conditions.push(gte(transactions.dueDate, defaultStartDate));
+  }
+  if (endDate || !endDate) {
+    conditions.push(lte(transactions.dueDate, defaultEndDate));
+  }
 
   const result = await db
     .select({
@@ -598,15 +611,7 @@ export async function getCategoryDistribution(entityId: number) {
     })
     .from(transactions)
     .innerJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(
-      and(
-        eq(transactions.entityId, entityId),
-        eq(transactions.type, "EXPENSE"),
-        eq(transactions.status, "PAID"),
-        gte(transactions.dueDate, startOfMonth),
-        lte(transactions.dueDate, endOfMonth)
-      )
-    )
+    .where(and(...conditions))
     .groupBy(categories.name, categories.color)
     .orderBy(sql`SUM(${transactions.amount}) DESC`);
 

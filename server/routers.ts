@@ -529,14 +529,18 @@ export const appRouter = router({
       }),
 
     categoryDistribution: protectedProcedure
-      .input(z.object({ entityId: z.number() }))
+      .input(z.object({ 
+        entityId: z.number(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+      }))
       .query(async ({ input, ctx }) => {
         const entity = await db.getEntityById(input.entityId);
         if (!entity || entity.userId !== ctx.user.id) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
 
-        const distribution = await db.getCategoryDistribution(input.entityId);
+        const distribution = await db.getCategoryDistribution(input.entityId, input.startDate, input.endDate);
         
         // Convert amounts from cents
         return distribution.map((item) => ({
@@ -546,7 +550,12 @@ export const appRouter = router({
       }),
 
     recentTransactions: protectedProcedure
-      .input(z.object({ entityId: z.number(), limit: z.number().optional() }))
+      .input(z.object({ 
+        entityId: z.number(), 
+        limit: z.number().optional(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+      }))
       .query(async ({ input, ctx }) => {
         const entity = await db.getEntityById(input.entityId);
         if (!entity || entity.userId !== ctx.user.id) {
@@ -555,6 +564,8 @@ export const appRouter = router({
 
         const transactions = await db.getTransactionsByEntityId(input.entityId, {
           limit: input.limit || 10,
+          startDate: input.startDate,
+          endDate: input.endDate,
         });
 
         // Convert amounts from cents
