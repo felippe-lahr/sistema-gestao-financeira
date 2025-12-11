@@ -177,6 +177,7 @@ export default function Transactions() {
       isRecurring: false,
       recurrenceCount: "1",
       recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
+      attachments: [],
     });
     setAttachments([]);
     setEditingTransaction(null);
@@ -219,6 +220,7 @@ export default function Transactions() {
       isRecurring: transaction.isRecurring || false,
       recurrenceCount: "1",
       recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
+      attachments: [],
     });
     
     // Carregar anexos da transação

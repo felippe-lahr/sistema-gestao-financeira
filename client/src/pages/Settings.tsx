@@ -827,7 +827,6 @@ function CategoriesTab({ entityId }: { entityId: number }) {
       entityId,
       name: formData.name,
       type: formData.type,
-      transactionType: formData.transactionType,
       color: formData.color,
     });
   };
