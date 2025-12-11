@@ -509,6 +509,42 @@ export const appRouter = router({
       };
     }),
 
+    cashFlow: protectedProcedure
+      .input(z.object({ entityId: z.number(), months: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const months = input.months || 6;
+        const cashFlowData = await db.getCashFlowData(input.entityId, months);
+        
+        // Convert amounts from cents
+        return cashFlowData.map((item) => ({
+          ...item,
+          income: item.income / 100,
+          expense: item.expense / 100,
+        }));
+      }),
+
+    categoryDistribution: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const distribution = await db.getCategoryDistribution(input.entityId);
+        
+        // Convert amounts from cents
+        return distribution.map((item) => ({
+          ...item,
+          value: item.value / 100,
+        }));
+      }),
+
     recentTransactions: protectedProcedure
       .input(z.object({ entityId: z.number(), limit: z.number().optional() }))
       .query(async ({ input, ctx }) => {

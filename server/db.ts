@@ -551,3 +551,67 @@ export async function deletePaymentMethod(methodId: number) {
 
   await db.delete(paymentMethods).where(eq(paymentMethods.id, methodId));
 }
+
+// ========== DASHBOARD CHARTS ==========
+
+export async function getCashFlowData(entityId: number, months: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db
+    .select({
+      month: sql<string>`TO_CHAR(due_date, 'YYYY-MM')`,
+      income: sql<number>`COALESCE(SUM(CASE WHEN type = 'INCOME' AND status = 'PAID' THEN amount ELSE 0 END), 0)`,
+      expense: sql<number>`COALESCE(SUM(CASE WHEN type = 'EXPENSE' AND status = 'PAID' THEN amount ELSE 0 END), 0)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.entityId, entityId),
+        gte(transactions.dueDate, sql`NOW() - INTERVAL '${sql.raw(months.toString())} months'`)
+      )
+    )
+    .groupBy(sql`TO_CHAR(due_date, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(due_date, 'YYYY-MM')`);
+
+  return result.map((row) => ({
+    month: row.month,
+    income: Number(row.income),
+    expense: Number(row.expense),
+  }));
+}
+
+export async function getCategoryDistribution(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const result = await db
+    .select({
+      name: categories.name,
+      value: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`,
+      color: categories.color,
+    })
+    .from(transactions)
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(
+      and(
+        eq(transactions.entityId, entityId),
+        eq(transactions.type, "EXPENSE"),
+        eq(transactions.status, "PAID"),
+        gte(transactions.dueDate, startOfMonth),
+        lte(transactions.dueDate, endOfMonth)
+      )
+    )
+    .groupBy(categories.name, categories.color)
+    .orderBy(sql`SUM(${transactions.amount}) DESC`);
+
+  return result.map((row) => ({
+    name: row.name,
+    value: Number(row.value),
+    color: row.color || "#6B7280",
+  }));
+}

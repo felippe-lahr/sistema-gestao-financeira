@@ -4,24 +4,37 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Clock } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Clock, Calendar, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns";
+import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Pie, PieChart, Cell, Legend } from "recharts";
 
 export default function EntityDashboard() {
   const [, params] = useRoute("/dashboard/:id");
   const [, setLocation] = useLocation();
   const entityId = params?.id ? parseInt(params.id) : null;
+  
+  // Filtros
+  const [filterPeriod, setFilterPeriod] = useState<"month" | "quarter" | "year" | "all">("month");
+  const [filterCategoryId, setFilterCategoryId] = useState<string>("");
 
   const { data: entities } = trpc.entities.list.useQuery();
   const { data: metrics, isLoading: metricsLoading } = trpc.dashboard.metrics.useQuery(
     { entityId: entityId! },
     { enabled: !!entityId }
   );
-  // TODO: Implement chartData and categoryDistribution endpoints
-  const chartData: any[] = [];
-  const chartLoading = false;
-  const categoryData: any[] = [];
-  const categoryLoading = false;
+  
+  const { data: cashFlowData, isLoading: cashFlowLoading } = trpc.dashboard.cashFlow.useQuery(
+    { entityId: entityId!, months: 6 },
+    { enabled: !!entityId }
+  );
+  
+  const { data: categoryData, isLoading: categoryLoading } = trpc.dashboard.categoryDistribution.useQuery(
+    { entityId: entityId! },
+    { enabled: !!entityId }
+  );
+  
   const { data: recentTransactions, isLoading: transactionsLoading } = trpc.dashboard.recentTransactions.useQuery(
     { entityId: entityId!, limit: 10 },
     { enabled: !!entityId }
@@ -81,6 +94,29 @@ export default function EntityDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Filtros */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Período:</span>
+            </div>
+            <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Mês Atual</SelectItem>
+                <SelectItem value="quarter">Últimos 3 Meses</SelectItem>
+                <SelectItem value="year">Ano Atual</SelectItem>
+                <SelectItem value="all">Todos os Períodos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Metrics Cards */}
       {metricsLoading ? (
@@ -146,11 +182,11 @@ export default function EntityDashboard() {
             <CardDescription>Receitas e despesas dos últimos 6 meses</CardDescription>
           </CardHeader>
           <CardContent>
-            {chartLoading ? (
+            {cashFlowLoading ? (
               <Skeleton className="h-[300px] w-full" />
-            ) : chartData && chartData.length > 0 ? (
+            ) : cashFlowData && cashFlowData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={chartData}>
+                <AreaChart data={cashFlowData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -168,7 +204,7 @@ export default function EntityDashboard() {
                   />
                   <Area
                     type="monotone"
-                    dataKey="expenses"
+                    dataKey="expense"
                     stackId="2"
                     stroke="#EF4444"
                     fill="#EF4444"
@@ -207,7 +243,7 @@ export default function EntityDashboard() {
                     dataKey="value"
                   >
                     {categoryData.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
