@@ -307,6 +307,7 @@ export default function Transactions() {
               setSelectedEntityId={setSelectedEntityId}
               attachments={attachments}
               setAttachments={setAttachments}
+              editingTransaction={undefined}
             />
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -338,6 +339,7 @@ export default function Transactions() {
             setSelectedEntityId={setSelectedEntityId}
             attachments={attachments}
             setAttachments={setAttachments}
+            editingTransaction={editingTransaction}
             isEdit
           />
           <DialogFooter>
@@ -583,6 +585,7 @@ function TransactionForm({
   attachments: any[];
   setAttachments: (attachments: any[]) => void;
   isEdit?: boolean;
+  editingTransaction?: any;
 }) {
   const incomeCategories = categories.filter((c) => c.type === "INCOME");
   const expenseCategories = categories.filter((c) => c.type === "EXPENSE");
