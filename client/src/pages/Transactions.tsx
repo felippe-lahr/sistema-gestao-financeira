@@ -573,6 +573,7 @@ function TransactionForm({
   attachments,
   setAttachments,
   isEdit = false,
+  editingTransaction,
 }: {
   formData: any;
   setFormData: (data: any) => void;
