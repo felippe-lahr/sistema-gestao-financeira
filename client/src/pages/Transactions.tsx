@@ -159,6 +159,8 @@ export default function Transactions() {
       recurrenceCount: "1",
       recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
     });
+    setAttachments([]);
+    setEditingTransaction(null);
   };
 
   const handleCreate = () => {
@@ -182,7 +184,7 @@ export default function Transactions() {
     });
   };
 
-  const handleEdit = (transaction: any) => {
+  const handleEdit = async (transaction: any) => {
     setEditingTransaction(transaction);
     setFormData({
       type: transaction.type,
@@ -199,6 +201,18 @@ export default function Transactions() {
       recurrenceCount: "1",
       recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
     });
+    
+    // Carregar anexos da transação
+    try {
+      const transactionAttachments = await utils.client.attachments.listByTransaction.query({
+        transactionId: transaction.id,
+      });
+      setAttachments(transactionAttachments || []);
+    } catch (error) {
+      console.error("Erro ao carregar anexos:", error);
+      setAttachments([]);
+    }
+    
     setIsEditOpen(true);
   };
 
@@ -291,7 +305,7 @@ export default function Transactions() {
               Nova Transação
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
             <DialogHeader>
               <DialogTitle>Nova Transação</DialogTitle>
               <DialogDescription>Cadastre uma nova receita ou despesa</DialogDescription>
@@ -323,7 +337,7 @@ export default function Transactions() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>Editar Transação</DialogTitle>
             <DialogDescription>Atualize os dados da transação</DialogDescription>
@@ -556,6 +570,45 @@ export default function Transactions() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewAttachment} onOpenChange={() => setPreviewAttachment(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>{previewAttachment?.filename}</DialogTitle>
+            <DialogDescription>
+              {previewAttachment?.mimeType} • {previewAttachment?.fileSize ? `${(previewAttachment.fileSize / 1024).toFixed(1)} KB` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
+            {previewAttachment?.mimeType === 'application/pdf' ? (
+              <iframe
+                src={previewAttachment.blobUrl}
+                className="w-full h-[600px] border-0"
+                title="Preview PDF"
+              />
+            ) : previewAttachment?.mimeType?.startsWith('image/') ? (
+              <img
+                src={previewAttachment.blobUrl}
+                alt={previewAttachment.filename}
+                className="max-w-full max-h-[600px] object-contain"
+              />
+            ) : (
+              <p className="text-gray-500">Preview não disponível para este tipo de arquivo</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewAttachment(null)}>
+              Fechar
+            </Button>
+            <Button asChild>
+              <a href={previewAttachment?.blobUrl} download={previewAttachment?.filename}>
+                Baixar
+              </a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
