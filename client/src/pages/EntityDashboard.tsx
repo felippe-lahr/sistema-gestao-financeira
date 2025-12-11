@@ -16,8 +16,10 @@ export default function EntityDashboard() {
   const entityId = params?.id ? parseInt(params.id) : null;
   
   // Filtros
-  const [filterPeriod, setFilterPeriod] = useState<"month" | "quarter" | "year" | "all">("month");
+  const [filterPeriod, setFilterPeriod] = useState<"month" | "quarter" | "year" | "custom" | "all">("month");
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
 
   const { data: entities } = trpc.entities.list.useQuery();
   const { data: metrics, isLoading: metricsLoading } = trpc.dashboard.metrics.useQuery(
@@ -111,9 +113,33 @@ export default function EntityDashboard() {
                 <SelectItem value="month">Mês Atual</SelectItem>
                 <SelectItem value="quarter">Últimos 3 Meses</SelectItem>
                 <SelectItem value="year">Ano Atual</SelectItem>
+                <SelectItem value="custom">Período Personalizado</SelectItem>
                 <SelectItem value="all">Todos os Períodos</SelectItem>
               </SelectContent>
             </Select>
+            
+            {filterPeriod === "custom" && (
+              <>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm">De:</label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="px-3 py-2 border rounded-md text-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm">Até:</label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="px-3 py-2 border rounded-md text-sm"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
