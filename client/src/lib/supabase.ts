@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Credenciais públicas do Supabase (seguro expor a chave anon)
-const supabaseUrl = 'https://jyibtqwk-jthsdnahtdvd.supabase.co';
+const supabaseUrl = 'https://jyibtqwkjthsdnahtdvd.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5aWJ0cXdranRoc2RuYWh0ZHZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM4NjE1NjEsImV4cCI6MjA0OTQzNzU2MX0.VYqPYhKGzLRQcEQXoqAWX8vKqJqE7vH0YqJZNqE4Qzs';
 
 console.log('[Supabase] Initializing with URL:', supabaseUrl);
