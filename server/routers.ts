@@ -612,8 +612,8 @@ export const appRouter = router({
       .input(
         z.object({
           entityId: z.number(),
-          startDate: z.date().optional(),
-          endDate: z.date().optional(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
           period: z.string(),
         })
       )
@@ -624,8 +624,8 @@ export const appRouter = router({
         }
 
         const transactions = await db.getTransactionsByEntityId(input.entityId, {
-          startDate: input.startDate,
-          endDate: input.endDate,
+          startDate: input.startDate ? new Date(input.startDate) : undefined,
+          endDate: input.endDate ? new Date(input.endDate) : undefined,
         });
 
         const summary = {
@@ -654,8 +654,8 @@ export const appRouter = router({
       .input(
         z.object({
           entityId: z.number(),
-          startDate: z.date().optional(),
-          endDate: z.date().optional(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
           period: z.string(),
         })
       )
@@ -670,8 +670,8 @@ export const appRouter = router({
           console.log("[PDF Export] Entidade encontrada:", entity.name);
 
           const transactions = await db.getTransactionsByEntityId(input.entityId, {
-            startDate: input.startDate,
-            endDate: input.endDate,
+            startDate: input.startDate ? new Date(input.startDate) : undefined,
+            endDate: input.endDate ? new Date(input.endDate) : undefined,
           });
           console.log("[PDF Export] Transações encontradas:", transactions.length);
 
@@ -687,8 +687,8 @@ export const appRouter = router({
 
           // Buscar dados para gráficos
           const categoryExpenses = await db.getCategoryExpensesByStatus(input.entityId, {
-            startDate: input.startDate,
-            endDate: input.endDate,
+            startDate: input.startDate ? new Date(input.startDate) : undefined,
+            endDate: input.endDate ? new Date(input.endDate) : undefined,
           });
           console.log("[PDF Export] Despesas por categoria:", categoryExpenses.length);
 

@@ -132,8 +132,8 @@ export default function EntityDashboard() {
       
       const result = await exportExcelMutation.mutateAsync({
         entityId,
-        startDate,
-        endDate,
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
         period: periodLabels[filterPeriod],
       });
       
@@ -173,8 +173,8 @@ export default function EntityDashboard() {
       
       const result = await exportPDFMutation.mutateAsync({
         entityId,
-        startDate,
-        endDate,
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
         period: periodLabels[filterPeriod],
       });
       
