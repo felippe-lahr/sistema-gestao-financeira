@@ -149,6 +149,7 @@ export function generateTransactionsPDF(data: {
   cashFlowData?: any[];
   categoryData?: any[];
   categoryExpenses?: any[];
+  upcomingTransactions?: any[];
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: "A4" });
@@ -226,6 +227,66 @@ export function generateTransactionsPDF(data: {
 
     doc.y = summaryY + 80;
     doc.moveDown(2);
+
+    // Seção de Transações a Vencer
+    if (data.upcomingTransactions && data.upcomingTransactions.length > 0) {
+      doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Transações a Vencer");
+      doc.fontSize(10).font("Helvetica").fillColor("#6B7280").text("Próximos 7 dias");
+      doc.moveDown(0.5);
+
+      const upcomingTableTop = doc.y;
+      const upcomingColWidths = [200, 100, 80, 100];
+      const upcomingHeaders = ["Descrição", "Categoria", "Vencimento", "Valor"];
+
+      let upcomingXPos = 50;
+      upcomingHeaders.forEach((header, i) => {
+        doc
+          .fontSize(9)
+          .font("Helvetica-Bold")
+          .fillColor("#FFFFFF")
+          .rect(upcomingXPos, upcomingTableTop, upcomingColWidths[i], 20)
+          .fillAndStroke("#F59E0B", "#F59E0B")
+          .fillColor("#FFFFFF")
+          .text(header, upcomingXPos + 5, upcomingTableTop + 6, { width: upcomingColWidths[i] - 10 });
+        upcomingXPos += upcomingColWidths[i];
+      });
+
+      let upcomingRowY = upcomingTableTop + 20;
+
+      data.upcomingTransactions.slice(0, 5).forEach((transaction: any, index: number) => {
+        const bgColor = "#FEF3C7"; // Amarelo claro para destacar
+
+        upcomingXPos = 50;
+        const daysText = transaction.daysUntilDue === 0 
+          ? "Hoje" 
+          : transaction.daysUntilDue === 1 
+          ? "Amanhã" 
+          : `${transaction.daysUntilDue} dias`;
+        
+        const rowData = [
+          transaction.description.substring(0, 35),
+          (transaction.categoryName || "Sem Categoria").substring(0, 15),
+          daysText,
+          `R$ ${(transaction.amount / 100).toFixed(2)}`,
+        ];
+
+        rowData.forEach((cellData, i) => {
+          doc
+            .rect(upcomingXPos, upcomingRowY, upcomingColWidths[i], 20)
+            .fillAndStroke(bgColor, "#E5E7EB")
+            .fontSize(8)
+            .font("Helvetica")
+            .fillColor("#000000")
+            .text(cellData, upcomingXPos + 5, upcomingRowY + 6, { width: upcomingColWidths[i] - 10 });
+          upcomingXPos += upcomingColWidths[i];
+        });
+
+        upcomingRowY += 20;
+      });
+
+      doc.y = upcomingRowY;
+      doc.moveDown(2);
+    }
 
     // Tabela de Transações
     doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Transações");

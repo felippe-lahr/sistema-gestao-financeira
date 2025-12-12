@@ -715,6 +715,10 @@ export const appRouter = router({
           );
           console.log("[PDF Export] Despesas por categoria:", categoryExpenses.length);
 
+          // Buscar transações a vencer (próximos 7 dias)
+          const upcomingTransactions = await db.getUpcomingTransactions(input.entityId, 7);
+          console.log("[PDF Export] Transações a vencer:", upcomingTransactions.length);
+
           // Preparar dados do gráfico de pizza
           const categoryData = categoryExpenses.map((cat) => ({
             name: cat.categoryName || "Sem Categoria",
@@ -730,6 +734,7 @@ export const appRouter = router({
             period: input.period,
             categoryExpenses,
             categoryData,
+            upcomingTransactions,
           });
           console.log("[PDF Export] PDF gerado com sucesso. Tamanho:", buffer.length, "bytes");
 
