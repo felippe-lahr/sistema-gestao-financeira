@@ -28,7 +28,7 @@ export default function EntityDashboard() {
       case "month":
         return { startDate: startOfMonth(now), endDate: endOfMonth(now) };
       case "quarter":
-        return { startDate: subMonths(now, 3), endDate: now };
+        return { startDate: startOfMonth(subMonths(now, 2)), endDate: endOfMonth(now) };
       case "year":
         return { startDate: startOfYear(now), endDate: endOfYear(now) };
       case "custom":
