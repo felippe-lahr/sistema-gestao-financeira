@@ -571,6 +571,8 @@ export async function getCashFlowData(entityId: number, months: number, startDat
     conditions.push(lte(transactions.dueDate, endDate));
   }
 
+  console.log('[getCashFlowData] entityId:', entityId, 'months:', months, 'startDate:', startDate, 'endDate:', endDate);
+
   const result = await db
     .select({
       month: sql<string>`TO_CHAR(due_date, 'YYYY-MM')`,
@@ -581,6 +583,8 @@ export async function getCashFlowData(entityId: number, months: number, startDat
     .where(and(...conditions))
     .groupBy(sql`TO_CHAR(due_date, 'YYYY-MM')`)
     .orderBy(sql`TO_CHAR(due_date, 'YYYY-MM')`);
+
+  console.log('[getCashFlowData] result:', result);
 
   return result.map((row) => ({
     month: row.month,
