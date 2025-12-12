@@ -559,7 +559,10 @@ export async function getCashFlowData(entityId: number, months: number, startDat
   const db = await getDb();
   if (!db) return [];
 
-  const conditions = [eq(transactions.entityId, entityId)];
+  const conditions = [
+    eq(transactions.entityId, entityId),
+    sql`${transactions.dueDate} IS NOT NULL`
+  ];
 
   if (startDate) {
     conditions.push(gte(transactions.dueDate, startDate));
