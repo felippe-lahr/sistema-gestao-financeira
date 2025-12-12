@@ -578,14 +578,14 @@ export async function getCashFlowData(entityId: number, months: number, startDat
 
   const result = await db
     .select({
-      month: sql<string>`TO_CHAR(due_date, 'YYYY-MM')`,
-      income: sql<number>`COALESCE(SUM(CASE WHEN type = 'INCOME' AND status = 'PAID' THEN amount ELSE 0 END), 0)`,
-      expense: sql<number>`COALESCE(SUM(CASE WHEN type = 'EXPENSE' AND status = 'PAID' THEN amount ELSE 0 END), 0)`,
+      month: sql<string>`TO_CHAR(${transactions.dueDate}, 'YYYY-MM')`,
+      income: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'INCOME' AND ${transactions.status} = 'PAID' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      expense: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'EXPENSE' AND ${transactions.status} = 'PAID' THEN ${transactions.amount} ELSE 0 END), 0)`,
     })
     .from(transactions)
     .where(and(...conditions))
-    .groupBy(sql`TO_CHAR(due_date, 'YYYY-MM')`)
-    .orderBy(sql`TO_CHAR(due_date, 'YYYY-MM')`);
+    .groupBy(sql`TO_CHAR(${transactions.dueDate}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${transactions.dueDate}, 'YYYY-MM')`);
 
   console.log('[getCashFlowData] result:', result);
 
