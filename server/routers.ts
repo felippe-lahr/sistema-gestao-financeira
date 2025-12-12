@@ -686,10 +686,11 @@ export const appRouter = router({
           console.log("[PDF Export] Resumo calculado:", summary);
 
           // Buscar dados para gráficos
-          const categoryExpenses = await db.getCategoryExpensesByStatus(input.entityId, {
-            startDate: input.startDate ? new Date(input.startDate) : undefined,
-            endDate: input.endDate ? new Date(input.endDate) : undefined,
-          });
+          const categoryExpenses = await db.getCategoryExpensesByStatus(
+            input.entityId,
+            input.startDate ? new Date(input.startDate) : undefined,
+            input.endDate ? new Date(input.endDate) : undefined
+          );
           console.log("[PDF Export] Despesas por categoria:", categoryExpenses.length);
 
           // Preparar dados do gráfico de pizza
