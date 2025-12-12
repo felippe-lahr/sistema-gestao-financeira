@@ -700,51 +700,33 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
   const futureDate = new Date(today);
   futureDate.setDate(futureDate.getDate() + daysAhead);
 
-  console.log('[getUpcomingTransactions] entityId:', entityId);
-  console.log('[getUpcomingTransactions] daysAhead:', daysAhead);
-  console.log('[getUpcomingTransactions] today:', today.toISOString());
-  console.log('[getUpcomingTransactions] futureDate:', futureDate.toISOString());
-
-  console.log('[getUpcomingTransactions] Iniciando query SQL...');
-  
-  let result;
-  try {
-    result = await db
-      .select({
-        id: transactions.id,
-        description: transactions.description,
-        amount: transactions.amount,
-        dueDate: transactions.dueDate,
-        status: transactions.status,
-        type: transactions.type,
-        categoryId: transactions.categoryId,
-        categoryName: categories.name,
-        categoryColor: categories.color,
-      })
-      .from(transactions)
-      .leftJoin(categories, eq(transactions.categoryId, categories.id))
-      .where(
-        and(
-          eq(transactions.entityId, entityId),
-          eq(transactions.type, "EXPENSE"),
-          or(
-            eq(transactions.status, "PENDING"),
-            eq(transactions.status, "OVERDUE")
-          ),
-          sql`DATE(${transactions.dueDate}) >= CURRENT_DATE`,
-          sql`DATE(${transactions.dueDate}) <= CURRENT_DATE + INTERVAL '${sql.raw(daysAhead.toString())} days'`
-        )
+  const result = await db
+    .select({
+      id: transactions.id,
+      description: transactions.description,
+      amount: transactions.amount,
+      dueDate: transactions.dueDate,
+      status: transactions.status,
+      type: transactions.type,
+      categoryId: transactions.categoryId,
+      categoryName: categories.name,
+      categoryColor: categories.color,
+    })
+    .from(transactions)
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(
+      and(
+        eq(transactions.entityId, entityId),
+        eq(transactions.type, "EXPENSE"),
+        or(
+          eq(transactions.status, "PENDING"),
+          eq(transactions.status, "OVERDUE")
+        ),
+        sql`DATE(${transactions.dueDate}) >= CURRENT_DATE`,
+        sql`DATE(${transactions.dueDate}) <= CURRENT_DATE + INTERVAL '${sql.raw(daysAhead.toString())} days'`
       )
-      .orderBy(asc(transactions.dueDate));
-    
-    console.log('[getUpcomingTransactions] Query executada com sucesso!');
-  } catch (error) {
-    console.error('[getUpcomingTransactions] ERRO na query SQL:', error);
-    return [];
-  }
-
-  console.log('[getUpcomingTransactions] Resultado bruto:', JSON.stringify(result));
-  console.log('[getUpcomingTransactions] Total de registros:', result.length);
+    )
+    .orderBy(asc(transactions.dueDate));
 
   const mapped = result.map((row) => ({
     id: row.id,
@@ -759,7 +741,5 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
     daysUntilDue: Math.ceil((row.dueDate!.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
   }));
 
-  console.log('[getUpcomingTransactions] Resultado mapeado:', mapped);
-  
   return mapped;
 }
