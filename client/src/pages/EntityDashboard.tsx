@@ -162,6 +162,7 @@ export default function EntityDashboard() {
     
     setExportingPDF(true);
     try {
+      const { startDate, endDate } = getFilterDates();
       const periodLabels = {
         month: "Mês Atual",
         quarter: "Últimos 3 Meses",
