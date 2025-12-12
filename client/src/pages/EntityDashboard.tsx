@@ -54,7 +54,7 @@ export default function EntityDashboard() {
   );
   
   const { data: cashFlowData, isLoading: cashFlowLoading } = trpc.dashboard.cashFlow.useQuery(
-    { entityId: entityId!, months: 6 },
+    { entityId: entityId!, months: 6, startDate, endDate },
     { enabled: !!entityId }
   );
   

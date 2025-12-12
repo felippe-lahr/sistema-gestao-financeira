@@ -555,9 +555,21 @@ export async function deletePaymentMethod(methodId: number) {
 
 // ========== DASHBOARD CHARTS ==========
 
-export async function getCashFlowData(entityId: number, months: number) {
+export async function getCashFlowData(entityId: number, months: number, startDate?: Date, endDate?: Date) {
   const db = await getDb();
   if (!db) return [];
+
+  const conditions = [eq(transactions.entityId, entityId)];
+
+  if (startDate) {
+    conditions.push(gte(transactions.dueDate, startDate));
+  } else {
+    conditions.push(gte(transactions.dueDate, sql`NOW() - INTERVAL '${sql.raw(months.toString())} months'`));
+  }
+
+  if (endDate) {
+    conditions.push(lte(transactions.dueDate, endDate));
+  }
 
   const result = await db
     .select({
@@ -566,12 +578,7 @@ export async function getCashFlowData(entityId: number, months: number) {
       expense: sql<number>`COALESCE(SUM(CASE WHEN type = 'EXPENSE' AND status = 'PAID' THEN amount ELSE 0 END), 0)`,
     })
     .from(transactions)
-    .where(
-      and(
-        eq(transactions.entityId, entityId),
-        gte(transactions.dueDate, sql`NOW() - INTERVAL '${sql.raw(months.toString())} months'`)
-      )
-    )
+    .where(and(...conditions))
     .groupBy(sql`TO_CHAR(due_date, 'YYYY-MM')`)
     .orderBy(sql`TO_CHAR(due_date, 'YYYY-MM')`);
 

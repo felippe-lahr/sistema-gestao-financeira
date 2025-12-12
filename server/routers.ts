@@ -510,7 +510,12 @@ export const appRouter = router({
     }),
 
     cashFlow: protectedProcedure
-      .input(z.object({ entityId: z.number(), months: z.number().optional() }))
+      .input(z.object({ 
+        entityId: z.number(), 
+        months: z.number().optional(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional()
+      }))
       .query(async ({ input, ctx }) => {
         const entity = await db.getEntityById(input.entityId);
         if (!entity || entity.userId !== ctx.user.id) {
@@ -518,7 +523,7 @@ export const appRouter = router({
         }
 
         const months = input.months || 6;
-        const cashFlowData = await db.getCashFlowData(input.entityId, months);
+        const cashFlowData = await db.getCashFlowData(input.entityId, months, input.startDate, input.endDate);
         
         // Convert amounts from cents
         return cashFlowData.map((item) => ({
