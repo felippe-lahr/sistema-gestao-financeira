@@ -33,6 +33,7 @@ export default function Transactions() {
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
 
@@ -267,6 +268,11 @@ export default function Transactions() {
       return false;
     }
 
+    // Status filter
+    if (filterStatus && t.status !== filterStatus) {
+      return false;
+    }
+
     // Period filter
     const transactionDate = new Date(t.dueDate);
     if (filterPeriod === "month") {
@@ -492,11 +498,28 @@ export default function Transactions() {
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">Todas</SelectItem>
                   {categories?.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id.toString()}>
                       {cat.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status filter */}
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="PENDING">Pendente</SelectItem>
+                  <SelectItem value="PAID">Pago</SelectItem>
+                  <SelectItem value="OVERDUE">Vencido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
