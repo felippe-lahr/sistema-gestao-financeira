@@ -700,12 +700,10 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
   const futureDate = new Date(today);
   futureDate.setDate(futureDate.getDate() + daysAhead);
 
-  console.log('[getUpcomingTransactions] Parâmetros:', {
-    entityId,
-    daysAhead,
-    today: today.toISOString(),
-    futureDate: futureDate.toISOString()
-  });
+  console.log('[getUpcomingTransactions] entityId:', entityId);
+  console.log('[getUpcomingTransactions] daysAhead:', daysAhead);
+  console.log('[getUpcomingTransactions] today:', today.toISOString());
+  console.log('[getUpcomingTransactions] futureDate:', futureDate.toISOString());
 
   const result = await db
     .select({
