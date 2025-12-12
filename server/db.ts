@@ -1,4 +1,4 @@
-import { eq, or, and, isNull, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, or, and, isNull, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
