@@ -722,8 +722,8 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
           eq(transactions.status, "PENDING"),
           eq(transactions.status, "OVERDUE")
         ),
-        gte(transactions.dueDate, today),
-        lte(transactions.dueDate, futureDate)
+        sql`DATE(${transactions.dueDate}) >= CURRENT_DATE`,
+        sql`DATE(${transactions.dueDate}) <= CURRENT_DATE + INTERVAL '${sql.raw(daysAhead.toString())} days'`
       )
     )
     .orderBy(asc(transactions.dueDate));
