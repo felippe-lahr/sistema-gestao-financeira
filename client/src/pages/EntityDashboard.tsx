@@ -85,6 +85,25 @@ export default function EntityDashboard() {
     });
   };
 
+  const getPeriodDescription = () => {
+    switch (filterPeriod) {
+      case "month":
+        return "Receitas e despesas do mês atual";
+      case "quarter":
+        return "Receitas e despesas dos últimos 3 meses";
+      case "year":
+        return "Receitas e despesas do ano atual";
+      case "custom":
+        if (customStartDate && customEndDate) {
+          return `Receitas e despesas de ${format(new Date(customStartDate), "dd/MM/yyyy")} a ${format(new Date(customEndDate), "dd/MM/yyyy")}`;
+        }
+        return "Receitas e despesas do período selecionado";
+      case "all":
+      default:
+        return "Receitas e despesas de todos os períodos";
+    }
+  };
+
   if (!entityId || !entity) {
     return (
       <div className="container py-8">
@@ -231,7 +250,7 @@ export default function EntityDashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Fluxo de Caixa</CardTitle>
-            <CardDescription>Receitas e despesas dos últimos 6 meses</CardDescription>
+            <CardDescription>{getPeriodDescription()}</CardDescription>
           </CardHeader>
           <CardContent>
             {cashFlowLoading ? (
