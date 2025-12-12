@@ -581,6 +581,28 @@ export const appRouter = router({
         }));
       }),
 
+    upcomingTransactions: protectedProcedure
+      .input(z.object({ 
+        entityId: z.number(),
+        daysAhead: z.number().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const transactions = await db.getUpcomingTransactions(
+          input.entityId,
+          input.daysAhead || 7
+        );
+
+        return transactions.map((t) => ({
+          ...t,
+          amount: t.amount / 100,
+        }));
+      }),
+
     categoryExpensesByStatus: protectedProcedure
       .input(z.object({ 
         entityId: z.number(),

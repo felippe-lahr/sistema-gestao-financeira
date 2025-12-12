@@ -689,3 +689,55 @@ export async function updateOverdueTransactions() {
   // Drizzle não retorna rowCount, então retornamos sucesso
   return 1;
 }
+
+export async function getUpcomingTransactions(entityId: number, daysAhead: number = 7) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const futureDate = new Date(today);
+  futureDate.setDate(futureDate.getDate() + daysAhead);
+
+  const result = await db
+    .select({
+      id: transactions.id,
+      description: transactions.description,
+      amount: transactions.amount,
+      dueDate: transactions.dueDate,
+      status: transactions.status,
+      type: transactions.type,
+      categoryId: transactions.categoryId,
+      categoryName: categories.name,
+      categoryColor: categories.color,
+    })
+    .from(transactions)
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(
+      and(
+        eq(transactions.entityId, entityId),
+        eq(transactions.type, "EXPENSE"),
+        or(
+          eq(transactions.status, "PENDING"),
+          eq(transactions.status, "OVERDUE")
+        ),
+        gte(transactions.dueDate, today),
+        lte(transactions.dueDate, futureDate)
+      )
+    )
+    .orderBy(asc(transactions.dueDate));
+
+  return result.map((row) => ({
+    id: row.id,
+    description: row.description,
+    amount: row.amount,
+    dueDate: row.dueDate,
+    status: row.status,
+    type: row.type,
+    categoryId: row.categoryId,
+    categoryName: row.categoryName || "Sem Categoria",
+    categoryColor: row.categoryColor || "#6B7280",
+    daysUntilDue: Math.ceil((row.dueDate!.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+  }));
+}
