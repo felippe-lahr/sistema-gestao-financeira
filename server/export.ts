@@ -146,6 +146,9 @@ export function generateTransactionsPDF(data: {
   transactions: any[];
   summary: any;
   period: string;
+  cashFlowData?: any[];
+  categoryData?: any[];
+  categoryExpenses?: any[];
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: "A4" });
@@ -283,7 +286,7 @@ export function generateTransactionsPDF(data: {
       rowY += 20;
     });
 
-    // Rodapé
+    // Rodapé da primeira página
     doc
       .fontSize(8)
       .fillColor("#6B7280")
@@ -293,6 +296,162 @@ export function generateTransactionsPDF(data: {
         750,
         { align: "center" }
       );
+
+    // ========== SEGUNDA PÁGINA: GRÁFICOS ==========
+    if (data.categoryExpenses && data.categoryExpenses.length > 0) {
+      doc.addPage();
+
+      // Título da página
+      doc
+        .fontSize(18)
+        .font("Helvetica-Bold")
+        .fillColor("#2563EB")
+        .text("Análise Visual", { align: "center" });
+
+      doc.moveDown(2);
+
+      // Tabela de Despesas por Categoria
+      doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Despesas por Categoria e Status");
+      doc.moveDown();
+
+      const categoryTableTop = doc.y;
+      const categoryColWidths = [150, 80, 80, 80, 90];
+      const categoryHeaders = ["Categoria", "Pago", "Pendente", "Vencido", "Total"];
+
+      let categoryXPos = 50;
+      categoryHeaders.forEach((header, i) => {
+        doc
+          .fontSize(9)
+          .font("Helvetica-Bold")
+          .fillColor("#FFFFFF")
+          .rect(categoryXPos, categoryTableTop, categoryColWidths[i], 25)
+          .fillAndStroke("#2563EB", "#2563EB")
+          .fillColor("#FFFFFF")
+          .text(header, categoryXPos + 5, categoryTableTop + 8, { width: categoryColWidths[i] - 10 });
+        categoryXPos += categoryColWidths[i];
+      });
+
+      let categoryRowY = categoryTableTop + 25;
+
+      data.categoryExpenses.forEach((cat: any, index: number) => {
+        const bgColor = index % 2 === 0 ? "#F9FAFB" : "#FFFFFF";
+
+        categoryXPos = 50;
+        const rowData = [
+          cat.categoryName || "Sem Categoria",
+          `R$ ${(cat.paid / 100).toFixed(2)}`,
+          `R$ ${(cat.pending / 100).toFixed(2)}`,
+          `R$ ${(cat.overdue / 100).toFixed(2)}`,
+          `R$ ${(cat.total / 100).toFixed(2)}`,
+        ];
+
+        rowData.forEach((cellData, i) => {
+          doc
+            .rect(categoryXPos, categoryRowY, categoryColWidths[i], 22)
+            .fillAndStroke(bgColor, "#E5E7EB")
+            .fontSize(8)
+            .font("Helvetica")
+            .fillColor("#000000")
+            .text(cellData, categoryXPos + 5, categoryRowY + 7, { width: categoryColWidths[i] - 10 });
+          categoryXPos += categoryColWidths[i];
+        });
+
+        categoryRowY += 22;
+      });
+
+      // Linha de total
+      const totalPaid = data.categoryExpenses.reduce((sum: number, cat: any) => sum + cat.paid, 0);
+      const totalPending = data.categoryExpenses.reduce((sum: number, cat: any) => sum + cat.pending, 0);
+      const totalOverdue = data.categoryExpenses.reduce((sum: number, cat: any) => sum + cat.overdue, 0);
+      const totalAll = data.categoryExpenses.reduce((sum: number, cat: any) => sum + cat.total, 0);
+
+      categoryXPos = 50;
+      const totalRowData = [
+        "Total Geral",
+        `R$ ${(totalPaid / 100).toFixed(2)}`,
+        `R$ ${(totalPending / 100).toFixed(2)}`,
+        `R$ ${(totalOverdue / 100).toFixed(2)}`,
+        `R$ ${(totalAll / 100).toFixed(2)}`,
+      ];
+
+      totalRowData.forEach((cellData, i) => {
+        doc
+          .rect(categoryXPos, categoryRowY, categoryColWidths[i], 25)
+          .fillAndStroke("#EFF6FF", "#2563EB")
+          .fontSize(9)
+          .font("Helvetica-Bold")
+          .fillColor("#000000")
+          .text(cellData, categoryXPos + 5, categoryRowY + 8, { width: categoryColWidths[i] - 10 });
+        categoryXPos += categoryColWidths[i];
+      });
+
+      doc.y = categoryRowY + 40;
+
+      // Gráfico de Pizza (Distribuição por Categoria)
+      if (data.categoryData && data.categoryData.length > 0) {
+        doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Distribuição por Categoria");
+        doc.moveDown();
+
+        const pieX = 150;
+        const pieY = doc.y + 80;
+        const pieRadius = 70;
+
+        const total = data.categoryData.reduce((sum: number, cat: any) => sum + cat.value, 0);
+        let startAngle = -Math.PI / 2; // Começar no topo
+
+        const COLORS = ["#6B7280", "#EF4444", "#10B981", "#06B6D4", "#F59E0B", "#8B5CF6"];
+
+        data.categoryData.forEach((cat: any, index: number) => {
+          const sliceAngle = (cat.value / total) * 2 * Math.PI;
+          const endAngle = startAngle + sliceAngle;
+
+          // Desenhar fatia
+          doc.save();
+          doc
+            .moveTo(pieX, pieY)
+            .lineTo(
+              pieX + pieRadius * Math.cos(startAngle),
+              pieY + pieRadius * Math.sin(startAngle)
+            )
+            .arc(pieX, pieY, pieRadius, startAngle, endAngle)
+            .lineTo(pieX, pieY)
+            .fillAndStroke(COLORS[index % COLORS.length], "#FFFFFF");
+          doc.restore();
+
+          startAngle = endAngle;
+        });
+
+        // Legenda
+        let legendY = pieY - 70;
+        const legendX = 350;
+
+        data.categoryData.forEach((cat: any, index: number) => {
+          // Quadrado de cor
+          doc.rect(legendX, legendY, 12, 12).fillAndStroke(COLORS[index % COLORS.length], COLORS[index % COLORS.length]);
+
+          // Texto
+          const percentage = ((cat.value / total) * 100).toFixed(0);
+          doc
+            .fontSize(9)
+            .font("Helvetica")
+            .fillColor("#000000")
+            .text(`${cat.name} ${percentage}%`, legendX + 18, legendY + 2);
+
+          legendY += 18;
+        });
+      }
+
+      // Rodapé da segunda página
+      doc
+        .fontSize(8)
+        .fillColor("#6B7280")
+        .text(
+          "Sistema de Gestão Financeira - Relatório gerado automaticamente",
+          50,
+          750,
+          { align: "center" }
+        );
+    }
 
     doc.end();
   });

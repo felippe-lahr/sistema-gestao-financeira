@@ -678,11 +678,25 @@ export const appRouter = router({
             .reduce((sum, t) => sum + t.amount, 0),
         };
 
+        // Buscar dados para gráficos
+        const categoryExpenses = await db.getCategoryExpensesByStatus(input.entityId, {
+          startDate: input.startDate,
+          endDate: input.endDate,
+        });
+
+        // Preparar dados do gráfico de pizza
+        const categoryData = categoryExpenses.map((cat) => ({
+          name: cat.categoryName || "Sem Categoria",
+          value: cat.total,
+        }));
+
         const buffer = await exportUtils.generateTransactionsPDF({
           entityName: entity.name,
           transactions,
           summary,
           period: input.period,
+          categoryExpenses,
+          categoryData,
         });
 
         return {
