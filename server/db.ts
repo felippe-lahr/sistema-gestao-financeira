@@ -662,8 +662,8 @@ export async function getCategoryExpensesByStatus(entityId: number, startDate?: 
       categoryName: categories.name,
       categoryColor: categories.color,
       paid: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.status} = 'PAID' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      pending: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.status} = 'PENDING' AND ${transactions.dueDate} >= NOW() THEN ${transactions.amount} ELSE 0 END), 0)`,
-      overdue: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.status} = 'PENDING' AND ${transactions.dueDate} < NOW() THEN ${transactions.amount} ELSE 0 END), 0)`,
+      pending: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.status} = 'PENDING' AND DATE(${transactions.dueDate}) >= CURRENT_DATE THEN ${transactions.amount} ELSE 0 END), 0)`,
+      overdue: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.status} = 'OVERDUE' OR (${transactions.status} = 'PENDING' AND DATE(${transactions.dueDate}) < CURRENT_DATE) THEN ${transactions.amount} ELSE 0 END), 0)`,
     })
     .from(transactions)
     .innerJoin(categories, eq(transactions.categoryId, categories.id))
@@ -679,4 +679,21 @@ export async function getCategoryExpensesByStatus(entityId: number, startDate?: 
     overdue: Number(row.overdue),
     total: Number(row.paid) + Number(row.pending) + Number(row.overdue),
   }));
+}
+
+export async function updateOverdueTransactions() {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const result = await db
+    .update(transactions)
+    .set({ status: "OVERDUE" })
+    .where(
+      and(
+        eq(transactions.status, "PENDING"),
+        sql`DATE(${transactions.dueDate}) < CURRENT_DATE`
+      )
+    );
+
+  return result.rowCount || 0;
 }

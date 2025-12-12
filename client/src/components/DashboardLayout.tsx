@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Building2, Receipt, Settings } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Building2, Receipt, Settings, Clock } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -34,6 +34,56 @@ const menuItems = [
   { icon: Receipt, label: "Transações", path: "/transactions" },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];
+
+function LiveClock() {
+  const [time, setTime] = useState(new Date());
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'America/Sao_Paulo'
+    });
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      timeZone: 'America/Sao_Paulo'
+    });
+  };
+
+  if (isCollapsed) {
+    return (
+      <div className="flex items-center justify-center px-2 py-1.5">
+        <Clock className="h-4 w-4 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5 px-2 py-1.5 text-center border-b border-border/40">
+      <div className="text-xs font-mono text-muted-foreground">
+        {formatDate(time)}
+      </div>
+      <div className="text-sm font-mono font-medium tracking-wider">
+        {formatTime(time)}
+      </div>
+    </div>
+  );
+}
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 280;
@@ -205,6 +255,7 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           <SidebarFooter className="p-3 space-y-2">
+            <LiveClock />
             <div className="flex items-center justify-center group-data-[collapsible=icon]:justify-center">
               <ModeToggle />
             </div>
