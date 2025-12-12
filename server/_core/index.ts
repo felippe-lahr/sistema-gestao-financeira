@@ -8,6 +8,7 @@ import { registerDemoAuthRoutes } from "./demo-auth";
 import { registerUploadRoutes } from "./upload-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { startCronJobs } from "../cron";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -66,6 +67,9 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // Start cron jobs
+  startCronJobs();
 }
 
 startServer().catch(console.error);
