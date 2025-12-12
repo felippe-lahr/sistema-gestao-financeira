@@ -700,6 +700,13 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
   const futureDate = new Date(today);
   futureDate.setDate(futureDate.getDate() + daysAhead);
 
+  console.log('[getUpcomingTransactions] Parâmetros:', {
+    entityId,
+    daysAhead,
+    today: today.toISOString(),
+    futureDate: futureDate.toISOString()
+  });
+
   const result = await db
     .select({
       id: transactions.id,
@@ -728,7 +735,10 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
     )
     .orderBy(asc(transactions.dueDate));
 
-  return result.map((row) => ({
+  console.log('[getUpcomingTransactions] Resultado bruto:', result);
+  console.log('[getUpcomingTransactions] Total de registros:', result.length);
+
+  const mapped = result.map((row) => ({
     id: row.id,
     description: row.description,
     amount: row.amount,
@@ -740,4 +750,8 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
     categoryColor: row.categoryColor || "#6B7280",
     daysUntilDue: Math.ceil((row.dueDate!.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
   }));
+
+  console.log('[getUpcomingTransactions] Resultado mapeado:', mapped);
+  
+  return mapped;
 }
