@@ -580,12 +580,6 @@ export const appRouter = router({
         }));
       }),
 
-    // TEMPORARY ENDPOINT TO FORCE OVERDUE UPDATE
-    forceOverdueUpdate: protectedProcedure.mutation(async () => {
-      const updatedCount = await db.updateOverdueTransactions();
-      return { success: true, updatedCount };
-    }),
-
     categoryExpensesByStatus: protectedProcedure
       .input(z.object({ 
         entityId: z.number(),
