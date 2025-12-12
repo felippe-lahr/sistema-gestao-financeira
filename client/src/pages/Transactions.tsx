@@ -568,7 +568,7 @@ export default function Transactions() {
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold">{transaction.description}</h3>
                             {transaction.attachmentCount > 0 && (
-                              <Paperclip className="h-4 w-4 text-muted-foreground" title={`${transaction.attachmentCount} anexo(s)`} />
+                              <Paperclip className="h-4 w-4 text-muted-foreground" />
                             )}
                             {getCategoryBadge(transaction.categoryId)}
                           </div>
