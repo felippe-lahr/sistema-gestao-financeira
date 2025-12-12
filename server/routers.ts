@@ -607,7 +607,8 @@ export const appRouter = router({
   }),
 
   // ========== EXPORTS ==========
-  exports: router({    exportTransactionsExcel: protectedProcedure
+  exports: router({
+    exportTransactionsExcel: protectedProcedure
       .input(
         z.object({
           entityId: z.number(),
@@ -659,50 +660,67 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        try {
+          console.log("[PDF Export] Iniciando exportação para entityId:", input.entityId);
+          
+          const entity = await db.getEntityById(input.entityId);
+          if (!entity || entity.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+          console.log("[PDF Export] Entidade encontrada:", entity.name);
+
+          const transactions = await db.getTransactionsByEntityId(input.entityId, {
+            startDate: input.startDate,
+            endDate: input.endDate,
+          });
+          console.log("[PDF Export] Transações encontradas:", transactions.length);
+
+          const summary = {
+            totalIncome: transactions
+              .filter((t) => t.type === "INCOME" && t.status === "PAID")
+              .reduce((sum, t) => sum + t.amount, 0),
+            totalExpenses: transactions
+              .filter((t) => t.type === "EXPENSE" && t.status === "PAID")
+              .reduce((sum, t) => sum + t.amount, 0),
+          };
+          console.log("[PDF Export] Resumo calculado:", summary);
+
+          // Buscar dados para gráficos
+          const categoryExpenses = await db.getCategoryExpensesByStatus(input.entityId, {
+            startDate: input.startDate,
+            endDate: input.endDate,
+          });
+          console.log("[PDF Export] Despesas por categoria:", categoryExpenses.length);
+
+          // Preparar dados do gráfico de pizza
+          const categoryData = categoryExpenses.map((cat) => ({
+            name: cat.categoryName || "Sem Categoria",
+            value: cat.total,
+          }));
+          console.log("[PDF Export] Dados do gráfico preparados:", categoryData.length);
+
+          console.log("[PDF Export] Gerando PDF...");
+          const buffer = await exportUtils.generateTransactionsPDF({
+            entityName: entity.name,
+            transactions,
+            summary,
+            period: input.period,
+            categoryExpenses,
+            categoryData,
+          });
+          console.log("[PDF Export] PDF gerado com sucesso. Tamanho:", buffer.length, "bytes");
+
+          return {
+            data: buffer.toString("base64"),
+            filename: `relatorio_${entity.name.replace(/\s+/g, "_")}_${Date.now()}.pdf`,
+          };
+        } catch (error) {
+          console.error("[PDF Export] Erro ao exportar PDF:", error);
+          throw new TRPCError({ 
+            code: "INTERNAL_SERVER_ERROR", 
+            message: `Erro ao gerar PDF: ${error instanceof Error ? error.message : 'Erro desconhecido'}` 
+          });
         }
-
-        const transactions = await db.getTransactionsByEntityId(input.entityId, {
-          startDate: input.startDate,
-          endDate: input.endDate,
-        });
-
-        const summary = {
-          totalIncome: transactions
-            .filter((t) => t.type === "INCOME" && t.status === "PAID")
-            .reduce((sum, t) => sum + t.amount, 0),
-          totalExpenses: transactions
-            .filter((t) => t.type === "EXPENSE" && t.status === "PAID")
-            .reduce((sum, t) => sum + t.amount, 0),
-        };
-
-        // Buscar dados para gráficos
-        const categoryExpenses = await db.getCategoryExpensesByStatus(input.entityId, {
-          startDate: input.startDate,
-          endDate: input.endDate,
-        });
-
-        // Preparar dados do gráfico de pizza
-        const categoryData = categoryExpenses.map((cat) => ({
-          name: cat.categoryName || "Sem Categoria",
-          value: cat.total,
-        }));
-
-        const buffer = await exportUtils.generateTransactionsPDF({
-          entityName: entity.name,
-          transactions,
-          summary,
-          period: input.period,
-          categoryExpenses,
-          categoryData,
-        });
-
-        return {
-          data: buffer.toString("base64"),
-          filename: `relatorio_${entity.name.replace(/\s+/g, "_")}_${Date.now()}.pdf`,
-        };
       }),
   }),
 
