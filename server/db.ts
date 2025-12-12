@@ -635,3 +635,48 @@ export async function getCategoryDistribution(entityId: number, startDate?: Date
     color: row.color || "#6B7280",
   }));
 }
+
+export async function getCategoryExpensesByStatus(entityId: number, startDate?: Date, endDate?: Date) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const now = new Date();
+  const defaultStartDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+  const defaultEndDate = endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const conditions = [
+    eq(transactions.entityId, entityId),
+    eq(transactions.type, "EXPENSE"),
+    sql`${transactions.dueDate} IS NOT NULL`
+  ];
+
+  if (startDate || !startDate) {
+    conditions.push(gte(transactions.dueDate, defaultStartDate));
+  }
+  if (endDate || !endDate) {
+    conditions.push(lte(transactions.dueDate, defaultEndDate));
+  }
+
+  const result = await db
+    .select({
+      categoryName: categories.name,
+      categoryColor: categories.color,
+      paid: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.status} = 'PAID' THEN ${transactions.amount} ELSE 0 END), 0)`,
+      pending: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.status} = 'PENDING' AND ${transactions.dueDate} >= NOW() THEN ${transactions.amount} ELSE 0 END), 0)`,
+      overdue: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.status} = 'PENDING' AND ${transactions.dueDate} < NOW() THEN ${transactions.amount} ELSE 0 END), 0)`,
+    })
+    .from(transactions)
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(and(...conditions))
+    .groupBy(categories.name, categories.color)
+    .orderBy(sql`COALESCE(SUM(${transactions.amount}), 0) DESC`);
+
+  return result.map((row) => ({
+    categoryName: row.categoryName,
+    categoryColor: row.categoryColor || "#6B7280",
+    paid: Number(row.paid),
+    pending: Number(row.pending),
+    overdue: Number(row.overdue),
+    total: Number(row.paid) + Number(row.pending) + Number(row.overdue),
+  }));
+}

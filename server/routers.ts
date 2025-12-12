@@ -579,6 +579,30 @@ export const appRouter = router({
           amount: t.amount / 100,
         }));
       }),
+
+    categoryExpensesByStatus: protectedProcedure
+      .input(z.object({ 
+        entityId: z.number(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const data = await db.getCategoryExpensesByStatus(input.entityId, input.startDate, input.endDate);
+        
+        // Convert amounts from cents
+        return data.map((item) => ({
+          ...item,
+          paid: item.paid / 100,
+          pending: item.pending / 100,
+          overdue: item.overdue / 100,
+          total: item.total / 100,
+        }));
+      }),
   }),
 
   // ========== ATTACHMENTS ==========

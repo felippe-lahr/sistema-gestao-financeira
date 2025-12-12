@@ -67,6 +67,11 @@ export default function EntityDashboard() {
     { entityId: entityId!, limit: 10, startDate, endDate },
     { enabled: !!entityId }
   );
+  
+  const { data: categoryExpenses, isLoading: categoryExpensesLoading } = trpc.dashboard.categoryExpensesByStatus.useQuery(
+    { entityId: entityId!, startDate, endDate },
+    { enabled: !!entityId }
+  );
 
   const entity = entities?.find((e) => e.id === entityId);
 
@@ -329,6 +334,77 @@ export default function EntityDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Despesas por Categoria e Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Despesas por Categoria</CardTitle>
+          <CardDescription>Valores pagos, pendentes e vencidos por categoria</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {categoryExpensesLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : categoryExpenses && categoryExpenses.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium">Categoria</th>
+                    <th className="text-right py-3 px-4 font-medium text-green-600">Pago</th>
+                    <th className="text-right py-3 px-4 font-medium text-yellow-600">Pendente</th>
+                    <th className="text-right py-3 px-4 font-medium text-red-600">Vencido</th>
+                    <th className="text-right py-3 px-4 font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categoryExpenses.map((cat, index) => (
+                    <tr key={index} className="border-b hover:bg-muted/50 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: cat.categoryColor }}
+                          />
+                          <span className="font-medium">{cat.categoryName}</span>
+                        </div>
+                      </td>
+                      <td className="text-right py-3 px-4 text-green-600 font-medium">
+                        {formatCurrency(cat.paid)}
+                      </td>
+                      <td className="text-right py-3 px-4 text-yellow-600 font-medium">
+                        {formatCurrency(cat.pending)}
+                      </td>
+                      <td className="text-right py-3 px-4 text-red-600 font-medium">
+                        {formatCurrency(cat.overdue)}
+                      </td>
+                      <td className="text-right py-3 px-4 font-bold">
+                        {formatCurrency(cat.total)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 font-bold">
+                    <td className="py-3 px-4">Total Geral</td>
+                    <td className="text-right py-3 px-4 text-green-600">
+                      {formatCurrency(categoryExpenses.reduce((sum, cat) => sum + cat.paid, 0))}
+                    </td>
+                    <td className="text-right py-3 px-4 text-yellow-600">
+                      {formatCurrency(categoryExpenses.reduce((sum, cat) => sum + cat.pending, 0))}
+                    </td>
+                    <td className="text-right py-3 px-4 text-red-600">
+                      {formatCurrency(categoryExpenses.reduce((sum, cat) => sum + cat.overdue, 0))}
+                    </td>
+                    <td className="text-right py-3 px-4">
+                      {formatCurrency(categoryExpenses.reduce((sum, cat) => sum + cat.total, 0))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-muted-foreground">Nenhuma despesa encontrada</div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recent Transactions */}
       <Card>
