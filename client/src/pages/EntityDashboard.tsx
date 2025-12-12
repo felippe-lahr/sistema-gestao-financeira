@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Clock, Calendar, Filter } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Clock, Calendar, Filter, FileSpreadsheet, FileText, Download } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Pie, PieChart, Cell, Legend } from "recharts";
@@ -19,6 +19,14 @@ export default function EntityDashboard() {
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  
+  // Estados de exportação
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
+  
+  // Mutations de exportação
+  const exportExcelMutation = trpc.exports.exportTransactionsExcel.useMutation();
+  const exportPDFMutation = trpc.exports.exportTransactionsPDF.useMutation();
 
   // Calcular datas baseado no filtro
   const getFilterDates = () => {
@@ -108,6 +116,87 @@ export default function EntityDashboard() {
     }
   };
 
+  // Funções de exportação
+  const handleExportExcel = async () => {
+    if (!entityId) return;
+    
+    setExportingExcel(true);
+    try {
+      const periodLabels = {
+        month: "Mês Atual",
+        quarter: "Últimos 3 Meses",
+        year: "Ano Atual",
+        custom: "Período Personalizado",
+        all: "Todos os Períodos",
+      };
+      
+      const result = await exportExcelMutation.mutateAsync({
+        entityId,
+        startDate,
+        endDate,
+        period: periodLabels[filterPeriod],
+      });
+      
+      // Download do arquivo
+      const blob = new Blob([Uint8Array.from(atob(result.data), c => c.charCodeAt(0))], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Erro ao exportar Excel:', error);
+      alert('Erro ao exportar relatório. Tente novamente.');
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+  
+  const handleExportPDF = async () => {
+    if (!entityId) return;
+    
+    setExportingPDF(true);
+    try {
+      const periodLabels = {
+        month: "Mês Atual",
+        quarter: "Últimos 3 Meses",
+        year: "Ano Atual",
+        custom: "Período Personalizado",
+        all: "Todos os Períodos",
+      };
+      
+      const result = await exportPDFMutation.mutateAsync({
+        entityId,
+        startDate,
+        endDate,
+        period: periodLabels[filterPeriod],
+      });
+      
+      // Download do arquivo
+      const blob = new Blob([Uint8Array.from(atob(result.data), c => c.charCodeAt(0))], {
+        type: 'application/pdf',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      alert('Erro ao exportar relatório. Tente novamente.');
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
   if (!entityId || !entity) {
     return (
       <div className="container py-8">
@@ -189,6 +278,35 @@ export default function EntityDashboard() {
                 </div>
               </>
             )}
+            
+            <div className="ml-auto flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportExcel}
+                disabled={exportingExcel}
+              >
+                {exportingExcel ? (
+                  <Download className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                )}
+                Excel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPDF}
+                disabled={exportingPDF}
+              >
+                {exportingPDF ? (
+                  <Download className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 mr-2" />
+                )}
+                PDF
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

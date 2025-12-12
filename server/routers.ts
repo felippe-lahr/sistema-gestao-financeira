@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
+import * as exportUtils from "./export";
 import { TRPCError } from "@trpc/server";
 
 export const appRouter = router({
@@ -602,6 +603,92 @@ export const appRouter = router({
           overdue: item.overdue / 100,
           total: item.total / 100,
         }));
+      }),
+  }),
+
+  // ========== EXPORTS ==========
+  exports: router({    exportTransactionsExcel: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          startDate: z.date().optional(),
+          endDate: z.date().optional(),
+          period: z.string(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const transactions = await db.getTransactionsByEntityId(input.entityId, {
+          startDate: input.startDate,
+          endDate: input.endDate,
+        });
+
+        const summary = {
+          totalIncome: transactions
+            .filter((t) => t.type === "INCOME" && t.status === "PAID")
+            .reduce((sum, t) => sum + t.amount, 0),
+          totalExpenses: transactions
+            .filter((t) => t.type === "EXPENSE" && t.status === "PAID")
+            .reduce((sum, t) => sum + t.amount, 0),
+        };
+
+        const buffer = await exportUtils.generateTransactionsExcel({
+          entityName: entity.name,
+          transactions,
+          summary,
+          period: input.period,
+        });
+
+        return {
+          data: buffer.toString("base64"),
+          filename: `relatorio_${entity.name.replace(/\s+/g, "_")}_${Date.now()}.xlsx`,
+        };
+      }),
+
+    exportTransactionsPDF: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          startDate: z.date().optional(),
+          endDate: z.date().optional(),
+          period: z.string(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const transactions = await db.getTransactionsByEntityId(input.entityId, {
+          startDate: input.startDate,
+          endDate: input.endDate,
+        });
+
+        const summary = {
+          totalIncome: transactions
+            .filter((t) => t.type === "INCOME" && t.status === "PAID")
+            .reduce((sum, t) => sum + t.amount, 0),
+          totalExpenses: transactions
+            .filter((t) => t.type === "EXPENSE" && t.status === "PAID")
+            .reduce((sum, t) => sum + t.amount, 0),
+        };
+
+        const buffer = await exportUtils.generateTransactionsPDF({
+          entityName: entity.name,
+          transactions,
+          summary,
+          period: input.period,
+        });
+
+        return {
+          data: buffer.toString("base64"),
+          filename: `relatorio_${entity.name.replace(/\s+/g, "_")}_${Date.now()}.pdf`,
+        };
       }),
   }),
 
