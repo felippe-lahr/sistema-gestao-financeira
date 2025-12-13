@@ -6,6 +6,7 @@ import Home from "@/pages/Home";
 import EntityDashboard from "@/pages/EntityDashboard";
 import Entities from "@/pages/Entities";
 import Transactions from "@/pages/Transactions";
+import Investments from "@/pages/Investments";
 import Settings from "@/pages/Settings";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/dashboard/:id" component={() => <DashboardLayout><EntityDashboard /></DashboardLayout>} />
       <Route path="/entities" component={() => <DashboardLayout><Entities /></DashboardLayout>} />
       <Route path="/transactions" component={() => <DashboardLayout><Transactions /></DashboardLayout>} />
+      <Route path="/investments/:entityId" component={() => <DashboardLayout><Investments /></DashboardLayout>} />
       <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

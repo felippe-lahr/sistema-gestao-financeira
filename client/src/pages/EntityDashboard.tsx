@@ -228,17 +228,26 @@ export default function EntityDashboard() {
         <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div className="flex items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: entity.color || "#2563EB" }}
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: entity.color || "#2563EB" }}
+            >
+              <span className="text-white font-bold text-lg">{entity.name.charAt(0).toUpperCase()}</span>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">{entity.name}</h1>
+              <p className="text-muted-foreground">Visão geral das finanças</p>
+            </div>
+          </div>
+          <Button
+            onClick={() => setLocation(`/investments/${entityId}`)}
+            variant="outline"
           >
-            <span className="text-white font-bold text-lg">{entity.name.charAt(0).toUpperCase()}</span>
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{entity.name}</h1>
-            <p className="text-muted-foreground">Visão geral das finanças</p>
-          </div>
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Investimentos
+          </Button>
         </div>
       </div>
 
