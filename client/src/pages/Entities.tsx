@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Edit, Trash2, Building2, GripVertical } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListStrategy } from "@dnd-kit/sortable";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -274,7 +274,7 @@ export default function Entities() {
         </Card>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={localEntities.map(e => e.id)} strategy={verticalListStrategy}>
+          <SortableContext items={localEntities.map(e => e.id)}>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {localEntities.map((entity) => (
                 <SortableEntityCard key={entity.id} entity={entity} onEdit={handleEdit} onDelete={handleDelete} />
