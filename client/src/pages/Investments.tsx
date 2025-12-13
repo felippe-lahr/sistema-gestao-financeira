@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,9 +28,10 @@ const investmentTypes = [
 ];
 
 export default function Investments() {
-  const { entityId } = useParams<{ entityId: string }>();
-  const navigate = useNavigate();
+  const params = useParams<{ entityId: string }>();
+  const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  const entityId = params.entityId ? parseInt(params.entityId) : null;
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
