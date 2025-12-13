@@ -517,3 +517,73 @@ export function generateTransactionsPDF(data: {
     doc.end();
   });
 }
+
+// ========== ATTACHMENTS ZIP EXPORT ==========
+
+import archiver from "archiver";
+import { Readable } from "stream";
+
+export async function generateAttachmentsZip(data: {
+  entityName: string;
+  attachments: any[];
+}): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
+    const archive = archiver("zip", {
+      zlib: { level: 9 }, // Máxima compressão
+    });
+
+    const chunks: Buffer[] = [];
+
+    archive.on("data", (chunk) => chunks.push(chunk));
+    archive.on("end", () => resolve(Buffer.concat(chunks)));
+    archive.on("error", reject);
+
+    // Agrupar anexos por tipo
+    const attachmentsByType: Record<string, any[]> = {};
+    
+    for (const attachment of data.attachments) {
+      const type = attachment.type || "DOCUMENTOS";
+      if (!attachmentsByType[type]) {
+        attachmentsByType[type] = [];
+      }
+      attachmentsByType[type].push(attachment);
+    }
+
+    // Adicionar arquivos ao ZIP organizados por tipo
+    for (const [type, typeAttachments] of Object.entries(attachmentsByType)) {
+      const folderName = type.replace(/_/g, " ");
+      
+      for (const attachment of typeAttachments) {
+        try {
+          // Baixar arquivo do Vercel Blob
+          const response = await fetch(attachment.blobUrl);
+          if (!response.ok) {
+            console.error(`Erro ao baixar anexo ${attachment.id}: ${response.statusText}`);
+            continue;
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          // Criar nome de arquivo seguro
+          const transactionDesc = attachment.transactionDescription
+            ?.replace(/[^a-zA-Z0-9]/g, "_")
+            .substring(0, 30) || "sem_descricao";
+          
+          const extension = attachment.filename.split(".").pop() || "bin";
+          const safeFilename = `transacao_${attachment.transactionId}_${transactionDesc}.${extension}`;
+
+          // Adicionar ao ZIP
+          archive.append(buffer, { 
+            name: `${folderName}/${safeFilename}` 
+          });
+        } catch (error) {
+          console.error(`Erro ao processar anexo ${attachment.id}:`, error);
+        }
+      }
+    }
+
+    // Finalizar o ZIP
+    archive.finalize();
+  });
+}

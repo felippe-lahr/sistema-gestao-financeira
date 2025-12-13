@@ -743,3 +743,55 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
 
   return mapped;
 }
+
+export async function getAttachmentsByEntityWithFilters(
+  entityId: number,
+  options?: {
+    types?: string[];
+    startDate?: Date;
+    endDate?: Date;
+  }
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db
+    .select({
+      id: attachments.id,
+      filename: attachments.filename,
+      blobUrl: attachments.blobUrl,
+      fileSize: attachments.fileSize,
+      mimeType: attachments.mimeType,
+      type: attachments.type,
+      createdAt: attachments.createdAt,
+      transactionId: attachments.transactionId,
+      transactionDescription: transactions.description,
+      transactionDueDate: transactions.dueDate,
+    })
+    .from(attachments)
+    .innerJoin(transactions, eq(attachments.transactionId, transactions.id))
+    .where(eq(transactions.entityId, entityId))
+    .$dynamic();
+
+  const conditions = [eq(transactions.entityId, entityId)];
+
+  if (options?.types && options.types.length > 0) {
+    conditions.push(
+      or(...options.types.map((type) => eq(attachments.type, type as any)))!
+    );
+  }
+
+  if (options?.startDate) {
+    conditions.push(gte(transactions.dueDate, options.startDate));
+  }
+
+  if (options?.endDate) {
+    conditions.push(lte(transactions.dueDate, options.endDate));
+  }
+
+  if (conditions.length > 1) {
+    query = query.where(and(...conditions));
+  }
+
+  return await query.orderBy(asc(transactions.dueDate));
+}

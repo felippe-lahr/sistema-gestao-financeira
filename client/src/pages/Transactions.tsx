@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -57,6 +57,13 @@ export default function Transactions() {
   // Estado para gerenciar anexos
   const [attachments, setAttachments] = useState<any[]>([]);
   const [previewAttachment, setPreviewAttachment] = useState<any>(null);
+  
+  // Estados para exportação de anexos
+  const [isExportAttachmentsOpen, setIsExportAttachmentsOpen] = useState(false);
+  const [exportAttachmentsTypes, setExportAttachmentsTypes] = useState<string[]>([]);
+  const [exportAttachmentsStartDate, setExportAttachmentsStartDate] = useState("");
+  const [exportAttachmentsEndDate, setExportAttachmentsEndDate] = useState("");
+  const [exportingAttachments, setExportingAttachments] = useState(false);
 
   const utils = trpc.useUtils();
   const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery();
@@ -136,6 +143,8 @@ export default function Transactions() {
     },
   });
 
+  const exportAttachmentsMutation = trpc.exports.exportAttachmentsZip.useMutation();
+
   const deleteMutation = trpc.transactions.delete.useMutation({
     onSuccess: () => {
       utils.transactions.listByEntity.invalidate();
@@ -161,6 +170,49 @@ export default function Transactions() {
     if (deletingTransactionId) {
       deleteMutation.mutate({ id: deletingTransactionId });
     }
+  };
+
+  const handleExportAttachments = async () => {
+    if (!selectedEntityId) return;
+    
+    setExportingAttachments(true);
+    try {
+      const result = await exportAttachmentsMutation.mutateAsync({
+        entityId: selectedEntityId,
+        types: exportAttachmentsTypes.length > 0 ? exportAttachmentsTypes : undefined,
+        startDate: exportAttachmentsStartDate || undefined,
+        endDate: exportAttachmentsEndDate || undefined,
+      });
+      
+      // Download do arquivo
+      const blob = new Blob([Uint8Array.from(atob(result.data), c => c.charCodeAt(0))], {
+        type: 'application/zip',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      setIsExportAttachmentsOpen(false);
+      toast.success('Anexos exportados com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao exportar anexos:', error);
+      toast.error(error.message || 'Erro ao exportar anexos. Tente novamente.');
+    } finally {
+      setExportingAttachments(false);
+    }
+  };
+  
+  const toggleAttachmentType = (type: string) => {
+    setExportAttachmentsTypes(prev => 
+      prev.includes(type) 
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
   };
 
   const resetForm = () => {
@@ -325,16 +377,126 @@ export default function Transactions() {
           <h1 className="text-3xl font-bold">Transações</h1>
           <p className="text-muted-foreground">Gerencie receitas e despesas</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={(open) => {
-          setIsCreateOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Transação
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Dialog open={isExportAttachmentsOpen} onOpenChange={setIsExportAttachmentsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <FileArchive className="h-4 w-4 mr-2" />
+                Exportar Anexos
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Exportar Anexos</DialogTitle>
+                <DialogDescription>
+                  Selecione os tipos de anexos e período para exportar em um arquivo ZIP
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Tipos de Anexos</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="nota_fiscal"
+                        checked={exportAttachmentsTypes.includes("NOTA_FISCAL")}
+                        onCheckedChange={() => toggleAttachmentType("NOTA_FISCAL")}
+                      />
+                      <label htmlFor="nota_fiscal" className="text-sm cursor-pointer">
+                        Notas Fiscais
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="documentos"
+                        checked={exportAttachmentsTypes.includes("DOCUMENTOS")}
+                        onCheckedChange={() => toggleAttachmentType("DOCUMENTOS")}
+                      />
+                      <label htmlFor="documentos" className="text-sm cursor-pointer">
+                        Documentos
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="boleto"
+                        checked={exportAttachmentsTypes.includes("BOLETO")}
+                        onCheckedChange={() => toggleAttachmentType("BOLETO")}
+                      />
+                      <label htmlFor="boleto" className="text-sm cursor-pointer">
+                        Boletos
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="comprovante"
+                        checked={exportAttachmentsTypes.includes("COMPROVANTE_PAGAMENTO")}
+                        onCheckedChange={() => toggleAttachmentType("COMPROVANTE_PAGAMENTO")}
+                      />
+                      <label htmlFor="comprovante" className="text-sm cursor-pointer">
+                        Comprovantes de Pagamento
+                      </label>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Deixe vazio para exportar todos os tipos
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="export_start_date">Data Inicial</Label>
+                    <Input
+                      id="export_start_date"
+                      type="date"
+                      value={exportAttachmentsStartDate}
+                      onChange={(e) => setExportAttachmentsStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="export_end_date">Data Final</Label>
+                    <Input
+                      id="export_end_date"
+                      type="date"
+                      value={exportAttachmentsEndDate}
+                      onChange={(e) => setExportAttachmentsEndDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Deixe vazio para exportar de todos os períodos
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsExportAttachmentsOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleExportAttachments} disabled={exportingAttachments}>
+                  {exportingAttachments ? (
+                    <>
+                      <Download className="h-4 w-4 mr-2 animate-spin" />
+                      Exportando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar ZIP
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={isCreateOpen} onOpenChange={(open) => {
+            setIsCreateOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Transação
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nova Transação</DialogTitle>

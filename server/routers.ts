@@ -750,6 +750,66 @@ export const appRouter = router({
           });
         }
       }),
+
+    exportAttachmentsZip: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          types: z.array(z.string()).optional(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        try {
+          console.log("[ZIP Export] Iniciando exportação de anexos para entityId:", input.entityId);
+          
+          const entity = await db.getEntityById(input.entityId);
+          if (!entity || entity.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+          console.log("[ZIP Export] Entidade encontrada:", entity.name);
+
+          const attachments = await db.getAttachmentsByEntityWithFilters(input.entityId, {
+            types: input.types,
+            startDate: input.startDate ? new Date(input.startDate) : undefined,
+            endDate: input.endDate ? new Date(input.endDate) : undefined,
+          });
+          console.log("[ZIP Export] Anexos encontrados:", attachments.length);
+
+          if (attachments.length === 0) {
+            throw new TRPCError({ 
+              code: "NOT_FOUND", 
+              message: "Nenhum anexo encontrado com os filtros selecionados" 
+            });
+          }
+
+          if (attachments.length > 100) {
+            throw new TRPCError({ 
+              code: "BAD_REQUEST", 
+              message: `Muitos anexos selecionados (${attachments.length}). Máximo: 100 arquivos` 
+            });
+          }
+
+          console.log("[ZIP Export] Gerando ZIP...");
+          const buffer = await exportUtils.generateAttachmentsZip({
+            entityName: entity.name,
+            attachments,
+          });
+          console.log("[ZIP Export] ZIP gerado com sucesso. Tamanho:", buffer.length, "bytes");
+
+          return {
+            data: buffer.toString("base64"),
+            filename: `anexos_${entity.name.replace(/\s+/g, "_")}_${Date.now()}.zip`,
+          };
+        } catch (error) {
+          console.error("[ZIP Export] Erro ao exportar anexos:", error);
+          throw new TRPCError({ 
+            code: "INTERNAL_SERVER_ERROR", 
+            message: `Erro ao gerar ZIP: ${error instanceof Error ? error.message : 'Erro desconhecido'}` 
+          });
+        }
+      }),
   }),
 
   // ========== ATTACHMENTS ==========
