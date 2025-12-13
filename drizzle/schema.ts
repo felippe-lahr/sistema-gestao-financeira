@@ -35,6 +35,7 @@ export const entities = pgTable("entities", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   color: varchar("color", { length: 7 }).default("#2563EB"),
+  displayOrder: integer("displayOrder").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

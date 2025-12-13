@@ -86,6 +86,28 @@ export const appRouter = router({
       await db.deleteEntity(input.id);
       return { success: true };
     }),
+
+    updateOrder: protectedProcedure
+      .input(
+        z.array(
+          z.object({
+            id: z.number(),
+            displayOrder: z.number(),
+          })
+        )
+      )
+      .mutation(async ({ input, ctx }) => {
+        // Verify all entities belong to user
+        for (const item of input) {
+          const entity = await db.getEntityById(item.id);
+          if (!entity || entity.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        // Update display order for all entities
+        await db.updateEntitiesOrder(input);
+        return { success: true };
+      }),
   }),
 
   // ========== CATEGORIES ==========
