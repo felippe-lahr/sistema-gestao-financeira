@@ -162,3 +162,123 @@ export const paymentMethods = pgTable("payment_methods", {
 
 export type PaymentMethod = typeof paymentMethods.$inferSelect;
 export type InsertPaymentMethod = typeof paymentMethods.$inferInsert;
+
+/**
+ * Investment enums
+ */
+export const investmentTypeEnum = pgEnum("investment_type", [
+  "ACAO",           // Ações
+  "FII",            // Fundos Imobiliários
+  "TESOURO_DIRETO", // Tesouro Direto
+  "CDB",            // Certificado de Depósito Bancário
+  "LCI",            // Letra de Crédito Imobiliário
+  "LCA",            // Letra de Crédito do Agronegócio
+  "FUNDO",          // Fundos de Investimento
+  "CRIPTO",         // Criptomoedas
+  "OUTRO"           // Outros
+]);
+
+export const investmentTransactionTypeEnum = pgEnum("investment_transaction_type", [
+  "BUY",      // Compra
+  "SELL",     // Venda
+  "DIVIDEND", // Dividendo
+  "INTEREST", // Juros
+  "FEE"       // Taxa
+]);
+
+export const priceSourceEnum = pgEnum("price_source", [
+  "WEB_SCRAPING",
+  "API",
+  "MANUAL"
+]);
+
+/**
+ * Investments table - Aplicações financeiras por entidade
+ */
+export const investments = pgTable("investments", {
+  id: serial("id").primaryKey(),
+  entityId: integer("entityId").notNull(),
+  userId: integer("userId").notNull(),
+  
+  // Informações básicas
+  name: varchar("name", { length: 255 }).notNull(),
+  type: investmentTypeEnum("type").notNull(),
+  ticker: varchar("ticker", { length: 20 }), // Código do ativo (ex: PETR4, MXRF11)
+  institution: varchar("institution", { length: 255 }), // Instituição financeira
+  
+  // Valores
+  initialAmount: integer("initialAmount").notNull(), // Valor inicial em centavos
+  currentAmount: integer("currentAmount"), // Valor atual em centavos
+  quantity: integer("quantity"), // Quantidade de cotas/ações (em milésimos para precisão)
+  averagePrice: integer("averagePrice"), // Preço médio em centavos
+  currentPrice: integer("currentPrice"), // Preço atual em centavos
+  
+  // Rentabilidade
+  profitLoss: integer("profitLoss"), // Lucro/Prejuízo em centavos
+  profitLossPercent: integer("profitLossPercent"), // Lucro/Prejuízo em centésimos de % (ex: 1050 = 10.50%)
+  dailyChange: integer("dailyChange"), // Variação diária em centésimos de %
+  
+  // Datas
+  purchaseDate: timestamp("purchaseDate").notNull(),
+  maturityDate: timestamp("maturityDate"), // Data de vencimento (para renda fixa)
+  lastUpdate: timestamp("lastUpdate"), // Última atualização de preço
+  
+  // Configurações
+  autoUpdate: boolean("autoUpdate").default(true).notNull(),
+  alertThreshold: integer("alertThreshold"), // % de variação para alertar (em centésimos)
+  
+  // Metadados
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Investment = typeof investments.$inferSelect;
+export type InsertInvestment = typeof investments.$inferInsert;
+
+/**
+ * Investment History table - Histórico diário de preços
+ */
+export const investmentHistory = pgTable("investment_history", {
+  id: serial("id").primaryKey(),
+  investmentId: integer("investmentId").notNull(),
+  
+  // Snapshot diário
+  date: timestamp("date").notNull(),
+  price: integer("price").notNull(), // Preço em centavos
+  amount: integer("amount").notNull(), // Valor total em centavos
+  profitLoss: integer("profitLoss"), // Lucro/Prejuízo em centavos
+  profitLossPercent: integer("profitLossPercent"), // Em centésimos de %
+  
+  // Metadados
+  source: priceSourceEnum("source").default("WEB_SCRAPING").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InvestmentHistory = typeof investmentHistory.$inferSelect;
+export type InsertInvestmentHistory = typeof investmentHistory.$inferInsert;
+
+/**
+ * Investment Transactions table - Transações de investimentos
+ */
+export const investmentTransactions = pgTable("investment_transactions", {
+  id: serial("id").primaryKey(),
+  investmentId: integer("investmentId").notNull(),
+  
+  // Transação
+  type: investmentTransactionTypeEnum("type").notNull(),
+  date: timestamp("date").notNull(),
+  quantity: integer("quantity"), // Quantidade em milésimos
+  price: integer("price"), // Preço unitário em centavos
+  amount: integer("amount").notNull(), // Valor total em centavos
+  fees: integer("fees").default(0).notNull(), // Taxas em centavos
+  
+  // Descrição
+  description: text("description"),
+  
+  // Metadados
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InvestmentTransaction = typeof investmentTransactions.$inferSelect;
+export type InsertInvestmentTransaction = typeof investmentTransactions.$inferInsert;

@@ -921,6 +921,240 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  // ========== INVESTMENTS ==========
+  investments: router({
+    listByEntity: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        // Verify entity belongs to user
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.getInvestmentsByEntity(input.entityId);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const investment = await db.getInvestmentById(input.id);
+        if (!investment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
+        }
+        // Verify investment belongs to user
+        const entity = await db.getEntityById(investment.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return investment;
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          name: z.string(),
+          type: z.enum(["ACAO", "FII", "TESOURO_DIRETO", "CDB", "LCI", "LCA", "FUNDO", "CRIPTO", "OUTRO"]),
+          ticker: z.string().optional(),
+          institution: z.string().optional(),
+          initialAmount: z.number(),
+          quantity: z.number().optional(),
+          averagePrice: z.number().optional(),
+          purchaseDate: z.string(),
+          maturityDate: z.string().optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        // Verify entity belongs to user
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const investment = await db.createInvestment({
+          ...input,
+          userId: ctx.user.id,
+          currentAmount: input.initialAmount,
+          purchaseDate: new Date(input.purchaseDate),
+          maturityDate: input.maturityDate ? new Date(input.maturityDate) : undefined,
+        });
+
+        return investment;
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          ticker: z.string().optional(),
+          institution: z.string().optional(),
+          notes: z.string().optional(),
+          autoUpdate: z.boolean().optional(),
+          alertThreshold: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        const investment = await db.getInvestmentById(id);
+        if (!investment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
+        }
+        // Verify investment belongs to user
+        const entity = await db.getEntityById(investment.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.updateInvestment(id, data);
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const investment = await db.getInvestmentById(input.id);
+        if (!investment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
+        }
+        // Verify investment belongs to user
+        const entity = await db.getEntityById(investment.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        await db.deleteInvestment(input.id);
+        return { success: true };
+      }),
+
+    summary: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        // Verify entity belongs to user
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.getInvestmentsSummary(input.entityId);
+      }),
+
+    distribution: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        // Verify entity belongs to user
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.getPortfolioDistribution(input.entityId);
+      }),
+
+    history: protectedProcedure
+      .input(z.object({ investmentId: z.number(), days: z.number().default(30) }))
+      .query(async ({ input, ctx }) => {
+        const investment = await db.getInvestmentById(input.investmentId);
+        if (!investment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
+        }
+        // Verify investment belongs to user
+        const entity = await db.getEntityById(investment.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.getInvestmentHistory(input.investmentId, input.days);
+      }),
+
+    transactions: protectedProcedure
+      .input(z.object({ investmentId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const investment = await db.getInvestmentById(input.investmentId);
+        if (!investment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
+        }
+        // Verify investment belongs to user
+        const entity = await db.getEntityById(investment.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.getInvestmentTransactions(input.investmentId);
+      }),
+
+    addTransaction: protectedProcedure
+      .input(
+        z.object({
+          investmentId: z.number(),
+          type: z.enum(["BUY", "SELL", "DIVIDEND", "INTEREST", "FEE"]),
+          date: z.string(),
+          quantity: z.number().optional(),
+          price: z.number().optional(),
+          amount: z.number(),
+          fees: z.number().default(0),
+          description: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const investment = await db.getInvestmentById(input.investmentId);
+        if (!investment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
+        }
+        // Verify investment belongs to user
+        const entity = await db.getEntityById(investment.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.addInvestmentTransaction({
+          ...input,
+          date: new Date(input.date),
+        });
+      }),
+
+    updatePrice: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const investment = await db.getInvestmentById(input.id);
+        if (!investment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
+        }
+        // Verify investment belongs to user
+        const entity = await db.getEntityById(investment.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        // Import scraper dynamically to avoid circular dependencies
+        const scraper = await import("./services/investment-scraper");
+        const result = await scraper.updateInvestmentPrice(input.id);
+
+        if (!result.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: result.error || "Failed to update price",
+          });
+        }
+
+        return result;
+      }),
+
+    updateAll: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        // Verify entity belongs to user
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        // Import scraper dynamically
+        const scraper = await import("./services/investment-scraper");
+        const results = await scraper.updateInvestmentsByEntity(input.entityId);
+
+        return {
+          total: results.length,
+          success: results.filter((r) => r.success).length,
+          failed: results.filter((r) => !r.success).length,
+          results,
+        };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

@@ -18,6 +18,12 @@ import {
   InsertBankAccount,
   paymentMethods,
   InsertPaymentMethod,
+  investments,
+  InsertInvestment,
+  investmentHistory,
+  InsertInvestmentHistory,
+  investmentTransactions,
+  InsertInvestmentTransaction,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -806,4 +812,227 @@ export async function updateEntitiesOrder(updates: { id: number; displayOrder: n
       .set({ displayOrder: update.displayOrder })
       .where(eq(entities.id, update.id));
   }
+}
+
+
+// ============================================
+// INVESTMENTS
+// ============================================
+
+/**
+ * Get all investments for an entity
+ */
+export async function getInvestmentsByEntity(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(investments)
+    .where(eq(investments.entityId, entityId))
+    .orderBy(desc(investments.currentAmount));
+}
+
+/**
+ * Get investment by ID
+ */
+export async function getInvestmentById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(investments)
+    .where(eq(investments.id, id))
+    .limit(1);
+
+  return result[0] || null;
+}
+
+/**
+ * Create new investment
+ */
+export async function createInvestment(data: InsertInvestment) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .insert(investments)
+    .values(data)
+    .returning();
+
+  return result[0];
+}
+
+/**
+ * Update investment
+ */
+export async function updateInvestment(id: number, data: Partial<InsertInvestment>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .update(investments)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(investments.id, id))
+    .returning();
+
+  return result[0];
+}
+
+/**
+ * Delete investment
+ */
+export async function deleteInvestment(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .delete(investments)
+    .where(eq(investments.id, id));
+}
+
+/**
+ * Get investments summary for an entity
+ */
+export async function getInvestmentsSummary(entityId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const allInvestments = await getInvestmentsByEntity(entityId);
+
+  const totalInvested = allInvestments.reduce((sum, inv) => sum + (inv.initialAmount || 0), 0);
+  const currentValue = allInvestments.reduce((sum, inv) => sum + (inv.currentAmount || inv.initialAmount || 0), 0);
+  const totalProfitLoss = currentValue - totalInvested;
+  const totalProfitLossPercent = totalInvested > 0 ? (totalProfitLoss / totalInvested) * 10000 : 0; // Em centésimos de %
+
+  return {
+    totalInvested,
+    currentValue,
+    totalProfitLoss,
+    totalProfitLossPercent: Math.round(totalProfitLossPercent),
+    count: allInvestments.length,
+  };
+}
+
+/**
+ * Get portfolio distribution by type
+ */
+export async function getPortfolioDistribution(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const allInvestments = await getInvestmentsByEntity(entityId);
+
+  const distribution: Record<string, { type: string; amount: number; count: number }> = {};
+
+  for (const inv of allInvestments) {
+    const type = inv.type;
+    const amount = inv.currentAmount || inv.initialAmount || 0;
+
+    if (!distribution[type]) {
+      distribution[type] = { type, amount: 0, count: 0 };
+    }
+
+    distribution[type].amount += amount;
+    distribution[type].count += 1;
+  }
+
+  return Object.values(distribution).sort((a, b) => b.amount - a.amount);
+}
+
+// ============================================
+// INVESTMENT HISTORY
+// ============================================
+
+/**
+ * Get investment history
+ */
+export async function getInvestmentHistory(investmentId: number, days: number = 30) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  return await db
+    .select()
+    .from(investmentHistory)
+    .where(
+      and(
+        eq(investmentHistory.investmentId, investmentId),
+        gte(investmentHistory.date, startDate)
+      )
+    )
+    .orderBy(asc(investmentHistory.date));
+}
+
+/**
+ * Add investment history entry
+ */
+export async function addInvestmentHistory(data: InsertInvestmentHistory) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if entry for this date already exists
+  const existing = await db
+    .select()
+    .from(investmentHistory)
+    .where(
+      and(
+        eq(investmentHistory.investmentId, data.investmentId),
+        eq(investmentHistory.date, data.date)
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    // Update existing entry
+    const result = await db
+      .update(investmentHistory)
+      .set(data)
+      .where(eq(investmentHistory.id, existing[0].id))
+      .returning();
+    return result[0];
+  } else {
+    // Insert new entry
+    const result = await db
+      .insert(investmentHistory)
+      .values(data)
+      .returning();
+    return result[0];
+  }
+}
+
+// ============================================
+// INVESTMENT TRANSACTIONS
+// ============================================
+
+/**
+ * Get investment transactions
+ */
+export async function getInvestmentTransactions(investmentId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(investmentTransactions)
+    .where(eq(investmentTransactions.investmentId, investmentId))
+    .orderBy(desc(investmentTransactions.date));
+}
+
+/**
+ * Add investment transaction
+ */
+export async function addInvestmentTransaction(data: InsertInvestmentTransaction) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .insert(investmentTransactions)
+    .values(data)
+    .returning();
+
+  return result[0];
 }
