@@ -968,21 +968,33 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         console.log('[investments.create] Input:', JSON.stringify(input, null, 2));
-        // Verify entity belongs to user
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        
+        try {
+          console.log('[investments.create] Verificando entidade...');
+          // Verify entity belongs to user
+          const entity = await db.getEntityById(input.entityId);
+          console.log('[investments.create] Entidade:', entity);
+          
+          if (!entity || entity.userId !== ctx.user.id) {
+            console.log('[investments.create] ERRO: Acesso negado');
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+
+          console.log('[investments.create] Criando investimento...');
+          const investment = await db.createInvestment({
+            ...input,
+            userId: ctx.user.id,
+            currentAmount: input.initialAmount,
+            purchaseDate: new Date(input.purchaseDate),
+            maturityDate: input.maturityDate ? new Date(input.maturityDate) : undefined,
+          });
+          
+          console.log('[investments.create] Investimento criado:', investment);
+          return investment;
+        } catch (error) {
+          console.error('[investments.create] ERRO:', error);
+          throw error;
         }
-
-        const investment = await db.createInvestment({
-          ...input,
-          userId: ctx.user.id,
-          currentAmount: input.initialAmount,
-          purchaseDate: new Date(input.purchaseDate),
-          maturityDate: input.maturityDate ? new Date(input.maturityDate) : undefined,
-        });
-
-        return investment;
       }),
 
     update: protectedProcedure
