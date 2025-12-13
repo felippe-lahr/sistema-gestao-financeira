@@ -64,29 +64,82 @@ export async function updateStockPrice(ticker: string): Promise<PriceData> {
 // ============================================
 
 /**
- * Atualizar preço de título do Tesouro Direto
- * Fonte: Site oficial do Tesouro Direto
+ * Atualizar preço de título do Tesouro Direto (Tesouro Selic)
+ * Cálculo baseado na taxa Selic acumulada desde a compra
+ * Fonte: API do Banco Central para taxa Selic
  */
-export async function updateTesouroDiretoPrice(ticker: string): Promise<PriceData> {
+export async function updateTesouroDiretoPrice(investmentId: number): Promise<PriceData> {
   try {
-    // Tesouro Direto disponibiliza API pública
-    const response = await axios.get(
-      "https://www.tesourotransparente.gov.br/ckan/api/3/action/datastore_search",
+    const investment = await db.getInvestmentById(investmentId);
+    if (!investment) {
+      throw new Error("Investimento não encontrado");
+    }
+
+    // Buscar taxa Selic acumulada do Banco Central
+    // Série 11 = Taxa Selic (% a.a.)
+    const purchaseDate = new Date(investment.purchaseDate);
+    const today = new Date();
+    
+    // Formatar datas para API do Banco Central (dd/MM/yyyy)
+    const formatDate = (date: Date) => {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    const startDate = formatDate(purchaseDate);
+    const endDate = formatDate(today);
+
+    // Buscar série histórica da Selic
+    const selicResponse = await axios.get(
+      `https://api.bcb.gov.br/dados/serie/bcdata.sgs.11/dados`,
       {
         params: {
-          resource_id: "796d2059-14e9-44e3-80c9-2d9e30b405c1",
-          limit: 1,
+          formato: "json",
+          dataInicial: startDate,
+          dataFinal: endDate,
         },
-        timeout: 10000,
+        timeout: 15000,
       }
     );
 
-    // TODO: Implementar parsing específico do Tesouro Direto
-    // Por enquanto, retornar erro para implementar manualmente
-    throw new Error("Tesouro Direto: Implementação pendente");
+    const selicData = selicResponse.data;
+    
+    if (!selicData || selicData.length === 0) {
+      throw new Error("Dados da Selic não disponíveis");
+    }
+
+    // Calcular rentabilidade acumulada
+    // Tesouro Selic rende 100% da Selic (taxa over)
+    let fatorAcumulado = 1.0;
+    
+    for (const item of selicData) {
+      const taxaDiaria = parseFloat(item.valor) / 100; // Taxa anual em decimal
+      // Converter taxa anual para diária: (1 + taxa_anual)^(1/252) - 1
+      const taxaDiariaEfetiva = Math.pow(1 + taxaDiaria, 1/252) - 1;
+      fatorAcumulado *= (1 + taxaDiariaEfetiva);
+    }
+
+    // Calcular valor atual
+    const valorAtual = investment.initialAmount * fatorAcumulado;
+    const price = Math.round(valorAtual); // Já em centavos
+    
+    // Calcular variação diária (usar última taxa Selic)
+    const ultimaTaxaSelic = parseFloat(selicData[selicData.length - 1].valor);
+    const change = Math.round(ultimaTaxaSelic * 100); // Converter para centésimos de %
+
+    console.log(`[Tesouro Selic] Rentabilidade calculada: ${((fatorAcumulado - 1) * 100).toFixed(4)}%`);
+
+    return {
+      price,
+      change,
+      source: "API",
+      timestamp: new Date(),
+    };
   } catch (error: any) {
-    console.error(`[Investment Scraper] Erro ao buscar Tesouro Direto:`, error.message);
-    throw new Error(`Falha ao buscar Tesouro Direto: ${error.message}`);
+    console.error(`[Investment Scraper] Erro ao calcular Tesouro Selic:`, error.message);
+    throw new Error(`Falha ao calcular Tesouro Selic: ${error.message}`);
   }
 }
 
@@ -239,10 +292,8 @@ export async function updateInvestmentPrice(investmentId: number): Promise<Updat
         break;
 
       case "TESOURO_DIRETO":
-        if (!investment.ticker) {
-          throw new Error("Ticker não definido");
-        }
-        priceData = await updateTesouroDiretoPrice(investment.ticker);
+        // Para Tesouro Selic, calcular baseado na taxa Selic acumulada
+        priceData = await updateTesouroDiretoPrice(investmentId);
         break;
 
       case "CDB":
