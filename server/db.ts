@@ -116,7 +116,7 @@ export async function getEntitiesByUserId(userId: number) {
   const db = await getDb();
   if (!db) return [];
 
-  return await db.select().from(entities).where(eq(entities.userId, userId)).orderBy(asc(entities.displayOrder), desc(entities.createdAt));
+  return await db.select().from(entities).where(eq(entities.userId, userId)).orderBy(desc(entities.createdAt));
 }
 
 export async function getEntityById(entityId: number) {
@@ -796,13 +796,3 @@ export async function getAttachmentsByEntityWithFilters(
   return await query.orderBy(asc(transactions.dueDate));
 }
 
-export async function updateEntitiesOrder(updates: { id: number; displayOrder: number }[]) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  for (const update of updates) {
-    await db.update(entities)
-      .set({ displayOrder: update.displayOrder })
-      .where(eq(entities.id, update.id));
-  }
-}

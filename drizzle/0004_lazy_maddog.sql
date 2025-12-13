@@ -1,1 +1,0 @@
-ALTER TABLE "entities" ADD COLUMN "displayOrder" integer DEFAULT 0 NOT NULL;
