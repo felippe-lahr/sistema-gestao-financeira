@@ -497,36 +497,37 @@ export default function Transactions() {
                 Nova Transação
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Nova Transação</DialogTitle>
-              <DialogDescription>Cadastre uma nova receita ou despesa</DialogDescription>
-            </DialogHeader>
-            <TransactionForm
-              formData={formData}
-              setFormData={setFormData}
-              entities={entities || []}
-              categories={categories || []}
-              bankAccounts={bankAccounts || []}
-              paymentMethods={paymentMethods || []}
-              selectedEntityId={selectedEntityId}
-              setSelectedEntityId={setSelectedEntityId}
-              attachments={attachments}
-              setAttachments={setAttachments}
-              editingTransaction={undefined}
-              utils={utils}
-              setPreviewAttachment={setPreviewAttachment}
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Criando..." : "Criar Transação"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Nova Transação</DialogTitle>
+                <DialogDescription>Cadastre uma nova receita ou despesa</DialogDescription>
+              </DialogHeader>
+              <TransactionForm
+                formData={formData}
+                setFormData={setFormData}
+                entities={entities || []}
+                categories={categories || []}
+                bankAccounts={bankAccounts || []}
+                paymentMethods={paymentMethods || []}
+                selectedEntityId={selectedEntityId}
+                setSelectedEntityId={setSelectedEntityId}
+                attachments={attachments}
+                setAttachments={setAttachments}
+                editingTransaction={undefined}
+                utils={utils}
+                setPreviewAttachment={setPreviewAttachment}
+              />
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                  {createMutation.isPending ? "Criando..." : "Criar Transação"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Edit Dialog */}
