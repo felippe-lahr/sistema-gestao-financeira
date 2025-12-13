@@ -967,6 +967,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        console.log('[investments.create] Input:', JSON.stringify(input, null, 2));
         // Verify entity belongs to user
         const entity = await db.getEntityById(input.entityId);
         if (!entity || entity.userId !== ctx.user.id) {

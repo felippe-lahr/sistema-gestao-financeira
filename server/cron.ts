@@ -1,6 +1,5 @@
 import cron from "node-cron";
 import { updateOverdueTransactions } from "./db";
-import { startInvestmentCron } from "./services/investment-cron";
 
 export function startCronJobs() {
   // Atualizar status vencidos todos os dias à meia-noite (horário do servidor)
@@ -16,10 +15,6 @@ export function startCronJobs() {
     }
   });
 
-  // Iniciar cron job de investimentos
-  startInvestmentCron();
-
   console.log("[CRON] Jobs agendados:");
   console.log("  - Atualização de status vencidos (diariamente à meia-noite)");
-  console.log("  - Atualização de investimentos (diariamente às 18:00)");
 }
