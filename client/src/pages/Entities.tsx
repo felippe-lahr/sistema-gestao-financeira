@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2, Building2 } from "lucide-react";
+import { Plus, Edit, Trash2, Building2, GripVertical } from "lucide-react";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -23,9 +26,25 @@ export default function Entities() {
     description: "",
     color: "#2563EB",
   });
+  const [localEntities, setLocalEntities] = useState<any[]>([]);
 
   const utils = trpc.useUtils();
   const { data: entities, isLoading } = trpc.entities.list.useQuery();
+
+  // Sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Update local entities when data changes
+  useEffect(() => {
+    if (entities) {
+      setLocalEntities([...entities].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)));
+    }
+  }, [entities]);
 
   const createMutation = trpc.entities.create.useMutation({
     onSuccess: () => {
@@ -61,6 +80,20 @@ export default function Entities() {
     },
     onError: (error) => {
       toast.error("Erro ao excluir entidade: " + error.message);
+    },
+  });
+
+  const updateOrderMutation = trpc.entities.updateOrder.useMutation({
+    onSuccess: () => {
+      utils.entities.list.invalidate();
+      toast.success("Ordem atualizada!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar ordem: " + error.message);
+      // Revert local state on error
+      if (entities) {
+        setLocalEntities([...entities].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)));
+      }
     },
   });
 
@@ -104,6 +137,27 @@ export default function Entities() {
   const handleDelete = (entity: any) => {
     setSelectedEntity(entity);
     setIsDeleteOpen(true);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = localEntities.findIndex((e) => e.id === active.id);
+      const newIndex = localEntities.findIndex((e) => e.id === over.id);
+
+      const newOrder = arrayMove(localEntities, oldIndex, newIndex);
+      setLocalEntities(newOrder);
+
+      // Update display order in backend
+      const updates = newOrder.map((entity, index) => ({
+        id: entity.id,
+        displayOrder: index,
+      }));
+
+      // Call backend to update order (we'll implement this next)
+      updateOrderMutation.mutate(updates);
+    }
   };
 
   const confirmDelete = () => {
@@ -220,50 +274,15 @@ export default function Entities() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {entities.map((entity) => (
-            <Card key={entity.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: entity.color || "#2563EB" }}
-                    >
-                      <Building2 className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{entity.name}</CardTitle>
-                      <CardDescription className="text-xs">
-                        Criado em {format(new Date(entity.createdAt), "dd/MM/yyyy", { locale: ptBR })}
-                      </CardDescription>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {entity.description && (
-                  <p className="text-sm text-muted-foreground mb-4">{entity.description}</p>
-                )}
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEdit(entity)}>
-                    <Edit className="mr-2 h-3 w-3" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(entity)}
-                  >
-                    <Trash2 className="mr-2 h-3 w-3" />
-                    Excluir
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={localEntities.map(e => e.id)} strategy={verticalListStrategy}>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {localEntities.map((entity) => (
+                <SortableEntityCard key={entity.id} entity={entity} onEdit={handleEdit} onDelete={handleDelete} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Edit Dialog */}
@@ -343,6 +362,77 @@ export default function Entities() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// Sortable Entity Card Component
+function SortableEntityCard({ entity, onEdit, onDelete }: { entity: any; onEdit: (entity: any) => void; onDelete: (entity: any) => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: entity.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className="hover:shadow-lg transition-shadow">
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3 flex-1">
+              <div
+                className="w-12 h-12 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: entity.color || "#2563EB" }}
+              >
+                <Building2 className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <CardTitle className="text-lg">{entity.name}</CardTitle>
+                <CardDescription className="text-xs">
+                  Criado em {format(new Date(entity.createdAt), "dd/MM/yyyy", { locale: ptBR })}
+                </CardDescription>
+              </div>
+            </div>
+            <button
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded"
+              title="Arrastar para reordenar"
+            >
+              <GripVertical className="h-5 w-5 text-muted-foreground" />
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {entity.description && (
+            <p className="text-sm text-muted-foreground mb-4">{entity.description}</p>
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit(entity)}>
+              <Edit className="mr-2 h-3 w-3" />
+              Editar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 text-destructive hover:text-destructive"
+              onClick={() => onDelete(entity)}
+            >
+              <Trash2 className="mr-2 h-3 w-3" />
+              Excluir
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
