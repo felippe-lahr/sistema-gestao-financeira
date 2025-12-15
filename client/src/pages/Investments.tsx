@@ -14,7 +14,7 @@ import { Plus, TrendingUp, TrendingDown, RefreshCw, Edit, Trash2, DollarSign, Wa
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import CurrencyInput, { parseCurrency, formatCurrency as formatCurrencyValue } from "@/components/CurrencyInput";
+import { CurrencyInput, parseCurrency, formatCurrency as formatCurrencyValue } from "@/components/CurrencyInput";
 
 const investmentTypes = [
   { value: "ACAO", label: "Ação" },
