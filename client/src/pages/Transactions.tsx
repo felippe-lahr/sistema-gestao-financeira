@@ -287,7 +287,7 @@ export default function Transactions() {
     setFormData({
       type: transaction.type,
       description: transaction.description,
-      amount: (transaction.amount / 100).toString(),
+      amount: formatCurrencyValue(transaction.amount / 100),
       dueDate: format(new Date(transaction.dueDate), "yyyy-MM-dd"),
       paymentDate: transaction.paymentDate ? format(new Date(transaction.paymentDate), "yyyy-MM-dd") : "",
       status: transaction.status,

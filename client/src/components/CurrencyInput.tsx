@@ -76,6 +76,7 @@ const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
 CurrencyInput.displayName = 'CurrencyInput';
 
 export { CurrencyInput };
+export { formatCurrency as formatCurrencyValue };
 
 /**
  * Função auxiliar para converter valor formatado (9.000,00) para número (9000.00)
