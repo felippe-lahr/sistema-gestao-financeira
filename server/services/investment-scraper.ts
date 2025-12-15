@@ -63,93 +63,71 @@ export async function updateStockPrice(ticker: string): Promise<PriceData> {
 // TESOURO DIRETO
 // ============================================
 
-/**
- * Atualizar preço de título do Tesouro Direto (Tesouro Selic)
- * Cálculo baseado na taxa Selic atual + spread do título
- * Fonte: API do Banco Central (série 432 - Meta Selic)
- */
-export async function updateTesouroDiretoPrice(investmentId: number): Promise<PriceData> {
-  try {
-    const investment = await db.getInvestmentById(investmentId);
-    if (!investment) {
-      throw new Error("Investimento não encontrado");
-    }
 
-    // Buscar taxa Selic atual do Banco Central (série 432 - Meta Selic)
-    const selicResponse = await axios.get(
-      'https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1',
-      {
-        params: { formato: 'json' },
-        timeout: 10000
-      }
-    );
 
-    const selicData = selicResponse.data;
-    
-    if (!selicData || selicData.length === 0) {
-      throw new Error("Taxa Selic não disponível");
-    }
 
-    // Taxa Selic atual (% a.a.)
-    const taxaSelicAnual = parseFloat(selicData[0].valor) / 100; // Converter para decimal
-    
-    // Spread do título (ex: Tesouro Selic 2031 = +0,1027%)
-    // TODO: Buscar spread do banco de dados (campo investment.spread)
-    // Por enquanto, assumir 0,1027% como padrão
-    const spreadTitulo = 0.001027; // 0,1027% em decimal
-    
-    // Taxa total do investimento
-    const taxaTotal = taxaSelicAnual + spreadTitulo;
 
-    // Calcular dias úteis desde a compra
-    const purchaseDate = new Date(investment.purchaseDate);
-    const today = new Date();
-    
-    // Função para contar dias úteis (aproximação sem feriados)
-    const contarDiasUteis = (inicio: Date, fim: Date): number => {
-      let count = 0;
-      const current = new Date(inicio);
-      while (current <= fim) {
-        const dayOfWeek = current.getDay();
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Não é sábado nem domingo
-          count++;
-        }
-        current.setDate(current.getDate() + 1);
-      }
-      return count;
-    };
 
-    const diasUteis = contarDiasUteis(purchaseDate, today);
 
-    // Calcular rentabilidade acumulada
-    // Fórmula: Valor Atual = Valor Inicial × (1 + taxa_total)^(dias_úteis / 252)
-    const fatorAcumulado = Math.pow(1 + taxaTotal, diasUteis / 252);
-    const valorAtual = investment.initialAmount * fatorAcumulado;
-    const price = Math.round(valorAtual); // Já em centavos
-    
-    // Calcular variação percentual
-    const rentabilidadePercent = (fatorAcumulado - 1) * 100;
-    const change = Math.round(rentabilidadePercent * 100); // Converter para centésimos de %
 
-    console.log(`[Tesouro Selic] Taxa Selic: ${(taxaSelicAnual * 100).toFixed(2)}% a.a.`);
-    console.log(`[Tesouro Selic] Spread: ${(spreadTitulo * 100).toFixed(4)}%`);
-    console.log(`[Tesouro Selic] Taxa total: ${(taxaTotal * 100).toFixed(4)}% a.a.`);
-    console.log(`[Tesouro Selic] Dias úteis: ${diasUteis}`);
-    console.log(`[Tesouro Selic] Rentabilidade: ${rentabilidadePercent.toFixed(4)}%`);
-    console.log(`[Tesouro Selic] Valor inicial: R$ ${(investment.initialAmount / 100).toFixed(2)}`);
-    console.log(`[Tesouro Selic] Valor atual: R$ ${(valorAtual / 100).toFixed(2)}`);
 
-    return {
-      price,
-      change,
-      source: "API",
-      timestamp: new Date(),
-    };
-  } catch (error: any) {
-    console.error(`[Investment Scraper] Erro ao calcular Tesouro Selic:`, error.message);
-    throw new Error(`Falha ao calcular Tesouro Selic: ${error.message}`);
-  }
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ============================================
 // CDB, LCI, LCA - CÁLCULO BASEADO EM CDI
@@ -171,7 +149,6 @@ export async function updateCDBPrice(investmentId: number): Promise<PriceData> {
       "https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados/ultimos/1",
       {
         params: { formato: "json" },
-        timeout: 10000,
       }
     );
 
