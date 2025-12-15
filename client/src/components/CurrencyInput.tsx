@@ -85,7 +85,10 @@ export const parseCurrency = (value: string): number => {
   
   // Remove pontos de milhar e substitui vírgula por ponto
   const cleaned = value.replace(/\./g, '').replace(',', '.');
-  return parseFloat(cleaned) || 0;
+  const amount = parseFloat(cleaned) || 0;
+  
+  // Retorna em centavos (multiplicado por 100)
+  return Math.round(amount * 100);
 };
 
 /**

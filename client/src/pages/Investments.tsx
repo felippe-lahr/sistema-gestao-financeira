@@ -161,9 +161,9 @@ export default function Investments() {
       type: formData.type,
       ticker: formData.ticker || undefined,
       institution: formData.institution || undefined,
-      initialAmount: Math.round(parseCurrency(formData.initialAmount) * 100), // Converter para centavos
+      initialAmount: parseCurrency(formData.initialAmount), // Já retorna em centavos
       quantity: formData.quantity ? Math.round(parseFloat(formData.quantity) * 1000) : undefined, // Converter para milésimos
-      averagePrice: formData.averagePrice ? Math.round(parseCurrency(formData.averagePrice) * 100) : undefined,
+      averagePrice: formData.averagePrice ? parseCurrency(formData.averagePrice) : undefined, // Já retorna em centavos
       purchaseDate: formData.purchaseDate,
       maturityDate: formData.maturityDate || undefined,
       notes: formData.notes || undefined,
