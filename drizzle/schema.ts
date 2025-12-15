@@ -282,3 +282,21 @@ export const investmentTransactions = pgTable("investment_transactions", {
 
 export type InvestmentTransaction = typeof investmentTransactions.$inferSelect;
 export type InsertInvestmentTransaction = typeof investmentTransactions.$inferInsert;
+
+
+/**
+ * Treasury Selic table - Tesouro Selic investments
+ */
+export const treasurySelic = pgTable("treasury_selic", {
+  id: serial("id").primaryKey(),
+  entityId: integer("entityId").notNull().references(() => entities.id, { onDelete: "cascade" }),
+  quantity: varchar("quantity", { length: 50 }).notNull(), // Decimal string (ex: "2.86")
+  initialPrice: integer("initialPrice").notNull(), // Preço inicial em centavos
+  currentPrice: integer("currentPrice").notNull(), // Preço atual em centavos
+  lastUpdated: timestamp("lastUpdated").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type TreasurySelic = typeof treasurySelic.$inferSelect;
+export type InsertTreasurySelic = typeof treasurySelic.$inferInsert;

@@ -6,6 +6,9 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import * as exportUtils from "./export";
 import { TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
+import { treasurySelic } from "../drizzle/schema";
+import { getDb } from "./db";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1240,6 +1243,85 @@ export const appRouter = router({
           failed: results.filter((r) => !r.success).length,
           results,
         };
+      }),
+  }),
+  treasurySelic: router({
+    getByEntity: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const result = await db.getTreasurySelicByEntity(input.entityId);
+        return result && result.length > 0 ? result[0] : null;
+      }),
+    createOrUpdate: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          quantity: z.string(),
+          initialPrice: z.number(),
+          currentPrice: z.number(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const result = await db.createOrUpdateTreasurySelic(input.entityId, {
+          quantity: input.quantity,
+          initialPrice: input.initialPrice,
+          currentPrice: input.currentPrice,
+        });
+        return result && result.length > 0 ? result[0] : null;
+      }),
+    updatePrice: protectedProcedure
+      .input(z.object({ entityId: z.number(), currentPrice: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const result = await db.updateTreasurySelicPrice(input.entityId, input.currentPrice);
+        return result && result.length > 0 ? result[0] : null;
+      }),
+    fetchLatestPrice: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        
+        try {
+          const { fetchTreasurySelicPrice } = await import("../services/treasury-selic-scraper");
+          const currentPrice = await fetchTreasurySelicPrice();
+          const result = await db.updateTreasurySelicPrice(input.entityId, currentPrice);
+          
+          return {
+            success: true,
+            currentPrice,
+            updated: result && result.length > 0 ? result[0] : null,
+          };
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao buscar preço: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+          });
+        }
+      }),
+    delete: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const database = await db.getDb();
+        if (!database) throw new Error("Database not available");
+        return database.delete(treasurySelic).where(eq(treasurySelic.entityId, input.entityId)).returning();
       }),
   }),
 });

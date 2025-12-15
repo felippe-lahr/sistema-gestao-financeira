@@ -24,6 +24,8 @@ import {
   InsertInvestmentHistory,
   investmentTransactions,
   InsertInvestmentTransaction,
+  treasurySelic,
+  InsertTreasurySelic,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1112,4 +1114,54 @@ export async function addInvestmentTransaction(data: InsertInvestmentTransaction
     .returning();
 
   return result[0];
+}
+
+
+// Treasury Selic functions
+export async function getTreasurySelicByEntity(entityId: number) {
+  return db()
+    .select()
+    .from(treasurySelic)
+    .where(eq(treasurySelic.entityId, entityId));
+}
+
+export async function createOrUpdateTreasurySelic(
+  entityId: number,
+  data: Omit<InsertTreasurySelic, "entityId">
+) {
+  const existing = await db()
+    .select()
+    .from(treasurySelic)
+    .where(eq(treasurySelic.entityId, entityId));
+
+  if (existing.length > 0) {
+    return db()
+      .update(treasurySelic)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(treasurySelic.entityId, entityId))
+      .returning();
+  } else {
+    return db()
+      .insert(treasurySelic)
+      .values({
+        entityId,
+        ...data,
+      })
+      .returning();
+  }
+}
+
+export async function updateTreasurySelicPrice(entityId: number, currentPrice: number) {
+  return db()
+    .update(treasurySelic)
+    .set({
+      currentPrice,
+      lastUpdated: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(treasurySelic.entityId, entityId))
+    .returning();
 }
