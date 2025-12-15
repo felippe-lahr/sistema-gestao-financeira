@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { AttachmentUploader } from "@/components/AttachmentUploader";
 import { uploadFile, deleteFile } from "@/lib/supabase";
+import { CurrencyInput, parseCurrency, formatCurrencyValue } from "@/components/CurrencyInput";
 
 export default function Transactions() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -243,7 +244,7 @@ export default function Transactions() {
       entityId: selectedEntityId,
       type: formData.type,
       description: formData.description,
-      amount: parseFloat(formData.amount),
+      amount: parseCurrency(formData.amount),
       dueDate: new Date(formData.dueDate + "T12:00:00"),
       paymentDate: formData.paymentDate ? new Date(formData.paymentDate + "T12:00:00") : undefined,
       status: formData.status,
@@ -297,7 +298,7 @@ export default function Transactions() {
       id: editingTransaction.id,
       type: formData.type,
       description: formData.description,
-      amount: parseFloat(formData.amount),
+      amount: parseCurrency(formData.amount),
       dueDate: new Date(formData.dueDate + "T12:00:00"),
       paymentDate: formData.paymentDate ? new Date(formData.paymentDate + "T12:00:00") : undefined,
       status: formData.status,
@@ -907,7 +908,7 @@ function TransactionForm({
 
         <div className="space-y-2">
           <Label htmlFor="amount">Valor (R$)</Label>
-          <Input id="amount" type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} placeholder="0.00" />
+          <CurrencyInput id="amount" value={formData.amount} onChange={(value) => setFormData({ ...formData, amount: value })} placeholder="0,00" />
         </div>
       </div>
 
