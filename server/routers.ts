@@ -694,9 +694,23 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
 
+        // Processar datas corretamente (formato YYYY-MM-DD vem do frontend)
+        let startDate: Date | undefined;
+        let endDate: Date | undefined;
+        
+        if (input.startDate) {
+          const parts = input.startDate.split('-').map(Number);
+          startDate = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+        }
+        
+        if (input.endDate) {
+          const parts = input.endDate.split('-').map(Number);
+          endDate = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
+        }
+        
         const transactions = await db.getTransactionsByEntityId(input.entityId, {
-          startDate: input.startDate ? new Date(input.startDate) : undefined,
-          endDate: input.endDate ? new Date(input.endDate) : undefined,
+          startDate,
+          endDate,
         });
 
         const summary = {

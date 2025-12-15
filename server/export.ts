@@ -331,7 +331,7 @@ export function generateTransactionsPDF(data: {
 
     // Linhas da tabela
     let rowY = doc.y;
-    data.transactions.slice(0, 20).forEach((transaction, index) => {
+    data.transactions.forEach((transaction, index) => {
       if (rowY > 700) {
         doc.addPage();
         rowY = 50;
