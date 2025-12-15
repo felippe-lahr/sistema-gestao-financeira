@@ -146,6 +146,20 @@ export default function Transactions() {
 
   const exportAttachmentsMutation = trpc.exports.exportAttachmentsZip.useMutation();
 
+  const deleteRecurringMutation = trpc.transactions.deleteRecurring.useMutation({
+    onSuccess: () => {
+      utils.transactions.listByEntity.invalidate();
+      utils.dashboard.metrics.invalidate();
+      setDeleteDialogOpen(false);
+      setDeletingTransactionId(null);
+      setIsRecurringTransaction(false);
+      toast.success("Transacao(oes) excluida(s) com sucesso!");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao excluir transacao");
+    },
+  });
+
   const deleteMutation = trpc.transactions.delete.useMutation({
     onSuccess: () => {
       utils.transactions.listByEntity.invalidate();
@@ -176,7 +190,7 @@ export default function Transactions() {
   const confirmDelete = () => {
     if (deletingTransactionId) {
       if (isRecurringTransaction) {
-        utils.client.transactions.deleteRecurring.mutate({ id: deletingTransactionId, deleteMode });
+        deleteRecurringMutation.mutate({ id: deletingTransactionId, deleteMode });
       } else {
         deleteMutation.mutate({ id: deletingTransactionId });
       }
