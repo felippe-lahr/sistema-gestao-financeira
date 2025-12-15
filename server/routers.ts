@@ -740,9 +740,23 @@ export const appRouter = router({
           }
           console.log("[PDF Export] Entidade encontrada:", entity.name);
 
+          // Ajustar datas para incluir o dia inteiro
+          let startDate: Date | undefined;
+          let endDate: Date | undefined;
+          
+          if (input.startDate) {
+            startDate = new Date(input.startDate);
+            startDate.setHours(0, 0, 0, 0);
+          }
+          
+          if (input.endDate) {
+            endDate = new Date(input.endDate);
+            endDate.setHours(23, 59, 59, 999);
+          }
+          
           const transactions = await db.getTransactionsByEntityId(input.entityId, {
-            startDate: input.startDate ? new Date(input.startDate) : undefined,
-            endDate: input.endDate ? new Date(input.endDate) : undefined,
+            startDate,
+            endDate,
           });
           console.log("[PDF Export] Transações encontradas:", transactions.length);
 
@@ -759,8 +773,8 @@ export const appRouter = router({
           // Buscar dados para gráficos
           const categoryExpenses = await db.getCategoryExpensesByStatus(
             input.entityId,
-            input.startDate ? new Date(input.startDate) : undefined,
-            input.endDate ? new Date(input.endDate) : undefined
+            startDate,
+            endDate
           );
           console.log("[PDF Export] Despesas por categoria:", categoryExpenses.length);
 
@@ -781,6 +795,8 @@ export const appRouter = router({
             transactions,
             summary,
             period: input.period,
+            startDate: input.startDate,
+            endDate: input.endDate,
             categoryExpenses,
             categoryData,
             upcomingTransactions,

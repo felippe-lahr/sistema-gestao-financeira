@@ -146,6 +146,8 @@ export function generateTransactionsPDF(data: {
   transactions: any[];
   summary: any;
   period: string;
+  startDate?: string;
+  endDate?: string;
   cashFlowData?: any[];
   categoryData?: any[];
   categoryExpenses?: any[];
@@ -172,10 +174,24 @@ export function generateTransactionsPDF(data: {
       .fillColor("#000000")
       .text(data.entityName, { align: "center" });
 
+    // Formatar período com datas específicas
+    let periodText = data.period;
+    if (data.startDate && data.endDate) {
+      const startFormatted = format(new Date(data.startDate), "dd/MM/yyyy", { locale: ptBR });
+      const endFormatted = format(new Date(data.endDate), "dd/MM/yyyy", { locale: ptBR });
+      periodText = `${data.period} (${startFormatted} até ${endFormatted})`;
+    } else if (data.startDate) {
+      const startFormatted = format(new Date(data.startDate), "dd/MM/yyyy", { locale: ptBR });
+      periodText = `${data.period} (a partir de ${startFormatted})`;
+    } else if (data.endDate) {
+      const endFormatted = format(new Date(data.endDate), "dd/MM/yyyy", { locale: ptBR });
+      periodText = `${data.period} (até ${endFormatted})`;
+    }
+    
     doc
       .fontSize(10)
       .fillColor("#6B7280")
-      .text(`Período: ${data.period}`, { align: "center" });
+      .text(`Período: ${periodText}`, { align: "center" });
 
     doc
       .fontSize(8)
