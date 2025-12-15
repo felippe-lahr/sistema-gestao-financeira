@@ -740,25 +740,42 @@ export const appRouter = router({
           }
           console.log("[PDF Export] Entidade encontrada:", entity.name);
 
-          // Ajustar datas para incluir o dia inteiro
+          // Processar datas corretamente (formato YYYY-MM-DD vem do frontend)
           let startDate: Date | undefined;
           let endDate: Date | undefined;
           
           if (input.startDate) {
-            startDate = new Date(input.startDate);
-            startDate.setHours(0, 0, 0, 0);
+            const parts = input.startDate.split('-').map(Number);
+            startDate = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
           }
           
           if (input.endDate) {
-            endDate = new Date(input.endDate);
-            endDate.setHours(23, 59, 59, 999);
+            const parts = input.endDate.split('-').map(Number);
+            endDate = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
           }
+          
+          console.log("[PDF Export] Filtro de datas:", {
+            startDate: startDate?.toISOString(),
+            endDate: endDate?.toISOString(),
+            inputStartDate: input.startDate,
+            inputEndDate: input.endDate,
+          });
           
           const transactions = await db.getTransactionsByEntityId(input.entityId, {
             startDate,
             endDate,
           });
           console.log("[PDF Export] Transações encontradas:", transactions.length);
+          if (transactions.length > 0) {
+            console.log("[PDF Export] Primeira transação:", {
+              description: transactions[0].description,
+              dueDate: transactions[0].dueDate,
+            });
+            console.log("[PDF Export] Última transação:", {
+              description: transactions[transactions.length - 1].description,
+              dueDate: transactions[transactions.length - 1].dueDate,
+            });
+          }
 
           const summary = {
             totalIncome: transactions
