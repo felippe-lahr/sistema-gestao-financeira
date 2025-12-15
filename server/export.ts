@@ -3,6 +3,14 @@ import PDFDocument from "pdfkit";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+// Função para formatar valores em moeda brasileira
+function formatBRL(value: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
 // ========== EXCEL EXPORT ==========
 
 export async function generateTransactionsExcel(data: {
@@ -219,7 +227,7 @@ export function generateTransactionsPDF(data: {
     doc
       .fontSize(16)
       .font("Helvetica-Bold")
-      .text(`R$ ${(data.summary.totalIncome / 100).toFixed(2)}`, 60, summaryY + 35);
+      .text(formatBRL(data.summary.totalIncome / 100), 60, summaryY + 35);
 
     // Box de Despesas
     doc.rect(220, summaryY, 160, 60).fillAndStroke("#FECACA", "#DC2626");
@@ -227,7 +235,7 @@ export function generateTransactionsPDF(data: {
     doc
       .fontSize(16)
       .font("Helvetica-Bold")
-      .text(`R$ ${(data.summary.totalExpenses / 100).toFixed(2)}`, 230, summaryY + 35);
+      .text(formatBRL(data.summary.totalExpenses / 100), 230, summaryY + 35);
 
     // Box de Saldo
     const balance = (data.summary.totalIncome - data.summary.totalExpenses) / 100;
@@ -239,7 +247,7 @@ export function generateTransactionsPDF(data: {
     doc
       .fontSize(16)
       .font("Helvetica-Bold")
-      .text(`R$ ${balance.toFixed(2)}`, 400, summaryY + 35);
+      .text(formatBRL(balance), 400, summaryY + 35);
 
     doc.y = summaryY + 80;
     doc.moveDown(2);
@@ -283,7 +291,7 @@ export function generateTransactionsPDF(data: {
           transaction.description.substring(0, 35),
           (transaction.categoryName || "Sem Categoria").substring(0, 15),
           daysText,
-          `R$ ${(transaction.amount / 100).toFixed(2)}`,
+          formatBRL(transaction.amount / 100),
         ];
 
         rowData.forEach((cellData, i) => {
@@ -344,7 +352,7 @@ export function generateTransactionsPDF(data: {
         transaction.dueDate ? format(new Date(transaction.dueDate), "dd/MM/yyyy") : "",
         transaction.description.substring(0, 30),
         transaction.type === "INCOME" ? "Receita" : "Despesa",
-        `R$ ${(transaction.amount / 100).toFixed(2)}`,
+        formatBRL(transaction.amount / 100),
         transaction.status === "PAID" ? "Pago" : transaction.status === "PENDING" ? "Pendente" : "Vencido",
         transaction.dueDate ? format(new Date(transaction.dueDate), "dd/MM/yyyy") : "",
       ];
@@ -416,10 +424,10 @@ export function generateTransactionsPDF(data: {
         categoryXPos = 50;
         const rowData = [
           cat.categoryName || "Sem Categoria",
-          `R$ ${(cat.paid / 100).toFixed(2)}`,
-          `R$ ${(cat.pending / 100).toFixed(2)}`,
-          `R$ ${(cat.overdue / 100).toFixed(2)}`,
-          `R$ ${(cat.total / 100).toFixed(2)}`,
+          formatBRL(cat.paid / 100),
+          formatBRL(cat.pending / 100),
+          formatBRL(cat.overdue / 100),
+          formatBRL(cat.total / 100),
         ];
 
         rowData.forEach((cellData, i) => {
@@ -445,10 +453,10 @@ export function generateTransactionsPDF(data: {
       categoryXPos = 50;
       const totalRowData = [
         "Total Geral",
-        `R$ ${(totalPaid / 100).toFixed(2)}`,
-        `R$ ${(totalPending / 100).toFixed(2)}`,
-        `R$ ${(totalOverdue / 100).toFixed(2)}`,
-        `R$ ${(totalAll / 100).toFixed(2)}`,
+        formatBRL(totalPaid / 100),
+        formatBRL(totalPending / 100),
+        formatBRL(totalOverdue / 100),
+        formatBRL(totalAll / 100),
       ];
 
       totalRowData.forEach((cellData, i) => {

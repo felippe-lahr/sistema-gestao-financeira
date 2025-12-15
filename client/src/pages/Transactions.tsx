@@ -770,7 +770,7 @@ export default function Transactions() {
                         {getStatusBadge(transaction.status)}
                         <div className="text-right">
                           <p className={`text-lg font-bold ${transaction.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                            {transaction.type === "INCOME" ? "+" : "-"}R$ {(transaction.amount / 100).toFixed(2)}
+                            {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
                           </p>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(transaction)}>
