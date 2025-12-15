@@ -232,6 +232,7 @@ export async function getTransactionsByEntityId(
       bankAccountId: transactions.bankAccountId,
       paymentMethodId: transactions.paymentMethodId,
       isRecurring: transactions.isRecurring,
+      parentTransactionId: transactions.parentTransactionId,
       notes: transactions.notes,
       createdAt: transactions.createdAt,
       updatedAt: transactions.updatedAt,
@@ -294,6 +295,48 @@ export async function deleteTransaction(transactionId: number) {
   if (!db) throw new Error("Database not available");
 
   await db.delete(transactions).where(eq(transactions.id, transactionId));
+}
+
+/**
+ * Deletar transação recorrente com opções de exclusão
+ * @param transactionId - ID da transação a deletar
+ * @param deleteMode - 'single' (apenas esta) ou 'all' (todas da recorrência)
+ */
+export async function deleteRecurringTransaction(
+  transactionId: number,
+  deleteMode: 'single' | 'all' = 'single'
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const transaction = await getTransactionById(transactionId);
+  if (!transaction) throw new Error("Transaction not found");
+
+  if (deleteMode === 'single') {
+    // Deletar apenas esta transação
+    await db.delete(transactions).where(eq(transactions.id, transactionId));
+  } else if (deleteMode === 'all') {
+    // Deletar todas as transações com a mesma descrição base (sem o número de parcela)
+    // Extrai a descrição base removendo o padrão " (X/Y)"
+    const descriptionBase = transaction.description.replace(/ \(\d+\/\d+\)$/, '');
+    
+    // Encontrar todas as transações com descrição similar (mesma entidade, tipo e descrição base)
+    const allTransactions = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.entityId, transaction.entityId),
+          eq(transactions.type, transaction.type),
+          sql`${transactions.description} LIKE ${descriptionBase + '%'}`
+        )
+      );
+    
+    // Deletar todas as transações encontradas
+    for (const trans of allTransactions) {
+      await db.delete(transactions).where(eq(transactions.id, trans.id));
+    }
+  }
 }
 
 

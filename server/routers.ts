@@ -383,6 +383,7 @@ export const appRouter = router({
           const count = input.recurrenceCount;
           const frequency = input.recurrenceFrequency;
           const transactionIds: number[] = [];
+          let parentTransactionId: number | null = null;
 
           for (let i = 0; i < count; i++) {
             let newDueDate = new Date(input.dueDate);
@@ -416,8 +417,14 @@ export const appRouter = router({
               paymentMethodId: input.paymentMethodId,
               isRecurring: false,
               recurrencePattern: null,
+              parentTransactionId: parentTransactionId,
               notes: input.notes,
             });
+
+            if (i === 0) {
+              parentTransactionId = transactionId;
+              await db.updateTransaction(transactionId, { parentTransactionId: transactionId });
+            }
 
             transactionIds.push(transactionId);
           }
@@ -503,6 +510,26 @@ export const appRouter = router({
       await db.deleteTransaction(input.id);
       return { success: true };
     }),
+
+    deleteRecurring: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          deleteMode: z.enum(["single", "all"]).default("single"),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const transaction = await db.getTransactionById(input.id);
+        if (!transaction) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
+        }
+        const entity = await db.getEntityById(transaction.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        await db.deleteRecurringTransaction(input.id, input.deleteMode);
+        return { success: true };
+      }),
   }),
 
   // ========== DASHBOARD ==========

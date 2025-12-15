@@ -161,15 +161,25 @@ export default function Transactions() {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTransactionId, setDeletingTransactionId] = useState<number | null>(null);
+  const [deleteMode, setDeleteMode] = useState<'single' | 'all'>('single');
+  const [isRecurringTransaction, setIsRecurringTransaction] = useState(false);
 
   const handleDelete = (id: number) => {
+    const transaction = transactions?.find(t => t.id === id);
+    const hasRecurringPattern = transaction?.description.includes('(') && transaction?.description.includes('/');
+    setIsRecurringTransaction(!!hasRecurringPattern);
+    setDeleteMode('single');
     setDeletingTransactionId(id);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
     if (deletingTransactionId) {
-      deleteMutation.mutate({ id: deletingTransactionId });
+      if (isRecurringTransaction) {
+        utils.client.transactions.deleteRecurring.mutate({ id: deletingTransactionId, deleteMode });
+      } else {
+        deleteMutation.mutate({ id: deletingTransactionId });
+      }
     }
   };
 
@@ -780,6 +790,37 @@ export default function Transactions() {
               Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
+          {isRecurringTransaction && (
+            <div className="space-y-3 py-4">
+              <p className="text-sm font-medium">Esta é uma transação recorrente. Como deseja proceder?</p>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deleteMode"
+                    value="single"
+                    checked={deleteMode === 'single'}
+                    onChange={() => setDeleteMode('single')}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">Excluir apenas esta transação</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deleteMode"
+                    value="all"
+                    checked={deleteMode === 'all'}
+                    onChange={() => setDeleteMode('all')}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">Excluir todas as transações desta recorrência</span>
+                </label>
+              </div>
+            </div>
+          )}
+          
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
