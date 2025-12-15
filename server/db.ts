@@ -1119,7 +1119,9 @@ export async function addInvestmentTransaction(data: InsertInvestmentTransaction
 
 // Treasury Selic functions
 export async function getTreasurySelicByEntity(entityId: number) {
-  return db()
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db
     .select()
     .from(treasurySelic)
     .where(eq(treasurySelic.entityId, entityId));
@@ -1129,13 +1131,16 @@ export async function createOrUpdateTreasurySelic(
   entityId: number,
   data: Omit<InsertTreasurySelic, "entityId">
 ) {
-  const existing = await db()
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  
+  const existing = await database
     .select()
     .from(treasurySelic)
     .where(eq(treasurySelic.entityId, entityId));
 
   if (existing.length > 0) {
-    return db()
+    return database
       .update(treasurySelic)
       .set({
         ...data,
@@ -1144,7 +1149,7 @@ export async function createOrUpdateTreasurySelic(
       .where(eq(treasurySelic.entityId, entityId))
       .returning();
   } else {
-    return db()
+    return database
       .insert(treasurySelic)
       .values({
         entityId,
@@ -1155,7 +1160,9 @@ export async function createOrUpdateTreasurySelic(
 }
 
 export async function updateTreasurySelicPrice(entityId: number, currentPrice: number) {
-  return db()
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db
     .update(treasurySelic)
     .set({
       currentPrice,
