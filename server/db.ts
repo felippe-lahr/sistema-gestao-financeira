@@ -227,6 +227,21 @@ export async function getTransactionsByEntityId(
     });
   }
 
+  let conditions: any[] = [eq(transactions.entityId, entityId)];
+  
+  if (options?.startDate) {
+    conditions.push(gte(transactions.dueDate, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(transactions.dueDate, options.endDate));
+  }
+  if (options?.status) {
+    conditions.push(eq(transactions.status, options.status));
+  }
+  if (options?.type) {
+    conditions.push(eq(transactions.type, options.type));
+  }
+  
   let query = db
     .select({
       id: transactions.id,
@@ -251,21 +266,9 @@ export async function getTransactionsByEntityId(
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(eq(transactions.entityId, entityId))
+    .where(and(...conditions))
     .$dynamic();
 
-  if (options?.startDate) {
-    query = query.where(gte(transactions.dueDate, options.startDate));
-  }
-  if (options?.endDate) {
-    query = query.where(lte(transactions.dueDate, options.endDate));
-  }
-  if (options?.status) {
-    query = query.where(eq(transactions.status, options.status));
-  }
-  if (options?.type) {
-    query = query.where(eq(transactions.type, options.type));
-  }
 
   query = query.orderBy(desc(transactions.dueDate));
 
