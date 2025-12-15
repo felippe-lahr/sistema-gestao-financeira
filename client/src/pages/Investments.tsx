@@ -14,6 +14,7 @@ import { Plus, TrendingUp, TrendingDown, RefreshCw, Edit, Trash2, DollarSign, Wa
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import CurrencyInput, { parseCurrency, formatCurrency as formatCurrencyValue } from "@/components/CurrencyInput";
 
 const investmentTypes = [
   { value: "ACAO", label: "Ação" },
@@ -160,9 +161,9 @@ export default function Investments() {
       type: formData.type,
       ticker: formData.ticker || undefined,
       institution: formData.institution || undefined,
-      initialAmount: Math.round(parseFloat(formData.initialAmount) * 100), // Converter para centavos
+      initialAmount: Math.round(parseCurrency(formData.initialAmount) * 100), // Converter para centavos
       quantity: formData.quantity ? Math.round(parseFloat(formData.quantity) * 1000) : undefined, // Converter para milésimos
-      averagePrice: formData.averagePrice ? Math.round(parseFloat(formData.averagePrice) * 100) : undefined,
+      averagePrice: formData.averagePrice ? Math.round(parseCurrency(formData.averagePrice) * 100) : undefined,
       purchaseDate: formData.purchaseDate,
       maturityDate: formData.maturityDate || undefined,
       notes: formData.notes || undefined,
@@ -176,9 +177,9 @@ export default function Investments() {
       type: investment.type,
       ticker: investment.ticker || "",
       institution: investment.institution || "",
-      initialAmount: (investment.initialAmount / 100).toFixed(2),
+      initialAmount: formatCurrencyValue(investment.initialAmount / 100),
       quantity: investment.quantity ? (investment.quantity / 1000).toFixed(3) : "",
-      averagePrice: investment.averagePrice ? (investment.averagePrice / 100).toFixed(2) : "",
+      averagePrice: investment.averagePrice ? formatCurrencyValue(investment.averagePrice / 100) : "",
       purchaseDate: format(new Date(investment.purchaseDate), "yyyy-MM-dd"),
       maturityDate: investment.maturityDate ? format(new Date(investment.maturityDate), "yyyy-MM-dd") : "",
       notes: investment.notes || "",
@@ -478,13 +479,11 @@ export default function Investments() {
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="initialAmount">Valor Investido (R$) *</Label>
-                <Input
+                <CurrencyInput
                   id="initialAmount"
-                  type="number"
-                  step="0.01"
                   value={formData.initialAmount}
-                  onChange={(e) => setFormData({ ...formData, initialAmount: e.target.value })}
-                  placeholder="1000.00"
+                  onChange={(value) => setFormData({ ...formData, initialAmount: value })}
+                  placeholder="0,00"
                 />
               </div>
 
@@ -502,13 +501,11 @@ export default function Investments() {
 
               <div className="grid gap-2">
                 <Label htmlFor="averagePrice">Preço Médio (R$)</Label>
-                <Input
+                <CurrencyInput
                   id="averagePrice"
-                  type="number"
-                  step="0.01"
                   value={formData.averagePrice}
-                  onChange={(e) => setFormData({ ...formData, averagePrice: e.target.value })}
-                  placeholder="10.00"
+                  onChange={(value) => setFormData({ ...formData, averagePrice: value })}
+                  placeholder="0,00"
                 />
               </div>
             </div>
