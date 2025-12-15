@@ -319,7 +319,7 @@ export function generateTransactionsPDF(data: {
 
     // Cabeçalho da tabela
     const tableTop = doc.y;
-    const colWidths = [70, 180, 60, 80, 60, 70];
+    const colWidths = [55, 250, 50, 70, 50, 55];
     const headers = ["Data", "Descrição", "Tipo", "Valor", "Status", "Vencimento"];
 
     let xPos = 50;
@@ -350,7 +350,7 @@ export function generateTransactionsPDF(data: {
       xPos = 50;
       const rowData = [
         transaction.dueDate ? format(new Date(transaction.dueDate), "dd/MM/yyyy") : "",
-        transaction.description.substring(0, 30),
+        transaction.description.substring(0, 50),
         transaction.type === "INCOME" ? "Receita" : "Despesa",
         formatBRL(transaction.amount / 100),
         transaction.status === "PAID" ? "Pago" : transaction.status === "PENDING" ? "Pendente" : "Vencido",
