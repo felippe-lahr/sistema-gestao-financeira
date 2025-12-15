@@ -217,6 +217,13 @@ export async function getTransactionsByEntityId(
 ) {
   const db = await getDb();
   if (!db) return [];
+  
+  if (options?.startDate || options?.endDate) {
+    console.log("[getTransactionsByEntityId] Filtro de datas:", {
+      startDate: options?.startDate?.toISOString(),
+      endDate: options?.endDate?.toISOString(),
+    });
+  }
 
   let query = db
     .select({
@@ -264,7 +271,17 @@ export async function getTransactionsByEntityId(
     query = query.limit(options.limit);
   }
 
-  return await query;
+  const result = await query;
+  
+  if (options?.startDate || options?.endDate) {
+    console.log("[getTransactionsByEntityId] Resultados:", {
+      total: result.length,
+      primeiraDueDate: result[result.length - 1]?.dueDate?.toISOString(),
+      ultimaDueDate: result[0]?.dueDate?.toISOString(),
+    });
+  }
+  
+  return result;
 }
 
 export async function getTransactionById(transactionId: number) {
