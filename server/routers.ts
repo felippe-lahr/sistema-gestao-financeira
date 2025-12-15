@@ -1319,7 +1319,7 @@ export const appRouter = router({
         if (!entity || entity.userId !== ctx.user.id) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
-        const database = await db.getDb();
+        const database = await getDb();
         if (!database) throw new Error("Database not available");
         return database.delete(treasurySelic).where(eq(treasurySelic.entityId, input.entityId)).returning();
       }),
