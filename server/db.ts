@@ -641,8 +641,8 @@ export async function getCategoryDistribution(entityId: number, startDate?: Date
   if (!db) return [];
 
   const now = new Date();
-  const defaultStartDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1);
-  const defaultEndDate = endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const finalStartDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+  const finalEndDate = endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   const conditions = [
     eq(transactions.entityId, entityId),
@@ -650,11 +650,17 @@ export async function getCategoryDistribution(entityId: number, startDate?: Date
     eq(transactions.status, "PAID"),
   ];
 
-  if (startDate || !startDate) {
-    conditions.push(gte(transactions.dueDate, defaultStartDate));
+  // Aplicar filtro de datas corretamente
+  if (startDate) {
+    conditions.push(gte(transactions.dueDate, startDate));
+  } else {
+    conditions.push(gte(transactions.dueDate, finalStartDate));
   }
-  if (endDate || !endDate) {
-    conditions.push(lte(transactions.dueDate, defaultEndDate));
+  
+  if (endDate) {
+    conditions.push(lte(transactions.dueDate, endDate));
+  } else {
+    conditions.push(lte(transactions.dueDate, finalEndDate));
   }
 
   const result = await db
@@ -681,8 +687,8 @@ export async function getCategoryExpensesByStatus(entityId: number, startDate?: 
   if (!db) return [];
 
   const now = new Date();
-  const defaultStartDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1);
-  const defaultEndDate = endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const finalStartDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+  const finalEndDate = endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   const conditions = [
     eq(transactions.entityId, entityId),
@@ -690,11 +696,17 @@ export async function getCategoryExpensesByStatus(entityId: number, startDate?: 
     sql`${transactions.dueDate} IS NOT NULL`
   ];
 
-  if (startDate || !startDate) {
-    conditions.push(gte(transactions.dueDate, defaultStartDate));
+  // Aplicar filtro de datas corretamente
+  if (startDate) {
+    conditions.push(gte(transactions.dueDate, startDate));
+  } else {
+    conditions.push(gte(transactions.dueDate, finalStartDate));
   }
-  if (endDate || !endDate) {
-    conditions.push(lte(transactions.dueDate, defaultEndDate));
+  
+  if (endDate) {
+    conditions.push(lte(transactions.dueDate, endDate));
+  } else {
+    conditions.push(lte(transactions.dueDate, finalEndDate));
   }
 
   const result = await db
