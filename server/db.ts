@@ -222,6 +222,8 @@ export async function getTransactionsByEntityId(
     console.log("[getTransactionsByEntityId] Filtro de datas:", {
       startDate: options?.startDate?.toISOString(),
       endDate: options?.endDate?.toISOString(),
+      startDateTime: options?.startDate,
+      endDateTime: options?.endDate,
     });
   }
 
