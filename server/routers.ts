@@ -1326,31 +1326,31 @@ export const appRouter = router({
   }),
   treasuryDirect: router({
     /**
-     * Busca todos os títulos disponíveis do Tesouro Direto
+     * Busca todos os títulos do cache (instantâneo)
      */
     getAllTitles: publicProcedure.query(async () => {
       try {
-        const { fetchTreasuryDirectTitles } = await import("../services/treasury-direct-scraper");
-        const titles = await fetchTreasuryDirectTitles();
+        const { getTreasuryDirectTitlesFromCache } = await import("../db-treasury-direct");
+        const titles = await getTreasuryDirectTitlesFromCache();
         return titles;
       } catch (error) {
         console.error("[treasuryDirect.getAllTitles] Erro:", error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Erro ao buscar títulos do Tesouro Direto",
+          message: "Erro ao buscar títulos",
         });
       }
     }),
 
     /**
-     * Busca títulos de uma categoria específica
+     * Busca títulos de uma categoria específica do cache
      */
     getTitlesByCategory: publicProcedure
       .input(z.object({ category: z.enum(["SELIC", "IPCA", "EDUCAC", "RENDA", "PREFIXADO"]) }))
       .query(async ({ input }) => {
         try {
-          const { fetchTreasuryDirectTitlesByCategory } = await import("../services/treasury-direct-scraper");
-          const titles = await fetchTreasuryDirectTitlesByCategory(input.category);
+          const { getTreasuryDirectTitlesByCategoryFromCache } = await import("../db-treasury-direct");
+          const titles = await getTreasuryDirectTitlesByCategoryFromCache(input.category);
           return titles;
         } catch (error) {
           console.error("[treasuryDirect.getTitlesByCategory] Erro:", error);
@@ -1362,29 +1362,27 @@ export const appRouter = router({
       }),
 
     /**
-     * Busca um título específico pelo código
+     * Atualiza o cache com novos títulos (chamado quando usuário clica "Atualizar")
      */
-    getTitleByCode: publicProcedure
-      .input(z.object({ code: z.string() }))
-      .query(async ({ input }) => {
-        try {
-          const { fetchTreasuryDirectTitleByCode } = await import("../services/treasury-direct-scraper");
-          const title = await fetchTreasuryDirectTitleByCode(input.code);
-          if (!title) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Título não encontrado",
-            });
-          }
-          return title;
-        } catch (error) {
-          console.error("[treasuryDirect.getTitleByCode] Erro:", error);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Erro ao buscar título",
-          });
-        }
-      }),
+    refreshCache: protectedProcedure.mutation(async ({ ctx }) => {
+      try {
+        const { fetchTreasuryDirectTitles } = await import("../services/treasury-direct-scraper");
+        const { updateTreasuryDirectTitlesCache } = await import("../db-treasury-direct");
+        
+        console.log("[treasuryDirect.refreshCache] Iniciando atualização de cache...");
+        const titles = await fetchTreasuryDirectTitles();
+        const count = await updateTreasuryDirectTitlesCache(titles);
+        
+        console.log(`[treasuryDirect.refreshCache] ✓ Cache atualizado com ${count} títulos`);
+        return { success: true, count };
+      } catch (error) {
+        console.error("[treasuryDirect.refreshCache] Erro:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Erro ao atualizar cache de títulos",
+        });
+      }
+    }),
   }),
 });
 

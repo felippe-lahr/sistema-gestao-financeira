@@ -306,3 +306,22 @@ export const treasurySelic = pgTable("treasury_selic", {
 export type TreasurySelic = typeof treasurySelic.$inferSelect;
 export type InsertTreasurySelic = typeof treasurySelic.$inferInsert;
 
+/**
+ * Treasury Direct Titles Cache - Cache de títulos do Tesouro Direto
+ * Atualizado diariamente via cron job
+ */
+export const treasuryDirectTitlesCache = pgTable("treasury_direct_titles_cache", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(), // Ex: "Tesouro Selic 2031"
+  category: varchar("category", { length: 50 }).notNull(), // Ex: "SELIC", "IPCA", "EDUCAC", "RENDA", "PREFIXADO"
+  code: varchar("code", { length: 100 }).unique().notNull(), // Código único (ex: "SELIC_2031")
+  profitability: varchar("profitability", { length: 100 }).notNull(), // Ex: "SELIC + 0,1025%"
+  unitaryPrice: integer("unitaryPrice").notNull(), // Preço unitário em centavos
+  minimumInvestment: integer("minimumInvestment").notNull(), // Investimento mínimo em centavos
+  maturityDate: varchar("maturityDate", { length: 20 }).notNull(), // Data de vencimento (ISO format)
+  lastUpdated: timestamp("lastUpdated").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type TreasuryDirectTitleCache = typeof treasuryDirectTitlesCache.$inferSelect;
+export type InsertTreasuryDirectTitleCache = typeof treasuryDirectTitlesCache.$inferInsert;
