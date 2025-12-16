@@ -1324,6 +1324,68 @@ export const appRouter = router({
         return database.delete(treasurySelic).where(eq(treasurySelic.entityId, input.entityId)).returning();
       }),
   }),
+  treasuryDirect: router({
+    /**
+     * Busca todos os títulos disponíveis do Tesouro Direto
+     */
+    getAllTitles: publicProcedure.query(async () => {
+      try {
+        const { fetchTreasuryDirectTitles } = await import("../services/treasury-direct-scraper");
+        const titles = await fetchTreasuryDirectTitles();
+        return titles;
+      } catch (error) {
+        console.error("[treasuryDirect.getAllTitles] Erro:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Erro ao buscar títulos do Tesouro Direto",
+        });
+      }
+    }),
+
+    /**
+     * Busca títulos de uma categoria específica
+     */
+    getTitlesByCategory: publicProcedure
+      .input(z.object({ category: z.enum(["SELIC", "IPCA", "EDUCAC", "RENDA", "PREFIXADO"]) }))
+      .query(async ({ input }) => {
+        try {
+          const { fetchTreasuryDirectTitlesByCategory } = await import("../services/treasury-direct-scraper");
+          const titles = await fetchTreasuryDirectTitlesByCategory(input.category);
+          return titles;
+        } catch (error) {
+          console.error("[treasuryDirect.getTitlesByCategory] Erro:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Erro ao buscar títulos da categoria",
+          });
+        }
+      }),
+
+    /**
+     * Busca um título específico pelo código
+     */
+    getTitleByCode: publicProcedure
+      .input(z.object({ code: z.string() }))
+      .query(async ({ input }) => {
+        try {
+          const { fetchTreasuryDirectTitleByCode } = await import("../services/treasury-direct-scraper");
+          const title = await fetchTreasuryDirectTitleByCode(input.code);
+          if (!title) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Título não encontrado",
+            });
+          }
+          return title;
+        } catch (error) {
+          console.error("[treasuryDirect.getTitleByCode] Erro:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Erro ao buscar título",
+          });
+        }
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
