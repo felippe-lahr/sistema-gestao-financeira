@@ -277,8 +277,14 @@ export async function updateInvestmentPrice(investmentId: number): Promise<Updat
         break;
 
       case "TESOURO_DIRETO":
-        // Para Tesouro Selic, calcular baseado na taxa Selic acumulada
-        priceData = await updateTesouroDiretoPrice(investmentId);
+        // Tesouro Direto genérico - não atualizar automaticamente
+        // Use a página específica de Tesouro Selic para esse tipo
+        console.log(`[Investment Scraper] Pulando TESOURO_DIRETO ${investmentId} - use página de Tesouro Selic`);
+        return {
+          investmentId,
+          success: false,
+          error: "Use a página de Tesouro Selic para esse tipo de investimento",
+        };
         break;
 
       case "CDB":
