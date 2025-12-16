@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CurrencyInput, parseCurrency, formatCurrency as formatCurrencyValue } from "@/components/CurrencyInput";
+import { TreasuryDirectSelector } from "@/components/TreasuryDirectSelector";
 
 const investmentTypes = [
   { value: "ACAO", label: "Ação" },
@@ -460,6 +461,18 @@ export default function Investments() {
                 placeholder="Ex: Banco Inter, XP Investimentos"
               />
             </div>
+            {formData.type === "TESOURO_DIRETO" && (
+              <TreasuryDirectSelector
+                onTitleSelected={(title) => {
+                  setFormData({
+                    ...formData,
+                    name: title.name,
+                    ticker: title.code,
+                    averagePrice: formatCurrencyValue(title.unitaryPrice / 100),
+                  });
+                }}
+              />
+            )}
 
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
