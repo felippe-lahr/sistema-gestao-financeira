@@ -227,6 +227,11 @@ export const investments = pgTable("investments", {
   autoUpdate: boolean("autoUpdate").default(true).notNull(),
   alertThreshold: integer("alertThreshold"), // % de variação para alertar (em centésimos)
   
+  // Tesouro Direto específico
+  treasuryDirectCode: varchar("treasuryDirectCode", { length: 100 }), // Código do título (ex: "SELIC_2031")
+  treasuryDirectCategory: varchar("treasuryDirectCategory", { length: 50 }), // Categoria (SELIC, IPCA, EDUCAC, RENDA, PREFIXADO)
+  treasuryDirectProfitability: varchar("treasuryDirectProfitability", { length: 100 }), // Rentabilidade (ex: "SELIC + 0,1025%")
+  
   // Metadados
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -300,3 +305,4 @@ export const treasurySelic = pgTable("treasury_selic", {
 
 export type TreasurySelic = typeof treasurySelic.$inferSelect;
 export type InsertTreasurySelic = typeof treasurySelic.$inferInsert;
+
