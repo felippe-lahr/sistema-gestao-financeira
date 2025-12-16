@@ -346,16 +346,11 @@ export default function Investments() {
                     <th className="text-left p-2">Ticker</th>
                     <th className="text-right p-2">Valor Investido</th>
                     <th className="text-right p-2">Valor Atual</th>
-                    <th className="text-right p-2">Lucro/Prejuízo</th>
                     <th className="text-right p-2">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {investments.map((investment) => {
-                    const profitLoss = investment.profitLoss || 0;
-                    const profitLossPercent = investment.profitLossPercent || 0;
-                    const isPositive = profitLoss >= 0;
-
                     return (
                       <tr key={investment.id} className="border-b hover:bg-muted/50">
                         <td className="p-2 font-medium">{investment.name}</td>
@@ -368,16 +363,6 @@ export default function Investments() {
                         <td className="p-2 text-right">{formatCurrency(investment.initialAmount)}</td>
                         <td className="p-2 text-right font-medium">
                           {formatCurrency(investment.currentAmount || investment.initialAmount)}
-                        </td>
-                        <td className="p-2 text-right">
-                          <div className={isPositive ? "text-green-600" : "text-red-600"}>
-                            <div className="font-medium">
-                              {isPositive ? "+" : ""}{formatCurrency(profitLoss)}
-                            </div>
-                            <div className="text-xs">
-                              {isPositive ? "+" : ""}{formatPercent(profitLossPercent)}
-                            </div>
-                          </div>
                         </td>
                         <td className="p-2">
                           <div className="flex justify-end gap-1">

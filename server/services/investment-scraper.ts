@@ -319,30 +319,20 @@ export async function updateInvestmentPrice(investmentId: number): Promise<Updat
       newAmount = priceData.price;
     }
 
-    // Calcular lucro/prejuízo
-    const profitLoss = newAmount - investment.initialAmount;
-    const profitLossPercent = investment.initialAmount > 0
-      ? Math.round((profitLoss / investment.initialAmount) * 10000)
-      : 0;
-
-    // Atualizar investimento
+    // Atualizar investimento (sem calcular rentabilidade automaticamente)
     await db.updateInvestment(investmentId, {
       currentPrice: priceData.price,
       currentAmount: newAmount,
-      profitLoss,
-      profitLossPercent,
       dailyChange: priceData.change,
       lastUpdate: priceData.timestamp,
     });
 
-    // Adicionar ao histórico
+    // Adicionar ao histórico (sem calcular rentabilidade automaticamente)
     await db.addInvestmentHistory({
       investmentId,
       date: priceData.timestamp,
       price: priceData.price,
       amount: newAmount,
-      profitLoss,
-      profitLossPercent,
       source: priceData.source,
     });
 
