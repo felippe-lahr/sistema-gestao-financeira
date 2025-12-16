@@ -213,7 +213,9 @@ export const investments = pgTable("investments", {
   averagePrice: integer("averagePrice"), // Preço médio em centavos
   currentPrice: integer("currentPrice"), // Preço atual em centavos
   
-  // Variação diária
+  // Rentabilidade
+  profitLoss: integer("profitLoss"), // Lucro/Prejuízo em centavos
+  profitLossPercent: integer("profitLossPercent"), // Lucro/Prejuízo em centésimos de % (ex: 1050 = 10.50%)
   dailyChange: integer("dailyChange"), // Variação diária em centésimos de %
   
   // Datas
@@ -245,6 +247,8 @@ export const investmentHistory = pgTable("investment_history", {
   date: timestamp("date").notNull(),
   price: integer("price").notNull(), // Preço em centavos
   amount: integer("amount").notNull(), // Valor total em centavos
+  profitLoss: integer("profitLoss"), // Lucro/Prejuízo em centavos
+  profitLossPercent: integer("profitLossPercent"), // Em centésimos de %
   
   // Metadados
   source: priceSourceEnum("source").default("WEB_SCRAPING").notNull(),

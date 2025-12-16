@@ -319,10 +319,18 @@ export async function updateInvestmentPrice(investmentId: number): Promise<Updat
       newAmount = priceData.price;
     }
 
+    // Calcular lucro/prejuízo
+    const profitLoss = newAmount - investment.initialAmount;
+    const profitLossPercent = investment.initialAmount > 0
+      ? Math.round((profitLoss / investment.initialAmount) * 10000)
+      : 0;
+
     // Atualizar investimento
     await db.updateInvestment(investmentId, {
       currentPrice: priceData.price,
       currentAmount: newAmount,
+      profitLoss,
+      profitLossPercent,
       dailyChange: priceData.change,
       lastUpdate: priceData.timestamp,
     });
@@ -333,10 +341,13 @@ export async function updateInvestmentPrice(investmentId: number): Promise<Updat
       date: priceData.timestamp,
       price: priceData.price,
       amount: newAmount,
+      profitLoss,
+      profitLossPercent,
       source: priceData.source,
     });
 
     console.log(`[Investment Scraper] ✓ Atualizado investimento ${investmentId} (${investment.name})`);
+
     return {
       investmentId,
       success: true,
