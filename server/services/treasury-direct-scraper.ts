@@ -1,7 +1,7 @@
 /**
  * Serviço de scraping de Tesouro Direto
- * Usa a API pública da ANBIMA para obter preços e informações dos títulos
- * Fonte: https://developers.anbima.com.br/
+ * Usa a API pública do Tesouro Direto para obter preços e informações dos títulos
+ * Fonte: https://www.tesourodireto.com.br/
  */
 
 export interface TreasuryDirectTitle {
@@ -14,97 +14,109 @@ export interface TreasuryDirectTitle {
   maturityDate: string;
 }
 
-interface ANBIMAResponse {
-  data: ANBIMATitle[];
+interface TreasuryDirectResponse {
+  TrsrBdTradgList: TreasuryDirectItem[];
 }
 
-interface ANBIMATitle {
-  tipo_titulo: string;
-  expressao: string;
-  data_vencimento: string;
-  data_referencia: string;
-  codigo_selic: string;
-  taxa_compra: number;
-  taxa_venda: number;
-  taxa_indicativa: number;
-  pu: number;
+interface TreasuryDirectItem {
+  TrsrBd: {
+    nm: string; // Nome do título
+    mtrtyDt: string; // Data de vencimento
+    untrRedVal: number; // Preço unitário de resgate
+    minInvstmtAmt: number; // Investimento mínimo
+    anulInvstmtRate: number; // Taxa anual de investimento
+    anulRedRate: number; // Taxa anual de resgate
+  };
+  FinIndxs?: {
+    nm: string; // Nome do índice (SELIC, IPCA, etc)
+  };
 }
 
 /**
- * Busca todos os títulos do Tesouro Direto usando API ANBIMA
+ * Busca todos os títulos do Tesouro Direto usando API pública
  */
 export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]> {
   try {
-    const url = "https://api.anbima.com.br/feed/precos-indices/v1/titulos-publicos/mercado-secundario-TPF";
+    const url = "https://api.radaropcoes.com/bonds.json";
     
-    console.log("[Treasury Direct Scraper] Buscando títulos do Tesouro Direto via ANBIMA...");
+    console.log("[Treasury Direct Scraper] Buscando títulos do Tesouro Direto...");
     
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Erro ao buscar API ANBIMA: ${response.statusText}`);
+      throw new Error(`Erro ao buscar API: ${response.statusText}`);
     }
 
-    const jsonData = (await response.json()) as ANBIMAResponse;
+    const jsonData = (await response.json()) as TreasuryDirectResponse;
     
-    if (!jsonData.data || !Array.isArray(jsonData.data)) {
-      throw new Error("Formato de resposta inválido da API ANBIMA");
+    if (!jsonData.TrsrBdTradgList || !Array.isArray(jsonData.TrsrBdTradgList)) {
+      throw new Error("Formato de resposta inválido");
     }
 
     const titles: TreasuryDirectTitle[] = [];
     const titleMap = new Map<string, TreasuryDirectTitle>(); // Para evitar duplicatas
 
     // Processar dados
-    for (const item of jsonData.data) {
+    for (const item of jsonData.TrsrBdTradgList) {
       try {
-        const tipoTitulo = item.tipo_titulo?.trim() || "";
-        const dataVencimento = item.data_vencimento?.trim() || "";
-        const pu = item.pu || 0;
-        const expressao = item.expressao?.trim() || "";
+        const treasuryBond = item.TrsrBd;
+        if (!treasuryBond) continue;
 
-        if (!tipoTitulo || !dataVencimento || pu === 0) continue;
+        const nome = treasuryBond.nm?.trim() || "";
+        const dataVencimento = treasuryBond.mtrtyDt?.split("T")[0] || "";
+        const precoUnitario = treasuryBond.untrRedVal || 0;
+        const investimentoMinimo = treasuryBond.minInvstmtAmt || 30; // Padrão R$ 30
 
-        // Extrair ano do vencimento
-        const anoVencimento = dataVencimento.split("-")[0];
-        const nomeCompleto = `${tipoTitulo} ${anoVencimento}`;
+        if (!nome || !dataVencimento || precoUnitario === 0) continue;
 
         // Determinar categoria
         let category: "SELIC" | "IPCA" | "EDUCAC" | "RENDA" | "PREFIXADO" = "SELIC";
-        if (tipoTitulo.toUpperCase().includes("IPCA")) {
+        const indexName = item.FinIndxs?.nm?.toUpperCase() || "";
+        const nomeMaiuscula = nome.toUpperCase();
+
+        if (indexName.includes("IPCA") || nomeMaiuscula.includes("IPCA")) {
           category = "IPCA";
-        } else if (tipoTitulo.toUpperCase().includes("EDUCA")) {
+        } else if (nomeMaiuscula.includes("EDUCA")) {
           category = "EDUCAC";
-        } else if (tipoTitulo.toUpperCase().includes("RENDA")) {
+        } else if (nomeMaiuscula.includes("RENDA")) {
           category = "RENDA";
-        } else if (tipoTitulo.toUpperCase().includes("PREFIXADO")) {
+        } else if (nomeMaiuscula.includes("PREFIXADO")) {
           category = "PREFIXADO";
+        } else if (nomeMaiuscula.includes("SELIC")) {
+          category = "SELIC";
         }
 
         // Gerar código único
-        const code = generateTitleCode(nomeCompleto, category);
+        const code = generateTitleCode(nome, category);
 
-        // Converter preço (PU está em reais com 6 casas decimais, converter para centavos)
-        const unitaryPrice = Math.round(pu * 100);
-        
-        // Investimento mínimo (padrão R$ 30,00 = 3000 centavos)
-        const minimumInvestment = 3000;
+        // Converter preços para centavos
+        const unitaryPrice = Math.round(precoUnitario * 100);
+        const minimumInvestment = Math.round(investimentoMinimo * 100);
+
+        // Determinar rentabilidade
+        let profitability = "N/A";
+        if (category === "SELIC") {
+          profitability = `SELIC + ${treasuryBond.anulInvstmtRate?.toFixed(2)}%` || "SELIC";
+        } else if (category === "IPCA") {
+          profitability = `IPCA + ${treasuryBond.anulInvstmtRate?.toFixed(2)}%` || "IPCA";
+        } else if (category === "PREFIXADO") {
+          profitability = `${treasuryBond.anulInvstmtRate?.toFixed(2)}%` || "Prefixado";
+        }
 
         // Usar apenas o registro mais recente
         const key = code;
-        const existingTitle = titleMap.get(key);
-        
-        if (!existingTitle) {
+        if (!titleMap.has(key)) {
           titleMap.set(key, {
-            name: nomeCompleto,
+            name: nome,
             category,
             code,
-            profitability: expressao || "N/A",
+            profitability,
             unitaryPrice,
             minimumInvestment,
             maturityDate: dataVencimento,
           });
         }
 
-        console.log(`[Treasury Direct Scraper] ✓ ${nomeCompleto} - R$ ${(unitaryPrice / 100).toFixed(2)}`);
+        console.log(`[Treasury Direct Scraper] ✓ ${nome} - R$ ${(unitaryPrice / 100).toFixed(2)}`);
       } catch (error) {
         console.error(`[Treasury Direct Scraper] Erro ao processar item:`, error);
       }
@@ -114,7 +126,7 @@ export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]
     const titlesList = Array.from(titleMap.values());
 
     if (titlesList.length === 0) {
-      throw new Error("Nenhum título encontrado na API ANBIMA");
+      throw new Error("Nenhum título encontrado");
     }
 
     console.log(`[Treasury Direct Scraper] ✓ Total de ${titlesList.length} títulos encontrados`);
