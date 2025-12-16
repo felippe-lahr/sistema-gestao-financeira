@@ -99,7 +99,7 @@ function EntityCard({ entity }: { entity: any }) {
 
   return (
     <Card
-      className="cursor-pointer card-hover border-2 border-transparent hover:border-primary/30"
+      className="cursor-pointer card-hover border-2 border-slate-200 dark:border-slate-700 hover:border-primary/60 hover:shadow-lg transition-all duration-200 shadow-sm"
       onClick={() => setLocation(`/dashboard/${entity.id}`)}
     >
       <CardHeader>
