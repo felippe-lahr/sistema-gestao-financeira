@@ -1330,7 +1330,7 @@ export const appRouter = router({
      */
     getAllTitles: publicProcedure.query(async () => {
       try {
-        const { getTreasuryDirectTitlesFromCache } = await import("../db-treasury-direct");
+        const { getTreasuryDirectTitlesFromCache } = await import("./db-treasury-direct");
         const titles = await getTreasuryDirectTitlesFromCache();
         return titles;
       } catch (error) {
@@ -1349,7 +1349,7 @@ export const appRouter = router({
       .input(z.object({ category: z.enum(["SELIC", "IPCA", "EDUCAC", "RENDA", "PREFIXADO"]) }))
       .query(async ({ input }) => {
         try {
-          const { getTreasuryDirectTitlesByCategoryFromCache } = await import("../db-treasury-direct");
+          const { getTreasuryDirectTitlesByCategoryFromCache } = await import("./db-treasury-direct");
           const titles = await getTreasuryDirectTitlesByCategoryFromCache(input.category);
           return titles;
         } catch (error) {
@@ -1366,8 +1366,8 @@ export const appRouter = router({
      */
     refreshCache: protectedProcedure.mutation(async ({ ctx }) => {
       try {
-        const { fetchTreasuryDirectTitles } = await import("../services/treasury-direct-scraper");
-        const { updateTreasuryDirectTitlesCache } = await import("../db-treasury-direct");
+        const { fetchTreasuryDirectTitles } = await import("./services/treasury-direct-scraper");
+        const { updateTreasuryDirectTitlesCache } = await import("./db-treasury-direct");
         
         console.log("[treasuryDirect.refreshCache] Iniciando atualização de cache...");
         const titles = await fetchTreasuryDirectTitles();
