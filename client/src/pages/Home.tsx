@@ -99,21 +99,21 @@ function EntityCard({ entity }: { entity: any }) {
 
   return (
     <Card
-      className="cursor-pointer hover:shadow-lg transition-shadow"
+      className="cursor-pointer card-hover border-2 border-transparent hover:border-primary/30"
       onClick={() => setLocation(`/dashboard/${entity.id}`)}
     >
       <CardHeader>
         <div className="flex items-center gap-3 mb-2">
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center"
+            className="w-12 h-12 rounded-full flex items-center justify-center shadow-md"
             style={{ backgroundColor: entity.color || "#2563EB" }}
           >
             <Building2 className="h-6 w-6 text-white" />
           </div>
           <div className="flex-1">
-            <CardTitle className="text-xl">{entity.name}</CardTitle>
+            <CardTitle className="text-lg font-bold">{entity.name}</CardTitle>
             {entity.description && (
-              <CardDescription className="line-clamp-1">{entity.description}</CardDescription>
+              <CardDescription className="line-clamp-1 text-xs">{entity.description}</CardDescription>
             )}
           </div>
         </div>
@@ -127,44 +127,43 @@ function EntityCard({ entity }: { entity: any }) {
         ) : (
           <div className="space-y-4">
             {/* Saldo */}
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Saldo</span>
+                <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">Saldo</span>
               </div>
-              <span className={`text-lg font-bold ${isPositive ? "text-green-600" : "text-red-600"}`}>
+              <span className={`text-lg font-bold ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                 {formatCurrency(balance)}
               </span>
             </div>
 
             {/* Receitas e Despesas */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border-emerald-200 dark:border-emerald-800">
+                <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 font-semibold mb-1">
                   <TrendingUp className="h-3 w-3" />
                   <span>Receitas</span>
                 </div>
-                <p className="text-sm font-semibold text-green-600">
+                <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">
                   {formatCurrency(metrics.monthIncome)}
                 </p>
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="p-3 rounded-lg bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800">
+                <div className="flex items-center gap-1 text-xs text-red-700 dark:text-red-300 font-semibold mb-1">
                   <TrendingDown className="h-3 w-3" />
                   <span>Despesas</span>
                 </div>
-                <p className="text-sm font-semibold text-red-600">
+                <p className="text-base font-bold text-red-600 dark:text-red-400">
                   {formatCurrency(metrics.monthExpenses)}
                 </p>
               </div>
             </div>
 
-            {/* Despesas Pendentes */}
             {metrics.pendingExpenses > 0 && (
-              <div className="pt-3 border-t">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Despesas pendentes</span>
-                  <span className="font-medium text-orange-600">
+              <div className="p-3 rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Despesas pendentes</span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400">
                     {formatCurrency(metrics.pendingExpenses)}
                   </span>
                 </div>
