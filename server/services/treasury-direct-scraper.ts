@@ -1,5 +1,8 @@
-import fetch from "node-fetch";
-import * as csv from "csv-parse/sync";
+/**
+ * Serviço de scraping de Tesouro Direto
+ * Usa a API pública da ANBIMA para obter preços e informações dos títulos
+ * Fonte: https://developers.anbima.com.br/
+ */
 
 export interface TreasuryDirectTitle {
   name: string;
@@ -11,56 +14,54 @@ export interface TreasuryDirectTitle {
   maturityDate: string;
 }
 
+interface ANBIMAResponse {
+  data: ANBIMATitle[];
+}
+
+interface ANBIMATitle {
+  tipo_titulo: string;
+  expressao: string;
+  data_vencimento: string;
+  data_referencia: string;
+  codigo_selic: string;
+  taxa_compra: number;
+  taxa_venda: number;
+  taxa_indicativa: number;
+  pu: number;
+}
+
 /**
- * Busca todos os títulos do Tesouro Direto usando API do governo
- * Fonte: https://www.tesourotransparente.gov.br/
+ * Busca todos os títulos do Tesouro Direto usando API ANBIMA
  */
 export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]> {
   try {
-    const url = "https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv";
+    const url = "https://api.anbima.com.br/feed/precos-indices/v1/titulos-publicos/mercado-secundario-TPF";
     
-    console.log("[Treasury Direct Scraper] Buscando títulos do Tesouro Direto...");
+    console.log("[Treasury Direct Scraper] Buscando títulos do Tesouro Direto via ANBIMA...");
     
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Erro ao buscar CSV: ${response.statusText}`);
+      throw new Error(`Erro ao buscar API ANBIMA: ${response.statusText}`);
     }
 
-    const csvContent = await response.text();
+    const jsonData = (await response.json()) as ANBIMAResponse;
     
-    // Parse CSV
-    const records = csv.parse(csvContent, {
-      columns: false,
-      delimiter: ";",
-      skip_empty_lines: true,
-    }) as string[][];
+    if (!jsonData.data || !Array.isArray(jsonData.data)) {
+      throw new Error("Formato de resposta inválido da API ANBIMA");
+    }
 
     const titles: TreasuryDirectTitle[] = [];
     const titleMap = new Map<string, TreasuryDirectTitle>(); // Para evitar duplicatas
 
-    // Processar linhas (pular header)
-    for (let i = 1; i < records.length; i++) {
+    // Processar dados
+    for (const item of jsonData.data) {
       try {
-        const row = records[i];
-        if (!row || row.length < 6) continue;
+        const tipoTitulo = item.tipo_titulo?.trim() || "";
+        const dataVencimento = item.data_vencimento?.trim() || "";
+        const pu = item.pu || 0;
+        const expressao = item.expressao?.trim() || "";
 
-        // Colunas do CSV:
-        // [0] Tipo Título (ex: "Tesouro Selic")
-        // [1] Data Vencimento (ex: "2031-03-01")
-        // [2] Data Base (data da cotação)
-        // [3] Taxa Rentabilidade (ex: "SELIC + 0,1025%")
-        // [4] PU Compra Manhã (preço unitário)
-        // [5] PU Venda Manhã
-        // [6] Investimento Mínimo
-
-        const tipoTitulo = row[0]?.trim();
-        const dataVencimento = row[1]?.trim();
-        const dataBase = row[2]?.trim();
-        const taxaRentabilidade = row[3]?.trim();
-        const puCompra = row[4]?.trim();
-        const investimentoMinimo = row[6]?.trim();
-
-        if (!tipoTitulo || !dataVencimento || !puCompra) continue;
+        if (!tipoTitulo || !dataVencimento || pu === 0) continue;
 
         // Extrair ano do vencimento
         const anoVencimento = dataVencimento.split("-")[0];
@@ -68,33 +69,35 @@ export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]
 
         // Determinar categoria
         let category: "SELIC" | "IPCA" | "EDUCAC" | "RENDA" | "PREFIXADO" = "SELIC";
-        if (tipoTitulo.includes("IPCA")) {
+        if (tipoTitulo.toUpperCase().includes("IPCA")) {
           category = "IPCA";
-        } else if (tipoTitulo.includes("Educa")) {
+        } else if (tipoTitulo.toUpperCase().includes("EDUCA")) {
           category = "EDUCAC";
-        } else if (tipoTitulo.includes("Renda")) {
+        } else if (tipoTitulo.toUpperCase().includes("RENDA")) {
           category = "RENDA";
-        } else if (tipoTitulo.includes("Prefixado")) {
+        } else if (tipoTitulo.toUpperCase().includes("PREFIXADO")) {
           category = "PREFIXADO";
         }
 
         // Gerar código único
         const code = generateTitleCode(nomeCompleto, category);
 
-        // Converter preços
-        const unitaryPrice = parsePrice(puCompra);
-        const minimumInvestment = parsePrice(investimentoMinimo);
+        // Converter preço (PU está em reais com 6 casas decimais, converter para centavos)
+        const unitaryPrice = Math.round(pu * 100);
+        
+        // Investimento mínimo (padrão R$ 30,00 = 3000 centavos)
+        const minimumInvestment = 3000;
 
-        // Usar apenas o registro mais recente (baseado em dataBase)
+        // Usar apenas o registro mais recente
         const key = code;
         const existingTitle = titleMap.get(key);
         
-        if (!existingTitle || (dataBase && (!existingTitle.maturityDate || dataBase > existingTitle.maturityDate))) {
+        if (!existingTitle) {
           titleMap.set(key, {
             name: nomeCompleto,
             category,
             code,
-            profitability: taxaRentabilidade || "N/A",
+            profitability: expressao || "N/A",
             unitaryPrice,
             minimumInvestment,
             maturityDate: dataVencimento,
@@ -103,7 +106,7 @@ export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]
 
         console.log(`[Treasury Direct Scraper] ✓ ${nomeCompleto} - R$ ${(unitaryPrice / 100).toFixed(2)}`);
       } catch (error) {
-        console.error(`[Treasury Direct Scraper] Erro ao processar linha ${i}:`, error);
+        console.error(`[Treasury Direct Scraper] Erro ao processar item:`, error);
       }
     }
 
@@ -111,7 +114,7 @@ export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]
     const titlesList = Array.from(titleMap.values());
 
     if (titlesList.length === 0) {
-      throw new Error("Nenhum título encontrado no CSV");
+      throw new Error("Nenhum título encontrado na API ANBIMA");
     }
 
     console.log(`[Treasury Direct Scraper] ✓ Total de ${titlesList.length} títulos encontrados`);
@@ -119,32 +122,6 @@ export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]
   } catch (error) {
     console.error("[Treasury Direct Scraper] Erro ao buscar títulos:", error);
     throw error;
-  }
-}
-
-/**
- * Converte string de preço (ex: "178,91") para centavos
- */
-function parsePrice(priceStr: string): number {
-  try {
-    if (!priceStr) return 0;
-    
-    // Remove espaços
-    let cleaned = priceStr.trim();
-    
-    // Converte vírgula para ponto
-    cleaned = cleaned.replace(",", ".");
-    
-    const price = parseFloat(cleaned);
-    if (isNaN(price)) {
-      throw new Error(`Preço inválido: ${priceStr}`);
-    }
-    
-    // Converte para centavos
-    return Math.round(price * 100);
-  } catch (error) {
-    console.error(`[Treasury Direct Scraper] Erro ao converter preço "${priceStr}":`, error);
-    return 0;
   }
 }
 
