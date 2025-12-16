@@ -15,7 +15,12 @@ export interface TreasuryDirectTitle {
 }
 
 interface TreasuryDirectResponse {
-  TrsrBdTradgList: TreasuryDirectItem[];
+  response: {
+    TrsrBdTradgList: TreasuryDirectItem[];
+  };
+  responseStatus: number;
+  responseStatusText: string;
+  timestamp: string;
 }
 
 interface TreasuryDirectItem {
@@ -26,9 +31,15 @@ interface TreasuryDirectItem {
     minInvstmtAmt: number; // Investimento mínimo
     anulInvstmtRate: number; // Taxa anual de investimento
     anulRedRate: number; // Taxa anual de resgate
+    FinIndxs?: {
+      nm: string; // Nome do índice (SELIC, IPCA, etc)
+    };
+    BusSegmt?: {
+      nm: string; // Segmento de negócio
+    };
   };
-  FinIndxs?: {
-    nm: string; // Nome do índice (SELIC, IPCA, etc)
+  TrsrBdType?: {
+    nm: string;
   };
 }
 
@@ -48,7 +59,7 @@ export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]
 
     const jsonData = (await response.json()) as TreasuryDirectResponse;
     
-    if (!jsonData.TrsrBdTradgList || !Array.isArray(jsonData.TrsrBdTradgList)) {
+    if (!jsonData.response || !jsonData.response.TrsrBdTradgList || !Array.isArray(jsonData.response.TrsrBdTradgList)) {
       throw new Error("Formato de resposta inválido");
     }
 
@@ -56,7 +67,7 @@ export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]
     const titleMap = new Map<string, TreasuryDirectTitle>(); // Para evitar duplicatas
 
     // Processar dados
-    for (const item of jsonData.TrsrBdTradgList) {
+    for (const item of jsonData.response.TrsrBdTradgList) {
       try {
         const treasuryBond = item.TrsrBd;
         if (!treasuryBond) continue;
@@ -70,18 +81,20 @@ export async function fetchTreasuryDirectTitles(): Promise<TreasuryDirectTitle[]
 
         // Determinar categoria
         let category: "SELIC" | "IPCA" | "EDUCAC" | "RENDA" | "PREFIXADO" = "SELIC";
-        const indexName = item.FinIndxs?.nm?.toUpperCase() || "";
+        const indexName = treasuryBond.FinIndxs?.nm?.toUpperCase() || "";
+        const segmentName = treasuryBond.BusSegmt?.nm?.toUpperCase() || "";
         const nomeMaiuscula = nome.toUpperCase();
 
-        if (indexName.includes("IPCA") || nomeMaiuscula.includes("IPCA")) {
-          category = "IPCA";
-        } else if (nomeMaiuscula.includes("EDUCA")) {
+        // Usar segmento primeiro, depois indice, depois nome
+        if (segmentName.includes("EDUCA")) {
           category = "EDUCAC";
-        } else if (nomeMaiuscula.includes("RENDA")) {
+        } else if (segmentName.includes("RENDA")) {
           category = "RENDA";
+        } else if (indexName.includes("IPCA") || nomeMaiuscula.includes("IPCA")) {
+          category = "IPCA";
         } else if (nomeMaiuscula.includes("PREFIXADO")) {
           category = "PREFIXADO";
-        } else if (nomeMaiuscula.includes("SELIC")) {
+        } else if (indexName.includes("SELIC") || nomeMaiuscula.includes("SELIC")) {
           category = "SELIC";
         }
 
