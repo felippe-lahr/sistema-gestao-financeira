@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,15 +43,22 @@ export function TreasuryDirectSelector({ onTitleSelected, isLoading }: TreasuryD
     },
   });
 
+  // Encontrar o título selecionado
+  const selectedTitleData = useMemo(() => {
+    if (!selectedTitle || !titles) return null;
+    return titles.find((t: any) => t.code === selectedTitle);
+  }, [selectedTitle, titles]);
+
   // Quando um título é selecionado
-  useEffect(() => {
-    if (selectedTitle && titles) {
-      const title = titles.find((t: any) => t.code === selectedTitle);
-      if (title) {
-        onTitleSelected(title);
-      }
+  const handleTitleSelected = useCallback(() => {
+    if (selectedTitleData) {
+      onTitleSelected(selectedTitleData);
     }
-  }, [selectedTitle, titles, onTitleSelected]);
+  }, [selectedTitleData, onTitleSelected]);
+
+  useEffect(() => {
+    handleTitleSelected();
+  }, [handleTitleSelected]);
 
   return (
     <div className="space-y-4 border-t pt-4">
@@ -102,16 +109,16 @@ export function TreasuryDirectSelector({ onTitleSelected, isLoading }: TreasuryD
         </div>
       </div>
 
-      {titles && titles.length > 0 && selectedTitle && (
+      {selectedTitleData && (
         <div className="bg-blue-50 p-3 rounded text-sm text-blue-900">
           <p>
-            <strong>Preço Unitário:</strong> R${((titles.find((t: any) => t.code === selectedTitle)?.unitaryPrice || 0) / 100).toFixed(2)}
+            <strong>Preço Unitário:</strong> R${((selectedTitleData.unitaryPrice || 0) / 100).toFixed(2)}
           </p>
           <p>
-            <strong>Investimento Mínimo:</strong> R${((titles.find((t: any) => t.code === selectedTitle)?.minimumInvestment || 0) / 100).toFixed(2)}
+            <strong>Investimento Mínimo:</strong> R${((selectedTitleData.minimumInvestment || 0) / 100).toFixed(2)}
           </p>
           <p>
-            <strong>Vencimento:</strong> {titles.find((t: any) => t.code === selectedTitle)?.maturityDate}
+            <strong>Vencimento:</strong> {selectedTitleData.maturityDate}
           </p>
         </div>
       )}
