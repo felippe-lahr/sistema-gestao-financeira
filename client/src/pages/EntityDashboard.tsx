@@ -476,7 +476,7 @@ export default function EntityDashboard() {
                       return null;
                     }}
                   />
-                  <Bar dataKey="value" fill="#8884d8" radius={[0, 8, 8, 0]} label={({ payload }) => `${payload.percentage}%`}>
+                  <Bar dataKey="value" fill="#8884d8" radius={[0, 8, 8, 0]} label={{ position: 'right', formatter: (value: number, entry: any) => `${entry.payload.percentage}%` }}>
                     {categoryData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                     ))}
