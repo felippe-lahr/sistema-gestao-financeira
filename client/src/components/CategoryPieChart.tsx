@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 
 interface CategoryPieChartProps {
   data: Array<{
@@ -26,6 +26,9 @@ export function CategoryPieChart({
   description = "Proporção de despesas por categoria",
   colors = DEFAULT_COLORS,
 }: CategoryPieChartProps) {
+  // Ordenar dados em ordem decrescente
+  const sortedData = [...data].sort((a, b) => b.value - a.value);
+
   return (
     <Card className="card-hover">
       <CardHeader>
@@ -33,22 +36,15 @@ export function CategoryPieChart({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              label={({ name, value }) => `${name}: ${value}%`}
-              outerRadius={80}
-              fill="#8884d8"
-              dataKey="value"
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-              ))}
-            </Pie>
+        <ResponsiveContainer width="100%" height={Math.max(300, sortedData.length * 40)}>
+          <BarChart
+            data={sortedData}
+            layout="vertical"
+            margin={{ top: 5, right: 30, left: 200, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" />
+            <YAxis dataKey="name" type="category" width={190} tick={{ fontSize: 12 }} />
             <Tooltip
               formatter={(value) => `${value}%`}
               contentStyle={{
@@ -57,8 +53,12 @@ export function CategoryPieChart({
                 borderRadius: "0.5rem",
               }}
             />
-            <Legend />
-          </PieChart>
+            <Bar dataKey="value" fill="#8884d8" radius={[0, 8, 8, 0]}>
+              {sortedData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+              ))}
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
