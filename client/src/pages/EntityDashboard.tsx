@@ -469,14 +469,14 @@ export default function EntityDashboard() {
                           <div className="bg-card border border-border rounded p-2 text-sm">
                             <p className="font-semibold">{data.name}</p>
                             <p className="text-primary">{formatCurrency(data.value)}</p>
-                            <p className="text-muted-foreground">{data.percentage}%</p>
+                            <p className="text-muted-foreground font-medium">{data.percentage || '0'}% do total</p>
                           </div>
                         );
                       }
                       return null;
                     }}
                   />
-                  <Bar dataKey="value" fill="#8884d8" radius={[0, 8, 8, 0]} label={({ payload }: any) => `${payload?.percentage || ''}%`}>
+                  <Bar dataKey="value" fill="#8884d8" radius={[0, 8, 8, 0]}>
                     {categoryData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                     ))}
