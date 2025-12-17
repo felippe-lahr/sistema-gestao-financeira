@@ -391,18 +391,18 @@ export default function EntityDashboard() {
       ) : null}
 
       {/* Charts */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 h-[600px]">
         {/* Fluxo de Caixa */}
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Fluxo de Caixa</CardTitle>
             <CardDescription>{getPeriodDescription()}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 w-full p-0">
             {cashFlowLoading ? (
-              <Skeleton className="h-[300px] w-full" />
+              <Skeleton className="h-full w-full" />
             ) : cashFlowData && cashFlowData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={400}>
+              <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashFlowData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
@@ -430,7 +430,7 @@ export default function EntityDashboard() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="h-full flex items-center justify-center text-muted-foreground">
                 Sem dados para exibir
               </div>
             )}
@@ -438,12 +438,12 @@ export default function EntityDashboard() {
         </Card>
 
         {/* Distribuição por Categoria */}
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Distribuição por Categoria</CardTitle>
             <CardDescription>Despesas do mês atual</CardDescription>
           </CardHeader>
-          <CardContent className="h-[600px]">
+          <CardContent className="flex-1 w-full p-0">
             {categoryLoading ? (
               <Skeleton className="h-full w-full" />
             ) : categoryData && categoryData.length > 0 ? (
