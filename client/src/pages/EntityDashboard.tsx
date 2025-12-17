@@ -443,11 +443,11 @@ export default function EntityDashboard() {
             <CardTitle>Distribuição por Categoria</CardTitle>
             <CardDescription>Despesas do mês atual</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="h-[600px]">
             {categoryLoading ? (
-              <Skeleton className="h-[300px] w-full" />
+              <Skeleton className="h-full w-full" />
             ) : categoryData && categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={Math.max(600, categoryData.length * 60)}>
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={[...categoryData].sort((a, b) => b.value - a.value).map((item: any) => ({
                     ...item,
@@ -484,7 +484,7 @@ export default function EntityDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="h-full flex items-center justify-center text-muted-foreground">
                 Sem dados para exibir
               </div>
             )}
