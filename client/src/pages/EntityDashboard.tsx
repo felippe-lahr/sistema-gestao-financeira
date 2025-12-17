@@ -447,7 +447,7 @@ export default function EntityDashboard() {
             {categoryLoading ? (
               <Skeleton className="h-[300px] w-full" />
             ) : categoryData && categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={Math.max(300, categoryData.length * 40)}>
+              <ResponsiveContainer width="100%" height={Math.max(500, categoryData.length * 50)}>
                 <BarChart
                   data={[...categoryData].sort((a, b) => b.value - a.value).map((item: any) => ({
                     ...item,
