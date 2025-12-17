@@ -398,7 +398,8 @@ export default function EntityDashboard() {
             <CardTitle>Fluxo de Caixa</CardTitle>
             <CardDescription>{getPeriodDescription()}</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 w-full p-0">
+          <CardContent className="flex-1 w-full p-4">
+            <div className="h-full w-full">
             {cashFlowLoading ? (
               <Skeleton className="h-full w-full" />
             ) : cashFlowData && cashFlowData.length > 0 ? (
@@ -434,6 +435,7 @@ export default function EntityDashboard() {
                 Sem dados para exibir
               </div>
             )}
+            </div>
           </CardContent>
         </Card>
 
@@ -443,7 +445,7 @@ export default function EntityDashboard() {
             <CardTitle>Distribuição por Categoria</CardTitle>
             <CardDescription>Despesas do mês atual</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 w-full p-0">
+          <CardContent className="flex-1 w-full p-4">
             {categoryLoading ? (
               <Skeleton className="h-full w-full" />
             ) : categoryData && categoryData.length > 0 ? (
@@ -454,7 +456,7 @@ export default function EntityDashboard() {
                     percentage: categoryData.length > 0 ? ((item.value / categoryData.reduce((sum: number, cat: any) => sum + cat.value, 0)) * 100).toFixed(1) : 0
                   }))}
                   layout="vertical"
-                  margin={{ top: 5, right: 100, left: 150, bottom: 5 }}
+                  margin={{ top: 5, right: 20, left: 150, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
