@@ -446,6 +446,7 @@ export default function EntityDashboard() {
             <CardDescription>Despesas do mês atual</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 w-full p-4">
+            <div className="h-full w-full">
             {categoryLoading ? (
               <Skeleton className="h-full w-full" />
             ) : categoryData && categoryData.length > 0 ? (
@@ -490,6 +491,7 @@ export default function EntityDashboard() {
                 Sem dados para exibir
               </div>
             )}
+            </div>
           </CardContent>
         </Card>
       </div>
