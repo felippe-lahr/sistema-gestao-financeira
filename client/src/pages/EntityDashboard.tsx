@@ -402,7 +402,7 @@ export default function EntityDashboard() {
             {cashFlowLoading ? (
               <Skeleton className="h-[300px] w-full" />
             ) : cashFlowData && cashFlowData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={400}>
                 <AreaChart data={cashFlowData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
@@ -449,15 +449,34 @@ export default function EntityDashboard() {
             ) : categoryData && categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height={Math.max(300, categoryData.length * 40)}>
                 <BarChart
-                  data={[...categoryData].sort((a, b) => b.value - a.value)}
+                  data={[...categoryData].sort((a, b) => b.value - a.value).map((item: any) => ({
+                    ...item,
+                    percentage: categoryData.length > 0 ? ((item.value / categoryData.reduce((sum: number, cat: any) => sum + cat.value, 0)) * 100).toFixed(1) : 0
+                  }))}
                   layout="vertical"
-                  margin={{ top: 5, right: 30, left: 150, bottom: 5 }}
+                  margin={{ top: 5, right: 100, left: 150, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
                   <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Bar dataKey="value" fill="#8884d8" radius={[0, 8, 8, 0]}>
+                  <Tooltip 
+                    formatter={(value: number) => formatCurrency(value)}
+                    labelFormatter={(label: string) => `${label}`}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload[0]) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-card border border-border rounded p-2 text-sm">
+                            <p className="font-semibold">{data.name}</p>
+                            <p className="text-primary">{formatCurrency(data.value)}</p>
+                            <p className="text-muted-foreground">{data.percentage}%</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="value" fill="#8884d8" radius={[0, 8, 8, 0]} label={({ payload }) => `${payload.percentage}%`}>
                     {categoryData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                     ))}
