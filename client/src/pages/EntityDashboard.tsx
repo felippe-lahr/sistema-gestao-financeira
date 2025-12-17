@@ -457,11 +457,11 @@ export default function EntityDashboard() {
                     percentage: categoryData.length > 0 ? ((item.value / categoryData.reduce((sum: number, cat: any) => sum + cat.value, 0)) * 100).toFixed(1) : 0
                   }))}
                   layout="vertical"
-                  margin={{ top: 5, right: 20, left: 150, bottom: 5 }}
+                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 12 }} />
+                  <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
                   <Tooltip 
                     formatter={(value: number) => formatCurrency(value)}
                     labelFormatter={(label: string) => `${label}`}
