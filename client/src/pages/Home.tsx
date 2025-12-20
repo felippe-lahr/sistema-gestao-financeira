@@ -2,12 +2,29 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Plus, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { Building2, Plus, TrendingUp, TrendingDown, DollarSign, Eye, EyeOff } from "lucide-react";
 import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const [showValues, setShowValues] = useState(true);
   const { data: entities, isLoading } = trpc.entities.list.useQuery();
+
+  // Carregar preferência do localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('showFinancialValues');
+    if (saved !== null) {
+      setShowValues(JSON.parse(saved));
+    }
+  }, []);
+
+  // Salvar preferência no localStorage
+  const toggleShowValues = () => {
+    const newValue = !showValues;
+    setShowValues(newValue);
+    localStorage.setItem('showFinancialValues', JSON.stringify(newValue));
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -68,22 +85,27 @@ export default function Home() {
             {entities.length} {entities.length === 1 ? "entidade cadastrada" : "entidades cadastradas"}
           </p>
         </div>
-        <Button onClick={() => setLocation("/entities")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Entidade
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={toggleShowValues} title={showValues ? "Esconder valores" : "Mostrar valores"}>
+            {showValues ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </Button>
+          <Button onClick={() => setLocation("/entities")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Entidade
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {entities.map((entity) => (
-          <EntityCard key={entity.id} entity={entity} />
+          <EntityCard key={entity.id} entity={entity} showValues={showValues} />
         ))}
       </div>
     </div>
   );
 }
 
-function EntityCard({ entity }: { entity: any }) {
+function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }) {
   const [, setLocation] = useLocation();
   const { data: metrics } = trpc.dashboard.metrics.useQuery({ entityId: entity.id });
 
@@ -96,6 +118,13 @@ function EntityCard({ entity }: { entity: any }) {
 
   const balance = metrics ? metrics.currentBalance : 0;
   const isPositive = balance >= 0;
+
+  const maskValue = (value: number) => {
+    if (!showValues) {
+      return "••••••";
+    }
+    return formatCurrency(value);
+  };
 
   return (
     <Card
@@ -133,7 +162,7 @@ function EntityCard({ entity }: { entity: any }) {
                 <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">Saldo</span>
               </div>
               <span className={`text-lg font-bold ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                {formatCurrency(balance)}
+                {maskValue(balance)}
               </span>
             </div>
 
@@ -145,7 +174,7 @@ function EntityCard({ entity }: { entity: any }) {
                   <span>Receitas</span>
                 </div>
                 <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">
-                  {formatCurrency(metrics.monthIncome)}
+                  {maskValue(metrics.monthIncome)}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800">
@@ -154,7 +183,7 @@ function EntityCard({ entity }: { entity: any }) {
                   <span>Despesas</span>
                 </div>
                 <p className="text-base font-bold text-red-600 dark:text-red-400">
-                  {formatCurrency(metrics.monthExpenses)}
+                  {maskValue(metrics.monthExpenses)}
                 </p>
               </div>
             </div>
@@ -164,7 +193,7 @@ function EntityCard({ entity }: { entity: any }) {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Despesas pendentes</span>
                   <span className="font-bold text-amber-600 dark:text-amber-400">
-                    {formatCurrency(metrics.pendingExpenses)}
+                    {maskValue(metrics.pendingExpenses)}
                   </span>
                 </div>
               </div>
