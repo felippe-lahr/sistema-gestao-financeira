@@ -779,10 +779,14 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
   const db = await getDb();
   if (!db) return [];
 
+  // Criar data em São Paulo (GMT-3)
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const offset = 3 * 60 * 60 * 1000; // GMT-3 em milissegundos
+  const localDate = new Date(today.getTime() - offset);
+  localDate.setUTCHours(0, 0, 0, 0);
+  const todayAtMidnight = new Date(localDate.getTime() + offset);
   
-  const futureDate = new Date(today);
+  const futureDate = new Date(todayAtMidnight);
   futureDate.setDate(futureDate.getDate() + daysAhead);
 
   const result = await db
@@ -823,7 +827,7 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
     categoryId: row.categoryId,
     categoryName: row.categoryName || "Sem Categoria",
     categoryColor: row.categoryColor || "#6B7280",
-    daysUntilDue: Math.ceil((row.dueDate!.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+    daysUntilDue: Math.ceil((row.dueDate!.getTime() - todayAtMidnight.getTime()) / (1000 * 60 * 60 * 24)),
   }));
 
   return mapped;
