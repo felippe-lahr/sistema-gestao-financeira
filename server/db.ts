@@ -784,14 +784,14 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
   const offset = 3 * 60 * 60 * 1000; // GMT-3 em milissegundos
   const localDate = new Date(today.getTime() - offset);
   localDate.setUTCHours(0, 0, 0, 0);
-  const todayAtMidnight = new Date(localDate.getTime() + offset);
   
-  const futureDate = new Date(todayAtMidnight);
-  futureDate.setDate(futureDate.getDate() + daysAhead);
-
-  // Converter todayAtMidnight para string no formato YYYY-MM-DD para usar na query
-  const todayDateString = todayAtMidnight.toISOString().split('T')[0];
-  const futureDateString = futureDate.toISOString().split('T')[0];
+  // Converter para string no formato YYYY-MM-DD usando a data local
+  const todayDateString = localDate.toISOString().split('T')[0];
+  
+  // Calcular a data futura
+  const futureDateObj = new Date(localDate);
+  futureDateObj.setUTCDate(futureDateObj.getUTCDate() + daysAhead);
+  const futureDateString = futureDateObj.toISOString().split('T')[0];
 
   const result = await db
     .select({
@@ -815,8 +815,8 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
           eq(transactions.status, "PENDING"),
           eq(transactions.status, "OVERDUE")
         ),
-        sql`DATE(${transactions.dueDate}) >= ${sql.raw(`'${todayDateString}'`)}`,
-        sql`DATE(${transactions.dueDate}) <= ${sql.raw(`'${futureDateString}'`)}`
+        sql`DATE(${transactions.dueDate}) >= DATE('${todayDateString}')`,
+        sql`DATE(${transactions.dueDate}) <= DATE('${futureDateString}')`
       )
     )
     .orderBy(asc(transactions.dueDate));
@@ -831,7 +831,7 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
     categoryId: row.categoryId,
     categoryName: row.categoryName || "Sem Categoria",
     categoryColor: row.categoryColor || "#6B7280",
-    daysUntilDue: Math.ceil((row.dueDate!.getTime() - todayAtMidnight.getTime()) / (1000 * 60 * 60 * 24)),
+    daysUntilDue: Math.floor((new Date(row.dueDate!).getTime() - localDate.getTime()) / (1000 * 60 * 60 * 24)),
   }));
 
   return mapped;
