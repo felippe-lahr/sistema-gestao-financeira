@@ -789,6 +789,10 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
   const futureDate = new Date(todayAtMidnight);
   futureDate.setDate(futureDate.getDate() + daysAhead);
 
+  // Converter todayAtMidnight para string no formato YYYY-MM-DD para usar na query
+  const todayDateString = todayAtMidnight.toISOString().split('T')[0];
+  const futureDateString = futureDate.toISOString().split('T')[0];
+
   const result = await db
     .select({
       id: transactions.id,
@@ -811,8 +815,8 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
           eq(transactions.status, "PENDING"),
           eq(transactions.status, "OVERDUE")
         ),
-        sql`DATE(${transactions.dueDate}) >= CURRENT_DATE`,
-        sql`DATE(${transactions.dueDate}) <= CURRENT_DATE + INTERVAL '${sql.raw(daysAhead.toString())} days'`
+        sql`DATE(${transactions.dueDate}) >= ${sql.raw(`'${todayDateString}'`)}`,
+        sql`DATE(${transactions.dueDate}) <= ${sql.raw(`'${futureDateString}'`)}`
       )
     )
     .orderBy(asc(transactions.dueDate));
