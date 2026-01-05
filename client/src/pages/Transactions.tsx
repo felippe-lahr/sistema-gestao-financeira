@@ -397,15 +397,15 @@ export default function Transactions() {
 
   return (
     <div className="container mx-auto py-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Transações</h1>
           <p className="text-muted-foreground">Gerencie receitas e despesas</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
           <Dialog open={isExportAttachmentsOpen} onOpenChange={setIsExportAttachmentsOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="w-full md:w-auto">
                 <FileArchive className="h-4 w-4 mr-2" />
                 Exportar Anexos
               </Button>
@@ -517,7 +517,7 @@ export default function Transactions() {
             if (!open) resetForm();
           }}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full md:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Transação
               </Button>
@@ -546,7 +546,7 @@ export default function Transactions() {
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                <Button onClick={handleCreate} disabled={createMutation.isPending} className="w-full md:w-auto">
                   {createMutation.isPending ? "Criando..." : "Criar Transação"}
                 </Button>
               </DialogFooter>
