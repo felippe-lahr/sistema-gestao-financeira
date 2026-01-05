@@ -743,7 +743,8 @@ export default function Transactions() {
               {filteredTransactions.map((transaction) => (
                 <Card key={transaction.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                    {/* Desktop Layout */}
+                    <div className="hidden md:flex items-center justify-between">
                       <div className="flex items-center gap-4 flex-1">
                         <div className={`p-3 rounded-full ${transaction.type === "INCOME" ? "bg-green-100" : "bg-red-100"}`}>
                           {transaction.type === "INCOME" ? (
@@ -777,6 +778,50 @@ export default function Transactions() {
                           <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDelete(transaction.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Mobile Layout */}
+                    <div className="md:hidden space-y-3">
+                      {/* Row 1: Icon + Title + Edit Icon */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className={`p-2 rounded-full flex-shrink-0 ${transaction.type === "INCOME" ? "bg-green-100" : "bg-red-100"}`}>
+                            {transaction.type === "INCOME" ? (
+                              <ArrowUpRight className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <ArrowDownRight className="h-4 w-4 text-red-600" />
+                            )}
+                          </div>
+                          <h3 className="font-semibold text-base">{transaction.description}</h3>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleEdit(transaction)}>
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Row 2: Category Badge */}
+                      <div>
+                        {getCategoryBadge(transaction.categoryId)}
+                      </div>
+
+                      {/* Row 3: Dates */}
+                      <p className="text-xs text-muted-foreground">
+                        Vencimento: {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                        {transaction.paymentDate && ` • Pago em: ${format(new Date(transaction.paymentDate), "dd/MM/yyyy", { locale: ptBR })}`}
+                      </p>
+
+                      {/* Row 4: Status + Amount + Delete */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(transaction.status)}
+                        </div>
+                        <p className={`text-base font-bold ${transaction.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
+                          {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
+                        </p>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleDelete(transaction.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
