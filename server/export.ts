@@ -65,7 +65,7 @@ export async function generateTransactionsExcel(data: {
           ? "Pendente"
           : "Vencido",
       dueDate: transaction.dueDate ? format(new Date(transaction.dueDate), "dd/MM/yyyy") : "",
-      paidDate: transaction.paidDate ? format(new Date(transaction.paidDate), "dd/MM/yyyy") : "",
+      paidDate: transaction.paymentDate ? format(new Date(transaction.paymentDate), "dd/MM/yyyy") : "",
     });
 
     // Formatação de valor
