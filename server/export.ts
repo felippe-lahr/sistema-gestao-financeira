@@ -201,9 +201,12 @@ export function generateTransactionsPDF(data: {
       .fillColor("#6B7280")
       .text(`Período: ${periodText}`, { align: "center" });
 
+    // Formatar horário com timezone GMT-3 (São Paulo)
+    const now = new Date();
+    const gmtMinus3Time = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     doc
       .fontSize(8)
-      .text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, {
+      .text(`Gerado em: ${format(gmtMinus3Time, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, {
         align: "center",
       });
 
