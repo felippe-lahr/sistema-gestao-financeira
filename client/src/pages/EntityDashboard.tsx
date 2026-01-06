@@ -138,9 +138,12 @@ export default function EntityDashboard() {
       
       const formatDateForAPI = (date: Date | undefined) => {
         if (!date) return undefined;
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        // Converter para GMT-3 (São Paulo)
+        const offset = 3 * 60 * 60 * 1000; // GMT-3 em milissegundos
+        const localDate = new Date(date.getTime() - offset);
+        const year = localDate.getUTCFullYear();
+        const month = String(localDate.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(localDate.getUTCDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
       
@@ -192,9 +195,12 @@ export default function EntityDashboard() {
       
       const formatDateForAPI = (date: Date | undefined) => {
         if (!date) return undefined;
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        // Converter para GMT-3 (São Paulo)
+        const offset = 3 * 60 * 60 * 1000; // GMT-3 em milissegundos
+        const localDate = new Date(date.getTime() - offset);
+        const year = localDate.getUTCFullYear();
+        const month = String(localDate.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(localDate.getUTCDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
       
