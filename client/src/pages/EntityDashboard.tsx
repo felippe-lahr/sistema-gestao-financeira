@@ -738,30 +738,35 @@ export default function EntityDashboard() {
               {recentTransactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                  className="flex flex-col gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{transaction.description}</p>
-                      {transaction.categoryName && (
-                        <span
-                          className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                          style={{ backgroundColor: transaction.categoryColor || "#6B7280" }}
-                        >
-                          {transaction.categoryName}
-                        </span>
-                      )}
+                  {/* Linha 1: Descrição */}
+                  <p className="font-medium text-sm sm:text-base">{transaction.description}</p>
+
+                  {/* Linha 2: Data */}
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    {transaction.dueDate && formatDate(transaction.dueDate)}
+                    {transaction.status === "PAID" && transaction.paymentDate && (
+                      <span className="ml-2">• Pago em {formatDate(transaction.paymentDate)}</span>
+                    )}
+                  </p>
+
+                  {/* Linha 3: Categoria */}
+                  {transaction.categoryName && (
+                    <div>
+                      <span
+                        className="inline-block px-2 py-1 rounded-full text-xs font-medium text-white"
+                        style={{ backgroundColor: transaction.categoryColor || "#6B7280" }}
+                      >
+                        {transaction.categoryName}
+                      </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {transaction.dueDate && formatDate(transaction.dueDate)}
-                      {transaction.status === "PAID" && transaction.paymentDate && (
-                        <span className="ml-2">• Pago em {formatDate(transaction.paymentDate)}</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="text-right">
+                  )}
+
+                  {/* Linha 4: Valor + Status */}
+                  <div className="flex items-center justify-between pt-2 border-t">
                     <p
-                      className={`text-lg font-bold ${
+                      className={`text-base sm:text-lg font-bold ${
                         transaction.type === "INCOME" ? "text-green-600" : "text-red-600"
                       }`}
                     >
