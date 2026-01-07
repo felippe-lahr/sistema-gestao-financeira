@@ -498,36 +498,7 @@ export default function EntityDashboard() {
         </Button>
       </div>
 
-      {/* Separador */}
-      <div className="ml-auto flex gap-2 md:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportExcel}
-            disabled={exportingExcel}
-          >
-            {exportingExcel ? (
-              <Download className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-            )}
-            Excel
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportPDF}
-            disabled={exportingPDF}
-          >
-            {exportingPDF ? (
-              <Download className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <FileText className="h-4 w-4 mr-2" />
-            )}
-            PDF
-          </Button>
-        </div>
-      </div>
+
 
       {/* Metrics Cards */}
       {metricsLoading ? (
