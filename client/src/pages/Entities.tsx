@@ -191,7 +191,7 @@ export default function Entities() {
   return (
     <div className="container py-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Gerenciar Entidades</h1>
           <p className="text-muted-foreground">
@@ -200,7 +200,7 @@ export default function Entities() {
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => resetForm()}>
+            <Button onClick={() => resetForm()} className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Nova Entidade
             </Button>

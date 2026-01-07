@@ -78,18 +78,23 @@ export default function Home() {
 
   return (
     <div className="container py-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Minhas Entidades</h1>
-          <p className="text-muted-foreground">
-            {entities.length} {entities.length === 1 ? "entidade cadastrada" : "entidades cadastradas"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={toggleShowValues} title={showValues ? "Esconder valores" : "Mostrar valores"}>
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Minhas Entidades</h1>
+            <p className="text-muted-foreground">
+              {entities.length} {entities.length === 1 ? "entidade cadastrada" : "entidades cadastradas"}
+            </p>
+          </div>
+          <Button variant="outline" size="icon" onClick={toggleShowValues} title={showValues ? "Esconder valores" : "Mostrar valores"} className="hidden sm:flex">
             {showValues ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           </Button>
-          <Button onClick={() => setLocation("/entities")}>
+        </div>
+        <div className="flex gap-2 flex-col sm:flex-row">
+          <Button variant="outline" size="icon" onClick={toggleShowValues} title={showValues ? "Esconder valores" : "Mostrar valores"} className="sm:hidden">
+            {showValues ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </Button>
+          <Button onClick={() => setLocation("/entities")} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Nova Entidade
           </Button>

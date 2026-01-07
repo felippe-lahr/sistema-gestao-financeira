@@ -156,7 +156,7 @@ export default function TreasurySelix() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Tesouro Selic</h1>
           <p className="text-muted-foreground mt-1">Gerenciar investimento em Tesouro Selic</p>
@@ -165,6 +165,7 @@ export default function TreasurySelix() {
           variant="outline"
           size="sm"
           onClick={() => setLocation(`/entities/${entityId}`)}
+          className="w-full sm:w-auto"
         >
           ← Voltar
         </Button>

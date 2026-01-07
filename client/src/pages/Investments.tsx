@@ -238,14 +238,14 @@ export default function Investments() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Investimentos</h1>
           <p className="text-muted-foreground">
             {entity?.name || "Carregando..."}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-col sm:flex-row">
           <Button
             variant="outline"
             onClick={handleUpdateAll}
