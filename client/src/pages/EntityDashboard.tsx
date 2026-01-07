@@ -273,8 +273,7 @@ export default function EntityDashboard() {
           </div>
           <Button
             onClick={() => setLocation(`/investments/${entityId}`)}
-            variant="outline"
-            className="hidden sm:flex flex-shrink-0"
+            className="hidden sm:flex flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
           >
             <TrendingUp className="h-4 w-4 mr-2" />
             Investimentos
@@ -295,8 +294,7 @@ export default function EntityDashboard() {
         {/* Linha 3: Botao Investimentos (Mobile) */}
         <Button
           onClick={() => setLocation(`/investments/${entityId}`)}
-          variant="outline"
-          className="sm:hidden w-full"
+          className="sm:hidden w-full bg-blue-600 hover:bg-blue-700 text-white"
         >
           <TrendingUp className="h-4 w-4 mr-2" />
           Investimentos
@@ -422,80 +420,82 @@ export default function EntityDashboard() {
         </div>
       </div>
 
-      {/* Filtros - Desktop: Linha horizontal */}
-      <div className="hidden md:flex gap-3 items-center flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Período:</span>
-          <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="month">Mês Atual</SelectItem>
-              <SelectItem value="quarter">Últimos 3 Meses</SelectItem>
-              <SelectItem value="year">Ano Atual</SelectItem>
-              <SelectItem value="custom">Período Personalizado</SelectItem>
-              <SelectItem value="all">Todos os Períodos</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* Filtros - Desktop: Seção com destaque */}
+      <div className="hidden md:block bg-blue-50 border border-blue-100 rounded-lg p-4">
+        <div className="flex gap-3 items-center flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Período:</span>
+            <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Mês Atual</SelectItem>
+                <SelectItem value="quarter">Últimos 3 Meses</SelectItem>
+                <SelectItem value="year">Ano Atual</SelectItem>
+                <SelectItem value="custom">Período Personalizado</SelectItem>
+                <SelectItem value="all">Todos os Períodos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {filterPeriod === "custom" && (
+            <>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-3 py-2 border rounded-md text-sm w-[140px]"
+              />
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-3 py-2 border rounded-md text-sm w-[140px]"
+              />
+            </>
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setFilterPeriod("month");
+              setFilterCategoryId("");
+              setCustomStartDate("");
+              setCustomEndDate("");
+            }}
+          >
+            Limpar
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={exportingExcel}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {exportingExcel ? (
+              <Download className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+            )}
+            Excel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleExportPDF}
+            disabled={exportingPDF}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            {exportingPDF ? (
+              <Download className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4 mr-2" />
+            )}
+            PDF
+          </Button>
         </div>
-
-        {filterPeriod === "custom" && (
-          <>
-            <input
-              type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
-              className="px-3 py-2 border rounded-md text-sm w-[140px]"
-            />
-            <input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              className="px-3 py-2 border rounded-md text-sm w-[140px]"
-            />
-          </>
-        )}
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setFilterPeriod("month");
-            setFilterCategoryId("");
-            setCustomStartDate("");
-            setCustomEndDate("");
-          }}
-        >
-          Limpar
-        </Button>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExportExcel}
-          disabled={exportingExcel}
-        >
-          {exportingExcel ? (
-            <Download className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-          )}
-          Excel
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExportPDF}
-          disabled={exportingPDF}
-        >
-          {exportingPDF ? (
-            <Download className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <FileText className="h-4 w-4 mr-2" />
-          )}
-          PDF
-        </Button>
       </div>
 
 

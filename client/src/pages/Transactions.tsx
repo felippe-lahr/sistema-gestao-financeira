@@ -771,8 +771,9 @@ export default function Transactions() {
         </div>
       </div>
 
-      {/* Desktop: Filtros em linha horizontal */}
-      <div className="hidden md:flex gap-3 items-center flex-wrap">
+      {/* Desktop: Filtros em seção com destaque */}
+      <div className="hidden md:block bg-blue-50 border border-blue-100 rounded-lg p-4">
+        <div className="flex gap-3 items-center flex-wrap">
         {/* Entidade */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Entidade:</span>
@@ -896,6 +897,7 @@ export default function Transactions() {
         >
           Limpar
         </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
