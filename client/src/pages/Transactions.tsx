@@ -43,8 +43,8 @@ export default function Transactions() {
   // Calcular quantos filtros estao ativos
   const activeFiltersCount = [
     filterPeriod !== "all",
-    filterCategoryId !== "",
-    filterStatus !== "",
+    filterCategoryId !== "" && filterCategoryId !== "all",
+    filterStatus !== "" && filterStatus !== "all",
     filterStartDate !== "" || filterEndDate !== ""
   ].filter(Boolean).length;
 
@@ -713,7 +713,7 @@ export default function Transactions() {
                     <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas</SelectItem>
+                    <SelectItem value="all">Todas</SelectItem>
                     {categories?.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id.toString()}>
                         {cat.name}
@@ -731,7 +731,7 @@ export default function Transactions() {
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="PENDING">Pendente</SelectItem>
                     <SelectItem value="PAID">Pago</SelectItem>
                     <SelectItem value="OVERDUE">Vencido</SelectItem>
