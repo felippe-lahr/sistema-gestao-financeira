@@ -114,41 +114,66 @@ export function registerPasswordAuthRoutes(app: Express) {
   // Alterar senha
   app.post("/api/auth/change-password", async (req: Request, res: Response) => {
     try {
+      console.log("[Password Auth] Change password request received");
       const { currentPassword, newPassword } = req.body;
 
       if (!currentPassword || !newPassword) {
+        console.log("[Password Auth] Missing passwords");
         res.status(400).json({ error: "Senha atual e nova senha sao obrigatorias" });
         return;
       }
 
       if (newPassword.length < 6) {
+        console.log("[Password Auth] New password too short");
         res.status(400).json({ error: "A nova senha deve ter pelo menos 6 caracteres" });
         return;
       }
 
-      // Obter usuario da sessao
-      const sessionToken = req.cookies[COOKIE_NAME];
+      // Obter usuario da sessao - tentar de cookies ou header
+      let sessionToken = req.cookies?.[COOKIE_NAME];
+      
+      // Se não encontrou no cookies, tentar no header Authorization
       if (!sessionToken) {
-        res.status(401).json({ error: "Nao autenticado" });
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          sessionToken = authHeader.substring(7);
+        }
+      }
+      
+      console.log("[Password Auth] Session token found:", !!sessionToken);
+      console.log("[Password Auth] Cookies:", JSON.stringify(req.cookies));
+      
+      if (!sessionToken) {
+        console.log("[Password Auth] No session token");
+        res.status(401).json({ error: "Nao autenticado - sessao nao encontrada" });
         return;
       }
 
       const sessionInfo = await sdk.verifySession(sessionToken);
+      console.log("[Password Auth] Session info:", JSON.stringify(sessionInfo));
+      
       if (!sessionInfo || !sessionInfo.openId) {
+        console.log("[Password Auth] Invalid session");
         res.status(401).json({ error: "Sessao invalida" });
         return;
       }
 
       const user = await db.getUserByOpenId(sessionInfo.openId);
+      console.log("[Password Auth] User found:", !!user, user?.id);
+      
       if (!user) {
+        console.log("[Password Auth] User not found");
         res.status(401).json({ error: "Usuario nao encontrado" });
         return;
       }
 
       // Verificar senha atual
       const currentPasswordHash = await db.getUserPassword(user.id);
+      console.log("[Password Auth] Current password hash found:", !!currentPasswordHash);
+      
       if (currentPasswordHash) {
         const isValid = await bcrypt.compare(currentPassword, currentPasswordHash);
+        console.log("[Password Auth] Password valid:", isValid);
         if (!isValid) {
           res.status(401).json({ error: "Senha atual incorreta" });
           return;
@@ -156,13 +181,16 @@ export function registerPasswordAuthRoutes(app: Express) {
       }
 
       // Atualizar senha
+      console.log("[Password Auth] Updating password for user:", user.id);
       const newPasswordHash = await bcrypt.hash(newPassword, 10);
       await db.setUserPassword(user.id, newPasswordHash);
 
+      console.log("[Password Auth] Password updated successfully");
       res.json({ success: true });
     } catch (error) {
       console.error("[Password Auth] Change password failed", error);
-      res.status(500).json({ error: "Erro ao alterar senha" });
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      res.status(500).json({ error: "Erro ao alterar senha: " + errorMessage });
     }
   });
 }

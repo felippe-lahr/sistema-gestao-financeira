@@ -5,6 +5,7 @@ import net from "net";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerDemoAuthRoutes } from "./demo-auth";
@@ -73,6 +74,9 @@ async function startServer() {
     maxAge: 86400,
   };
   app.use(cors(corsOptions));
+
+  // 2.5. Cookie Parser - Parse cookies from requests
+  app.use(cookieParser());
 
   // 3. Rate Limiting - Prevent brute force and DDoS
   const limiter = rateLimit({
