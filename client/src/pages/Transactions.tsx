@@ -877,6 +877,28 @@ export default function Transactions() {
             <Input placeholder="Buscar descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
           </div>
         </div>
+
+        {/* Botões */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setSelectedEntityId(undefined);
+            setFilterPeriod("all");
+            setFilterMonth(new Date().getMonth() + 1);
+            setFilterYear(new Date().getFullYear());
+            setFilterStartDate("");
+            setFilterEndDate("");
+            setFilterCategoryId("all");
+            setFilterStatus("all");
+            setSearchTerm("");
+          }}
+        >
+          Limpar
+        </Button>
+        <Button size="sm">
+          Aplicar
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
