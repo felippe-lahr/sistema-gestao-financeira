@@ -11,6 +11,59 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+/**
+ * Validate filename to prevent path traversal attacks
+ */
+function validateFilename(filename: string): boolean {
+  // Check for path traversal attempts
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return false;
+  }
+
+  // Check for null bytes
+  if (filename.includes('\0')) {
+    return false;
+  }
+
+  // Check for suspicious patterns
+  if (filename.match(/[<>:"|?*]/)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Safely resolve file path to prevent directory traversal
+ */
+export function getFilePath(filename: string): string {
+  if (!validateFilename(filename)) {
+    throw new Error('Invalid filename');
+  }
+
+  // Use path.join and path.resolve to safely construct the path
+  const filePath = path.resolve(UPLOAD_DIR, filename);
+
+  // Ensure the resolved path is within UPLOAD_DIR
+  if (!filePath.startsWith(UPLOAD_DIR)) {
+    throw new Error('Path traversal attempt detected');
+  }
+
+  return filePath;
+}
+
+/**
+ * Check if file exists safely
+ */
+export function fileExists(filename: string): boolean {
+  try {
+    const filePath = getFilePath(filename);
+    return fs.existsSync(filePath);
+  } catch {
+    return false;
+  }
+}
+
 // Configuração do multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -21,7 +74,11 @@ const storage = multer.diskStorage({
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
     const basename = path.basename(file.originalname, ext);
-    cb(null, `${basename}-${uniqueSuffix}${ext}`);
+    
+    // Sanitize basename to prevent injection
+    const sanitizedBasename = basename.replace(/[^a-zA-Z0-9_-]/g, '_');
+    
+    cb(null, `${sanitizedBasename}-${uniqueSuffix}${ext}`);
   },
 });
 
@@ -52,7 +109,7 @@ export const upload = multer({
 // Função para deletar arquivo do filesystem
 export function deleteFile(filename: string): boolean {
   try {
-    const filePath = path.join(UPLOAD_DIR, filename);
+    const filePath = getFilePath(filename);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
       return true;
@@ -62,14 +119,4 @@ export function deleteFile(filename: string): boolean {
     console.error("[Upload] Error deleting file:", error);
     return false;
   }
-}
-
-// Função para obter caminho completo do arquivo
-export function getFilePath(filename: string): string {
-  return path.join(UPLOAD_DIR, filename);
-}
-
-// Função para verificar se arquivo existe
-export function fileExists(filename: string): boolean {
-  return fs.existsSync(getFilePath(filename));
 }
