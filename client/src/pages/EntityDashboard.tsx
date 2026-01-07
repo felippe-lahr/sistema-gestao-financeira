@@ -251,31 +251,35 @@ export default function EntityDashboard() {
   return (
     <div className="container py-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: entity.color || "#2563EB" }}
-            >
-              <span className="text-white font-bold text-lg">{entity.name.charAt(0).toUpperCase()}</span>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">{entity.name}</h1>
-              <p className="text-muted-foreground">Visão geral das finanças</p>
-            </div>
-          </div>
-          <Button
-            onClick={() => setLocation(`/investments/${entityId}`)}
-            variant="outline"
-          >
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Investimentos
+      <div className="flex flex-col gap-4">
+        {/* Linha 1: Botao Voltar + Titulo */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="flex-shrink-0">
+            <ArrowLeft className="h-5 w-5" />
           </Button>
+          <h1 className="text-3xl font-bold tracking-tight">{entity.name}</h1>
         </div>
+        
+        {/* Linha 2: Icone da Entidade + Descricao */}
+        <div className="flex items-center gap-3">
+          <div
+            className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: entity.color || "#2563EB" }}
+          >
+            <span className="text-white font-bold text-lg">{entity.name.charAt(0).toUpperCase()}</span>
+          </div>
+          <p className="text-muted-foreground">Visao geral das financas</p>
+        </div>
+        
+        {/* Linha 3: Botao Investimentos */}
+        <Button
+          onClick={() => setLocation(`/investments/${entityId}`)}
+          variant="outline"
+          className="w-full sm:w-auto"
+        >
+          <TrendingUp className="h-4 w-4 mr-2" />
+          Investimentos
+        </Button>
       </div>
 
       {/* Filtros */}
