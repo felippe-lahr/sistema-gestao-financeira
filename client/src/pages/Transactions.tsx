@@ -600,7 +600,8 @@ export default function Transactions() {
       </Dialog>
 
       {/* Filtros */}
-      <div className="flex gap-2 items-center flex-wrap">
+      {/* Mobile: Drawer de Filtros */}
+      <div className="flex gap-2 items-center flex-wrap md:hidden">
         <Drawer open={isFilterDrawerOpen} onOpenChange={setIsFilterDrawerOpen}>
           <Button
             variant="outline"
@@ -760,6 +761,114 @@ export default function Transactions() {
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
+
+        {/* Buscar */}
+        <div className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: Filtros em linha horizontal */}
+      <div className="hidden md:flex gap-3 items-center flex-wrap">
+        {/* Entidade */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Entidade:</span>
+          <Select value={selectedEntityId?.toString() || ""} onValueChange={(v) => setSelectedEntityId(parseInt(v))}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {entities?.map((entity) => (
+                <SelectItem key={entity.id} value={entity.id.toString()}>
+                  {entity.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Período */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Período:</span>
+          <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="month">Mês</SelectItem>
+              <SelectItem value="year">Ano</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Mês/Ano */}
+        {filterPeriod === "month" && (
+          <>
+            <Select value={filterMonth.toString()} onValueChange={(v) => setFilterMonth(parseInt(v))}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => (
+                  <SelectItem key={i + 1} value={(i + 1).toString()}>
+                    {format(new Date(2024, i), "MMM", { locale: ptBR })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input type="number" value={filterYear} onChange={(e) => setFilterYear(parseInt(e.target.value))} className="w-[100px]" />
+          </>
+        )}
+
+        {filterPeriod === "year" && (
+          <Input type="number" value={filterYear} onChange={(e) => setFilterYear(parseInt(e.target.value))} className="w-[100px]" />
+        )}
+
+        {filterPeriod === "custom" && (
+          <>
+            <Input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} className="w-[140px]" />
+            <Input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} className="w-[140px]" />
+          </>
+        )}
+
+        {/* Categoria */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Categoria:</span>
+          <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {categories?.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id.toString()}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Status */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Status:</span>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue placeholder="Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="PENDING">Pendente</SelectItem>
+              <SelectItem value="PAID">Pago</SelectItem>
+              <SelectItem value="OVERDUE">Vencido</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Buscar */}
         <div className="flex-1 min-w-[200px]">
