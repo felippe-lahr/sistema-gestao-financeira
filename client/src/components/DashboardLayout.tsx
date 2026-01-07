@@ -55,7 +55,10 @@ function LoginForm() {
       const data = await response.json();
       if (response.ok) {
         toast.success("Login realizado com sucesso!");
-        window.location.reload();
+        // Definir valores como ocultos por padrão
+        localStorage.setItem('showFinancialValues', JSON.stringify(false));
+        // Redirecionar para página de entidades
+        window.location.href = '/';
       } else {
         toast.error(data.error || "Email ou senha incorretos");
       }
