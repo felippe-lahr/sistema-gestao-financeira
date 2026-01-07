@@ -61,6 +61,56 @@ export function registerPasswordAuthRoutes(app: Express) {
     }
   });
 
+  // Setup inicial de senha (rota temporaria para configurar senha inicial)
+  app.post("/api/auth/setup-password", async (req: Request, res: Response) => {
+    try {
+      const { email, password, setupKey } = req.body;
+
+      // Chave de setup para seguranca (deve ser removida apos configuracao)
+      if (setupKey !== "SETUP_INITIAL_2026") {
+        res.status(403).json({ error: "Chave de setup invalida" });
+        return;
+      }
+
+      if (!email || !password) {
+        res.status(400).json({ error: "Email e senha sao obrigatorios" });
+        return;
+      }
+
+      // Buscar usuario pelo email
+      const user = await db.getUserByEmail(email);
+      if (!user) {
+        res.status(404).json({ error: "Usuario nao encontrado" });
+        return;
+      }
+
+      // Verificar se ja tem senha
+      const existingPassword = await db.getUserPassword(user.id);
+      if (existingPassword) {
+        res.status(400).json({ error: "Usuario ja possui senha configurada" });
+        return;
+      }
+
+      // Configurar senha
+      const passwordHash = await bcrypt.hash(password, 10);
+      await db.setUserPassword(user.id, passwordHash);
+
+      // Atualizar nome do usuario
+      await db.upsertUser({
+        openId: user.openId,
+        name: "Felippe Lahr",
+        email: user.email,
+        loginMethod: "password",
+        lastSignedIn: new Date(),
+      });
+
+      res.json({ success: true, message: "Senha configurada com sucesso" });
+    } catch (error) {
+      console.error("[Password Auth] Setup password failed", error);
+      res.status(500).json({ error: "Erro ao configurar senha" });
+    }
+  });
+
   // Alterar senha
   app.post("/api/auth/change-password", async (req: Request, res: Response) => {
     try {
