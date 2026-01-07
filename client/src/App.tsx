@@ -9,6 +9,7 @@ import Transactions from "@/pages/Transactions";
 import Investments from "@/pages/Investments";
 import TreasurySelix from "@/pages/TreasurySelix";
 import Settings from "@/pages/Settings";
+import UserProfile from "@/pages/UserProfile";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/investments/:entityId" component={() => <DashboardLayout><Investments /></DashboardLayout>} />
       <Route path="/treasury-selic/:entityId" component={() => <DashboardLayout><TreasurySelix /></DashboardLayout>} />
       <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
+      <Route path="/profile" component={() => <DashboardLayout><UserProfile /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

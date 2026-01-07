@@ -22,17 +22,95 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Building2, Receipt, Settings, Clock } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Building2, Receipt, Settings, Clock, User } from "lucide-react";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { toast } from "sonner";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
+// Componente de Login
+function LoginForm() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast.error("Preencha email e senha");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("Login realizado com sucesso!");
+        window.location.reload();
+      } else {
+        toast.error(data.error || "Email ou senha incorretos");
+      }
+    } catch (error) {
+      toast.error("Erro ao fazer login");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <Card className="w-full max-w-md mx-4 shadow-xl">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Sistema de Gestao Financeira</CardTitle>
+          <CardDescription>Entre com suas credenciais para acessar</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Sua senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Entrando..." : "Entrar"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 const menuItems = [
-  { icon: LayoutDashboard, label: "Início", path: "/" },
+  { icon: LayoutDashboard, label: "Inicio", path: "/" },
   { icon: Building2, label: "Entidades", path: "/entities" },
-  { icon: Receipt, label: "Transações", path: "/transactions" },
-  { icon: Settings, label: "Configurações", path: "/settings" },
+  { icon: Receipt, label: "Transacoes", path: "/transactions" },
+  { icon: Settings, label: "Configuracoes", path: "/settings" },
 ];
 
 function LiveClock() {
@@ -101,7 +179,7 @@ export default function DashboardLayout({
   });
   const { loading, user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const inactivityTimeoutRef = useRef<NodeJS.Timeout>();
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -130,29 +208,7 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              window.location.href = getLoginUrl();
-            }}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-            Sign in
-          </Button>
-        </div>
-      </div>
-    );
+    return <LoginForm />;
   }
 
   return (
@@ -299,11 +355,11 @@ function DashboardLayoutContent({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem
-                  onClick={() => window.location.href = '/settings'}
+                  onClick={() => window.location.href = '/profile'}
                   className="cursor-pointer"
                 >
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Configurações</span>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Meu Perfil</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={logout}

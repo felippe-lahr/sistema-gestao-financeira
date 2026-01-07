@@ -8,6 +8,7 @@ import cors from "cors";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerDemoAuthRoutes } from "./demo-auth";
+import { registerPasswordAuthRoutes } from "./password-auth";
 import { registerUploadRoutes } from "./upload-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -103,6 +104,8 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Demo auth route for when OAuth is not available
   registerDemoAuthRoutes(app);
+  // Password auth routes for email/password login
+  registerPasswordAuthRoutes(app);
   // Upload routes for attachments
   registerUploadRoutes(app);
 
