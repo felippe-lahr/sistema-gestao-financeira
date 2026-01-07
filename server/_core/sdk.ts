@@ -220,8 +220,7 @@ class SDKServer {
 
       if (
         !isNonEmptyString(openId) ||
-        !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
+        !isNonEmptyString(appId)
       ) {
         console.warn("[Auth] Session payload missing required fields");
         return null;
@@ -230,7 +229,7 @@ class SDKServer {
       return {
         openId,
         appId,
-        name,
+        name: typeof name === 'string' ? name : '',
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
