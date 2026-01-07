@@ -303,8 +303,8 @@ export default function EntityDashboard() {
         </Button>
       </div>
 
-      {/* Filtros */}
-      <div className="flex gap-2 items-center flex-wrap">
+      {/* Filtros - Mobile: Drawer */}
+      <div className="flex gap-2 items-center flex-wrap md:hidden">
         <Drawer open={isFilterDrawerOpen} onOpenChange={setIsFilterDrawerOpen}>
           <Button
             variant="outline"
@@ -393,6 +393,113 @@ export default function EntityDashboard() {
         </Drawer>
 
         <div className="ml-auto flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={exportingExcel}
+          >
+            {exportingExcel ? (
+              <Download className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+            )}
+            Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPDF}
+            disabled={exportingPDF}
+          >
+            {exportingPDF ? (
+              <Download className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4 mr-2" />
+            )}
+            PDF
+          </Button>
+        </div>
+      </div>
+
+      {/* Filtros - Desktop: Linha horizontal */}
+      <div className="hidden md:flex gap-3 items-center flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Período:</span>
+          <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">Mês Atual</SelectItem>
+              <SelectItem value="quarter">Últimos 3 Meses</SelectItem>
+              <SelectItem value="year">Ano Atual</SelectItem>
+              <SelectItem value="custom">Período Personalizado</SelectItem>
+              <SelectItem value="all">Todos os Períodos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {filterPeriod === "custom" && (
+          <>
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm w-[140px]"
+            />
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm w-[140px]"
+            />
+          </>
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setFilterPeriod("month");
+            setFilterCategoryId("");
+            setCustomStartDate("");
+            setCustomEndDate("");
+          }}
+        >
+          Limpar
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportExcel}
+          disabled={exportingExcel}
+        >
+          {exportingExcel ? (
+            <Download className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+          )}
+          Excel
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportPDF}
+          disabled={exportingPDF}
+        >
+          {exportingPDF ? (
+            <Download className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <FileText className="h-4 w-4 mr-2" />
+          )}
+          PDF
+        </Button>
+      </div>
+
+      {/* Separador */}
+      <div className="ml-auto flex gap-2 md:hidden">
           <Button
             variant="outline"
             size="sm"
@@ -748,33 +855,34 @@ export default function EntityDashboard() {
               {recentTransactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="p-3 rounded-lg border hover:bg-muted/50 transition-colors flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4"
+                  className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                 >
-                  {/* Linha 1: Descrição */}
-                  <p className="font-medium text-sm sm:text-base">{transaction.description}</p>
+                  {/* Mobile: Flex Column, Desktop: Flex Row */}
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3 md:flex-1">
+                    {/* Descrição */}
+                    <p className="font-medium text-sm sm:text-base">{transaction.description}</p>
 
-                  {/* Linha 2: Data */}
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    {transaction.dueDate && formatDate(transaction.dueDate)}
-                    {transaction.status === "PAID" && transaction.paymentDate && (
-                      <span className="ml-2">• Pago em {formatDate(transaction.paymentDate)}</span>
-                    )}
-                  </p>
+                    {/* Data */}
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {transaction.dueDate && formatDate(transaction.dueDate)}
+                      {transaction.status === "PAID" && transaction.paymentDate && (
+                        <span className="ml-2">• Pago em {formatDate(transaction.paymentDate)}</span>
+                      )}
+                    </p>
 
-                  {/* Linha 3: Categoria */}
-                  {transaction.categoryName && (
-                    <div>
+                    {/* Categoria */}
+                    {transaction.categoryName && (
                       <span
-                        className="inline-block px-2 py-1 rounded-full text-xs font-medium text-white"
+                        className="inline-block px-2 py-1 rounded-full text-xs font-medium text-white w-fit"
                         style={{ backgroundColor: transaction.categoryColor || "#6B7280" }}
                       >
                         {transaction.categoryName}
                       </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  {/* Linha 4: Valor + Status */}
-                  <div className="flex items-center justify-between pt-2 border-t">
+                  {/* Valor + Status */}
+                  <div className="flex items-center justify-between md:gap-4 md:flex-shrink-0 pt-2 md:pt-0 md:border-t-0 border-t">
                     <p
                       className={`text-base sm:text-lg font-bold ${
                         transaction.type === "INCOME" ? "text-green-600" : "text-red-600"
