@@ -99,11 +99,31 @@ export default function DashboardLayout({
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth();
+  const { loading, user, logout } = useAuth();
+  const [, setLocation] = useLocation();
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
+    const resetTimer = () => {
+      if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = setTimeout(() => {
+        logout();
+        setLocation('/');
+      }, INACTIVITY_TIMEOUT);
+    };
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => window.addEventListener(event, resetTimer));
+    resetTimer();
+    return () => {
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+      if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+    };
+  }, [logout, setLocation]);
 
   if (loading) {
     return <DashboardLayoutSkeleton />
@@ -278,6 +298,13 @@ function DashboardLayoutContent({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onClick={() => window.location.href = '/settings'}
+                  className="cursor-pointer"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Configurações</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={logout}
                   className="cursor-pointer text-destructive focus:text-destructive"

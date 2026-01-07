@@ -1180,3 +1180,45 @@ export async function updateTreasurySelicPrice(entityId: number, currentPrice: n
     .where(eq(treasurySelic.entityId, entityId))
     .returning();
 }
+
+
+// ========== PASSWORD FUNCTIONS ==========
+
+export async function setUserPassword(userId: number, passwordHash: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { userPasswords } = await import("../drizzle/schema");
+  
+  const existing = await db.select().from(userPasswords).where(eq(userPasswords.userId, userId)).limit(1);
+  
+  if (existing.length > 0) {
+    await db.update(userPasswords).set({ passwordHash, updatedAt: new Date() }).where(eq(userPasswords.userId, userId));
+  } else {
+    await db.insert(userPasswords).values({ userId, passwordHash });
+  }
+}
+
+export async function getUserPassword(userId: number): Promise<string | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const { userPasswords } = await import("../drizzle/schema");
+  const result = await db.select().from(userPasswords).where(eq(userPasswords.userId, userId)).limit(1);
+  return result.length > 0 ? result[0].passwordHash : null;
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateUserName(userId: number, name: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users).set({ name, updatedAt: new Date() }).where(eq(users.id, userId));
+}

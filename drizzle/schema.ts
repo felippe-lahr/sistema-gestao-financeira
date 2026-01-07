@@ -325,3 +325,16 @@ export const treasuryDirectTitlesCache = pgTable("treasury_direct_titles_cache",
 
 export type TreasuryDirectTitleCache = typeof treasuryDirectTitlesCache.$inferSelect;
 export type InsertTreasuryDirectTitleCache = typeof treasuryDirectTitlesCache.$inferInsert;
+
+
+// User Passwords table
+export const userPasswords = pgTable("user_passwords", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type UserPassword = typeof userPasswords.$inferSelect;
+export type InsertUserPassword = typeof userPasswords.$inferInsert;
