@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
 import { AttachmentUploader } from "@/components/AttachmentUploader";
 import { uploadFile, deleteFile } from "@/lib/supabase";
 import { CurrencyInput, parseCurrency, formatCurrencyValue } from "@/components/CurrencyInput";
@@ -37,6 +38,15 @@ export default function Transactions() {
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  
+  // Calcular quantos filtros estao ativos
+  const activeFiltersCount = [
+    filterPeriod !== "all",
+    filterCategoryId !== "",
+    filterStatus !== "",
+    filterStartDate !== "" || filterEndDate !== ""
+  ].filter(Boolean).length;
 
   const [formData, setFormData] = useState({
     type: "EXPENSE" as "INCOME" | "EXPENSE",
@@ -589,140 +599,176 @@ export default function Transactions() {
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Filtros</CardTitle>
-              <CardDescription>Filtre as transações por período e categoria</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Entity selector */}
-            <div className="space-y-2">
-              <Label>Entidade</Label>
-              <Select value={selectedEntityId?.toString() || ""} onValueChange={(v) => setSelectedEntityId(parseInt(v))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {entities?.map((entity) => (
-                    <SelectItem key={entity.id} value={entity.id.toString()}>
-                      {entity.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Filtros */}
+      <div className="flex gap-2 items-center flex-wrap">
+        <Drawer open={isFilterDrawerOpen} onOpenChange={setIsFilterDrawerOpen}>
+          <Button
+            variant="outline"
+            onClick={() => setIsFilterDrawerOpen(true)}
+            className="relative"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filtros
+            {activeFiltersCount > 0 && (
+              <Badge className="ml-2 bg-blue-500 text-white">{activeFiltersCount}</Badge>
+            )}
+          </Button>
 
-            {/* Period filter */}
-            <div className="space-y-2">
-              <Label>Período</Label>
-              <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="month">Mês</SelectItem>
-                  <SelectItem value="year">Ano</SelectItem>
-                  <SelectItem value="custom">Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <DrawerContent>
+            <DrawerHeader>
+              <div className="flex items-center justify-between">
+                <DrawerTitle>Filtros</DrawerTitle>
+                <DrawerClose asChild>
+                  <Button variant="ghost" size="icon">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DrawerClose>
+              </div>
+            </DrawerHeader>
 
-            {/* Month/Year selector */}
-            {filterPeriod === "month" && (
-              <>
-                <div className="space-y-2">
-                  <Label>Mês</Label>
-                  <Select value={filterMonth.toString()} onValueChange={(v) => setFilterMonth(parseInt(v))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <SelectItem key={i + 1} value={(i + 1).toString()}>
-                          {format(new Date(2024, i), "MMMM", { locale: ptBR })}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="space-y-4 p-4 overflow-y-auto max-h-[60vh]">
+              {/* Entidade */}
+              <div className="space-y-2">
+                <Label>Entidade</Label>
+                <Select value={selectedEntityId?.toString() || ""} onValueChange={(v) => setSelectedEntityId(parseInt(v))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {entities?.map((entity) => (
+                      <SelectItem key={entity.id} value={entity.id.toString()}>
+                        {entity.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Período */}
+              <div className="space-y-2">
+                <Label>Período</Label>
+                <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="month">Mês</SelectItem>
+                    <SelectItem value="year">Ano</SelectItem>
+                    <SelectItem value="custom">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Mês/Ano */}
+              {filterPeriod === "month" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Mês</Label>
+                    <Select value={filterMonth.toString()} onValueChange={(v) => setFilterMonth(parseInt(v))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <SelectItem key={i + 1} value={(i + 1).toString()}>
+                            {format(new Date(2024, i), "MMMM", { locale: ptBR })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Ano</Label>
+                    <Input type="number" value={filterYear} onChange={(e) => setFilterYear(parseInt(e.target.value))} />
+                  </div>
+                </>
+              )}
+
+              {filterPeriod === "year" && (
                 <div className="space-y-2">
                   <Label>Ano</Label>
                   <Input type="number" value={filterYear} onChange={(e) => setFilterYear(parseInt(e.target.value))} />
                 </div>
-              </>
-            )}
+              )}
 
-            {filterPeriod === "year" && (
+              {filterPeriod === "custom" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Data Inicial</Label>
+                    <Input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data Final</Label>
+                    <Input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {/* Categoria */}
               <div className="space-y-2">
-                <Label>Ano</Label>
-                <Input type="number" value={filterYear} onChange={(e) => setFilterYear(parseInt(e.target.value))} />
+                <Label>Categoria</Label>
+                <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todas</SelectItem>
+                    {categories?.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id.toString()}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
 
-            {filterPeriod === "custom" && (
-              <>
-                <div className="space-y-2">
-                  <Label>Data Início</Label>
-                  <Input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Data Fim</Label>
-                  <Input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} />
-                </div>
-              </>
-            )}
-
-            {/* Category filter */}
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {categories?.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id.toString()}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Status filter */}
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="PENDING">Pendente</SelectItem>
-                  <SelectItem value="PAID">Pago</SelectItem>
-                  <SelectItem value="OVERDUE">Vencido</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Search */}
-            <div className="space-y-2">
-              <Label>Buscar</Label>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
+              {/* Status */}
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="PENDING">Pendente</SelectItem>
+                    <SelectItem value="PAID">Pago</SelectItem>
+                    <SelectItem value="OVERDUE">Vencido</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+
+            <DrawerFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFilterPeriod("all");
+                  setFilterCategoryId("");
+                  setFilterStatus("");
+                  setFilterStartDate("");
+                  setFilterEndDate("");
+                  setSearchTerm("");
+                }}
+              >
+                Limpar Filtros
+              </Button>
+              <Button onClick={() => setIsFilterDrawerOpen(false)}>
+                Aplicar
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+
+        {/* Buscar */}
+        <div className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
         <TabsList>

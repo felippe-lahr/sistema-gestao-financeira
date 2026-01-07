@@ -4,8 +4,11 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Clock, Calendar, Filter, FileSpreadsheet, FileText, Download } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Clock, Calendar, Filter, FileSpreadsheet, FileText, Download, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Pie, PieChart, Cell, Legend, BarChart, Bar } from "recharts";
 
@@ -19,6 +22,14 @@ export default function EntityDashboard() {
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  
+  // Calcular quantos filtros estao ativos
+  const activeFiltersCount = [
+    filterPeriod !== "month",
+    filterCategoryId !== "",
+    customStartDate !== "" || customEndDate !== ""
+  ].filter(Boolean).length;
   
   // Estados de exportação
   const [exportingExcel, setExportingExcel] = useState(false);
@@ -283,80 +294,123 @@ export default function EntityDashboard() {
       </div>
 
       {/* Filtros */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Período:</span>
-            </div>
-            <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="month">Mês Atual</SelectItem>
-                <SelectItem value="quarter">Últimos 3 Meses</SelectItem>
-                <SelectItem value="year">Ano Atual</SelectItem>
-                <SelectItem value="custom">Período Personalizado</SelectItem>
-                <SelectItem value="all">Todos os Períodos</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {filterPeriod === "custom" && (
-              <>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm">De:</label>
-                  <input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="px-3 py-2 border rounded-md text-sm"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm">Até:</label>
-                  <input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="px-3 py-2 border rounded-md text-sm"
-                  />
-                </div>
-              </>
+      <div className="flex gap-2 items-center flex-wrap">
+        <Drawer open={isFilterDrawerOpen} onOpenChange={setIsFilterDrawerOpen}>
+          <Button
+            variant="outline"
+            onClick={() => setIsFilterDrawerOpen(true)}
+            className="relative"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filtros
+            {activeFiltersCount > 0 && (
+              <Badge className="ml-2 bg-blue-500 text-white">{activeFiltersCount}</Badge>
             )}
-            
-            <div className="ml-auto flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportExcel}
-                disabled={exportingExcel}
-              >
-                {exportingExcel ? (
-                  <Download className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                )}
-                Excel
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportPDF}
-                disabled={exportingPDF}
-              >
-                {exportingPDF ? (
-                  <Download className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4 mr-2" />
-                )}
-                PDF
-              </Button>
+          </Button>
+
+          <DrawerContent>
+            <DrawerHeader>
+              <div className="flex items-center justify-between">
+                <DrawerTitle>Filtros</DrawerTitle>
+                <DrawerClose asChild>
+                  <Button variant="ghost" size="icon">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DrawerClose>
+              </div>
+            </DrawerHeader>
+
+            <div className="space-y-6 p-4 overflow-y-auto max-h-[60vh]">
+              {/* Período */}
+              <div className="space-y-2">
+                <Label>Período</Label>
+                <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="month">Mês Atual</SelectItem>
+                    <SelectItem value="quarter">Últimos 3 Meses</SelectItem>
+                    <SelectItem value="year">Ano Atual</SelectItem>
+                    <SelectItem value="custom">Período Personalizado</SelectItem>
+                    <SelectItem value="all">Todos os Períodos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Datas Personalizadas */}
+              {filterPeriod === "custom" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Data Inicial</Label>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data Final</Label>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                    />
+                  </div>
+                </>
+              )}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+
+            <DrawerFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFilterPeriod("month");
+                  setFilterCategoryId("");
+                  setCustomStartDate("");
+                  setCustomEndDate("");
+                }}
+              >
+                Limpar Filtros
+              </Button>
+              <Button onClick={() => setIsFilterDrawerOpen(false)}>
+                Aplicar
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+
+        <div className="ml-auto flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={exportingExcel}
+          >
+            {exportingExcel ? (
+              <Download className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+            )}
+            Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPDF}
+            disabled={exportingPDF}
+          >
+            {exportingPDF ? (
+              <Download className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4 mr-2" />
+            )}
+            PDF
+          </Button>
+        </div>
+      </div>
 
       {/* Metrics Cards */}
       {metricsLoading ? (
