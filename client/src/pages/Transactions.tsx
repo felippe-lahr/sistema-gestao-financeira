@@ -878,7 +878,7 @@ export default function Transactions() {
           </div>
         </div>
 
-        {/* Botões */}
+        {/* Botão Limpar */}
         <Button
           variant="outline"
           size="sm"
@@ -895,9 +895,6 @@ export default function Transactions() {
           }}
         >
           Limpar
-        </Button>
-        <Button size="sm">
-          Aplicar
         </Button>
       </div>
 
