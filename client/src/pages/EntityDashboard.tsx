@@ -263,12 +263,22 @@ export default function EntityDashboard() {
     <div className="container py-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4">
-        {/* Linha 1: Botao Voltar + Titulo */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="flex-shrink-0">
-            <ArrowLeft className="h-5 w-5" />
+        {/* Linha 1: Botao Voltar + Titulo + Botao Investimentos (Desktop) */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="flex-shrink-0">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-3xl font-bold tracking-tight">{entity.name}</h1>
+          </div>
+          <Button
+            onClick={() => setLocation(`/investments/${entityId}`)}
+            variant="outline"
+            className="hidden sm:flex flex-shrink-0"
+          >
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Investimentos
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">{entity.name}</h1>
         </div>
         
         {/* Linha 2: Icone da Entidade + Descricao */}
@@ -282,11 +292,11 @@ export default function EntityDashboard() {
           <p className="text-muted-foreground">Visao geral das financas</p>
         </div>
         
-        {/* Linha 3: Botao Investimentos */}
+        {/* Linha 3: Botao Investimentos (Mobile) */}
         <Button
           onClick={() => setLocation(`/investments/${entityId}`)}
           variant="outline"
-          className="w-full sm:w-auto"
+          className="sm:hidden w-full"
         >
           <TrendingUp className="h-4 w-4 mr-2" />
           Investimentos
