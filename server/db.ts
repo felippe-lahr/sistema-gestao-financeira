@@ -1188,6 +1188,21 @@ export async function setUserPassword(userId: number, passwordHash: string): Pro
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Criar tabela se não existir
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS user_passwords (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        "passwordHash" VARCHAR(255) NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+        "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `);
+  } catch (e) {
+    console.log("[DB] Tabela user_passwords já existe ou erro ao criar:", e);
+  }
+
   const { userPasswords } = await import("../drizzle/schema");
   
   const existing = await db.select().from(userPasswords).where(eq(userPasswords.userId, userId)).limit(1);
