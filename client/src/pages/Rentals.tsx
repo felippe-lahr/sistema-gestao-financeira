@@ -396,12 +396,12 @@ export default function Rentals() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="extraFeeType">Tipo de Taxa Extra</Label>
-                    <Select value={formData.extraFeeType || ""} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
+                    <Select value={formData.extraFeeType || "NONE"} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value === "NONE" ? undefined : value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Nenhuma</SelectItem>
+                        <SelectItem value="NONE">Nenhuma</SelectItem>
                         <SelectItem value="IMPOSTO">Imposto</SelectItem>
                         <SelectItem value="TAXA_PET">Taxa Pet</SelectItem>
                         <SelectItem value="LIMPEZA">Limpeza</SelectItem>
