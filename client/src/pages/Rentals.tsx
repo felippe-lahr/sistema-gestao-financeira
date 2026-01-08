@@ -322,11 +322,24 @@ export default function Rentals() {
                     <div className="grid grid-cols-7 gap-1">
                       {week.map((day, dayIndex) => {
                         const isCurrentMonth = isSameMonth(day, currentMonth);
+                        
+                        // Verificar se a data já passou
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const dayNormalized = new Date(day);
+                        dayNormalized.setHours(0, 0, 0, 0);
+                        const isPastDate = dayNormalized < today;
 
                         return (
                           <div
                             key={day.toISOString()}
-                            className={`min-h-32 border rounded p-2 relative ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
+                            className={`min-h-32 border rounded p-2 relative ${
+                              isPastDate
+                                ? "bg-gray-100 text-gray-400"
+                                : isCurrentMonth
+                                ? "bg-background"
+                                : "bg-muted/30"
+                            }`}
                           >
                             {/* Número do dia */}
                             <div className="text-sm font-semibold">{format(day, "d")}</div>
@@ -470,6 +483,7 @@ export default function Rentals() {
                 <Input
                   type="date"
                   value={formData.startDate}
+                  min={format(new Date(), "yyyy-MM-dd")}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
@@ -655,6 +669,7 @@ export default function Rentals() {
                 <Input
                   type="date"
                   value={formData.startDate}
+                  min={format(new Date(), "yyyy-MM-dd")}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
