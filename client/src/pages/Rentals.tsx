@@ -197,24 +197,29 @@ export default function Rentals() {
   const allDays = [...daysFromPrevMonth, ...daysInMonth, ...daysFromNextMonth];
   const weeks = Array.from({ length: 6 }, (_, i) => allDays.slice(i * 7, (i + 1) * 7));
 
-  const getRentalsForDay = (day) => {
-    return rentals.filter((rental) => {
-      const start = new Date(rental.startDate);
-      const end = new Date(rental.endDate);
-      return day >= start && day <= end;
-    });
-  };
-
-  const getRentalBarWidth = (rental, day) => {
+  // Calcular posição da barra no grid
+  const getRentalGridPosition = (rental, weekDays) => {
     const start = new Date(rental.startDate);
     const end = new Date(rental.endDate);
-    const dayStart = new Date(day);
-    dayStart.setHours(0, 0, 0, 0);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
 
-    if (dayStart.getTime() === end.getTime()) {
-      return 'w-1/2';
-    }
-    return 'w-full';
+    let startCol = -1;
+    let endCol = -1;
+
+    weekDays.forEach((day, idx) => {
+      const dayStart = new Date(day);
+      dayStart.setHours(0, 0, 0, 0);
+
+      if (dayStart.getTime() === start.getTime()) {
+        startCol = idx + 1; // CSS Grid é 1-indexed
+      }
+      if (dayStart.getTime() === end.getTime()) {
+        endCol = idx + 1;
+      }
+    });
+
+    return { startCol, endCol };
   };
 
   const formatCurrency = (value) => {
@@ -282,39 +287,65 @@ export default function Rentals() {
                 ))}
               </div>
 
-              {/* Grid do calendário */}
-              {weeks.map((week, weekIndex) => (
-                <div key={weekIndex} className="grid grid-cols-7 gap-1">
-                  {week.map((day, dayIndex) => {
-                    const rentalsInDay = getRentalsForDay(day);
-                    const isCurrentMonth = isSameMonth(day, currentMonth);
+              {/* Grid do calendário com barras contínuas */}
+              {weeks.map((week, weekIndex) => {
+                // Obter todas as reservas desta semana
+                const weekRentals = rentals.filter((rental) => {
+                  const start = new Date(rental.startDate);
+                  const end = new Date(rental.endDate);
+                  return week.some((day) => day >= start && day <= end);
+                });
 
-                    return (
-                      <div
-                        key={day.toISOString()}
-                        className={`min-h-24 border rounded p-1 ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
-                      >
-                        <div className="text-xs font-semibold mb-1">{format(day, "d")}</div>
-                        <div className="space-y-1">
-                          {rentalsInDay.map((rental, idx) => {
-                            const barWidth = getRentalBarWidth(rental, day);
-                            return (
-                              <button
-                                key={`${rental.id}-${idx}`}
-                                onClick={() => handleEdit(rental)}
-                                className={`${barWidth} text-xs font-semibold text-white rounded px-1 py-1 truncate cursor-pointer transition-all block ${getSourceColor(rental.source)}`}
-                                title={rental.guestName || getSourceLabel(rental.source)}
-                              >
-                                {rental.guestName || getSourceLabel(rental.source)}
-                              </button>
-                            );
-                          })}
+                return (
+                  <div key={weekIndex} className="space-y-2">
+                    {/* Barras de reservas */}
+                    {weekRentals.map((rental) => {
+                      const { startCol, endCol } = getRentalGridPosition(rental, week);
+                      if (startCol === -1 || endCol === -1) return null;
+
+                      const colSpan = endCol - startCol + 1;
+                      const gapSize = 0.25; // gap-1 = 0.25rem
+                      const totalGapWidth = (colSpan - 1) * gapSize;
+                      const width = `calc((100% + ${totalGapWidth}rem) / 7 * ${colSpan})`;
+
+                      return (
+                        <div
+                          key={`${rental.id}-bar`}
+                          className="relative h-8 px-1"
+                          style={{
+                            marginLeft: `calc((100% + ${totalGapWidth}rem) / 7 * ${startCol - 1})`,
+                            width: width,
+                          }}
+                        >
+                          <button
+                            onClick={() => handleEdit(rental)}
+                            className={`w-full h-full text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all ${getSourceColor(rental.source)}`}
+                            title={rental.guestName || getSourceLabel(rental.source)}
+                          >
+                            {rental.guestName || getSourceLabel(rental.source)}
+                          </button>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+                      );
+                    })}
+
+                    {/* Células do calendário */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {week.map((day, dayIndex) => {
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
+
+                        return (
+                          <div
+                            key={day.toISOString()}
+                            className={`min-h-24 border rounded p-1 ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
+                          >
+                            <div className="text-xs font-semibold">{format(day, "d")}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -695,5 +726,3 @@ export default function Rentals() {
     </div>
   );
 }
-
-
