@@ -296,37 +296,55 @@ export default function Rentals() {
                   return week.some((day) => day >= start && day <= end);
                 });
 
+                // Agrupar reservas por linha (para evitar sobreposição)
+                const rentalRows = [];
+                weekRentals.forEach((rental) => {
+                  let placed = false;
+                  for (let row of rentalRows) {
+                    // Verificar se não há conflito com outras reservas nesta linha
+                    const hasConflict = row.some((r) => {
+                      const rStart = new Date(r.startDate);
+                      const rEnd = new Date(r.endDate);
+                      const rentalStart = new Date(rental.startDate);
+                      const rentalEnd = new Date(rental.endDate);
+                      return !(rentalEnd < rStart || rentalStart > rEnd);
+                    });
+                    if (!hasConflict) {
+                      row.push(rental);
+                      placed = true;
+                      break;
+                    }
+                  }
+                  if (!placed) {
+                    rentalRows.push([rental]);
+                  }
+                });
+
                 return (
-                  <div key={weekIndex} className="space-y-2">
-                    {/* Barras de reservas */}
-                    {weekRentals.map((rental) => {
-                      const { startCol, endCol } = getRentalGridPosition(rental, week);
-                      if (startCol === -1 || endCol === -1) return null;
+                  <div key={weekIndex} className="relative">
+                    {/* Renderizar barras de reservas */}
+                    {rentalRows.map((row, rowIndex) => (
+                      <div key={`row-${rowIndex}`} className="grid grid-cols-7 gap-1 mb-1 h-8">
+                        {row.map((rental) => {
+                          const { startCol, endCol } = getRentalGridPosition(rental, week);
+                          if (startCol === -1 || endCol === -1) return null;
 
-                      const colSpan = endCol - startCol + 1;
-                      const gapSize = 0.25; // gap-1 = 0.25rem
-                      const totalGapWidth = (colSpan - 1) * gapSize;
-                      const width = `calc((100% + ${totalGapWidth}rem) / 7 * ${colSpan})`;
-
-                      return (
-                        <div
-                          key={`${rental.id}-bar`}
-                          className="relative h-8 px-1"
-                          style={{
-                            marginLeft: `calc((100% + ${totalGapWidth}rem) / 7 * ${startCol - 1})`,
-                            width: width,
-                          }}
-                        >
-                          <button
-                            onClick={() => handleEdit(rental)}
-                            className={`w-full h-full text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all ${getSourceColor(rental.source)}`}
-                            title={rental.guestName || getSourceLabel(rental.source)}
-                          >
-                            {rental.guestName || getSourceLabel(rental.source)}
-                          </button>
-                        </div>
-                      );
-                    })}
+                          return (
+                            <button
+                              key={`${rental.id}-bar`}
+                              onClick={() => handleEdit(rental)}
+                              className={`text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all ${getSourceColor(rental.source)}`}
+                              style={{
+                                gridColumn: `${startCol} / span ${endCol - startCol + 1}`,
+                              }}
+                              title={rental.guestName || getSourceLabel(rental.source)}
+                            >
+                              {rental.guestName || getSourceLabel(rental.source)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
 
                     {/* Células do calendário */}
                     <div className="grid grid-cols-7 gap-1">
