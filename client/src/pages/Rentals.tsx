@@ -199,8 +199,11 @@ export default function Rentals() {
 
   // Função para calcular quantos dias a reserva ocupa
   const getRentalDaySpan = (rental, week) => {
+    // Adicionar 1 dia para compensar o deslocamento de timezone nas datas antigas
     const start = new Date(rental.startDate);
     const end = new Date(rental.endDate);
+    start.setDate(start.getDate() + 1);
+    end.setDate(end.getDate() + 1);
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
 
