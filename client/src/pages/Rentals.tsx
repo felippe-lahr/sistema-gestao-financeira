@@ -469,7 +469,7 @@ export default function Rentals() {
                                   onClick={() => handleEdit(rental)}
                                   onMouseEnter={() => setOpenPopoverId(rental.id)}
                                   onMouseLeave={() => setOpenPopoverId(null)}
-                                  className={`absolute text-xs font-semibold text-white px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 hover:opacity-80 ${getSourceColor(rental.source)}`}
+                                  className={`absolute text-sm md:text-base font-semibold text-white px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 hover:opacity-80 ${getSourceColor(rental.source)}`}
                                   style={{
                                     left: `${left}%`,
                                     width: `${width}%`,
