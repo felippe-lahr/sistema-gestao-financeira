@@ -45,8 +45,10 @@ export async function createRental(data: {
   
   // Converter string de data (YYYY-MM-DD) para Date sem timezone
   const parseDate = (dateStr: string) => {
-    // Usar ISO string para evitar problemas de timezone
-    return new Date(dateStr + 'T00:00:00Z');
+    // Usar apenas a data sem timezone para evitar deslocamento
+    const [year, month, day] = dateStr.split('-').map(Number);
+    // Criar date com UTC para armazenar corretamente
+    return new Date(Date.UTC(year, month - 1, day));
   };
   
   const result = await db.insert(rentals).values({
@@ -97,8 +99,10 @@ export async function updateRental(
   
   // Converter string de data (YYYY-MM-DD) para Date sem timezone
   const parseDate = (dateStr: string) => {
-    // Usar ISO string para evitar problemas de timezone
-    return new Date(dateStr + 'T00:00:00Z');
+    // Usar apenas a data sem timezone para evitar deslocamento
+    const [year, month, day] = dateStr.split('-').map(Number);
+    // Criar date com UTC para armazenar corretamente
+    return new Date(Date.UTC(year, month - 1, day));
   };
   
   if (data.startDate) updateData.startDate = parseDate(data.startDate);
