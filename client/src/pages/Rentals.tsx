@@ -197,17 +197,6 @@ export default function Rentals() {
   const allDays = [...daysFromPrevMonth, ...daysInMonth, ...daysFromNextMonth];
   const weeks = Array.from({ length: 6 }, (_, i) => allDays.slice(i * 7, (i + 1) * 7));
 
-  // Função para obter as reservas que começam em um dia específico
-  const getRentalsStartingOnDay = (day) => {
-    return rentals.filter((rental) => {
-      const start = new Date(rental.startDate);
-      start.setHours(0, 0, 0, 0);
-      const dayNormalized = new Date(day);
-      dayNormalized.setHours(0, 0, 0, 0);
-      return dayNormalized.getTime() === start.getTime();
-    });
-  };
-
   // Função para calcular quantos dias a reserva ocupa
   const getRentalDaySpan = (rental, week) => {
     const start = new Date(rental.startDate);
@@ -307,7 +296,7 @@ export default function Rentals() {
 
               {/* Grid do calendário */}
               {weeks.map((week, weekIndex) => {
-                // Obter reservas únicas que começam nesta semana (usando Set para evitar duplicatas)
+                // Obter reservas únicas que começam nesta semana
                 const rentalsInWeek = [];
                 const seenIds = new Set();
                 
@@ -330,47 +319,67 @@ export default function Rentals() {
                 });
                 
                 return (
-                <div key={weekIndex} className="relative">
-                  {/* Renderizar barras de reservas */}
-                  <div className="space-y-1 mb-1 pl-1">
-                    {rentalsInWeek.map((rental) => {
-                      const daySpan = getRentalDaySpan(rental, week);
-                      if (daySpan === 0) return null;
+                  <div key={weekIndex} className="relative">
+                    {/* Células do calendário */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {week.map((day, dayIndex) => {
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
 
-                      return (
-                          <button
-                            key={`${rental.id}-bar`}
-                            onClick={() => handleEdit(rental)}
-                            className={`block text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all ${getSourceColor(rental.source)}`}
-                            style={{
-                              width: `calc(${daySpan * (100 / 7)}% + ${(daySpan - 1) * 4}px)`,
-                            }}
-                            title={rental.guestName || getSourceLabel(rental.source)}
+                        return (
+                          <div
+                            key={day.toISOString()}
+                            className={`min-h-32 border rounded p-2 relative ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
                           >
-                            {rental.guestName || getSourceLabel(rental.source)}
-                          </button>
-                      );
-                    })}
-                  </div>
+                            {/* Número do dia */}
+                            <div className="text-sm font-semibold">{format(day, "d")}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                  {/* Células do calendário */}
-                  <div className="grid grid-cols-7 gap-1">
-                    {week.map((day, dayIndex) => {
-                      const isCurrentMonth = isSameMonth(day, currentMonth);
+                    {/* Barras de reservas sobrepostas */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="grid grid-cols-7 gap-1 h-full">
+                        {rentalsInWeek.map((rental, rentalIndex) => {
+                          const daySpan = getRentalDaySpan(rental, week);
+                          if (daySpan === 0) return null;
 
-                      return (
-                        <div
-                          key={day.toISOString()}
-                          className={`min-h-32 border rounded p-2 ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
-                        >
-                          {/* Número do dia */}
-                          <div className="text-sm font-semibold">{format(day, "d")}</div>
-                        </div>
-                      );
-                    })}
+                          // Calcular a posição left (em %)
+                          const start = new Date(rental.startDate);
+                          start.setHours(0, 0, 0, 0);
+                          let startDayIndex = 0;
+                          week.forEach((day, idx) => {
+                            const dayNormalized = new Date(day);
+                            dayNormalized.setHours(0, 0, 0, 0);
+                            if (dayNormalized.getTime() === start.getTime()) {
+                              startDayIndex = idx;
+                            }
+                          });
+
+                          const cellWidth = 100 / 7;
+                          const gapWidth = 4; // gap-1 = 4px
+                          const left = (startDayIndex * (cellWidth + gapWidth / 100));
+                          const width = daySpan * cellWidth + (daySpan - 1) * (gapWidth / 100);
+
+                          return (
+                            <button
+                              key={`${rental.id}-bar-${rentalIndex}`}
+                              onClick={() => handleEdit(rental)}
+                              className={`absolute text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 ${getSourceColor(rental.source)}`}
+                              style={{
+                                left: `${left}%`,
+                                width: `${width}%`,
+                              }}
+                              title={rental.guestName || getSourceLabel(rental.source)}
+                            >
+                              {rental.guestName || getSourceLabel(rental.source)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              );
+                );
               })}
             </div>
           )}
