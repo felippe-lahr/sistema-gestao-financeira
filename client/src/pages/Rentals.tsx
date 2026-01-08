@@ -199,25 +199,20 @@ export default function Rentals() {
 
   // Função para calcular quantos dias a reserva ocupa
   const getRentalDaySpan = (rental, week) => {
-    // Usar strings de data para evitar problemas de timezone
+    // Usar strings ISO para evitar problemas de timezone
     const startStr = rental.startDate.split('T')[0]; // YYYY-MM-DD
     const endStr = rental.endDate.split('T')[0]; // YYYY-MM-DD
-    const start = new Date(startStr + 'T00:00:00');
-    const end = new Date(endStr + 'T00:00:00');
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
 
     let startDayIndex = -1;
     let endDayIndex = -1;
 
     week.forEach((day, idx) => {
-      const dayNormalized = new Date(day);
-      dayNormalized.setHours(0, 0, 0, 0);
+      const dayStr = format(day, 'yyyy-MM-dd');
 
-      if (dayNormalized.getTime() === start.getTime()) {
+      if (dayStr === startStr) {
         startDayIndex = idx;
       }
-      if (dayNormalized.getTime() === end.getTime()) {
+      if (dayStr === endStr) {
         endDayIndex = idx;
       }
     });
@@ -230,7 +225,7 @@ export default function Rentals() {
     // Caso contrário, calcular até o fim da semana
     const endIdx = endDayIndex !== -1 ? endDayIndex : 6;
     return endIdx - startDayIndex + 1;
-  };
+  }
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -405,10 +400,9 @@ export default function Rentals() {
                           // Detectar conflito: outra reserva começa no dia de checkout desta
                           const conflictingRental = rentals.find((r) => {
                             if (r.id === rental.id) return false;
-                            const rStart = new Date(r.startDate);
-                            rStart.setHours(0, 0, 0, 0);
-                            return rStart.getTime() === end.getTime();
-                          });
+                            const rStartStr = r.startDate.split('T')[0];
+                            return rStartStr === endStr;
+                          })
 
                           // Se há conflito no dia de checkout
                           if (conflictingRental && isSegmentEnd) {

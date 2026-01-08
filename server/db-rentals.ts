@@ -43,8 +43,8 @@ export async function createRental(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  // Converter string de data (YYYY-MM-DD ou DD/MM/YYYY) para Date sem timezone
-  const parseDate = (dateStr: string) => {
+  // Converter string de data (YYYY-MM-DD ou DD/MM/YYYY) para ISO string (YYYY-MM-DD)
+  const parseDate = (dateStr: string): string => {
     let year, month, day;
     
     // Detectar formato: DD/MM/YYYY ou YYYY-MM-DD
@@ -62,8 +62,8 @@ export async function createRental(data: {
       day = d;
     }
     
-    // Criar date com UTC para armazenar corretamente
-    return new Date(Date.UTC(year, month - 1, day));
+    // Retornar como string ISO (YYYY-MM-DD) sem timezone
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
   
   const result = await db.insert(rentals).values({
@@ -112,8 +112,8 @@ export async function updateRental(
   
   const updateData: any = {};
   
-  // Converter string de data (YYYY-MM-DD ou DD/MM/YYYY) para Date sem timezone
-  const parseDate = (dateStr: string) => {
+  // Converter string de data (YYYY-MM-DD ou DD/MM/YYYY) para ISO string (YYYY-MM-DD)
+  const parseDate = (dateStr: string): string => {
     let year, month, day;
     
     // Detectar formato: DD/MM/YYYY ou YYYY-MM-DD
@@ -131,8 +131,8 @@ export async function updateRental(
       day = d;
     }
     
-    // Criar date com UTC para armazenar corretamente
-    return new Date(Date.UTC(year, month - 1, day));
+    // Retornar como string ISO (YYYY-MM-DD) sem timezone
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
   
   if (data.startDate) updateData.startDate = parseDate(data.startDate);
