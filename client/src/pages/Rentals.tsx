@@ -332,12 +332,38 @@ export default function Rentals() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="numberOfGuests">Número de Hóspedes</Label>
+                    <Select value={(formData.numberOfGuests || 1).toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                          <SelectItem key={num} value={num.toString()}>
+                            {num} {num === 1 ? "hóspede" : "hóspedes"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <Label htmlFor="guestEmail">Email</Label>
                     <Input
                       id="guestEmail"
                       type="email"
                       value={formData.guestEmail || ""}
                       onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="guestPhone">Telefone</Label>
+                    <Input
+                      id="guestPhone"
+                      value={formData.guestPhone || ""}
+                      onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
                     />
                   </div>
                 </div>
@@ -351,6 +377,7 @@ export default function Rentals() {
                       step="0.01"
                       value={formData.dailyRate || ""}
                       onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || undefined })}
+                      placeholder="0,00"
                     />
                   </div>
                   <div className="space-y-2">
@@ -361,6 +388,35 @@ export default function Rentals() {
                       step="0.01"
                       value={formData.totalAmount || ""}
                       onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || undefined })}
+                      placeholder="0,00"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="extraFeeType">Tipo de Taxa Extra</Label>
+                    <Select value={formData.extraFeeType || ""} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Nenhuma</SelectItem>
+                        <SelectItem value="IMPOSTO">Imposto</SelectItem>
+                        <SelectItem value="TAXA_PET">Taxa Pet</SelectItem>
+                        <SelectItem value="LIMPEZA">Limpeza</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="extraFeeAmount">Valor da Taxa (R$)</Label>
+                    <Input
+                      id="extraFeeAmount"
+                      type="number"
+                      step="0.01"
+                      value={formData.extraFeeAmount || ""}
+                      onChange={(e) => setFormData({ ...formData, extraFeeAmount: parseFloat(e.target.value) || undefined })}
+                      placeholder="0,00"
                     />
                   </div>
                 </div>
@@ -387,6 +443,27 @@ export default function Rentals() {
                 />
               </div>
             </div>
+
+            {formData.source !== "BLOCKED" && (
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                <div>
+                  <Label className="mb-0">Data de Competência</Label>
+                  <p className="text-xs text-muted-foreground mt-1">Quando o valor será contabilizado</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{formData.competencyDate === "CHECK_IN" ? "Check-in" : "Check-out"}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, competencyDate: formData.competencyDate === "CHECK_IN" ? "CHECK_OUT" : "CHECK_IN" })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.competencyDate === "CHECK_OUT" ? "bg-blue-600" : "bg-gray-300"}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.competencyDate === "CHECK_OUT" ? "translate-x-6" : "translate-x-1"}`}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notas</Label>
