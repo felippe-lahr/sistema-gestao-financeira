@@ -367,7 +367,7 @@ export default function Rentals() {
                           <div className="text-sm font-semibold">{format(day, "d")}</div>
                         </div>
                       );
-                    })
+                    }))
                   </div>
                 </div>
               );
