@@ -294,7 +294,7 @@ export default function Rentals() {
 
               {/* Grid do calendário */}
               {weeks.map((week, weekIndex) => {
-                // Obter reservas únicas que começam nesta semana
+                // Obter reservas únicas que intersectam com esta semana
                 const rentalsInWeek = [];
                 const seenIds = new Set();
                 
@@ -303,14 +303,19 @@ export default function Rentals() {
                   
                   const start = new Date(rental.startDate);
                   start.setHours(0, 0, 0, 0);
+                  const end = new Date(rental.endDate);
+                  end.setHours(0, 0, 0, 0);
                   
-                  const startsThisWeek = week.some((day) => {
-                    const dayNormalized = new Date(day);
-                    dayNormalized.setHours(0, 0, 0, 0);
-                    return dayNormalized.getTime() === start.getTime();
-                  });
+                  // Verificar se a reserva intersecta com esta semana
+                  const weekStart = new Date(week[0]);
+                  weekStart.setHours(0, 0, 0, 0);
+                  const weekEnd = new Date(week[6]);
+                  weekEnd.setHours(0, 0, 0, 0);
                   
-                  if (startsThisWeek) {
+                  // A reserva intersecta se: start <= weekEnd E end > weekStart
+                  const intersectsWeek = start <= weekEnd && end > weekStart;
+                  
+                  if (intersectsWeek) {
                     rentalsInWeek.push(rental);
                     seenIds.add(rental.id);
                   }
