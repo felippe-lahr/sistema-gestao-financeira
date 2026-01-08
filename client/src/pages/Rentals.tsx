@@ -25,6 +25,7 @@ export default function Rentals() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingRental, setEditingRental] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [openPopoverId, setOpenPopoverId] = useState(null);
 
   const [formData, setFormData] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -462,10 +463,10 @@ export default function Rentals() {
                           const extraFeeFormatted = rental.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.extraFeeAmount) : 'N/A';
 
                           return (
-                            <Popover key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`}>
+                            <Popover key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`} open={openPopoverId === rental.id} onOpenChange={(open) => setOpenPopoverId(open ? rental.id : null)}>
                               <PopoverTrigger asChild>
                                 <button
-                                  onClick={() => handleEdit(rental)}
+                                  onDoubleClick={() => handleEdit(rental)}
                                   className={`absolute text-xs font-semibold text-white px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 hover:opacity-80 ${getSourceColor(rental.source)}`}
                                   style={{
                                     left: `${left}%`,
