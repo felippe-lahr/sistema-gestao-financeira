@@ -336,7 +336,7 @@ export default function Rentals() {
                     </div>
 
                     {/* Barras de reservas sobrepostas */}
-                    <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
                       <div className="grid grid-cols-7 gap-1 h-full">
                         {rentals.map((rental, rentalIndex) => {
                           // Usar strings ISO para evitar problemas de timezone
