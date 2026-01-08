@@ -70,6 +70,10 @@ export async function createRental(data: {
   checkOutTime?: string;
   notes?: string;
   specialRequests?: string;
+  numberOfGuests?: number;
+  extraFeeType?: string;
+  extraFeeAmount?: number;
+  competencyDate?: string;
 }): Promise<Rental> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -122,6 +126,10 @@ export async function createRental(data: {
     checkOutTime: data.checkOutTime || "11:00",
     notes: data.notes,
     specialRequests: data.specialRequests,
+    numberOfGuests: data.numberOfGuests || 1,
+    extraFeeType: data.extraFeeType,
+    extraFeeAmount: data.extraFeeAmount,
+    competencyDate: data.competencyDate || "CHECK_IN",
   }).returning();
   
   return convertRentalDatesToISO(result[0]);
@@ -145,6 +153,10 @@ export async function updateRental(
     checkOutTime?: string;
     notes?: string;
     specialRequests?: string;
+    numberOfGuests?: number;
+    extraFeeType?: string;
+    extraFeeAmount?: number;
+    competencyDate?: string;
   }
 ): Promise<Rental> {
   const db = await getDb();
@@ -190,6 +202,10 @@ export async function updateRental(
   if (data.checkOutTime !== undefined) updateData.checkOutTime = data.checkOutTime;
   if (data.notes !== undefined) updateData.notes = data.notes;
   if (data.specialRequests !== undefined) updateData.specialRequests = data.specialRequests;
+  if (data.numberOfGuests !== undefined) updateData.numberOfGuests = data.numberOfGuests;
+  if (data.extraFeeType !== undefined) updateData.extraFeeType = data.extraFeeType;
+  if (data.extraFeeAmount !== undefined) updateData.extraFeeAmount = data.extraFeeAmount;
+  if (data.competencyDate !== undefined) updateData.competencyDate = data.competencyDate;
   
   updateData.updatedAt = new Date();
   

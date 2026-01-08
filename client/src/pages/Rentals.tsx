@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -459,23 +460,61 @@ export default function Rentals() {
                           const totalFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.totalAmount || 0);
                           const dailyFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.dailyRate || 0);
                           const extraFeeFormatted = rental.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.extraFeeAmount) : 'N/A';
-                          
-                          const tooltipText = `Hospede: ${rental.guestName || 'N/A'}\nTipo: ${getSourceLabel(rental.source)}\nEntrada: ${new Date(rental.startDate).toLocaleDateString('pt-BR')}\nSaida: ${new Date(rental.endDate).toLocaleDateString('pt-BR')}\nHospedes: ${rental.numberOfGuests || 1}\nDiaria: ${dailyFormatted}\nTotal: ${totalFormatted}\nTaxa Extra: ${extraFeeFormatted}`;
 
                           return (
-                            <button
-                              key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`}
-                              onClick={() => handleEdit(rental)}
-                              className={`absolute text-xs font-semibold text-white px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 ${getSourceColor(rental.source)}`}
-                              style={{
-                                left: `${left}%`,
-                                width: `${width}%`,
-                                borderRadius: borderRadius,
-                              }}
-                              title={tooltipText}
-                            >
-                              {rental.guestName || getSourceLabel(rental.source)} - {totalFormatted}
-                            </button>
+                            <Popover key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`}>
+                              <PopoverTrigger asChild>
+                                <button
+                                  onClick={() => handleEdit(rental)}
+                                  className={`absolute text-xs font-semibold text-white px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 hover:opacity-80 ${getSourceColor(rental.source)}`}
+                                  style={{
+                                    left: `${left}%`,
+                                    width: `${width}%`,
+                                    borderRadius: borderRadius,
+                                  }}
+                                >
+                                  {rental.guestName || getSourceLabel(rental.source)} - {totalFormatted}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80 p-4 bg-white rounded-lg shadow-lg border border-gray-200">
+                                <div className="space-y-3">
+                                  <div className="border-b pb-2">
+                                    <h3 className="font-bold text-lg text-gray-900">{rental.guestName || 'Sem hóspede'}</h3>
+                                    <p className="text-sm text-gray-600">{getSourceLabel(rental.source)}</p>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                      <p className="text-gray-600 font-medium">Entrada</p>
+                                      <p className="text-gray-900">{new Date(rental.startDate).toLocaleDateString('pt-BR')}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-600 font-medium">Saída</p>
+                                      <p className="text-gray-900">{new Date(rental.endDate).toLocaleDateString('pt-BR')}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-600 font-medium">Hóspedes</p>
+                                      <p className="text-gray-900">{rental.numberOfGuests || 1}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-600 font-medium">Diária</p>
+                                      <p className="text-gray-900">{dailyFormatted}</p>
+                                    </div>
+                                  </div>
+                                  <div className="border-t pt-2">
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-medium text-gray-900">Total</span>
+                                      <span className="font-bold text-lg text-green-600">{totalFormatted}</span>
+                                    </div>
+                                    {rental.extraFeeAmount > 0 && (
+                                      <div className="flex justify-between items-center text-sm mt-2">
+                                        <span className="text-gray-600">{rental.extraFeeType || 'Taxa Extra'}</span>
+                                        <span className="text-gray-900">{extraFeeFormatted}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
                           );
                         })}
                       </div>
