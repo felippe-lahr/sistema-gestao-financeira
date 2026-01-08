@@ -43,10 +43,25 @@ export async function createRental(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  // Converter string de data (YYYY-MM-DD) para Date sem timezone
+  // Converter string de data (YYYY-MM-DD ou DD/MM/YYYY) para Date sem timezone
   const parseDate = (dateStr: string) => {
-    // Usar apenas a data sem timezone para evitar deslocamento
-    const [year, month, day] = dateStr.split('-').map(Number);
+    let year, month, day;
+    
+    // Detectar formato: DD/MM/YYYY ou YYYY-MM-DD
+    if (dateStr.includes('/')) {
+      // Formato DD/MM/YYYY
+      const [d, m, y] = dateStr.split('/').map(Number);
+      day = d;
+      month = m;
+      year = y;
+    } else {
+      // Formato YYYY-MM-DD
+      const [y, m, d] = dateStr.split('-').map(Number);
+      year = y;
+      month = m;
+      day = d;
+    }
+    
     // Criar date com UTC para armazenar corretamente
     return new Date(Date.UTC(year, month - 1, day));
   };
@@ -97,10 +112,25 @@ export async function updateRental(
   
   const updateData: any = {};
   
-  // Converter string de data (YYYY-MM-DD) para Date sem timezone
+  // Converter string de data (YYYY-MM-DD ou DD/MM/YYYY) para Date sem timezone
   const parseDate = (dateStr: string) => {
-    // Usar apenas a data sem timezone para evitar deslocamento
-    const [year, month, day] = dateStr.split('-').map(Number);
+    let year, month, day;
+    
+    // Detectar formato: DD/MM/YYYY ou YYYY-MM-DD
+    if (dateStr.includes('/')) {
+      // Formato DD/MM/YYYY
+      const [d, m, y] = dateStr.split('/').map(Number);
+      day = d;
+      month = m;
+      year = y;
+    } else {
+      // Formato YYYY-MM-DD
+      const [y, m, d] = dateStr.split('-').map(Number);
+      year = y;
+      month = m;
+      day = d;
+    }
+    
     // Criar date com UTC para armazenar corretamente
     return new Date(Date.UTC(year, month - 1, day));
   };
