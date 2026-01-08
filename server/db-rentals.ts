@@ -3,21 +3,32 @@ import { rentals, rentalConfigs, rentalSyncLogs, Rental, RentalConfig, RentalSyn
 import { eq, and } from "drizzle-orm";
 
 /**
- * Converter timestamp para string ISO
+ * Converter timestamp para string ISO (YYYY-MM-DD)
  */
 function convertRentalDatesToISO(rental: any): any {
+  const convertDate = (date: any): string => {
+    if (!date) return date;
+    
+    if (date instanceof Date) {
+      // Converter Date para YYYY-MM-DD usando UTC
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
+    if (typeof date === 'string') {
+      // Se já é string, extrair apenas a parte da data
+      return date.split('T')[0];
+    }
+    
+    return date;
+  };
+  
   return {
     ...rental,
-    startDate: rental.startDate instanceof Date 
-      ? rental.startDate.toISOString().split('T')[0] 
-      : typeof rental.startDate === 'string' 
-        ? rental.startDate.split('T')[0]
-        : rental.startDate,
-    endDate: rental.endDate instanceof Date 
-      ? rental.endDate.toISOString().split('T')[0] 
-      : typeof rental.endDate === 'string' 
-        ? rental.endDate.split('T')[0]
-        : rental.endDate,
+    startDate: convertDate(rental.startDate),
+    endDate: convertDate(rental.endDate),
   };
 }
 
