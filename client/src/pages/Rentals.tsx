@@ -372,11 +372,12 @@ export default function Rentals() {
                             }
                           });
 
-                          // Encontrar o índice de fim
+                          // Encontrar o índice de fim (endDate é exclusivo - dia de checkout)
                           week.forEach((day, idx) => {
                             const dayStr = format(day, 'yyyy-MM-dd');
                             if (dayStr === endStr) {
-                              segmentEnd = idx;
+                              // endStr é o dia de checkout, então a barra termina no dia anterior
+                              segmentEnd = idx - 1;
                               isSegmentEnd = true;
                             }
                           });
