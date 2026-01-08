@@ -197,21 +197,19 @@ export default function Rentals() {
   const allDays = [...daysFromPrevMonth, ...daysInMonth, ...daysFromNextMonth];
   const weeks = Array.from({ length: 6 }, (_, i) => allDays.slice(i * 7, (i + 1) * 7));
 
-  // Função para obter as reservas que passam por um dia específico
-  const getRentalsForDay = (day) => {
+  // Função para obter as reservas que começam em um dia específico
+  const getRentalsStartingOnDay = (day) => {
     return rentals.filter((rental) => {
       const start = new Date(rental.startDate);
-      const end = new Date(rental.endDate);
       start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
       const dayNormalized = new Date(day);
       dayNormalized.setHours(0, 0, 0, 0);
-      return dayNormalized >= start && dayNormalized <= end;
+      return dayNormalized.getTime() === start.getTime();
     });
   };
 
-  // Função para calcular o posicionamento da barra (left, width, row)
-  const getRentalBarPosition = (rental, week) => {
+  // Função para calcular quantos dias a reserva ocupa
+  const getRentalDaySpan = (rental, week) => {
     const start = new Date(rental.startDate);
     const end = new Date(rental.endDate);
     start.setHours(0, 0, 0, 0);
@@ -232,16 +230,14 @@ export default function Rentals() {
       }
     });
 
-    if (startDayIndex === -1 || endDayIndex === -1) {
-      return null;
+    if (startDayIndex === -1) {
+      return 0; // Reserva não começa nesta semana
     }
 
-    // Calcular a posição left (em %) e width (em %)
-    const cellWidth = 100 / 7;
-    const left = startDayIndex * cellWidth;
-    const width = (endDayIndex - startDayIndex + 1) * cellWidth;
-
-    return { left, width };
+    // Se a reserva termina nesta semana, calcular até o fim
+    // Caso contrário, calcular até o fim da semana
+    const endIdx = endDayIndex !== -1 ? endDayIndex : 6;
+    return endIdx - startDayIndex + 1;
   };
 
   const formatCurrency = (value) => {
@@ -311,40 +307,56 @@ export default function Rentals() {
 
               {/* Grid do calendário */}
               {weeks.map((week, weekIndex) => (
-                <div key={weekIndex} className="grid grid-cols-7 gap-1">
-                  {week.map((day, dayIndex) => {
-                    const isCurrentMonth = isSameMonth(day, currentMonth);
-                    const dayRentals = getRentalsForDay(day);
+                <div key={weekIndex} className="relative">
+                  {/* Renderizar barras de reservas */}
+                  <div className="space-y-1 mb-1 pl-1">
+                    {rentals
+                      .filter((rental) => {
+                        // Filtrar apenas reservas que começam nesta semana
+                        const start = new Date(rental.startDate);
+                        start.setHours(0, 0, 0, 0);
+                        return week.some((day) => {
+                          const dayNormalized = new Date(day);
+                          dayNormalized.setHours(0, 0, 0, 0);
+                          return dayNormalized.getTime() === start.getTime();
+                        });
+                      })
+                      .map((rental) => {
+                        const daySpan = getRentalDaySpan(rental, week);
+                        if (daySpan === 0) return null;
 
-                    return (
-                      <div
-                        key={day.toISOString()}
-                        className={`relative min-h-32 border rounded p-2 ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
-                      >
-                        {/* Número do dia */}
-                        <div className="text-sm font-semibold mb-1">{format(day, "d")}</div>
+                        return (
+                          <button
+                            key={`${rental.id}-bar`}
+                            onClick={() => handleEdit(rental)}
+                            className={`block text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all ${getSourceColor(rental.source)}`}
+                            style={{
+                              width: `calc(${daySpan * (100 / 7)}% + ${(daySpan - 1) * 4}px)`,
+                            }}
+                            title={rental.guestName || getSourceLabel(rental.source)}
+                          >
+                            {rental.guestName || getSourceLabel(rental.source)}
+                          </button>
+                        );
+                      })}
+                  </div>
 
-                        {/* Barras de reservas */}
-                        <div className="space-y-1">
-                          {dayRentals.map((rental, rentalIndex) => {
-                            const position = getRentalBarPosition(rental, week);
-                            if (!position) return null;
+                  {/* Células do calendário */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {week.map((day, dayIndex) => {
+                      const isCurrentMonth = isSameMonth(day, currentMonth);
 
-                            return (
-                              <button
-                                key={`${rental.id}-${dayIndex}`}
-                                onClick={() => handleEdit(rental)}
-                                className={`block w-full text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all ${getSourceColor(rental.source)}`}
-                                title={rental.guestName || getSourceLabel(rental.source)}
-                              >
-                                {rental.guestName || getSourceLabel(rental.source)}
-                              </button>
-                            );
-                          })}
+                      return (
+                        <div
+                          key={day.toISOString()}
+                          className={`min-h-32 border rounded p-2 ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
+                        >
+                          {/* Número do dia */}
+                          <div className="text-sm font-semibold">{format(day, "d")}</div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               ))}
             </div>
