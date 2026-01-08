@@ -413,7 +413,10 @@ export default function Rentals() {
                           // Calcular span e posição
                           const daySpan = segmentEnd - segmentStart + 1;
                           const cellWidth = 100 / 7;
-                          const gapPercentage = 0.5;
+                          // gap-1 do Tailwind = 0.25rem ≈ 4px
+                          // Em um container de ~1000px, isso é ~0.4% por gap
+                          // Mas usamos 0.3% para ser conservador e evitar overflow
+                          const gapPercentage = 0.3;
                           let left = segmentStart * (cellWidth + gapPercentage);
                           let width = daySpan * cellWidth + (daySpan - 1) * gapPercentage;
 
