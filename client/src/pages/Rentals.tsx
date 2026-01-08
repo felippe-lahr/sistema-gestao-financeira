@@ -466,7 +466,9 @@ export default function Rentals() {
                             <Popover key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`} open={openPopoverId === rental.id} onOpenChange={(open) => setOpenPopoverId(open ? rental.id : null)}>
                               <PopoverTrigger asChild>
                                 <button
-                                  onDoubleClick={() => handleEdit(rental)}
+                                  onClick={() => handleEdit(rental)}
+                                  onMouseEnter={() => setOpenPopoverId(rental.id)}
+                                  onMouseLeave={() => setOpenPopoverId(null)}
                                   className={`absolute text-xs font-semibold text-white px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 hover:opacity-80 ${getSourceColor(rental.source)}`}
                                   style={{
                                     left: `${left}%`,
@@ -477,7 +479,7 @@ export default function Rentals() {
                                   {rental.guestName || getSourceLabel(rental.source)} - {totalFormatted}
                                 </button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-80 p-4 bg-white rounded-lg shadow-lg border border-gray-200">
+                              <PopoverContent className="w-80 p-4 bg-white rounded-lg shadow-lg border border-gray-200" onMouseEnter={() => setOpenPopoverId(rental.id)} onMouseLeave={() => setOpenPopoverId(null)}>
                                 <div className="space-y-3">
                                   <div className="border-b pb-2">
                                     <h3 className="font-bold text-lg text-gray-900">{rental.guestName || 'Sem hóspede'}</h3>
@@ -507,9 +509,9 @@ export default function Rentals() {
                                       <span className="font-bold text-lg text-green-600">{totalFormatted}</span>
                                     </div>
                                     {rental.extraFeeAmount > 0 && (
-                                      <div className="flex justify-between items-center text-sm mt-2">
-                                        <span className="text-gray-600">{rental.extraFeeType || 'Taxa Extra'}</span>
-                                        <span className="text-gray-900">{extraFeeFormatted}</span>
+                                      <div className="flex justify-between items-center text-sm mt-2 border-t pt-2">
+                                        <span className="text-gray-600">{rental.extraFeeType === 'IMPOSTO' ? 'Imposto' : rental.extraFeeType === 'TAXA_PET' ? 'Taxa Pet' : rental.extraFeeType === 'LIMPEZA' ? 'Limpeza' : rental.extraFeeType || 'Taxa Extra'}</span>
+                                        <span className="text-gray-900 font-medium">{extraFeeFormatted}</span>
                                       </div>
                                     )}
                                   </div>
@@ -908,17 +910,27 @@ export default function Rentals() {
 
             <div>
               <Label>Data de Competência</Label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="competency-edit"
-                  checked={formData.competencyDate === "CHECK_OUT"}
-                  onChange={(e) => setFormData({ ...formData, competencyDate: e.target.checked ? "CHECK_OUT" : "CHECK_IN" })}
-                  className="rounded"
-                />
-                <label htmlFor="competency-edit" className="text-sm">
-                  {formData.competencyDate === "CHECK_IN" ? "Check-in" : "Check-out"}
-                </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFormData({ ...formData, competencyDate: "CHECK_IN" })}
+                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                    formData.competencyDate === "CHECK_IN"
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Check-in
+                </button>
+                <button
+                  onClick={() => setFormData({ ...formData, competencyDate: "CHECK_OUT" })}
+                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                    formData.competencyDate === "CHECK_OUT"
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Check-out
+                </button>
               </div>
             </div>
 
