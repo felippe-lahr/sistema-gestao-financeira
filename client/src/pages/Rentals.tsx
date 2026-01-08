@@ -303,68 +303,58 @@ export default function Rentals() {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Cabeçalho com dias da semana */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
-                  <div key={day} className="text-center font-semibold text-sm p-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
+              {/* Timeline com barras de reservas */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-muted-foreground">Reservas - {format(currentMonth, "MMMM yyyy", { locale: ptBR })}</h3>
+                
+                {/* Cabeçalho com semanas */}
+                <div className="flex gap-1 mb-2 text-xs font-semibold text-center">
+                  {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
+                    <div key={day} className="flex-1">{day}</div>
+                  ))}
+                </div>
 
-              {/* Dias do mês com números */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {daysInMonth.map((day) => (
-                  <div
-                    key={day.toISOString()}
-                    className={`text-sm font-semibold p-2 text-center border rounded ${
-                      isSameMonth(day, currentMonth) ? "bg-background" : "bg-muted/50"
-                    }`}
-                  >
-                    {format(day, "d")}
-                  </div>
-                ))}
-              </div>
-
-              {/* Barras de reservas */}
-              {getRentalsByRow().map((row, rowIndex) => (
-                <div key={rowIndex} className="space-y-1">
-                  {row.map((rental) => {
-                    const rentalStart = new Date(rental.startDate);
-                    const rentalEnd = new Date(rental.endDate);
-                    const monthStart = startOfMonth(currentMonth);
-                    
-                    let barStart = new Date(rentalStart);
-                    barStart.setDate(barStart.getDate() - 1);
-                    
-                    const barStartIndex = Math.max(0, differenceInDays(barStart, monthStart));
-                    const barEndIndex = Math.min(daysInMonth.length - 1, differenceInDays(rentalEnd, monthStart));
-                    const barWidth = ((barEndIndex - barStartIndex + 1) / daysInMonth.length) * 100;
-                    const barLeft = (barStartIndex / daysInMonth.length) * 100;
-                    
-                    return (
-                      <div
-                        key={rental.id}
-                        className="relative h-8 mb-1"
-                        style={{
-                          marginLeft: `${barLeft}%`,
-                          width: `${barWidth}%`,
-                        }}
-                      >
+                {/* Barras de reservas */}
+                {getRentalsByRow().map((row, rowIndex) => (
+                  <div key={rowIndex} className="relative h-10 bg-muted/30 rounded border">
+                    {row.map((rental) => {
+                      const rentalStart = new Date(rental.startDate);
+                      const rentalEnd = new Date(rental.endDate);
+                      const monthStart = startOfMonth(currentMonth);
+                      const monthEnd = endOfMonth(currentMonth);
+                      
+                      let barStart = new Date(rentalStart);
+                      barStart.setDate(barStart.getDate() - 1);
+                      
+                      if (barStart > monthEnd || rentalEnd < monthStart) {
+                        return null;
+                      }
+                      
+                      const barStartIndex = Math.max(0, differenceInDays(barStart, monthStart));
+                      const barEndIndex = Math.min(daysInMonth.length - 1, differenceInDays(rentalEnd, monthStart));
+                      const barWidth = ((barEndIndex - barStartIndex + 1) / daysInMonth.length) * 100;
+                      const barLeft = (barStartIndex / daysInMonth.length) * 100;
+                      
+                      return (
                         <button
+                          key={rental.id}
                           onClick={() => handleEdit(rental)}
-                          className={`w-full h-full rounded px-2 text-xs font-semibold text-white truncate cursor-pointer transition-all ${getSourceColor(
+                          className={`absolute top-1 bottom-1 rounded px-2 text-xs font-semibold text-white truncate cursor-pointer transition-all hover:shadow-lg ${getSourceColor(
                             rental.source
                           )}`}
+                          style={{
+                            left: `${barLeft}%`,
+                            width: `${barWidth}%`,
+                          }}
                           title={rental.guestName || getSourceLabel(rental.source)}
                         >
                           {rental.guestName || getSourceLabel(rental.source)}
                         </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>
