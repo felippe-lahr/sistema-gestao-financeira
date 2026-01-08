@@ -416,7 +416,7 @@ export default function Rentals() {
                             } else {
                               // Reserva que começa: ocupa metade direita
                               // Calcular left para começar na metade direita do dia de checkout
-                              left = segmentEnd * (cellWidth + gapPercentage) - (cellWidth + gapPercentage) / 2;
+                              left = segmentStart * (cellWidth + gapPercentage) + (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2;
                               width = (cellWidth + gapPercentage) / 2;
                             }
                           }
