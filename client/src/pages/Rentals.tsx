@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,7 +17,8 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 export default function Rentals() {
-  const { entityId } = useRoute().params;
+  const params = useParams<{ entityId: string }>();
+  const entityId = params?.entityId || "";
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -680,4 +682,4 @@ export default function Rentals() {
   );
 }
 
-import { useRoute } from "wouter";
+
