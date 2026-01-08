@@ -420,26 +420,30 @@ export default function Rentals() {
                           let left = segmentStart * (cellWidth + gapPercentage);
                           let width = daySpan * cellWidth + (daySpan - 1) * gapPercentage;
 
-                          // Detectar conflito: outra reserva começa no dia de checkout desta
-                          const conflictingRental = rentals.find((r) => {
-                            if (r.id === rental.id) return false;
-                            const rStartStr = r.startDate.split('T')[0];
-                            return rStartStr === endStr;
-                          })
-
-                          // Se há conflito no dia de checkout
-                          if (conflictingRental && isSegmentEnd) {
-                            const gapBetweenBars = 0.25; // Pequeno gap entre as barras
-                            // Reserva que termina: ocupa metade esquerda
-                            if (rental.id < conflictingRental.id) {
-                              // Ajustar width para ocupar apenas metade do último dia (menos o gap)
-                              width = (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
+                          // Aplicar divisão horizontal 50%/50% no check-in e checkout
+                          const gapBetweenBars = 0.25;
+                          
+                          if (isSegmentStart && isSegmentEnd) {
+                            // Reserva que começa E termina nesta semana
+                            if (daySpan === 1) {
+                              // Um único dia: ocupa 100%
                             } else {
-                              // Reserva que começa: ocupa metade direita
-                              // Calcular left para começar na metade direita do dia de checkout (com gap)
-                              left = segmentStart * (cellWidth + gapPercentage) + (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2 + gapBetweenBars / 2;
-                              width = (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
+                              // Mais de um dia: 50% no primeiro, 100% nos intermediários, 50% no último
+                              const firstDayWidth = (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
+                              const lastDayWidth = (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
+                              const middleDaysWidth = (daySpan - 2) * cellWidth + (daySpan - 3) * gapPercentage;
+                              left = segmentStart * (cellWidth + gapPercentage) + (cellWidth + gapPercentage) / 2 + gapBetweenBars / 2;
+                              width = firstDayWidth + middleDaysWidth + lastDayWidth;
                             }
+                          } else if (isSegmentStart && !isSegmentEnd) {
+                            // Reserva que começa nesta semana mas não termina: 50% à direita no primeiro dia
+                            const firstDayWidth = (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
+                            const restWidth = (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage;
+                            left = segmentStart * (cellWidth + gapPercentage) + (cellWidth + gapPercentage) / 2 + gapBetweenBars / 2;
+                            width = firstDayWidth + restWidth;
+                          } else if (!isSegmentStart && isSegmentEnd) {
+                            // Reserva que termina nesta semana mas não começa: 50% à esquerda no último dia
+                            width = (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
                           }
 
                           // Bordas arredondadas apenas nas extremidades
