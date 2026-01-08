@@ -356,10 +356,13 @@ export default function Rentals() {
                             }
                           });
 
-                          const cellWidth = 100 / 7;
-                          const gapWidth = 4; // gap-1 = 4px
-                          const left = (startDayIndex * (cellWidth + gapWidth / 100));
-                          const width = daySpan * cellWidth + (daySpan - 1) * (gapWidth / 100);
+                          // Calcular left e width em porcentagem
+                          // Cada célula tem 1/7 de largura + gap entre elas
+                          // gap-1 no Tailwind = 0.25rem = 4px (aproximadamente)
+                          const cellWidth = 100 / 7; // ~14.28%
+                          const gapPercentage = 0.5; // Aproximadamente 0.5% por gap
+                          const left = startDayIndex * (cellWidth + gapPercentage);
+                          const width = daySpan * cellWidth + (daySpan - 1) * gapPercentage;
 
                           return (
                             <button
