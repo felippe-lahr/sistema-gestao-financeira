@@ -339,18 +339,21 @@ export default function Rentals() {
                     <div className="absolute inset-0 pointer-events-none">
                       <div className="grid grid-cols-7 gap-1 h-full">
                         {rentals.map((rental, rentalIndex) => {
-                          const start = new Date(rental.startDate);
-                          start.setHours(0, 0, 0, 0);
-                          const end = new Date(rental.endDate);
-                          end.setHours(0, 0, 0, 0);
+                          // Usar strings ISO para evitar problemas de timezone
+                          const startStr = rental.startDate.split('T')[0]; // YYYY-MM-DD
+                          const endStr = rental.endDate.split('T')[0]; // YYYY-MM-DD
 
                           // Verificar se a reserva intersecta com esta semana
-                          const weekStart = new Date(week[0]);
-                          weekStart.setHours(0, 0, 0, 0);
-                          const weekEnd = new Date(week[6]);
-                          weekEnd.setHours(23, 59, 59, 999);
+                          let intersectsWeek = false;
+                          const weekStartStr = format(week[0], 'yyyy-MM-dd');
+                          const weekEndStr = format(week[6], 'yyyy-MM-dd');
 
-                          if (end.getTime() < weekStart.getTime() || start.getTime() > weekEnd.getTime()) {
+                          // Verificar intersecção
+                          if (!(endStr < weekStartStr || startStr > weekEndStr)) {
+                            intersectsWeek = true;
+                          }
+
+                          if (!intersectsWeek) {
                             return null; // Reserva não intersecta com esta semana
                           }
 
@@ -362,9 +365,8 @@ export default function Rentals() {
 
                           // Encontrar o índice de início
                           week.forEach((day, idx) => {
-                            const dayNormalized = new Date(day);
-                            dayNormalized.setHours(0, 0, 0, 0);
-                            if (dayNormalized.getTime() === start.getTime()) {
+                            const dayStr = format(day, 'yyyy-MM-dd');
+                            if (dayStr === startStr) {
                               segmentStart = idx;
                               isSegmentStart = true;
                             }
@@ -372,21 +374,20 @@ export default function Rentals() {
 
                           // Encontrar o índice de fim
                           week.forEach((day, idx) => {
-                            const dayNormalized = new Date(day);
-                            dayNormalized.setHours(0, 0, 0, 0);
-                            if (dayNormalized.getTime() === end.getTime()) {
+                            const dayStr = format(day, 'yyyy-MM-dd');
+                            if (dayStr === endStr) {
                               segmentEnd = idx;
                               isSegmentEnd = true;
                             }
                           });
 
                           // Se a reserva começou antes desta semana
-                          if (!isSegmentStart && start.getTime() < weekStart.getTime()) {
+                          if (!isSegmentStart && startStr < weekStartStr) {
                             segmentStart = 0;
                           }
 
                           // Se a reserva termina depois desta semana
-                          if (!isSegmentEnd && end.getTime() > weekEnd.getTime()) {
+                          if (!isSegmentEnd && endStr > weekEndStr) {
                             segmentEnd = 6;
                           }
 
