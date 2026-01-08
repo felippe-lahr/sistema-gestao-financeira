@@ -1,232 +1,167 @@
-import React, { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { getRentalsByEntityId, createRental, updateRental, deleteRental } from "@/api";
-
-interface Rental {
-  id: number;
-  entityId: number;
-  userId: number;
-  startDate: Date;
-  endDate: Date;
-  source: "AIRBNB" | "DIRECT" | "BLOCKED";
-  guestName?: string;
-  guestEmail?: string;
-  guestPhone?: string;
-  dailyRate?: number;
-  totalAmount?: number;
-  checkInTime?: string;
-  checkOutTime?: string;
-  notes?: string;
-  specialRequests?: string;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { Plus, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, differenceInDays, isSameMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 export default function Rentals() {
   const params = useParams<{ entityId: string }>();
-  const entityId = parseInt(params?.entityId || "0");
-
+  const entityId = params?.entityId || "";
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [rentals, setRentals] = useState<Rental[]>([]);
-  const [rentalsLoading, setRentalsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingRental, setEditingRental] = useState<Rental | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingRental, setEditingRental] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
   const [formData, setFormData] = useState({
-    startDate: "",
-    endDate: "",
+    startDate: format(new Date(), "yyyy-MM-dd"),
+    endDate: format(new Date(), "yyyy-MM-dd"),
     source: "DIRECT",
     guestName: "",
     guestEmail: "",
     guestPhone: "",
-    dailyRate: "",
-    totalAmount: "",
+    numberOfGuests: 1,
+    dailyRate: 0,
+    totalAmount: 0,
+    extraFeeType: "",
+    extraFeeAmount: 0,
     checkInTime: "14:00",
     checkOutTime: "11:00",
     notes: "",
+    competencyDate: "CHECK_IN",
   });
 
-  // Carregar reservas
-  useEffect(() => {
-    const loadRentals = async () => {
-      if (!entityId) return;
-      setRentalsLoading(true);
-      try {
-        const data = await getRentalsByEntityId(entityId);
-        setRentals(
-          data.map((r: any) => ({
-            ...r,
-            startDate: new Date(r.startDate),
-            endDate: new Date(r.endDate),
-            createdAt: new Date(r.createdAt),
-            updatedAt: new Date(r.updatedAt),
-          }))
-        );
-      } catch (error) {
-        console.error("Erro ao carregar reservas:", error);
-      } finally {
-        setRentalsLoading(false);
-      }
-    };
-    loadRentals();
-  }, [entityId]);
+  const { data: rentals = [], isLoading: rentalsLoading, refetch } = trpc.rentals.list.useQuery({
+    entityId: parseInt(entityId),
+    month: currentMonth.getMonth() + 1,
+    year: currentMonth.getFullYear(),
+  });
 
-  // Resetar formulário
+  const createMutation = trpc.rentals.create.useMutation({
+    onSuccess: () => {
+      toast.success("Reserva criada com sucesso!");
+      setIsCreateOpen(false);
+      resetForm();
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao criar reserva");
+    },
+  });
+
+  const updateMutation = trpc.rentals.update.useMutation({
+    onSuccess: () => {
+      toast.success("Reserva atualizada com sucesso!");
+      setIsEditOpen(false);
+      resetForm();
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao atualizar reserva");
+    },
+  });
+
+  const deleteMutation = trpc.rentals.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Reserva deletada com sucesso!");
+      setIsEditOpen(false);
+      resetForm();
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao deletar reserva");
+    },
+  });
+
   const resetForm = () => {
     setFormData({
-      startDate: "",
-      endDate: "",
+      startDate: format(new Date(), "yyyy-MM-dd"),
+      endDate: format(new Date(), "yyyy-MM-dd"),
       source: "DIRECT",
       guestName: "",
       guestEmail: "",
       guestPhone: "",
-      dailyRate: "",
-      totalAmount: "",
+      numberOfGuests: 1,
+      dailyRate: 0,
+      totalAmount: 0,
+      extraFeeType: "",
+      extraFeeAmount: 0,
       checkInTime: "14:00",
       checkOutTime: "11:00",
       notes: "",
+      competencyDate: "CHECK_IN",
     });
     setEditingRental(null);
   };
 
-  // Abrir diálogo para editar
-  const handleEdit = (rental: Rental) => {
+  const handleCreate = () => {
+    createMutation.mutate({
+      entityId: parseInt(entityId),
+      ...formData,
+    });
+  };
+
+  const handleUpdate = () => {
+    if (!editingRental) return;
+    updateMutation.mutate({
+      id: editingRental.id,
+      ...formData,
+    });
+  };
+
+  const handleDelete = () => {
+    if (!editingRental) return;
+    deleteMutation.mutate({ id: editingRental.id });
+  };
+
+  const handleEdit = (rental) => {
     setEditingRental(rental);
     setFormData({
-      startDate: format(rental.startDate, "yyyy-MM-dd"),
-      endDate: format(rental.endDate, "yyyy-MM-dd"),
+      startDate: rental.startDate,
+      endDate: rental.endDate,
       source: rental.source,
       guestName: rental.guestName || "",
       guestEmail: rental.guestEmail || "",
       guestPhone: rental.guestPhone || "",
-      dailyRate: rental.dailyRate?.toString() || "",
-      totalAmount: rental.totalAmount?.toString() || "",
+      numberOfGuests: rental.numberOfGuests || 1,
+      dailyRate: rental.dailyRate || 0,
+      totalAmount: rental.totalAmount || 0,
+      extraFeeType: rental.extraFeeType || "",
+      extraFeeAmount: rental.extraFeeAmount || 0,
       checkInTime: rental.checkInTime || "14:00",
       checkOutTime: rental.checkOutTime || "11:00",
       notes: rental.notes || "",
+      competencyDate: rental.competencyDate || "CHECK_IN",
     });
-    setIsDialogOpen(true);
+    setIsEditOpen(true);
   };
 
-  // Salvar reserva
-  const handleSave = async () => {
-    if (!formData.startDate || !formData.endDate) {
-      alert("Preencha as datas");
-      return;
-    }
-
-    try {
-      if (editingRental) {
-        const updated = await updateRental(editingRental.id, {
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          source: formData.source as "AIRBNB" | "DIRECT" | "BLOCKED",
-          guestName: formData.guestName,
-          guestEmail: formData.guestEmail,
-          guestPhone: formData.guestPhone,
-          dailyRate: formData.dailyRate ? parseFloat(formData.dailyRate) : undefined,
-          totalAmount: formData.totalAmount ? parseFloat(formData.totalAmount) : undefined,
-          checkInTime: formData.checkInTime,
-          checkOutTime: formData.checkOutTime,
-          notes: formData.notes,
-        });
-        setRentals(
-          rentals.map((r) =>
-            r.id === updated.id
-              ? {
-                  ...updated,
-                  startDate: new Date(updated.startDate),
-                  endDate: new Date(updated.endDate),
-                }
-              : r
-          )
-        );
-      } else {
-        const created = await createRental({
-          entityId,
-          userId: 1,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          source: formData.source as "AIRBNB" | "DIRECT" | "BLOCKED",
-          guestName: formData.guestName,
-          guestEmail: formData.guestEmail,
-          guestPhone: formData.guestPhone,
-          dailyRate: formData.dailyRate ? parseFloat(formData.dailyRate) : undefined,
-          totalAmount: formData.totalAmount ? parseFloat(formData.totalAmount) : undefined,
-          checkInTime: formData.checkInTime,
-          checkOutTime: formData.checkOutTime,
-          notes: formData.notes,
-        });
-        setRentals([
-          ...rentals,
-          {
-            ...created,
-            startDate: new Date(created.startDate),
-            endDate: new Date(created.endDate),
-          },
-        ]);
-      }
-      setIsDialogOpen(false);
-      resetForm();
-    } catch (error) {
-      console.error("Erro ao salvar reserva:", error);
-      alert("Erro ao salvar reserva");
-    }
-  };
-
-  // Deletar reserva
-  const handleDelete = async () => {
-    if (!editingRental) return;
-    if (!confirm("Tem certeza que deseja deletar esta reserva?")) return;
-
-    try {
-      await deleteRental(editingRental.id);
-      setRentals(rentals.filter((r) => r.id !== editingRental.id));
-      setIsDialogOpen(false);
-      resetForm();
-    } catch (error) {
-      console.error("Erro ao deletar reserva:", error);
-      alert("Erro ao deletar reserva");
-    }
-  };
-
-  // Gerar semanas do mês
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
-  const allDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-  const weeks: Date[][] = [];
-  for (let i = 0; i < allDays.length; i += 7) {
-    weeks.push(allDays.slice(i, i + 7));
-  }
-
-  // Obter cor da fonte
-  const getSourceColor = (source: string) => {
+  const getSourceColor = (source) => {
     switch (source) {
       case "AIRBNB":
-        return "bg-red-400";
+        return "bg-red-400 hover:bg-red-500";
       case "DIRECT":
-        return "bg-blue-400";
+        return "bg-blue-300 hover:bg-blue-400";
       case "BLOCKED":
-        return "bg-gray-400";
+        return "bg-gray-400 hover:bg-gray-500";
       default:
-        return "bg-gray-400";
+        return "bg-gray-300 hover:bg-gray-400";
     }
   };
 
-  // Obter label da fonte
-  const getSourceLabel = (source: string) => {
+  const getSourceLabel = (source) => {
     switch (source) {
       case "AIRBNB":
         return "Airbnb";
@@ -239,28 +174,34 @@ export default function Rentals() {
     }
   };
 
-  // Obter reservas da semana
-  const getRentalsInWeek = (week: Date[]) => {
-    const weekStart = new Date(week[0]);
-    weekStart.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(week[6]);
-    weekEnd.setHours(23, 59, 59, 999);
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-    return rentals.filter((rental) => {
-      const rStart = new Date(rental.startDate);
-      rStart.setHours(0, 0, 0, 0);
-      const rEnd = new Date(rental.endDate);
-      rEnd.setHours(0, 0, 0, 0);
+  // Preencher com dias do mês anterior
+  const firstDayOfWeek = monthStart.getDay();
+  const daysFromPrevMonth = Array.from({ length: firstDayOfWeek }, (_, i) => {
+    const date = new Date(monthStart);
+    date.setDate(date.getDate() - (firstDayOfWeek - i));
+    return date;
+  });
 
-      return !(rEnd < weekStart || rStart > weekEnd);
-    });
-  };
+  // Preencher com dias do próximo mês
+  const totalDays = daysFromPrevMonth.length + daysInMonth.length;
+  const daysFromNextMonth = Array.from({ length: 42 - totalDays }, (_, i) => {
+    const date = new Date(monthEnd);
+    date.setDate(date.getDate() + i + 1);
+    return date;
+  });
 
-  // Calcular dias que a reserva ocupa
-  const getRentalDaySpan = (rental: Rental, week: Date[]) => {
+  const allDays = [...daysFromPrevMonth, ...daysInMonth, ...daysFromNextMonth];
+  const weeks = Array.from({ length: 6 }, (_, i) => allDays.slice(i * 7, (i + 1) * 7));
+
+  // Função para calcular quantos dias a reserva ocupa
+  const getRentalDaySpan = (rental, week) => {
     const start = new Date(rental.startDate);
-    start.setHours(0, 0, 0, 0);
     const end = new Date(rental.endDate);
+    start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
 
     let startDayIndex = -1;
@@ -279,163 +220,44 @@ export default function Rentals() {
     });
 
     if (startDayIndex === -1) {
-      return 0;
+      return 0; // Reserva não começa nesta semana
     }
 
+    // Se a reserva termina nesta semana, calcular até o fim
+    // Caso contrário, calcular até o fim da semana
     const endIdx = endDayIndex !== -1 ? endDayIndex : 6;
     return endIdx - startDayIndex + 1;
   };
 
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Reservas</h1>
+          <p className="text-muted-foreground mt-2">Gerencie suas reservas e bloqueios de temporada</p>
+        </div>
+        <Button onClick={() => setIsCreateOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+          <Plus className="mr-2 h-4 w-4" />
+          Nova Reserva
+        </Button>
+      </div>
+
+      {/* Calendário */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Reservas</CardTitle>
-              <p className="text-sm text-muted-foreground">Gerencie suas reservas e bloqueios de temporada</p>
+              <CardTitle>{format(currentMonth, "MMMM yyyy", { locale: ptBR })}</CardTitle>
+              <CardDescription>Visualize suas reservas mês a mês</CardDescription>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => resetForm()}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Reserva
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingRental ? "Editar Reserva" : "Nova Reserva"}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Data de Início</Label>
-                      <Input
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Data de Fim</Label>
-                      <Input
-                        type="date"
-                        value={formData.endDate}
-                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Tipo de Reserva</Label>
-                    <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="DIRECT">Reserva Direta</SelectItem>
-                        <SelectItem value="AIRBNB">Airbnb</SelectItem>
-                        <SelectItem value="BLOCKED">Bloqueado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {formData.source !== "BLOCKED" && (
-                    <>
-                      <div>
-                        <Label>Nome do Hóspede</Label>
-                        <Input
-                          value={formData.guestName}
-                          onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Email</Label>
-                          <Input
-                            type="email"
-                            value={formData.guestEmail}
-                            onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <Label>Telefone</Label>
-                          <Input
-                            value={formData.guestPhone}
-                            onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Diária (R$)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={formData.dailyRate}
-                            onChange={(e) => setFormData({ ...formData, dailyRate: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <Label>Total (R$)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={formData.totalAmount}
-                            onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Horário Check-in</Label>
-                          <Input
-                            type="time"
-                            value={formData.checkInTime}
-                            onChange={(e) => setFormData({ ...formData, checkInTime: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <Label>Horário Check-out</Label>
-                          <Input
-                            type="time"
-                            value={formData.checkOutTime}
-                            onChange={(e) => setFormData({ ...formData, checkOutTime: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label>Notas</Label>
-                        <Input
-                          value={formData.notes}
-                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  <div className="flex gap-2 pt-4">
-                    <Button onClick={handleSave} className="flex-1">
-                      {editingRental ? "Atualizar" : "Criar"} Reserva
-                    </Button>
-                    {editingRental && (
-                      <Button onClick={handleDelete} variant="destructive">
-                        Deletar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Navegação de meses */}
-          <div className="flex items-center justify-between mt-4">
-            <h3 className="text-lg font-semibold">{format(currentMonth, "MMMM yyyy", { locale: ptBR })}</h3>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -466,26 +288,46 @@ export default function Rentals() {
               {/* Cabeçalho com dias da semana */}
               <div className="grid grid-cols-7 gap-1">
                 {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
-                  <div key={day} className="text-center font-semibold text-sm py-2">
+                  <div key={day} className="text-center font-semibold text-sm p-2 border rounded bg-muted">
                     {day}
                   </div>
                 ))}
               </div>
 
-              {/* Semanas */}
+              {/* Grid do calendário */}
               {weeks.map((week, weekIndex) => {
-                const rentalsInWeek = getRentalsInWeek(week);
-
+                // Obter reservas únicas que começam nesta semana
+                const rentalsInWeek = [];
+                const seenIds = new Set();
+                
+                rentals.forEach((rental) => {
+                  if (seenIds.has(rental.id)) return;
+                  
+                  const start = new Date(rental.startDate);
+                  start.setHours(0, 0, 0, 0);
+                  
+                  const startsThisWeek = week.some((day) => {
+                    const dayNormalized = new Date(day);
+                    dayNormalized.setHours(0, 0, 0, 0);
+                    return dayNormalized.getTime() === start.getTime();
+                  });
+                  
+                  if (startsThisWeek) {
+                    rentalsInWeek.push(rental);
+                    seenIds.add(rental.id);
+                  }
+                });
+                
                 return (
                   <div key={weekIndex} className="relative">
-                    {/* Células dos dias */}
+                    {/* Células do calendário */}
                     <div className="grid grid-cols-7 gap-1">
                       {week.map((day, dayIndex) => {
-                        const isCurrentMonth = format(day, "M") === format(currentMonth, "M");
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
 
                         return (
                           <div
-                            key={dayIndex}
+                            key={day.toISOString()}
                             className={`min-h-32 border rounded p-2 relative ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
                           >
                             {/* Número do dia */}
@@ -514,28 +356,11 @@ export default function Rentals() {
                             }
                           });
 
-                          // Detectar se há outra reserva que começa no dia de checkout desta
-                          const rentalEnd = new Date(rental.endDate);
-                          rentalEnd.setHours(0, 0, 0, 0);
-                          const conflictingRentals = rentalsInWeek.filter((r) => {
-                            if (r.id === rental.id) return false;
-                            const rStart = new Date(r.startDate);
-                            rStart.setHours(0, 0, 0, 0);
-                            return rStart.getTime() === rentalEnd.getTime();
-                          });
-
-                          // Se há conflito, posicionar lado a lado (50% cada)
-                          let topOffset = 0;
-                          let heightClass = "h-full";
-                          if (conflictingRentals.length > 0) {
-                            const shouldBeTop = rental.id < conflictingRentals[0].id;
-                            topOffset = shouldBeTop ? 0 : 50;
-                            heightClass = "h-1/2";
-                          }
-
                           // Calcular left e width em porcentagem
-                          const cellWidth = 100 / 7;
-                          const gapPercentage = 0.5;
+                          // Cada célula tem 1/7 de largura + gap entre elas
+                          // gap-1 no Tailwind = 0.25rem = 4px (aproximadamente)
+                          const cellWidth = 100 / 7; // ~14.28%
+                          const gapPercentage = 0.5; // Aproximadamente 0.5% por gap
                           const left = startDayIndex * (cellWidth + gapPercentage);
                           const width = daySpan * cellWidth + (daySpan - 1) * gapPercentage;
 
@@ -543,11 +368,10 @@ export default function Rentals() {
                             <button
                               key={`${rental.id}-bar-${rentalIndex}`}
                               onClick={() => handleEdit(rental)}
-                              className={`absolute text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto ${heightClass} ${getSourceColor(rental.source)}`}
+                              className={`absolute text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 ${getSourceColor(rental.source)}`}
                               style={{
                                 left: `${left}%`,
                                 width: `${width}%`,
-                                top: `${topOffset}%`,
                               }}
                               title={rental.guestName || getSourceLabel(rental.source)}
                             >
@@ -564,6 +388,379 @@ export default function Rentals() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog de Criar Reserva */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nova Reserva</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Data de Início *</Label>
+                <Input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Data de Fim *</Label>
+                <Input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Tipo de Reserva *</Label>
+              <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DIRECT">Reserva Direta</SelectItem>
+                  <SelectItem value="AIRBNB">Airbnb</SelectItem>
+                  <SelectItem value="BLOCKED">Bloqueado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Nome do Hóspede</Label>
+                <Input
+                  value={formData.guestName}
+                  onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Número de Hóspedes</Label>
+                <Select value={formData.numberOfGuests.toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                      <SelectItem key={num} value={num.toString()}>
+                        {num} hóspede{num > 1 ? "s" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={formData.guestEmail}
+                  onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Telefone</Label>
+                <Input
+                  value={formData.guestPhone}
+                  onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Diária (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.dailyRate}
+                  onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+              <div>
+                <Label>Total (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.totalAmount}
+                  onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo de Taxa Extra</Label>
+                <Select value={formData.extraFeeType} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Nenhuma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">Nenhuma</SelectItem>
+                    <SelectItem value="IMPOSTO">Imposto</SelectItem>
+                    <SelectItem value="TAXA_PET">Taxa Pet</SelectItem>
+                    <SelectItem value="LIMPEZA">Limpeza</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Valor da Taxa Extra (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.extraFeeAmount}
+                  onChange={(e) => setFormData({ ...formData, extraFeeAmount: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Horário Check-in</Label>
+                <Input
+                  type="time"
+                  value={formData.checkInTime}
+                  onChange={(e) => setFormData({ ...formData, checkInTime: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Horário Check-out</Label>
+                <Input
+                  type="time"
+                  value={formData.checkOutTime}
+                  onChange={(e) => setFormData({ ...formData, checkOutTime: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Data de Competência</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="competency"
+                  checked={formData.competencyDate === "CHECK_OUT"}
+                  onChange={(e) => setFormData({ ...formData, competencyDate: e.target.checked ? "CHECK_OUT" : "CHECK_IN" })}
+                  className="rounded"
+                />
+                <label htmlFor="competency" className="text-sm">
+                  {formData.competencyDate === "CHECK_IN" ? "Check-in" : "Check-out"}
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <Label>Notas</Label>
+              <Textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
+                Criar Reserva
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Editar Reserva */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Reserva</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Data de Início *</Label>
+                <Input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Data de Fim *</Label>
+                <Input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Tipo de Reserva *</Label>
+              <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DIRECT">Reserva Direta</SelectItem>
+                  <SelectItem value="AIRBNB">Airbnb</SelectItem>
+                  <SelectItem value="BLOCKED">Bloqueado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Nome do Hóspede</Label>
+                <Input
+                  value={formData.guestName}
+                  onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Número de Hóspedes</Label>
+                <Select value={formData.numberOfGuests.toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                      <SelectItem key={num} value={num.toString()}>
+                        {num} hóspede{num > 1 ? "s" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={formData.guestEmail}
+                  onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Telefone</Label>
+                <Input
+                  value={formData.guestPhone}
+                  onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Diária (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.dailyRate}
+                  onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+              <div>
+                <Label>Total (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.totalAmount}
+                  onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo de Taxa Extra</Label>
+                <Select value={formData.extraFeeType} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Nenhuma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">Nenhuma</SelectItem>
+                    <SelectItem value="IMPOSTO">Imposto</SelectItem>
+                    <SelectItem value="TAXA_PET">Taxa Pet</SelectItem>
+                    <SelectItem value="LIMPEZA">Limpeza</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Valor da Taxa Extra (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.extraFeeAmount}
+                  onChange={(e) => setFormData({ ...formData, extraFeeAmount: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Horário Check-in</Label>
+                <Input
+                  type="time"
+                  value={formData.checkInTime}
+                  onChange={(e) => setFormData({ ...formData, checkInTime: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Horário Check-out</Label>
+                <Input
+                  type="time"
+                  value={formData.checkOutTime}
+                  onChange={(e) => setFormData({ ...formData, checkOutTime: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Data de Competência</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="competency-edit"
+                  checked={formData.competencyDate === "CHECK_OUT"}
+                  onChange={(e) => setFormData({ ...formData, competencyDate: e.target.checked ? "CHECK_OUT" : "CHECK_IN" })}
+                  className="rounded"
+                />
+                <label htmlFor="competency-edit" className="text-sm">
+                  {formData.competencyDate === "CHECK_IN" ? "Check-in" : "Check-out"}
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <Label>Notas</Label>
+              <Textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDelete}>
+                Deletar
+              </Button>
+              <Button onClick={handleUpdate} className="bg-blue-600 hover:bg-blue-700">
+                Salvar Alterações
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
