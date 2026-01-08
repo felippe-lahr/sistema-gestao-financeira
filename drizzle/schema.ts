@@ -379,6 +379,19 @@ export const rentals = pgTable("rentals", {
   notes: text("notes"),
   specialRequests: text("specialRequests"),
   
+  // Número de hóspedes
+  numberOfGuests: integer("numberOfGuests").default(1),
+  
+  // Taxa extra
+  extraFeeType: varchar("extraFeeType", { length: 50 }), // IMPOSTO, TAXA_PET, LIMPEZA
+  extraFeeAmount: integer("extraFeeAmount"),
+  
+  // Data de competência
+  competencyDate: varchar("competencyDate", { length: 20 }).default("CHECK_IN"), // CHECK_IN ou CHECK_OUT
+  
+  // Documentos anexados (JSON array de IDs de attachments)
+  attachmentIds: text("attachmentIds"),
+  
   // Integração Airbnb (fase 2)
   airbnbListingId: varchar("airbnbListingId", { length: 255 }),
   airbnbReservationId: varchar("airbnbReservationId", { length: 255 }).unique(),
