@@ -109,8 +109,8 @@ export async function createRental(data: {
   const result = await db.insert(rentals).values({
     entityId: data.entityId,
     userId: data.userId,
-    startDate: new Date(parseDate(data.startDate)),
-    endDate: new Date(parseDate(data.endDate)),
+    startDate: new Date(`${parseDate(data.startDate)}T00:00:00Z`),
+    endDate: new Date(`${parseDate(data.endDate)}T00:00:00Z`),
     source: data.source,
     status: data.source === "BLOCKED" ? "BLOCKED" : `RESERVED_${data.source}`,
     guestName: data.guestName,
