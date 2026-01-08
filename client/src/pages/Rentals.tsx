@@ -456,6 +456,12 @@ export default function Rentals() {
                             borderRadius = "0px 6px 6px 0px"; // Apenas fim
                           }
 
+                          const totalFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.totalAmount || 0);
+                          const dailyFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.dailyRate || 0);
+                          const extraFeeFormatted = rental.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.extraFeeAmount) : 'N/A';
+                          
+                          const tooltipText = `Hospede: ${rental.guestName || 'N/A'}\nTipo: ${getSourceLabel(rental.source)}\nEntrada: ${new Date(rental.startDate).toLocaleDateString('pt-BR')}\nSaida: ${new Date(rental.endDate).toLocaleDateString('pt-BR')}\nHospedes: ${rental.numberOfGuests || 1}\nDiaria: ${dailyFormatted}\nTotal: ${totalFormatted}\nTaxa Extra: ${extraFeeFormatted}`;
+
                           return (
                             <button
                               key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`}
@@ -466,9 +472,9 @@ export default function Rentals() {
                                 width: `${width}%`,
                                 borderRadius: borderRadius,
                               }}
-                              title={rental.guestName || getSourceLabel(rental.source)}
+                              title={tooltipText}
                             >
-                              {rental.guestName || getSourceLabel(rental.source)}
+                              {rental.guestName || getSourceLabel(rental.source)} - {totalFormatted}
                             </button>
                           );
                         })}
@@ -615,10 +621,15 @@ export default function Rentals() {
               <div>
                 <Label>Valor da Taxa Extra (R$)</Label>
                 <Input
-                  type="number"
-                  value={formData.extraFeeAmount}
-                  onChange={(e) => setFormData({ ...formData, extraFeeAmount: parseFloat(e.target.value) || 0 })}
-                  placeholder="0,00"
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.extraFeeAmount) : ''}
+                  onChange={(e) => {
+                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
+                    setFormData({ ...formData, extraFeeAmount: floatValue });
+                  }}
+                  placeholder="R$ 0,00"
                 />
               </div>
             </div>
@@ -823,10 +834,15 @@ export default function Rentals() {
               <div>
                 <Label>Valor da Taxa Extra (R$)</Label>
                 <Input
-                  type="number"
-                  value={formData.extraFeeAmount}
-                  onChange={(e) => setFormData({ ...formData, extraFeeAmount: parseFloat(e.target.value) || 0 })}
-                  placeholder="0,00"
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.extraFeeAmount) : ''}
+                  onChange={(e) => {
+                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
+                    setFormData({ ...formData, extraFeeAmount: floatValue });
+                  }}
+                  placeholder="R$ 0,00"
                 />
               </div>
             </div>
