@@ -574,8 +574,9 @@ export default function Rentals() {
                   inputMode="decimal"
                   value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate) : ''}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9,]/g, '').replace(',', '.');
-                    setFormData({ ...formData, dailyRate: parseFloat(value) || 0 });
+                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
+                    setFormData({ ...formData, dailyRate: floatValue });
                   }}
                   placeholder="R$ 0,00"
                 />
@@ -587,8 +588,9 @@ export default function Rentals() {
                   inputMode="decimal"
                   value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount) : ''}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9,]/g, '').replace(',', '.');
-                    setFormData({ ...formData, totalAmount: parseFloat(value) || 0 });
+                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
+                    setFormData({ ...formData, totalAmount: floatValue });
                   }}
                   placeholder="R$ 0,00"
                 />
@@ -780,8 +782,9 @@ export default function Rentals() {
                   inputMode="decimal"
                   value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate) : ''}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9,]/g, '').replace(',', '.');
-                    setFormData({ ...formData, dailyRate: parseFloat(value) || 0 });
+                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
+                    setFormData({ ...formData, dailyRate: floatValue });
                   }}
                   placeholder="R$ 0,00"
                 />
@@ -793,8 +796,9 @@ export default function Rentals() {
                   inputMode="decimal"
                   value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount) : ''}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9,]/g, '').replace(',', '.');
-                    setFormData({ ...formData, totalAmount: parseFloat(value) || 0 });
+                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
+                    setFormData({ ...formData, totalAmount: floatValue });
                   }}
                   placeholder="R$ 0,00"
                 />
