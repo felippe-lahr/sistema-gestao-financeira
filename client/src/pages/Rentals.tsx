@@ -307,7 +307,11 @@ export default function Rentals() {
                       const rEnd = new Date(r.endDate);
                       const rentalStart = new Date(rental.startDate);
                       const rentalEnd = new Date(rental.endDate);
-                      return !(rentalEnd < rStart || rentalStart > rEnd);
+                      rStart.setHours(0, 0, 0, 0);
+                      rEnd.setHours(0, 0, 0, 0);
+                      rentalStart.setHours(0, 0, 0, 0);
+                      rentalEnd.setHours(0, 0, 0, 0);
+                      return !(rentalEnd.getTime() < rStart.getTime() || rentalStart.getTime() > rEnd.getTime());
                     });
                     if (!hasConflict) {
                       row.push(rental);
