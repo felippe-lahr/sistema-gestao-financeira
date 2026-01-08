@@ -6,7 +6,8 @@ import { eq, and } from "drizzle-orm";
  * Obter reservas por entidade
  */
 export async function getRentalsByEntityId(entityId: number): Promise<Rental[]> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) return [];
   return await db.select().from(rentals).where(eq(rentals.entityId, entityId));
 }
 
@@ -14,7 +15,8 @@ export async function getRentalsByEntityId(entityId: number): Promise<Rental[]> 
  * Obter uma reserva específica
  */
 export async function getRentalById(id: number): Promise<Rental | undefined> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) return undefined;
   const result = await db.select().from(rentals).where(eq(rentals.id, id));
   return result[0];
 }
@@ -38,7 +40,9 @@ export async function createRental(data: {
   notes?: string;
   specialRequests?: string;
 }): Promise<Rental> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
   const result = await db.insert(rentals).values({
     entityId: data.entityId,
     userId: data.userId,
@@ -80,7 +84,9 @@ export async function updateRental(
     specialRequests?: string;
   }
 ): Promise<Rental> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
   const updateData: any = {};
   
   if (data.startDate) updateData.startDate = new Date(data.startDate);
@@ -109,7 +115,8 @@ export async function updateRental(
  * Deletar uma reserva
  */
 export async function deleteRental(id: number): Promise<boolean> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) return false;
   await db.delete(rentals).where(eq(rentals.id, id));
   return true;
 }
@@ -118,7 +125,8 @@ export async function deleteRental(id: number): Promise<boolean> {
  * Obter configuração de locação por entidade
  */
 export async function getRentalConfigByEntityId(entityId: number): Promise<RentalConfig | undefined> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) return undefined;
   const result = await db.select().from(rentalConfigs).where(eq(rentalConfigs.entityId, entityId));
   return result[0];
 }
@@ -132,7 +140,9 @@ export async function createRentalConfig(data: {
   defaultCheckInTime?: string;
   defaultCheckOutTime?: string;
 }): Promise<RentalConfig> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
   const result = await db.insert(rentalConfigs).values({
     entityId: data.entityId,
     userId: data.userId,
@@ -157,7 +167,9 @@ export async function updateRentalConfig(
     airbnbWebhookSecret?: string;
   }
 ): Promise<RentalConfig> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
   const updateData: any = {
     updatedAt: new Date(),
   };
@@ -185,7 +197,9 @@ export async function createSyncLog(data: {
   itemsSynced?: number;
   itemsFailed?: number;
 }): Promise<RentalSyncLog> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
   const result = await db.insert(rentalSyncLogs).values({
     entityId: data.entityId,
     userId: data.userId,
@@ -203,11 +217,13 @@ export async function createSyncLog(data: {
  * Obter logs de sincronização
  */
 export async function getSyncLogsByEntityId(entityId: number, limit: number = 10): Promise<RentalSyncLog[]> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) return [];
+  
   return await db
     .select()
     .from(rentalSyncLogs)
     .where(eq(rentalSyncLogs.entityId, entityId))
-    .orderBy((t) => t.createdAt)
+    .orderBy((t: any) => t.createdAt)
     .limit(limit);
 }

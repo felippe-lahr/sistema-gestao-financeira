@@ -103,6 +103,7 @@ export default function Entities() {
       name: "",
       description: "",
       color: "#2563EB",
+      temporaryRentalEnabled: false,
     });
   };
 
