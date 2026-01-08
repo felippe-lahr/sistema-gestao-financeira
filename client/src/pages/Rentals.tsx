@@ -197,29 +197,51 @@ export default function Rentals() {
   const allDays = [...daysFromPrevMonth, ...daysInMonth, ...daysFromNextMonth];
   const weeks = Array.from({ length: 6 }, (_, i) => allDays.slice(i * 7, (i + 1) * 7));
 
-  // Calcular posição da barra no grid
-  const getRentalGridPosition = (rental, weekDays) => {
+  // Função para obter as reservas que passam por um dia específico
+  const getRentalsForDay = (day) => {
+    return rentals.filter((rental) => {
+      const start = new Date(rental.startDate);
+      const end = new Date(rental.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      const dayNormalized = new Date(day);
+      dayNormalized.setHours(0, 0, 0, 0);
+      return dayNormalized >= start && dayNormalized <= end;
+    });
+  };
+
+  // Função para calcular o posicionamento da barra (left, width, row)
+  const getRentalBarPosition = (rental, week) => {
     const start = new Date(rental.startDate);
     const end = new Date(rental.endDate);
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
 
-    let startCol = -1;
-    let endCol = -1;
+    let startDayIndex = -1;
+    let endDayIndex = -1;
 
-    weekDays.forEach((day, idx) => {
-      const dayStart = new Date(day);
-      dayStart.setHours(0, 0, 0, 0);
+    week.forEach((day, idx) => {
+      const dayNormalized = new Date(day);
+      dayNormalized.setHours(0, 0, 0, 0);
 
-      if (dayStart.getTime() === start.getTime()) {
-        startCol = idx + 1; // CSS Grid é 1-indexed
+      if (dayNormalized.getTime() === start.getTime()) {
+        startDayIndex = idx;
       }
-      if (dayStart.getTime() === end.getTime()) {
-        endCol = idx + 1;
+      if (dayNormalized.getTime() === end.getTime()) {
+        endDayIndex = idx;
       }
     });
 
-    return { startCol, endCol };
+    if (startDayIndex === -1 || endDayIndex === -1) {
+      return null;
+    }
+
+    // Calcular a posição left (em %) e width (em %)
+    const cellWidth = 100 / 7;
+    const left = startDayIndex * cellWidth;
+    const width = (endDayIndex - startDayIndex + 1) * cellWidth;
+
+    return { left, width };
   };
 
   const formatCurrency = (value) => {
@@ -273,11 +295,11 @@ export default function Rentals() {
           {rentalsLoading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Skeleton key={i} className="h-20 w-full" />
+                <Skeleton key={i} className="h-32 w-full" />
               ))}
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {/* Cabeçalho com dias da semana */}
               <div className="grid grid-cols-7 gap-1">
                 {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
@@ -287,87 +309,44 @@ export default function Rentals() {
                 ))}
               </div>
 
-              {/* Grid do calendário com barras contínuas */}
-              {weeks.map((week, weekIndex) => {
-                // Obter todas as reservas desta semana
-                const weekRentals = rentals.filter((rental) => {
-                  const start = new Date(rental.startDate);
-                  const end = new Date(rental.endDate);
-                  return week.some((day) => day >= start && day <= end);
-                });
+              {/* Grid do calendário */}
+              {weeks.map((week, weekIndex) => (
+                <div key={weekIndex} className="grid grid-cols-7 gap-1">
+                  {week.map((day, dayIndex) => {
+                    const isCurrentMonth = isSameMonth(day, currentMonth);
+                    const dayRentals = getRentalsForDay(day);
 
-                // Agrupar reservas por linha (para evitar sobreposição)
-                const rentalRows = [];
-                weekRentals.forEach((rental) => {
-                  let placed = false;
-                  for (let row of rentalRows) {
-                    // Verificar se não há conflito com outras reservas nesta linha
-                    const hasConflict = row.some((r) => {
-                      const rStart = new Date(r.startDate);
-                      const rEnd = new Date(r.endDate);
-                      const rentalStart = new Date(rental.startDate);
-                      const rentalEnd = new Date(rental.endDate);
-                      rStart.setHours(0, 0, 0, 0);
-                      rEnd.setHours(0, 0, 0, 0);
-                      rentalStart.setHours(0, 0, 0, 0);
-                      rentalEnd.setHours(0, 0, 0, 0);
-                      return !(rentalEnd.getTime() < rStart.getTime() || rentalStart.getTime() > rEnd.getTime());
-                    });
-                    if (!hasConflict) {
-                      row.push(rental);
-                      placed = true;
-                      break;
-                    }
-                  }
-                  if (!placed) {
-                    rentalRows.push([rental]);
-                  }
-                });
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        className={`relative min-h-32 border rounded p-2 ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
+                      >
+                        {/* Número do dia */}
+                        <div className="text-sm font-semibold mb-1">{format(day, "d")}</div>
 
-                return (
-                  <div key={weekIndex} className="relative">
-                    {/* Renderizar barras de reservas */}
-                    {rentalRows.map((row, rowIndex) => (
-                      <div key={`row-${rowIndex}`} className="grid grid-cols-7 gap-1 mb-1 h-8">
-                        {row.map((rental) => {
-                          const { startCol, endCol } = getRentalGridPosition(rental, week);
-                          if (startCol === -1 || endCol === -1) return null;
+                        {/* Barras de reservas */}
+                        <div className="space-y-1">
+                          {dayRentals.map((rental, rentalIndex) => {
+                            const position = getRentalBarPosition(rental, week);
+                            if (!position) return null;
 
-                          return (
-                            <button
-                              key={`${rental.id}-bar`}
-                              onClick={() => handleEdit(rental)}
-                              className={`text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all ${getSourceColor(rental.source)}`}
-                              style={{
-                                gridColumn: `${startCol} / span ${endCol - startCol + 1}`,
-                              }}
-                              title={rental.guestName || getSourceLabel(rental.source)}
-                            >
-                              {rental.guestName || getSourceLabel(rental.source)}
-                            </button>
-                          );
-                        })}
+                            return (
+                              <button
+                                key={`${rental.id}-${dayIndex}`}
+                                onClick={() => handleEdit(rental)}
+                                className={`block w-full text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all ${getSourceColor(rental.source)}`}
+                                title={rental.guestName || getSourceLabel(rental.source)}
+                              >
+                                {rental.guestName || getSourceLabel(rental.source)}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    ))}
-
-                    {/* Células do calendário */}
-                    <div className="grid grid-cols-7 gap-1">
-                      {week.map((day, dayIndex) => {
-                        const isCurrentMonth = isSameMonth(day, currentMonth);
-
-                        return (
-                          <div
-                            key={day.toISOString()}
-                            className={`min-h-24 border rounded p-1 ${isCurrentMonth ? "bg-background" : "bg-muted/30"}`}
-                          >
-                            <div className="text-xs font-semibold">{format(day, "d")}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
