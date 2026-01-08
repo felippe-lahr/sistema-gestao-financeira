@@ -409,15 +409,16 @@ export default function Rentals() {
 
                           // Se há conflito no dia de checkout
                           if (conflictingRental && isSegmentEnd) {
+                            const gapBetweenBars = 0.25; // Pequeno gap entre as barras
                             // Reserva que termina: ocupa metade esquerda
                             if (rental.id < conflictingRental.id) {
-                              // Ajustar width para ocupar apenas metade do último dia
-                              width = (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2;
+                              // Ajustar width para ocupar apenas metade do último dia (menos o gap)
+                              width = (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
                             } else {
                               // Reserva que começa: ocupa metade direita
-                              // Calcular left para começar na metade direita do dia de checkout
-                              left = segmentStart * (cellWidth + gapPercentage) + (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2;
-                              width = (cellWidth + gapPercentage) / 2;
+                              // Calcular left para começar na metade direita do dia de checkout (com gap)
+                              left = segmentStart * (cellWidth + gapPercentage) + (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2 + gapBetweenBars / 2;
+                              width = (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
                             }
                           }
 
