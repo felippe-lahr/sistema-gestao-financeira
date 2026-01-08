@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2, Building2, GripVertical } from "lucide-react";
+import { Plus, Edit, Trash2, Building2, GripVertical, Calendar } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -25,6 +25,7 @@ export default function Entities() {
     name: "",
     description: "",
     color: "#2563EB",
+    temporaryRentalEnabled: false,
   });
   const [localEntities, setLocalEntities] = useState<any[]>([]);
 
@@ -119,6 +120,7 @@ export default function Entities() {
       name: entity.name,
       description: entity.description || "",
       color: entity.color || "#2563EB",
+      temporaryRentalEnabled: entity.temporaryRentalEnabled || false,
     });
     setIsEditOpen(true);
   };
@@ -328,6 +330,33 @@ export default function Entities() {
                     title={color.label}
                   />
                 ))}
+              </div>
+            </div>
+            
+            {/* Módulos Section */}
+            <div className="space-y-3 border-t pt-4">
+              <Label className="text-base font-semibold">Módulos</Label>
+              <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="font-medium">Locação por Temporada</p>
+                    <p className="text-sm text-muted-foreground">Gerencie reservas e bloqueios</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, temporaryRentalEnabled: !formData.temporaryRentalEnabled })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    formData.temporaryRentalEnabled ? "bg-blue-600" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.temporaryRentalEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
           </div>

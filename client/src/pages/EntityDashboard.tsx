@@ -271,13 +271,24 @@ export default function EntityDashboard() {
             </Button>
             <h1 className="text-3xl font-bold tracking-tight">{entity.name}</h1>
           </div>
-          <Button
-            onClick={() => setLocation(`/investments/${entityId}`)}
-            className="hidden sm:flex flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Investimentos
-          </Button>
+          <div className="hidden sm:flex gap-2 flex-shrink-0">
+            {entity.temporaryRentalEnabled && (
+              <Button
+                onClick={() => setLocation(`/rentals/${entityId}`)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Reservas
+              </Button>
+            )}
+            <Button
+              onClick={() => setLocation(`/investments/${entityId}`)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Investimentos
+            </Button>
+          </div>
         </div>
         
         {/* Linha 2: Icone da Entidade + Descricao */}
@@ -291,14 +302,25 @@ export default function EntityDashboard() {
           <p className="text-muted-foreground">Visao geral das financas</p>
         </div>
         
-        {/* Linha 3: Botao Investimentos (Mobile) */}
-        <Button
-          onClick={() => setLocation(`/investments/${entityId}`)}
-          className="sm:hidden w-full bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          <TrendingUp className="h-4 w-4 mr-2" />
-          Investimentos
-        </Button>
+        {/* Linha 3: Botoes (Mobile) */}
+        <div className="sm:hidden w-full space-y-2">
+          {entity.temporaryRentalEnabled && (
+            <Button
+              onClick={() => setLocation(`/rentals/${entityId}`)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Reservas
+            </Button>
+          )}
+          <Button
+            onClick={() => setLocation(`/investments/${entityId}`)}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Investimentos
+          </Button>
+        </div>
       </div>
 
       {/* Filtros - Mobile: Drawer */}

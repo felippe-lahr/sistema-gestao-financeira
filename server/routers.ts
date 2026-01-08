@@ -1384,6 +1384,99 @@ export const appRouter = router({
       }
     }),
   }),
+
+  // ========== RENTALS ==========
+  rentals: router({
+    list: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const { getRentalsByEntityId } = await import("./db-rentals");
+        return await getRentalsByEntityId(input.entityId);
+      }),
+
+    getConfig: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const { getRentalConfigByEntityId } = await import("./db-rentals");
+        return await getRentalConfigByEntityId(input.entityId);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          startDate: z.string(),
+          endDate: z.string(),
+          source: z.enum(["AIRBNB", "DIRECT", "BLOCKED"]),
+          guestName: z.string().optional(),
+          guestEmail: z.string().email().optional(),
+          guestPhone: z.string().optional(),
+          dailyRate: z.number().optional(),
+          totalAmount: z.number().optional(),
+          checkInTime: z.string().optional(),
+          checkOutTime: z.string().optional(),
+          notes: z.string().optional(),
+          specialRequests: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const { createRental } = await import("./db-rentals");
+        return await createRental({
+          ...input,
+          userId: ctx.user.id,
+        });
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          startDate: z.string(),
+          endDate: z.string(),
+          source: z.enum(["AIRBNB", "DIRECT", "BLOCKED"]),
+          guestName: z.string().optional(),
+          guestEmail: z.string().email().optional(),
+          guestPhone: z.string().optional(),
+          dailyRate: z.number().optional(),
+          totalAmount: z.number().optional(),
+          checkInTime: z.string().optional(),
+          checkOutTime: z.string().optional(),
+          notes: z.string().optional(),
+          specialRequests: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { getRentalById, updateRental } = await import("./db-rentals");
+        const rental = await getRentalById(input.id);
+        if (!rental || rental.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await updateRental(input.id, input);
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const { getRentalById, deleteRental } = await import("./db-rentals");
+        const rental = await getRentalById(input.id);
+        if (!rental || rental.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await deleteRental(input.id);
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

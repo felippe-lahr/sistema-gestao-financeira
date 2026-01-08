@@ -36,6 +36,7 @@ export const entities = pgTable("entities", {
   description: text("description"),
   color: varchar("color", { length: 7 }).default("#2563EB"),
   displayOrder: integer("displayOrder").default(0).notNull(),
+  temporaryRentalEnabled: boolean("temporaryRentalEnabled").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -338,3 +339,106 @@ export const userPasswords = pgTable("user_passwords", {
 
 export type UserPassword = typeof userPasswords.$inferSelect;
 export type InsertUserPassword = typeof userPasswords.$inferInsert;
+
+/**
+ * Rental Status enum
+ */
+export const rentalStatusEnum = pgEnum("rental_status", ["BLOCKED", "RESERVED_AIRBNB", "RESERVED_DIRECT", "AVAILABLE"]);
+export const rentalSourceEnum = pgEnum("rental_source", ["AIRBNB", "DIRECT", "BLOCKED"]);
+
+/**
+ * Rentals table - Reservas e bloqueios de temporada
+ */
+export const rentals = pgTable("rentals", {
+  id: serial("id").primaryKey(),
+  entityId: integer("entityId").notNull().references(() => entities.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull(),
+  
+  // Período
+  startDate: timestamp("startDate").notNull(),
+  endDate: timestamp("endDate").notNull(),
+  
+  // Informações da reserva
+  source: rentalSourceEnum("source").notNull(),
+  status: rentalStatusEnum("status").default("AVAILABLE").notNull(),
+  
+  // Hóspede (para reservas diretas)
+  guestName: varchar("guestName", { length: 255 }),
+  guestEmail: varchar("guestEmail", { length: 320 }),
+  guestPhone: varchar("guestPhone", { length: 20 }),
+  
+  // Valores
+  dailyRate: integer("dailyRate"),
+  totalAmount: integer("totalAmount"),
+  
+  // Horários
+  checkInTime: varchar("checkInTime", { length: 5 }),
+  checkOutTime: varchar("checkOutTime", { length: 5 }),
+  
+  // Notas e observações
+  notes: text("notes"),
+  specialRequests: text("specialRequests"),
+  
+  // Integração Airbnb (fase 2)
+  airbnbListingId: varchar("airbnbListingId", { length: 255 }),
+  airbnbReservationId: varchar("airbnbReservationId", { length: 255 }).unique(),
+  airbnbSyncedAt: timestamp("airbnbSyncedAt"),
+  
+  // Metadados
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Rental = typeof rentals.$inferSelect;
+export type InsertRental = typeof rentals.$inferInsert;
+
+/**
+ * Rental Configuration table - Configurações do módulo de locação
+ */
+export const rentalConfigs = pgTable("rental_configs", {
+  id: serial("id").primaryKey(),
+  entityId: integer("entityId").notNull().unique().references(() => entities.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull(),
+  
+  // Configurações gerais
+  defaultCheckInTime: varchar("defaultCheckInTime", { length: 5 }).default("14:00"),
+  defaultCheckOutTime: varchar("defaultCheckOutTime", { length: 5 }).default("11:00"),
+  
+  // Integração Airbnb (fase 2)
+  airbnbApiKey: varchar("airbnbApiKey", { length: 255 }),
+  airbnbListingIds: text("airbnbListingIds"),
+  airbnbSyncEnabled: boolean("airbnbSyncEnabled").default(false),
+  airbnbLastSync: timestamp("airbnbLastSync"),
+  airbnbWebhookSecret: varchar("airbnbWebhookSecret", { length: 255 }),
+  
+  // Metadados
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type RentalConfig = typeof rentalConfigs.$inferSelect;
+export type InsertRentalConfig = typeof rentalConfigs.$inferInsert;
+
+/**
+ * Rental Sync Logs table - Logs de sincronização com Airbnb (fase 2)
+ */
+export const rentalSyncLogs = pgTable("rental_sync_logs", {
+  id: serial("id").primaryKey(),
+  entityId: integer("entityId").notNull().references(() => entities.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull(),
+  
+  // Informações da sincronização
+  syncType: varchar("syncType", { length: 50 }).notNull(),
+  status: varchar("status", { length: 50 }).notNull(),
+  message: text("message"),
+  
+  // Detalhes
+  itemsSynced: integer("itemsSynced").default(0),
+  itemsFailed: integer("itemsFailed").default(0),
+  
+  // Metadados
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RentalSyncLog = typeof rentalSyncLogs.$inferSelect;
+export type InsertRentalSyncLog = typeof rentalSyncLogs.$inferInsert;

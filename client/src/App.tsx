@@ -7,6 +7,7 @@ import EntityDashboard from "@/pages/EntityDashboard";
 import Entities from "@/pages/Entities";
 import Transactions from "@/pages/Transactions";
 import Investments from "@/pages/Investments";
+import Rentals from "@/pages/Rentals";
 import TreasurySelix from "@/pages/TreasurySelix";
 import Settings from "@/pages/Settings";
 import UserProfile from "@/pages/UserProfile";
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/entities" component={() => <DashboardLayout><Entities /></DashboardLayout>} />
       <Route path="/transactions" component={() => <DashboardLayout><Transactions /></DashboardLayout>} />
       <Route path="/investments/:entityId" component={() => <DashboardLayout><Investments /></DashboardLayout>} />
+      <Route path="/rentals/:entityId" component={() => <DashboardLayout><Rentals /></DashboardLayout>} />
       <Route path="/treasury-selic/:entityId" component={() => <DashboardLayout><TreasurySelix /></DashboardLayout>} />
       <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
       <Route path="/profile" component={() => <DashboardLayout><UserProfile /></DashboardLayout>} />
