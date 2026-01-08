@@ -43,11 +43,17 @@ export async function createRental(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
+  // Converter string de data (YYYY-MM-DD) para Date sem timezone
+  const parseDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+  
   const result = await db.insert(rentals).values({
     entityId: data.entityId,
     userId: data.userId,
-    startDate: new Date(data.startDate),
-    endDate: new Date(data.endDate),
+    startDate: parseDate(data.startDate),
+    endDate: parseDate(data.endDate),
     source: data.source,
     status: data.source === "BLOCKED" ? "BLOCKED" : `RESERVED_${data.source}`,
     guestName: data.guestName,
@@ -89,8 +95,14 @@ export async function updateRental(
   
   const updateData: any = {};
   
-  if (data.startDate) updateData.startDate = new Date(data.startDate);
-  if (data.endDate) updateData.endDate = new Date(data.endDate);
+  // Converter string de data (YYYY-MM-DD) para Date sem timezone
+  const parseDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+  
+  if (data.startDate) updateData.startDate = parseDate(data.startDate);
+  if (data.endDate) updateData.endDate = parseDate(data.endDate);
   if (data.source) {
     updateData.source = data.source;
     updateData.status = data.source === "BLOCKED" ? "BLOCKED" : `RESERVED_${data.source}`;
