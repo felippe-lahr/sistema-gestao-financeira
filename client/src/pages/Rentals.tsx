@@ -1,221 +1,165 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
-import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit, Paperclip } from "lucide-react";
-import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, differenceInDays } from "date-fns";
+import { Plus, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, differenceInDays, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
-interface RentalFormData {
-  startDate: string;
-  endDate: string;
-  source: "AIRBNB" | "DIRECT" | "BLOCKED";
-  guestName?: string;
-  guestEmail?: string;
-  guestPhone?: string;
-  numberOfGuests?: number;
-  dailyRate?: number;
-  totalAmount?: number;
-  extraFeeType?: string;
-  extraFeeAmount?: number;
-  checkInTime?: string;
-  checkOutTime?: string;
-  notes?: string;
-  specialRequests?: string;
-  competencyDate?: "CHECK_IN" | "CHECK_OUT";
-}
-
-// Função para formatar valor em moeda brasileira
-const formatCurrency = (value: number | string): string => {
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return "";
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(num);
-};
-
-// Função para remover máscara de moeda
-const unmaskCurrency = (value: string): number => {
-  const cleaned = value.replace(/\D/g, "");
-  return parseInt(cleaned) / 100;
-};
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 export default function Rentals() {
-  const [location] = useLocation();
-  const entityId = parseInt(location.split("/").pop() || "0");
-  
+  const { entityId } = useRoute().params;
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedRental, setSelectedRental] = useState<any>(null);
-  const [formData, setFormData] = useState<RentalFormData>({
-    startDate: "",
-    endDate: "",
+  const [editingRental, setEditingRental] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [formData, setFormData] = useState({
+    startDate: format(new Date(), "yyyy-MM-dd"),
+    endDate: format(new Date(), "yyyy-MM-dd"),
     source: "DIRECT",
+    guestName: "",
+    guestEmail: "",
+    guestPhone: "",
     numberOfGuests: 1,
+    dailyRate: 0,
+    totalAmount: 0,
+    extraFeeType: "",
+    extraFeeAmount: 0,
     checkInTime: "14:00",
     checkOutTime: "11:00",
+    notes: "",
     competencyDate: "CHECK_IN",
   });
 
-  const utils = trpc.useUtils();
-  const { data: rentals, isLoading } = trpc.rentals.list.useQuery({ entityId });
-  const { data: rentalConfig } = trpc.rentals.getConfig.useQuery({ entityId });
+  const { data: rentals = [], isLoading: rentalsLoading, refetch } = trpc.rentals.list.useQuery({
+    entityId: parseInt(entityId),
+    month: currentMonth.getMonth() + 1,
+    year: currentMonth.getFullYear(),
+  });
 
   const createMutation = trpc.rentals.create.useMutation({
     onSuccess: () => {
-      utils.rentals.list.invalidate();
-      setIsCreateOpen(false);
-      setFormData({
-        startDate: "",
-        endDate: "",
-        source: "DIRECT",
-        numberOfGuests: 1,
-        checkInTime: rentalConfig?.defaultCheckInTime || "14:00",
-        checkOutTime: rentalConfig?.defaultCheckOutTime || "11:00",
-        competencyDate: "CHECK_IN",
-      });
       toast.success("Reserva criada com sucesso!");
+      setIsCreateOpen(false);
+      resetForm();
+      refetch();
     },
     onError: (error) => {
-      toast.error("Erro ao criar reserva: " + error.message);
+      toast.error(error.message || "Erro ao criar reserva");
     },
   });
 
   const updateMutation = trpc.rentals.update.useMutation({
     onSuccess: () => {
-      utils.rentals.list.invalidate();
-      setIsEditOpen(false);
-      setSelectedRental(null);
       toast.success("Reserva atualizada com sucesso!");
+      setIsEditOpen(false);
+      resetForm();
+      refetch();
     },
     onError: (error) => {
-      toast.error("Erro ao atualizar reserva: " + error.message);
+      toast.error(error.message || "Erro ao atualizar reserva");
     },
   });
 
   const deleteMutation = trpc.rentals.delete.useMutation({
     onSuccess: () => {
-      utils.rentals.list.invalidate();
-      setIsDeleteOpen(false);
-      setSelectedRental(null);
-      toast.success("Reserva excluída com sucesso!");
+      toast.success("Reserva deletada com sucesso!");
+      setIsEditOpen(false);
+      resetForm();
+      refetch();
     },
     onError: (error) => {
-      toast.error("Erro ao excluir reserva: " + error.message);
+      toast.error(error.message || "Erro ao deletar reserva");
     },
   });
 
+  const resetForm = () => {
+    setFormData({
+      startDate: format(new Date(), "yyyy-MM-dd"),
+      endDate: format(new Date(), "yyyy-MM-dd"),
+      source: "DIRECT",
+      guestName: "",
+      guestEmail: "",
+      guestPhone: "",
+      numberOfGuests: 1,
+      dailyRate: 0,
+      totalAmount: 0,
+      extraFeeType: "",
+      extraFeeAmount: 0,
+      checkInTime: "14:00",
+      checkOutTime: "11:00",
+      notes: "",
+      competencyDate: "CHECK_IN",
+    });
+    setEditingRental(null);
+  };
+
   const handleCreate = () => {
-    if (!formData.startDate || !formData.endDate) {
-      toast.error("Datas de início e fim são obrigatórias");
-      return;
-    }
     createMutation.mutate({
-      entityId,
+      entityId: parseInt(entityId),
       ...formData,
-      dailyRate: formData.dailyRate ? Math.round(formData.dailyRate * 100) : undefined,
-      totalAmount: formData.totalAmount ? Math.round(formData.totalAmount * 100) : undefined,
-      extraFeeAmount: formData.extraFeeAmount ? Math.round(formData.extraFeeAmount * 100) : undefined,
-      numberOfGuests: formData.numberOfGuests || 1,
     });
   };
 
   const handleUpdate = () => {
-    if (!formData.startDate || !formData.endDate) {
-      toast.error("Datas de início e fim são obrigatórias");
-      return;
-    }
+    if (!editingRental) return;
     updateMutation.mutate({
-      id: selectedRental.id,
+      id: editingRental.id,
       ...formData,
-      dailyRate: formData.dailyRate ? Math.round(formData.dailyRate * 100) : undefined,
-      totalAmount: formData.totalAmount ? Math.round(formData.totalAmount * 100) : undefined,
-      extraFeeAmount: formData.extraFeeAmount ? Math.round(formData.extraFeeAmount * 100) : undefined,
-      numberOfGuests: formData.numberOfGuests || 1,
     });
   };
 
-  const handleEdit = (rental: any) => {
-    setSelectedRental(rental);
+  const handleDelete = () => {
+    if (!editingRental) return;
+    deleteMutation.mutate({ id: editingRental.id });
+  };
+
+  const handleEdit = (rental) => {
+    setEditingRental(rental);
     setFormData({
-      startDate: format(new Date(rental.startDate), "yyyy-MM-dd"),
-      endDate: format(new Date(rental.endDate), "yyyy-MM-dd"),
+      startDate: rental.startDate,
+      endDate: rental.endDate,
       source: rental.source,
       guestName: rental.guestName || "",
       guestEmail: rental.guestEmail || "",
       guestPhone: rental.guestPhone || "",
       numberOfGuests: rental.numberOfGuests || 1,
-      dailyRate: rental.dailyRate ? rental.dailyRate / 100 : undefined,
-      totalAmount: rental.totalAmount ? rental.totalAmount / 100 : undefined,
+      dailyRate: rental.dailyRate || 0,
+      totalAmount: rental.totalAmount || 0,
       extraFeeType: rental.extraFeeType || "",
-      extraFeeAmount: rental.extraFeeAmount ? rental.extraFeeAmount / 100 : undefined,
+      extraFeeAmount: rental.extraFeeAmount || 0,
       checkInTime: rental.checkInTime || "14:00",
       checkOutTime: rental.checkOutTime || "11:00",
       notes: rental.notes || "",
-      specialRequests: rental.specialRequests || "",
       competencyDate: rental.competencyDate || "CHECK_IN",
     });
     setIsEditOpen(true);
   };
 
-  // Obter dias do mês para o calendário
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
-  // Calcular posição e largura das barras
-  const getRentalPosition = (rental: any, day: Date) => {
-    const rentalStart = new Date(rental.startDate);
-    const rentalEnd = new Date(rental.endDate);
-    const monthStart = startOfMonth(currentMonth);
-    
-    // Determinar o dia de início da barra (checkout do dia anterior)
-    let barStart = new Date(rentalStart);
-    barStart.setDate(barStart.getDate() - 1);
-    
-    // Calcular a posição relativa ao mês
-    const dayIndex = differenceInDays(day, monthStart);
-    const barStartIndex = differenceInDays(barStart, monthStart);
-    const barEndIndex = differenceInDays(rentalEnd, monthStart);
-    
-    // Verificar se a barra aparece neste dia
-    if (dayIndex < barStartIndex || dayIndex > barEndIndex) {
-      return null;
-    }
-    
-    return {
-      startIndex: Math.max(0, barStartIndex),
-      endIndex: Math.min(daysInMonth.length - 1, barEndIndex),
-      dayIndex,
-    };
-  };
-
-  const getSourceColor = (source: string) => {
+  const getSourceColor = (source) => {
     switch (source) {
       case "AIRBNB":
-        return "bg-red-500 hover:bg-red-600";
+        return "bg-red-400 hover:bg-red-500";
       case "DIRECT":
         return "bg-blue-300 hover:bg-blue-400";
       case "BLOCKED":
         return "bg-gray-400 hover:bg-gray-500";
       default:
-        return "bg-gray-400 hover:bg-gray-500";
+        return "bg-gray-300 hover:bg-gray-400";
     }
   };
 
-  const getSourceLabel = (source: string) => {
+  const getSourceLabel = (source) => {
     switch (source) {
       case "AIRBNB":
         return "Airbnb";
@@ -228,30 +172,42 @@ export default function Rentals() {
     }
   };
 
-  // Agrupar reservas por linha para evitar sobreposição
-  const getRentalsByRow = () => {
-    const rows: any[][] = [];
-    (rentals || []).forEach((rental) => {
-      let placed = false;
-      for (let i = 0; i < rows.length; i++) {
-        const hasConflict = rows[i].some((r) => {
-          const rStart = new Date(r.startDate);
-          const rEnd = new Date(r.endDate);
-          const rentalStart = new Date(rental.startDate);
-          const rentalEnd = new Date(rental.endDate);
-          return !(rentalEnd < rStart || rentalStart > rEnd);
-        });
-        if (!hasConflict) {
-          rows[i].push(rental);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
-        rows.push([rental]);
-      }
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+  // Preencher com dias do mês anterior
+  const firstDayOfWeek = monthStart.getDay();
+  const daysFromPrevMonth = Array.from({ length: firstDayOfWeek }, (_, i) => {
+    const date = new Date(monthStart);
+    date.setDate(date.getDate() - (firstDayOfWeek - i));
+    return date;
+  });
+
+  // Preencher com dias do próximo mês
+  const totalDays = daysFromPrevMonth.length + daysInMonth.length;
+  const daysFromNextMonth = Array.from({ length: 42 - totalDays }, (_, i) => {
+    const date = new Date(monthEnd);
+    date.setDate(date.getDate() + i + 1);
+    return date;
+  });
+
+  const allDays = [...daysFromPrevMonth, ...daysInMonth, ...daysFromNextMonth];
+  const weeks = Array.from({ length: 6 }, (_, i) => allDays.slice(i * 7, (i + 1) * 7));
+
+  const getRentalForDay = (day) => {
+    return rentals.find((rental) => {
+      const start = new Date(rental.startDate);
+      const end = new Date(rental.endDate);
+      return day >= start && day <= end;
     });
-    return rows;
+  };
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
   };
 
   return (
@@ -295,7 +251,7 @@ export default function Rentals() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {rentalsLoading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <Skeleton key={i} className="h-20 w-full" />
@@ -303,86 +259,70 @@ export default function Rentals() {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Timeline com barras de reservas */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm text-muted-foreground">Reservas - {format(currentMonth, "MMMM yyyy", { locale: ptBR })}</h3>
-                
-                {/* Cabeçalho com semanas */}
-                <div className="flex gap-1 mb-2 text-xs font-semibold text-center">
-                  {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
-                    <div key={day} className="flex-1">{day}</div>
-                  ))}
-                </div>
-
-                {/* Barras de reservas */}
-                {getRentalsByRow().map((row, rowIndex) => (
-                  <div key={rowIndex} className="relative h-10 bg-muted/30 rounded border">
-                    {row.map((rental) => {
-                      const rentalStart = new Date(rental.startDate);
-                      const rentalEnd = new Date(rental.endDate);
-                      const monthStart = startOfMonth(currentMonth);
-                      const monthEnd = endOfMonth(currentMonth);
-                      
-                      let barStart = new Date(rentalStart);
-                      barStart.setDate(barStart.getDate() - 1);
-                      
-                      if (barStart > monthEnd || rentalEnd < monthStart) {
-                        return null;
-                      }
-                      
-                      const barStartIndex = Math.max(0, differenceInDays(barStart, monthStart));
-                      const barEndIndex = Math.min(daysInMonth.length - 1, differenceInDays(rentalEnd, monthStart));
-                      const barWidth = ((barEndIndex - barStartIndex + 1) / daysInMonth.length) * 100;
-                      const barLeft = (barStartIndex / daysInMonth.length) * 100;
-                      
-                      return (
-                        <button
-                          key={rental.id}
-                          onClick={() => handleEdit(rental)}
-                          className={`absolute top-1 bottom-1 rounded px-2 text-xs font-semibold text-white truncate cursor-pointer transition-all hover:shadow-lg ${getSourceColor(
-                            rental.source
-                          )}`}
-                          style={{
-                            left: `${barLeft}%`,
-                            width: `${barWidth}%`,
-                          }}
-                          title={rental.guestName || getSourceLabel(rental.source)}
-                        >
-                          {rental.guestName || getSourceLabel(rental.source)}
-                        </button>
-                      );
-                    })}
+              {/* Cabeçalho com dias da semana */}
+              <div className="grid grid-cols-7 gap-1">
+                {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
+                  <div key={day} className="text-center font-semibold text-sm p-2 border rounded bg-muted">
+                    {day}
                   </div>
                 ))}
               </div>
+
+              {/* Grid do calendário */}
+              {weeks.map((week, weekIndex) => (
+                <div key={weekIndex} className="grid grid-cols-7 gap-1">
+                  {week.map((day, dayIndex) => {
+                    const rental = getRentalForDay(day);
+                    const isCurrentMonth = isSameMonth(day, currentMonth);
+
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        className={`min-h-24 border rounded p-1 ${
+                          isCurrentMonth ? "bg-background" : "bg-muted/30"
+                        }`}
+                      >
+                        <div className="text-xs font-semibold mb-1">{format(day, "d")}</div>
+                        {rental && (
+                          <button
+                            onClick={() => handleEdit(rental)}
+                            className={`w-full text-xs font-semibold text-white rounded px-1 py-1 truncate cursor-pointer transition-all ${getSourceColor(
+                              rental.source
+                            )}`}
+                            title={rental.guestName || getSourceLabel(rental.source)}
+                          >
+                            {rental.guestName || getSourceLabel(rental.source)}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Create Dialog */}
+      {/* Dialog de Criar Reserva */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nova Reserva</DialogTitle>
-            <DialogDescription>Crie uma nova reserva ou bloqueio de período</DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate">Data de Início *</Label>
+              <div>
+                <Label>Data de Início *</Label>
                 <Input
-                  id="startDate"
                   type="date"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="endDate">Data de Fim *</Label>
+              <div>
+                <Label>Data de Fim *</Label>
                 <Input
-                  id="endDate"
                   type="date"
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
@@ -390,9 +330,9 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="source">Tipo de Reserva *</Label>
-              <Select value={formData.source} onValueChange={(value: any) => setFormData({ ...formData, source: value })}>
+            <div>
+              <Label>Tipo de Reserva *</Label>
+              <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -404,132 +344,108 @@ export default function Rentals() {
               </Select>
             </div>
 
-            {formData.source !== "BLOCKED" && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="guestName">Nome do Hóspede</Label>
-                    <Input
-                      id="guestName"
-                      value={formData.guestName || ""}
-                      onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="numberOfGuests">Número de Hóspedes</Label>
-                    <Select value={(formData.numberOfGuests || 1).toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
-                          <SelectItem key={num} value={num.toString()}>
-                            {num} {num === 1 ? "hóspede" : "hóspedes"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="guestEmail">Email</Label>
-                    <Input
-                      id="guestEmail"
-                      type="email"
-                      value={formData.guestEmail || ""}
-                      onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="guestPhone">Telefone</Label>
-                    <Input
-                      id="guestPhone"
-                      value={formData.guestPhone || ""}
-                      onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dailyRate">Diária (R$)</Label>
-                    <Input
-                      id="dailyRate"
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.dailyRate ? formatCurrency(formData.dailyRate).replace("R$", "").trim() : ""}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "");
-                        setFormData({ ...formData, dailyRate: value ? parseInt(value) / 100 : undefined });
-                      }}
-                      placeholder="0,00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="totalAmount">Total (R$)</Label>
-                    <Input
-                      id="totalAmount"
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.totalAmount ? formatCurrency(formData.totalAmount).replace("R$", "").trim() : ""}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "");
-                        setFormData({ ...formData, totalAmount: value ? parseInt(value) / 100 : undefined });
-                      }}
-                      placeholder="0,00"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="extraFeeType">Tipo de Taxa Extra</Label>
-                    <Select value={formData.extraFeeType || "NONE"} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value === "NONE" ? undefined : value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NONE">Nenhuma</SelectItem>
-                        <SelectItem value="IMPOSTO">Imposto</SelectItem>
-                        <SelectItem value="TAXA_PET">Taxa Pet</SelectItem>
-                        <SelectItem value="LIMPEZA">Limpeza</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="extraFeeAmount">Valor da Taxa (R$)</Label>
-                    <Input
-                      id="extraFeeAmount"
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.extraFeeAmount ? formatCurrency(formData.extraFeeAmount).replace("R$", "").trim() : ""}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "");
-                        setFormData({ ...formData, extraFeeAmount: value ? parseInt(value) / 100 : undefined });
-                      }}
-                      placeholder="0,00"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Nome do Hóspede</Label>
+                <Input
+                  value={formData.guestName}
+                  onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Número de Hóspedes</Label>
+                <Select value={formData.numberOfGuests.toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                      <SelectItem key={num} value={num.toString()}>
+                        {num} hóspede{num > 1 ? "s" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="checkInTime">Horário Check-in</Label>
+              <div>
+                <Label>Email</Label>
                 <Input
-                  id="checkInTime"
+                  type="email"
+                  value={formData.guestEmail}
+                  onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Telefone</Label>
+                <Input
+                  value={formData.guestPhone}
+                  onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Diária (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.dailyRate}
+                  onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+              <div>
+                <Label>Total (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.totalAmount}
+                  onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo de Taxa Extra</Label>
+                <Select value={formData.extraFeeType} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Nenhuma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">Nenhuma</SelectItem>
+                    <SelectItem value="IMPOSTO">Imposto</SelectItem>
+                    <SelectItem value="TAXA_PET">Taxa Pet</SelectItem>
+                    <SelectItem value="LIMPEZA">Limpeza</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Valor da Taxa Extra (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.extraFeeAmount}
+                  onChange={(e) => setFormData({ ...formData, extraFeeAmount: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Horário Check-in</Label>
+                <Input
                   type="time"
                   value={formData.checkInTime}
                   onChange={(e) => setFormData({ ...formData, checkInTime: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="checkOutTime">Horário Check-out</Label>
+              <div>
+                <Label>Horário Check-out</Label>
                 <Input
-                  id="checkOutTime"
                   type="time"
                   value={formData.checkOutTime}
                   onChange={(e) => setFormData({ ...formData, checkOutTime: e.target.value })}
@@ -537,72 +453,61 @@ export default function Rentals() {
               </div>
             </div>
 
-            {formData.source !== "BLOCKED" && (
-              <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                <div>
-                  <Label className="mb-0">Data de Competência</Label>
-                  <p className="text-xs text-muted-foreground mt-1">Quando o valor será contabilizado</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{formData.competencyDate === "CHECK_IN" ? "Check-in" : "Check-out"}</span>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, competencyDate: formData.competencyDate === "CHECK_IN" ? "CHECK_OUT" : "CHECK_IN" })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.competencyDate === "CHECK_OUT" ? "bg-blue-600" : "bg-gray-300"}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.competencyDate === "CHECK_OUT" ? "translate-x-6" : "translate-x-1"}`}
-                    />
-                  </button>
-                </div>
+            <div>
+              <Label>Data de Competência</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="competency"
+                  checked={formData.competencyDate === "CHECK_OUT"}
+                  onChange={(e) => setFormData({ ...formData, competencyDate: e.target.checked ? "CHECK_OUT" : "CHECK_IN" })}
+                  className="rounded"
+                />
+                <label htmlFor="competency" className="text-sm">
+                  {formData.competencyDate === "CHECK_IN" ? "Check-in" : "Check-out"}
+                </label>
               </div>
-            )}
+            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notas</Label>
+            <div>
+              <Label>Notas</Label>
               <Textarea
-                id="notes"
-                value={formData.notes || ""}
+                value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={3}
               />
             </div>
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Criando..." : "Criar Reserva"}
-            </Button>
-          </DialogFooter>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
+                Criar Reserva
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
+      {/* Dialog de Editar Reserva */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Reserva</DialogTitle>
-            <DialogDescription>Atualize as informações da reserva</DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate">Data de Início *</Label>
+              <div>
+                <Label>Data de Início *</Label>
                 <Input
-                  id="startDate"
                   type="date"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="endDate">Data de Fim *</Label>
+              <div>
+                <Label>Data de Fim *</Label>
                 <Input
-                  id="endDate"
                   type="date"
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
@@ -610,9 +515,9 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="source">Tipo de Reserva *</Label>
-              <Select value={formData.source} onValueChange={(value: any) => setFormData({ ...formData, source: value })}>
+            <div>
+              <Label>Tipo de Reserva *</Label>
+              <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -624,132 +529,108 @@ export default function Rentals() {
               </Select>
             </div>
 
-            {formData.source !== "BLOCKED" && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="guestName">Nome do Hóspede</Label>
-                    <Input
-                      id="guestName"
-                      value={formData.guestName || ""}
-                      onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="numberOfGuests">Número de Hóspedes</Label>
-                    <Select value={(formData.numberOfGuests || 1).toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
-                          <SelectItem key={num} value={num.toString()}>
-                            {num} {num === 1 ? "hóspede" : "hóspedes"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="guestEmail">Email</Label>
-                    <Input
-                      id="guestEmail"
-                      type="email"
-                      value={formData.guestEmail || ""}
-                      onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="guestPhone">Telefone</Label>
-                    <Input
-                      id="guestPhone"
-                      value={formData.guestPhone || ""}
-                      onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dailyRate">Diária (R$)</Label>
-                    <Input
-                      id="dailyRate"
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.dailyRate ? formatCurrency(formData.dailyRate).replace("R$", "").trim() : ""}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "");
-                        setFormData({ ...formData, dailyRate: value ? parseInt(value) / 100 : undefined });
-                      }}
-                      placeholder="0,00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="totalAmount">Total (R$)</Label>
-                    <Input
-                      id="totalAmount"
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.totalAmount ? formatCurrency(formData.totalAmount).replace("R$", "").trim() : ""}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "");
-                        setFormData({ ...formData, totalAmount: value ? parseInt(value) / 100 : undefined });
-                      }}
-                      placeholder="0,00"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="extraFeeType">Tipo de Taxa Extra</Label>
-                    <Select value={formData.extraFeeType || "NONE"} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value === "NONE" ? undefined : value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NONE">Nenhuma</SelectItem>
-                        <SelectItem value="IMPOSTO">Imposto</SelectItem>
-                        <SelectItem value="TAXA_PET">Taxa Pet</SelectItem>
-                        <SelectItem value="LIMPEZA">Limpeza</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="extraFeeAmount">Valor da Taxa (R$)</Label>
-                    <Input
-                      id="extraFeeAmount"
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.extraFeeAmount ? formatCurrency(formData.extraFeeAmount).replace("R$", "").trim() : ""}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "");
-                        setFormData({ ...formData, extraFeeAmount: value ? parseInt(value) / 100 : undefined });
-                      }}
-                      placeholder="0,00"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Nome do Hóspede</Label>
+                <Input
+                  value={formData.guestName}
+                  onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Número de Hóspedes</Label>
+                <Select value={formData.numberOfGuests.toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                      <SelectItem key={num} value={num.toString()}>
+                        {num} hóspede{num > 1 ? "s" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="checkInTime">Horário Check-in</Label>
+              <div>
+                <Label>Email</Label>
                 <Input
-                  id="checkInTime"
+                  type="email"
+                  value={formData.guestEmail}
+                  onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Telefone</Label>
+                <Input
+                  value={formData.guestPhone}
+                  onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Diária (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.dailyRate}
+                  onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+              <div>
+                <Label>Total (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.totalAmount}
+                  onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo de Taxa Extra</Label>
+                <Select value={formData.extraFeeType} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Nenhuma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">Nenhuma</SelectItem>
+                    <SelectItem value="IMPOSTO">Imposto</SelectItem>
+                    <SelectItem value="TAXA_PET">Taxa Pet</SelectItem>
+                    <SelectItem value="LIMPEZA">Limpeza</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Valor da Taxa Extra (R$)</Label>
+                <Input
+                  type="number"
+                  value={formData.extraFeeAmount}
+                  onChange={(e) => setFormData({ ...formData, extraFeeAmount: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Horário Check-in</Label>
+                <Input
                   type="time"
                   value={formData.checkInTime}
                   onChange={(e) => setFormData({ ...formData, checkInTime: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="checkOutTime">Horário Check-out</Label>
+              <div>
+                <Label>Horário Check-out</Label>
                 <Input
-                  id="checkOutTime"
                   type="time"
                   value={formData.checkOutTime}
                   onChange={(e) => setFormData({ ...formData, checkOutTime: e.target.value })}
@@ -757,74 +638,46 @@ export default function Rentals() {
               </div>
             </div>
 
-            {formData.source !== "BLOCKED" && (
-              <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                <div>
-                  <Label className="mb-0">Data de Competência</Label>
-                  <p className="text-xs text-muted-foreground mt-1">Quando o valor será contabilizado</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{formData.competencyDate === "CHECK_IN" ? "Check-in" : "Check-out"}</span>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, competencyDate: formData.competencyDate === "CHECK_IN" ? "CHECK_OUT" : "CHECK_IN" })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.competencyDate === "CHECK_OUT" ? "bg-blue-600" : "bg-gray-300"}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.competencyDate === "CHECK_OUT" ? "translate-x-6" : "translate-x-1"}`}
-                    />
-                  </button>
-                </div>
+            <div>
+              <Label>Data de Competência</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="competency-edit"
+                  checked={formData.competencyDate === "CHECK_OUT"}
+                  onChange={(e) => setFormData({ ...formData, competencyDate: e.target.checked ? "CHECK_OUT" : "CHECK_IN" })}
+                  className="rounded"
+                />
+                <label htmlFor="competency-edit" className="text-sm">
+                  {formData.competencyDate === "CHECK_IN" ? "Check-in" : "Check-out"}
+                </label>
               </div>
-            )}
+            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notas</Label>
+            <div>
+              <Label>Notas</Label>
               <Textarea
-                id="notes"
-                value={formData.notes || ""}
+                value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={3}
               />
             </div>
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={() => setIsDeleteOpen(true)} className="mr-auto">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Excluir
-            </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Atualizando..." : "Salvar Alterações"}
-            </Button>
-          </DialogFooter>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDelete}>
+                Deletar
+              </Button>
+              <Button onClick={handleUpdate} className="bg-blue-600 hover:bg-blue-700">
+                Salvar Alterações
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
-
-      {/* Delete Dialog */}
-      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Reserva</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir esta reserva? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteMutation.mutate({ id: selectedRental.id })}
-              disabled={deleteMutation.isPending}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
+
+import { useRoute } from "wouter";
