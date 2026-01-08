@@ -355,7 +355,7 @@ export default function Rentals() {
 
                     {/* Barras de reservas sobrepostas */}
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                      <div className="grid grid-cols-7 gap-1 h-full">
+                      <div className="grid grid-cols-7 h-full" style={{ gap: '0.25rem' }}>
                         {rentals.map((rental, rentalIndex) => {
                           // Usar strings ISO para evitar problemas de timezone
                           const startStr = rental.startDate.split('T')[0]; // YYYY-MM-DD
@@ -412,10 +412,13 @@ export default function Rentals() {
 
                           // Calcular span e posição
                           const daySpan = segmentEnd - segmentStart + 1;
-                          const cellWidth = 100 / 7;
-                          const gapPercentage = 0.5;
-                          let left = segmentStart * (cellWidth + gapPercentage);
-                          let width = daySpan * cellWidth + (daySpan - 1) * gapPercentage;
+                          // Usar calc() para considerar o gap do grid (gap-1 = 0.25rem)
+                          // left = segmentStart * (100% / 7 + gap)
+                          // width = daySpan * (100% / 7) + (daySpan - 1) * gap
+                          const cellWidthPercent = 100 / 7;
+                          const gapRem = 0.25; // gap-1 em Tailwind
+                          let left = `calc(${segmentStart} * (${cellWidthPercent}% + ${gapRem}rem))`;
+                          let width = `calc(${daySpan} * ${cellWidthPercent}% + ${daySpan > 1 ? (daySpan - 1) * gapRem : 0}rem)`;
 
                           // Detectar conflito: outra reserva começa no dia de checkout desta
                           const conflictingRental = rentals.find((r) => {
@@ -430,12 +433,12 @@ export default function Rentals() {
                             // Reserva que termina: ocupa metade esquerda
                             if (rental.id < conflictingRental.id) {
                               // Ajustar width para ocupar apenas metade do último dia (menos o gap)
-                              width = (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
+                              width = `calc(${(daySpan - 1) * cellWidthPercent}% + ${(daySpan - 2) * gapRem}rem + ${cellWidthPercent / 2}% - ${gapBetweenBars}rem)`;
                             } else {
                               // Reserva que começa: ocupa metade direita
                               // Calcular left para começar na metade direita do dia de checkout (com gap)
-                              left = segmentStart * (cellWidth + gapPercentage) + (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2 + gapBetweenBars / 2;
-                              width = (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
+                              left = `calc(${segmentStart * cellWidthPercent}% + ${(daySpan - 1) * cellWidthPercent}% + ${(daySpan - 2) * gapRem}rem + ${cellWidthPercent / 2}% + ${gapBetweenBars}rem)`;
+                              width = `calc(${cellWidthPercent / 2}% - ${gapBetweenBars}rem)`;
                             }
                           }
 
