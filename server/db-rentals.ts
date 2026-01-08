@@ -3,12 +3,32 @@ import { rentals, rentalConfigs, rentalSyncLogs, Rental, RentalConfig, RentalSyn
 import { eq, and } from "drizzle-orm";
 
 /**
+ * Converter timestamp para string ISO
+ */
+function convertRentalDatesToISO(rental: any): any {
+  return {
+    ...rental,
+    startDate: rental.startDate instanceof Date 
+      ? rental.startDate.toISOString().split('T')[0] 
+      : typeof rental.startDate === 'string' 
+        ? rental.startDate.split('T')[0]
+        : rental.startDate,
+    endDate: rental.endDate instanceof Date 
+      ? rental.endDate.toISOString().split('T')[0] 
+      : typeof rental.endDate === 'string' 
+        ? rental.endDate.split('T')[0]
+        : rental.endDate,
+  };
+}
+
+/**
  * Obter reservas por entidade
  */
 export async function getRentalsByEntityId(entityId: number): Promise<Rental[]> {
   const db = await getDb();
   if (!db) return [];
-  return await db.select().from(rentals).where(eq(rentals.entityId, entityId));
+  const results = await db.select().from(rentals).where(eq(rentals.entityId, entityId));
+  return results.map(convertRentalDatesToISO);
 }
 
 /**
@@ -18,7 +38,7 @@ export async function getRentalById(id: number): Promise<Rental | undefined> {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(rentals).where(eq(rentals.id, id));
-  return result[0];
+  return result[0] ? convertRentalDatesToISO(result[0]) : undefined;
 }
 
 /**
@@ -69,8 +89,8 @@ export async function createRental(data: {
   const result = await db.insert(rentals).values({
     entityId: data.entityId,
     userId: data.userId,
-    startDate: parseDate(data.startDate),
-    endDate: parseDate(data.endDate),
+    startDate: new Date(parseDate(data.startDate)),
+    endDate: new Date(parseDate(data.endDate)),
     source: data.source,
     status: data.source === "BLOCKED" ? "BLOCKED" : `RESERVED_${data.source}`,
     guestName: data.guestName,
@@ -84,7 +104,7 @@ export async function createRental(data: {
     specialRequests: data.specialRequests,
   }).returning();
   
-  return result[0];
+  return convertRentalDatesToISO(result[0]);
 }
 
 /**
@@ -135,8 +155,8 @@ export async function updateRental(
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
   
-  if (data.startDate) updateData.startDate = parseDate(data.startDate);
-  if (data.endDate) updateData.endDate = parseDate(data.endDate);
+  if (data.startDate) updateData.startDate = new Date(parseDate(data.startDate));
+  if (data.endDate) updateData.endDate = new Date(parseDate(data.endDate));
   if (data.source) {
     updateData.source = data.source;
     updateData.status = data.source === "BLOCKED" ? "BLOCKED" : `RESERVED_${data.source}`;
@@ -154,7 +174,7 @@ export async function updateRental(
   updateData.updatedAt = new Date();
   
   const result = await db.update(rentals).set(updateData).where(eq(rentals.id, id)).returning();
-  return result[0];
+  return convertRentalDatesToISO(result[0]);
 }
 
 /**
@@ -196,7 +216,7 @@ export async function createRentalConfig(data: {
     defaultCheckOutTime: data.defaultCheckOutTime || "11:00",
   }).returning();
   
-  return result[0];
+  return result[0] ? convertRentalDatesToISO(result[0]) : result[0];
 }
 
 /**
@@ -228,7 +248,7 @@ export async function updateRentalConfig(
   if (data.airbnbWebhookSecret !== undefined) updateData.airbnbWebhookSecret = data.airbnbWebhookSecret;
   
   const result = await db.update(rentalConfigs).set(updateData).where(eq(rentalConfigs.entityId, entityId)).returning();
-  return result[0];
+  return result[0] ? convertRentalDatesToISO(result[0]) : result[0];
 }
 
 /**
