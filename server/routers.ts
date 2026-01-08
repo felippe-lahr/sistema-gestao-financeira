@@ -1421,12 +1421,16 @@ export const appRouter = router({
           guestName: z.string().optional(),
           guestEmail: z.string().optional(),
           guestPhone: z.string().optional(),
+          numberOfGuests: z.number().optional(),
           dailyRate: z.number().optional(),
           totalAmount: z.number().optional(),
+          extraFeeType: z.string().optional(),
+          extraFeeAmount: z.number().optional(),
           checkInTime: z.string().optional(),
           checkOutTime: z.string().optional(),
           notes: z.string().optional(),
           specialRequests: z.string().optional(),
+          competencyDate: z.enum(["CHECK_IN", "CHECK_OUT"]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -1451,12 +1455,16 @@ export const appRouter = router({
           guestName: z.string().optional(),
           guestEmail: z.string().optional(),
           guestPhone: z.string().optional(),
+          numberOfGuests: z.number().optional(),
           dailyRate: z.number().optional(),
           totalAmount: z.number().optional(),
+          extraFeeType: z.string().optional(),
+          extraFeeAmount: z.number().optional(),
           checkInTime: z.string().optional(),
           checkOutTime: z.string().optional(),
           notes: z.string().optional(),
           specialRequests: z.string().optional(),
+          competencyDate: z.enum(["CHECK_IN", "CHECK_OUT"]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
