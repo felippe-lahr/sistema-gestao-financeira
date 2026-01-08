@@ -538,7 +538,7 @@ export default function Rentals() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                    {Array.from({ length: 8 }, (_, i) => i + 1).map((num) => (
                       <SelectItem key={num} value={num.toString()}>
                         {num} hóspede{num > 1 ? "s" : ""}
                       </SelectItem>
@@ -570,19 +570,27 @@ export default function Rentals() {
               <div>
                 <Label>Diária (R$)</Label>
                 <Input
-                  type="number"
-                  value={formData.dailyRate}
-                  onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || 0 })}
-                  placeholder="0,00"
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate) : ''}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9,]/g, '').replace(',', '.');
+                    setFormData({ ...formData, dailyRate: parseFloat(value) || 0 });
+                  }}
+                  placeholder="R$ 0,00"
                 />
               </div>
               <div>
                 <Label>Total (R$)</Label>
                 <Input
-                  type="number"
-                  value={formData.totalAmount}
-                  onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
-                  placeholder="0,00"
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount) : ''}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9,]/g, '').replace(',', '.');
+                    setFormData({ ...formData, totalAmount: parseFloat(value) || 0 });
+                  }}
+                  placeholder="R$ 0,00"
                 />
               </div>
             </div>
@@ -635,16 +643,28 @@ export default function Rentals() {
             <div>
               <Label>Data de Competência</Label>
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="competency"
-                  checked={formData.competencyDate === "CHECK_OUT"}
-                  onChange={(e) => setFormData({ ...formData, competencyDate: e.target.checked ? "CHECK_OUT" : "CHECK_IN" })}
-                  className="rounded"
-                />
-                <label htmlFor="competency" className="text-sm">
-                  {formData.competencyDate === "CHECK_IN" ? "Check-in" : "Check-out"}
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, competencyDate: "CHECK_IN" })}
+                  className={`px-4 py-2 rounded-l-md border transition-colors ${
+                    formData.competencyDate === "CHECK_IN"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  Check-in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, competencyDate: "CHECK_OUT" })}
+                  className={`px-4 py-2 rounded-r-md border-t border-b border-r transition-colors ${
+                    formData.competencyDate === "CHECK_OUT"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  Check-out
+                </button>
               </div>
             </div>
 
@@ -724,7 +744,7 @@ export default function Rentals() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                    {Array.from({ length: 8 }, (_, i) => i + 1).map((num) => (
                       <SelectItem key={num} value={num.toString()}>
                         {num} hóspede{num > 1 ? "s" : ""}
                       </SelectItem>
@@ -756,19 +776,27 @@ export default function Rentals() {
               <div>
                 <Label>Diária (R$)</Label>
                 <Input
-                  type="number"
-                  value={formData.dailyRate}
-                  onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || 0 })}
-                  placeholder="0,00"
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate) : ''}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9,]/g, '').replace(',', '.');
+                    setFormData({ ...formData, dailyRate: parseFloat(value) || 0 });
+                  }}
+                  placeholder="R$ 0,00"
                 />
               </div>
               <div>
                 <Label>Total (R$)</Label>
                 <Input
-                  type="number"
-                  value={formData.totalAmount}
-                  onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
-                  placeholder="0,00"
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount) : ''}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9,]/g, '').replace(',', '.');
+                    setFormData({ ...formData, totalAmount: parseFloat(value) || 0 });
+                  }}
+                  placeholder="R$ 0,00"
                 />
               </div>
             </div>
