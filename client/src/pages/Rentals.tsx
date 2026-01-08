@@ -340,58 +340,104 @@ export default function Rentals() {
                     {/* Barras de reservas sobrepostas */}
                     <div className="absolute inset-0 pointer-events-none">
                       <div className="grid grid-cols-7 gap-1 h-full">
-                        {rentalsInWeek.map((rental, rentalIndex) => {
-                          const daySpan = getRentalDaySpan(rental, week);
-                          if (daySpan === 0) return null;
-
-                          // Calcular a posição left (em %)
+                        {rentals.map((rental, rentalIndex) => {
                           const start = new Date(rental.startDate);
                           start.setHours(0, 0, 0, 0);
-                          let startDayIndex = 0;
+                          const end = new Date(rental.endDate);
+                          end.setHours(0, 0, 0, 0);
+
+                          // Verificar se a reserva intersecta com esta semana
+                          const weekStart = new Date(week[0]);
+                          weekStart.setHours(0, 0, 0, 0);
+                          const weekEnd = new Date(week[6]);
+                          weekEnd.setHours(23, 59, 59, 999);
+
+                          if (end.getTime() < weekStart.getTime() || start.getTime() > weekEnd.getTime()) {
+                            return null; // Reserva não intersecta com esta semana
+                          }
+
+                          // Calcular o índice de início e fim dentro desta semana
+                          let segmentStart = 0;
+                          let segmentEnd = 6;
+                          let isSegmentStart = false;
+                          let isSegmentEnd = false;
+
+                          // Encontrar o índice de início
                           week.forEach((day, idx) => {
                             const dayNormalized = new Date(day);
                             dayNormalized.setHours(0, 0, 0, 0);
                             if (dayNormalized.getTime() === start.getTime()) {
-                              startDayIndex = idx;
+                              segmentStart = idx;
+                              isSegmentStart = true;
                             }
                           });
 
+                          // Encontrar o índice de fim
+                          week.forEach((day, idx) => {
+                            const dayNormalized = new Date(day);
+                            dayNormalized.setHours(0, 0, 0, 0);
+                            if (dayNormalized.getTime() === end.getTime()) {
+                              segmentEnd = idx;
+                              isSegmentEnd = true;
+                            }
+                          });
+
+                          // Se a reserva começou antes desta semana
+                          if (!isSegmentStart && start.getTime() < weekStart.getTime()) {
+                            segmentStart = 0;
+                          }
+
+                          // Se a reserva termina depois desta semana
+                          if (!isSegmentEnd && end.getTime() > weekEnd.getTime()) {
+                            segmentEnd = 6;
+                          }
+
+                          // Calcular span e posição
+                          const daySpan = segmentEnd - segmentStart + 1;
+                          const cellWidth = 100 / 7;
+                          const gapPercentage = 0.5;
+                          let left = segmentStart * (cellWidth + gapPercentage);
+                          let width = daySpan * cellWidth + (daySpan - 1) * gapPercentage;
+
                           // Detectar conflito: outra reserva começa no dia de checkout desta
-                          const rentalEnd = new Date(rental.endDate);
-                          rentalEnd.setHours(0, 0, 0, 0);
-                          const conflictingRental = rentalsInWeek.find((r) => {
+                          const conflictingRental = rentals.find((r) => {
                             if (r.id === rental.id) return false;
                             const rStart = new Date(r.startDate);
                             rStart.setHours(0, 0, 0, 0);
-                            return rStart.getTime() === rentalEnd.getTime();
+                            return rStart.getTime() === end.getTime();
                           });
 
-                          // Se há conflito, usar top/bottom para posicionar lado a lado
-                          let topStyle = "50%";
-                          let transformStyle = "translateY(-50%)";
-                          if (conflictingRental) {
-                            topStyle = rental.id < conflictingRental.id ? "25%" : "75%";
-                            transformStyle = "translateY(-50%)";
+                          // Se há conflito no dia de checkout
+                          if (conflictingRental && isSegmentEnd) {
+                            // Reserva que termina: ocupa metade esquerda
+                            if (rental.id < conflictingRental.id) {
+                              width = (cellWidth + gapPercentage) / 2;
+                            } else {
+                              // Reserva que começa: ocupa metade direita
+                              left = segmentStart * (cellWidth + gapPercentage) + (cellWidth + gapPercentage) / 2;
+                              width = (cellWidth + gapPercentage) / 2;
+                            }
                           }
 
-                          // Calcular left e width em porcentagem
-                          // Cada célula tem 1/7 de largura + gap entre elas
-                          // gap-1 no Tailwind = 0.25rem = 4px (aproximadamente)
-                          const cellWidth = 100 / 7; // ~14.28%
-                          const gapPercentage = 0.5; // Aproximadamente 0.5% por gap
-                          const left = startDayIndex * (cellWidth + gapPercentage);
-                          const width = daySpan * cellWidth + (daySpan - 1) * gapPercentage;
+                          // Bordas arredondadas apenas nas extremidades
+                          let borderRadius = "0px";
+                          if (isSegmentStart && isSegmentEnd) {
+                            borderRadius = "6px"; // Ambas as extremidades
+                          } else if (isSegmentStart) {
+                            borderRadius = "6px 0px 0px 6px"; // Apenas início
+                          } else if (isSegmentEnd) {
+                            borderRadius = "0px 6px 6px 0px"; // Apenas fim
+                          }
 
                           return (
                             <button
-                              key={`${rental.id}-bar-${rentalIndex}`}
+                              key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`}
                               onClick={() => handleEdit(rental)}
-                              className={`absolute text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto ${getSourceColor(rental.source)}`}
+                              className={`absolute text-xs font-semibold text-white px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 ${getSourceColor(rental.source)}`}
                               style={{
                                 left: `${left}%`,
                                 width: `${width}%`,
-                                top: topStyle,
-                                transform: transformStyle,
+                                borderRadius: borderRadius,
                               }}
                               title={rental.guestName || getSourceLabel(rental.source)}
                             >
