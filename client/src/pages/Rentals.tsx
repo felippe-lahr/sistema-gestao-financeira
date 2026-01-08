@@ -411,11 +411,13 @@ export default function Rentals() {
                           if (conflictingRental && isSegmentEnd) {
                             // Reserva que termina: ocupa metade esquerda
                             if (rental.id < conflictingRental.id) {
+                              // Ajustar width para ocupar apenas metade
                               width = (cellWidth + gapPercentage) / 2;
                             } else {
                               // Reserva que começa: ocupa metade direita
+                              // Calcular left para começar na metade direita do dia de checkout
                               left = segmentStart * (cellWidth + gapPercentage) + (cellWidth + gapPercentage) / 2;
-                              width = (cellWidth + gapPercentage) / 2;
+                              width = (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2;
                             }
                           }
 
