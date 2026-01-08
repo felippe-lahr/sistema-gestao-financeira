@@ -356,25 +356,6 @@ export default function Rentals() {
                             }
                           });
 
-                          // Detectar se há outra reserva que começa no dia de checkout desta
-                          const rentalEnd = new Date(rental.endDate);
-                          rentalEnd.setHours(0, 0, 0, 0);
-                          const conflictingRentals = rentalsInWeek.filter((r) => {
-                            if (r.id === rental.id) return false;
-                            const rStart = new Date(r.startDate);
-                            rStart.setHours(0, 0, 0, 0);
-                            return rStart.getTime() === rentalEnd.getTime();
-                          });
-
-                          // Se há conflito, posicionar lado a lado (50% cada)
-                          let topOffset = 0;
-                          let heightClass = "h-full";
-                          if (conflictingRentals.length > 0) {
-                            const shouldBeTop = rental.id < conflictingRentals[0].id;
-                            topOffset = shouldBeTop ? 0 : 50;
-                            heightClass = "h-1/2";
-                          }
-
                           // Calcular left e width em porcentagem
                           // Cada célula tem 1/7 de largura + gap entre elas
                           // gap-1 no Tailwind = 0.25rem = 4px (aproximadamente)
@@ -387,11 +368,10 @@ export default function Rentals() {
                             <button
                               key={`${rental.id}-bar-${rentalIndex}`}
                               onClick={() => handleEdit(rental)}
-                              className={`absolute text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto ${heightClass} ${getSourceColor(rental.source)}`}
+                              className={`absolute text-xs font-semibold text-white rounded px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 ${getSourceColor(rental.source)}`}
                               style={{
                                 left: `${left}%`,
                                 width: `${width}%`,
-                                top: `${topOffset}%`,
                               }}
                               title={rental.guestName || getSourceLabel(rental.source)}
                             >
