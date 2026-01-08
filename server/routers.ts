@@ -66,6 +66,7 @@ export const appRouter = router({
           name: z.string().min(1).max(255).optional(),
           description: z.string().optional(),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+          temporaryRentalEnabled: z.boolean().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -77,6 +78,7 @@ export const appRouter = router({
           name: input.name,
           description: input.description,
           color: input.color,
+          temporaryRentalEnabled: input.temporaryRentalEnabled,
         });
         return { success: true };
       }),
