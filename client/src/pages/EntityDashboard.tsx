@@ -421,12 +421,12 @@ export default function EntityDashboard() {
       </div>
 
       {/* Filtros - Desktop: Seção com destaque */}
-      <div className="hidden md:block bg-blue-50 border border-blue-100 rounded-lg p-4">
+      <div className="hidden md:block bg-muted rounded-lg p-4">
         <div className="flex gap-3 items-center flex-wrap">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Período:</span>
             <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px] bg-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

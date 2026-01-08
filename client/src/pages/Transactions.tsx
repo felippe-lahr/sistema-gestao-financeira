@@ -751,12 +751,10 @@ export default function Transactions() {
                   setFilterStartDate("");
                   setFilterEndDate("");
                   setSearchTerm("");
+                  setIsFilterDrawerOpen(false);
                 }}
               >
                 Limpar Filtros
-              </Button>
-              <Button onClick={() => setIsFilterDrawerOpen(false)}>
-                Aplicar
               </Button>
             </DrawerFooter>
           </DrawerContent>
@@ -772,13 +770,13 @@ export default function Transactions() {
       </div>
 
       {/* Desktop: Filtros em seção com destaque */}
-      <div className="hidden md:block bg-blue-50 border border-blue-100 rounded-lg p-4">
+      <div className="hidden md:block bg-muted rounded-lg p-4">
         <div className="flex gap-3 items-center flex-wrap">
         {/* Entidade */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Entidade:</span>
           <Select value={selectedEntityId?.toString() || ""} onValueChange={(v) => setSelectedEntityId(parseInt(v))}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[200px] bg-white">
               <SelectValue placeholder="Selecione" />
             </SelectTrigger>
             <SelectContent>
@@ -795,7 +793,7 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Período:</span>
           <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] bg-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -811,7 +809,7 @@ export default function Transactions() {
         {filterPeriod === "month" && (
           <>
             <Select value={filterMonth.toString()} onValueChange={(v) => setFilterMonth(parseInt(v))}>
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-[120px] bg-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -841,7 +839,7 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Categoria:</span>
           <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[150px] bg-white">
               <SelectValue placeholder="Todas" />
             </SelectTrigger>
             <SelectContent>
@@ -859,7 +857,7 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Status:</span>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[130px]">
+            <SelectTrigger className="w-[130px] bg-white">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -971,7 +969,14 @@ export default function Transactions() {
                               <ArrowDownRight className="h-4 w-4 text-red-600" />
                             )}
                           </div>
-                          <h3 className="font-semibold text-base">{transaction.description}</h3>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-base">{transaction.description}</h3>
+                              {transaction.attachmentCount > 0 && (
+                                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleEdit(transaction)}>
                           <Edit2 className="h-4 w-4" />
