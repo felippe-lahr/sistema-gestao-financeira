@@ -306,26 +306,38 @@ export default function Rentals() {
               </div>
 
               {/* Grid do calendário */}
-              {weeks.map((week, weekIndex) => (
+              {weeks.map((week, weekIndex) => {
+                // Obter reservas únicas que começam nesta semana (usando Set para evitar duplicatas)
+                const rentalsInWeek = [];
+                const seenIds = new Set();
+                
+                rentals.forEach((rental) => {
+                  if (seenIds.has(rental.id)) return;
+                  
+                  const start = new Date(rental.startDate);
+                  start.setHours(0, 0, 0, 0);
+                  
+                  const startsThisWeek = week.some((day) => {
+                    const dayNormalized = new Date(day);
+                    dayNormalized.setHours(0, 0, 0, 0);
+                    return dayNormalized.getTime() === start.getTime();
+                  });
+                  
+                  if (startsThisWeek) {
+                    rentalsInWeek.push(rental);
+                    seenIds.add(rental.id);
+                  }
+                });
+                
+                return (
                 <div key={weekIndex} className="relative">
                   {/* Renderizar barras de reservas */}
                   <div className="space-y-1 mb-1 pl-1">
-                    {rentals
-                      .filter((rental) => {
-                        // Filtrar apenas reservas que começam nesta semana
-                        const start = new Date(rental.startDate);
-                        start.setHours(0, 0, 0, 0);
-                        return week.some((day) => {
-                          const dayNormalized = new Date(day);
-                          dayNormalized.setHours(0, 0, 0, 0);
-                          return dayNormalized.getTime() === start.getTime();
-                        });
-                      })
-                      .map((rental) => {
-                        const daySpan = getRentalDaySpan(rental, week);
-                        if (daySpan === 0) return null;
+                    {rentalsInWeek.map((rental) => {
+                      const daySpan = getRentalDaySpan(rental, week);
+                      if (daySpan === 0) return null;
 
-                        return (
+                      return (
                           <button
                             key={`${rental.id}-bar`}
                             onClick={() => handleEdit(rental)}
@@ -337,8 +349,8 @@ export default function Rentals() {
                           >
                             {rental.guestName || getSourceLabel(rental.source)}
                           </button>
-                        );
-                      })}
+                      );
+                    })}
                   </div>
 
                   {/* Células do calendário */}
@@ -355,10 +367,11 @@ export default function Rentals() {
                           <div className="text-sm font-semibold">{format(day, "d")}</div>
                         </div>
                       );
-                    })}
+                    })
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </CardContent>
