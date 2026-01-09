@@ -3,12 +3,13 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, Trash2, CreditCard, Building2, Tag } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, Building2, Tag, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -235,81 +236,84 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
         <p className="text-sm text-muted-foreground">
           {accounts?.length || 0} conta(s) cadastrada(s)
         </p>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova Conta
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Nova Conta Corrente</DialogTitle>
-              <DialogDescription>Adicione uma nova conta bancária</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome da Conta *</Label>
-                <Input
-                  id="name"
-                  placeholder="Ex: Conta Corrente Principal"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
+          <Plus className="mr-2 h-4 w-4" />
+          Nova Conta
+        </Button>
+
+        <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+            <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+              <SheetTitle className="text-2xl font-bold">Nova Conta Corrente</SheetTitle>
+              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="bank">Banco</Label>
+                  <Label htmlFor="name">Nome da Conta *</Label>
                   <Input
-                    id="bank"
-                    placeholder="Ex: Banco do Brasil"
-                    value={formData.bank}
-                    onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                    id="name"
+                    placeholder="Ex: Conta Corrente Principal"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="accountNumber">Número da Conta</Label>
-                  <Input
-                    id="accountNumber"
-                    placeholder="Ex: 12345-6"
-                    value={formData.accountNumber}
-                    onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bank">Banco</Label>
+                    <Input
+                      id="bank"
+                      placeholder="Ex: Banco do Brasil"
+                      value={formData.bank}
+                      onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="accountNumber">Número da Conta</Label>
+                    <Input
+                      id="accountNumber"
+                      placeholder="Ex: 12345-6"
+                      value={formData.accountNumber}
+                      onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="balance">Saldo Inicial</Label>
-                  <Input
-                    id="balance"
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={formData.balance}
-                    onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="color">Cor</Label>
-                  <Input
-                    id="color"
-                    type="color"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="balance">Saldo Inicial</Label>
+                    <Input
+                      id="balance"
+                      type="number"
+                      step="0.01"
+                      placeholder="0,00"
+                      value={formData.balance}
+                      onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="color">Cor</Label>
+                    <Input
+                      id="color"
+                      type="color"
+                      value={formData.color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending}>
+              <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
                 {createMutation.isPending ? "Criando..." : "Criar Conta"}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {!accounts || accounts.length === 0 ? (
@@ -367,76 +371,80 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
         </div>
       )}
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Conta Corrente</DialogTitle>
-            <DialogDescription>Atualize as informações da conta</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Nome da Conta *</Label>
-              <Input
-                id="edit-name"
-                placeholder="Ex: Conta Corrente Principal"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+      {/* Edit Sheet */}
+      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+            <SheetTitle className="text-2xl font-bold">Editar Conta Corrente</SheetTitle>
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-bank">Banco</Label>
+                <Label htmlFor="edit-name">Nome da Conta *</Label>
                 <Input
-                  id="edit-bank"
-                  placeholder="Ex: Banco do Brasil"
-                  value={formData.bank}
-                  onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                  id="edit-name"
+                  placeholder="Ex: Conta Corrente Principal"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-accountNumber">Número da Conta</Label>
-                <Input
-                  id="edit-accountNumber"
-                  placeholder="Ex: 12345-6"
-                  value={formData.accountNumber}
-                  onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-bank">Banco</Label>
+                  <Input
+                    id="edit-bank"
+                    placeholder="Ex: Banco do Brasil"
+                    value={formData.bank}
+                    onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-accountNumber">Número da Conta</Label>
+                  <Input
+                    id="edit-accountNumber"
+                    placeholder="Ex: 12345-6"
+                    value={formData.accountNumber}
+                    onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-balance">Saldo</Label>
-                <Input
-                  id="edit-balance"
-                  type="number"
-                  step="0.01"
-                  placeholder="0,00"
-                  value={formData.balance}
-                  onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-color">Cor</Label>
-                <Input
-                  id="edit-color"
-                  type="color"
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-balance">Saldo</Label>
+                  <Input
+                    id="edit-balance"
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={formData.balance}
+                    onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-color">Cor</Label>
+                  <Input
+                    id="edit-color"
+                    type="color"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
               {updateMutation.isPending ? "Atualizando..." : "Atualizar"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
@@ -569,78 +577,81 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
         <p className="text-sm text-muted-foreground">
           {methods?.length || 0} meio(s) de pagamento cadastrado(s)
         </p>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Meio de Pagamento
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Novo Meio de Pagamento</DialogTitle>
-              <DialogDescription>Adicione um novo meio de pagamento</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome *</Label>
-                <Input
-                  id="name"
-                  placeholder="Ex: Cartão Itaú, Pix Bradesco"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="transactionType">Usar para *</Label>
-                <Select value={formData.transactionType} onValueChange={(value: any) => setFormData({ ...formData, transactionType: value })}>
-                  <SelectTrigger id="transactionType">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EXPENSE">Despesas (meios que você paga)</SelectItem>
-                    <SelectItem value="INCOME">Receitas (meios que recebe)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
+          <Plus className="mr-2 h-4 w-4" />
+          Novo Meio de Pagamento
+        </Button>
+
+        <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+            <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+              <SheetTitle className="text-2xl font-bold">Novo Meio de Pagamento</SheetTitle>
+              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="type">Tipo *</Label>
-                  <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                    <SelectTrigger id="type">
+                  <Label htmlFor="name">Nome *</Label>
+                  <Input
+                    id="name"
+                    placeholder="Ex: Cartão Itaú, Pix Bradesco"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="transactionType">Usar para *</Label>
+                  <Select value={formData.transactionType} onValueChange={(value: any) => setFormData({ ...formData, transactionType: value })}>
+                    <SelectTrigger id="transactionType">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
-                      <SelectItem value="DEBIT_CARD">Cartão de Débito</SelectItem>
-                      <SelectItem value="PIX">PIX</SelectItem>
-                      <SelectItem value="CASH">Dinheiro</SelectItem>
-                      <SelectItem value="BANK_TRANSFER">Transferência Bancária</SelectItem>
-                      <SelectItem value="OTHER">Outro</SelectItem>
+                      <SelectItem value="EXPENSE">Despesas (meios que você paga)</SelectItem>
+                      <SelectItem value="INCOME">Receitas (meios que recebe)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="color">Cor</Label>
-                  <Input
-                    id="color"
-                    type="color"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Tipo *</Label>
+                    <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
+                      <SelectTrigger id="type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                        <SelectItem value="DEBIT_CARD">Cartão de Débito</SelectItem>
+                        <SelectItem value="PIX">PIX</SelectItem>
+                        <SelectItem value="CASH">Dinheiro</SelectItem>
+                        <SelectItem value="BANK_TRANSFER">Transferência Bancária</SelectItem>
+                        <SelectItem value="OTHER">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="color">Cor</Label>
+                    <Input
+                      id="color"
+                      type="color"
+                      value={formData.color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending}>
+              <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
                 {createMutation.isPending ? "Criando..." : "Criar"}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {!methods || methods.length === 0 ? (
@@ -689,73 +700,77 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
         </div>
       )}
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Meio de Pagamento</DialogTitle>
-            <DialogDescription>Atualize as informações do meio de pagamento</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Nome *</Label>
-              <Input
-                id="edit-name"
-                placeholder="Ex: Cartão Itaú"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-transactionType">Usar para *</Label>
-              <Select value={formData.transactionType} onValueChange={(value: any) => setFormData({ ...formData, transactionType: value })}>
-                <SelectTrigger id="edit-transactionType">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EXPENSE">Despesas (meios que você paga)</SelectItem>
-                  <SelectItem value="INCOME">Receitas (meios que recebe)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+      {/* Edit Sheet */}
+      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+            <SheetTitle className="text-2xl font-bold">Editar Meio de Pagamento</SheetTitle>
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-type">Tipo</Label>
-                <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                  <SelectTrigger id="edit-type">
+                <Label htmlFor="edit-name">Nome *</Label>
+                <Input
+                  id="edit-name"
+                  placeholder="Ex: Cartão Itaú"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-transactionType">Usar para *</Label>
+                <Select value={formData.transactionType} onValueChange={(value: any) => setFormData({ ...formData, transactionType: value })}>
+                  <SelectTrigger id="edit-transactionType">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
-                    <SelectItem value="DEBIT_CARD">Cartão de Débito</SelectItem>
-                    <SelectItem value="PIX">PIX</SelectItem>
-                    <SelectItem value="CASH">Dinheiro</SelectItem>
-                    <SelectItem value="BANK_TRANSFER">Transferência Bancária</SelectItem>
-                    <SelectItem value="OTHER">Outro</SelectItem>
+                    <SelectItem value="EXPENSE">Despesas (meios que você paga)</SelectItem>
+                    <SelectItem value="INCOME">Receitas (meios que recebe)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-color">Cor</Label>
-                <Input
-                  id="edit-color"
-                  type="color"
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-type">Tipo</Label>
+                  <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
+                    <SelectTrigger id="edit-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                      <SelectItem value="DEBIT_CARD">Cartão de Débito</SelectItem>
+                      <SelectItem value="PIX">PIX</SelectItem>
+                      <SelectItem value="CASH">Dinheiro</SelectItem>
+                      <SelectItem value="BANK_TRANSFER">Transferência Bancária</SelectItem>
+                      <SelectItem value="OTHER">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-color">Cor</Label>
+                  <Input
+                    id="edit-color"
+                    type="color"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
               {updateMutation.isPending ? "Atualizando..." : "Atualizar"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
@@ -873,62 +888,65 @@ function CategoriesTab({ entityId }: { entityId: number }) {
         <p className="text-sm text-muted-foreground">
           {categories?.length || 0} categoria(s) cadastrada(s)
         </p>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova Categoria
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Nova Categoria</DialogTitle>
-              <DialogDescription>Adicione uma nova categoria de receita ou despesa</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome *</Label>
-                <Input
-                  id="name"
-                  placeholder="Ex: Alimentação, Salário"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
+          <Plus className="mr-2 h-4 w-4" />
+          Nova Categoria
+        </Button>
+
+        <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+            <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+              <SheetTitle className="text-2xl font-bold">Nova Categoria</SheetTitle>
+              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="type">Tipo *</Label>
-                  <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                    <SelectTrigger id="type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="INCOME">Receita</SelectItem>
-                      <SelectItem value="EXPENSE">Despesa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="color">Cor</Label>
+                  <Label htmlFor="name">Nome *</Label>
                   <Input
-                    id="color"
-                    type="color"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    id="name"
+                    placeholder="Ex: Alimentação, Salário"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Tipo *</Label>
+                    <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
+                      <SelectTrigger id="type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INCOME">Receita</SelectItem>
+                        <SelectItem value="EXPENSE">Despesa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="color">Cor</Label>
+                    <Input
+                      id="color"
+                      type="color"
+                      value={formData.color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending}>
+              <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
                 {createMutation.isPending ? "Criando..." : "Criar Categoria"}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -1023,49 +1041,53 @@ function CategoriesTab({ entityId }: { entityId: number }) {
         </div>
       </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Categoria</DialogTitle>
-            <DialogDescription>Atualize as informações da categoria</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Nome *</Label>
-              <Input
-                id="edit-name"
-                placeholder="Ex: Alimentação"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-color">Cor</Label>
-              <Input
-                id="edit-color"
-                type="color"
-                value={formData.color}
-                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo (não editável)</Label>
-              <div className="p-2 bg-muted rounded text-sm">
-                {formData.type === "INCOME" ? "Receita" : "Despesa"}
+      {/* Edit Sheet */}
+      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+            <SheetTitle className="text-2xl font-bold">Editar Categoria</SheetTitle>
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Nome *</Label>
+                <Input
+                  id="edit-name"
+                  placeholder="Ex: Alimentação"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-color">Cor</Label>
+                <Input
+                  id="edit-color"
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo (não editável)</Label>
+                <div className="p-2 bg-muted rounded text-sm">
+                  {formData.type === "INCOME" ? "Receita" : "Despesa"}
+                </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
               {updateMutation.isPending ? "Atualizando..." : "Atualizar"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
