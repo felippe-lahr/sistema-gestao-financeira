@@ -650,11 +650,11 @@ export default function Rentals() {
                 <Input
                   type="text"
                   inputMode="decimal"
-                  value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate) : ''}
+                  value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate / 100) : ''}
                   onChange={(e) => {
                     const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
-                    setFormData({ ...formData, dailyRate: floatValue });
+                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                    setFormData({ ...formData, dailyRate: centavos });
                   }}
                   placeholder="R$ 0,00"
                 />
@@ -664,11 +664,11 @@ export default function Rentals() {
                 <Input
                   type="text"
                   inputMode="decimal"
-                  value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount) : ''}
+                  value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount / 100) : ''}
                   onChange={(e) => {
                     const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
-                    setFormData({ ...formData, totalAmount: floatValue });
+                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                    setFormData({ ...formData, totalAmount: centavos });
                   }}
                   placeholder="R$ 0,00"
                 />
@@ -695,11 +695,11 @@ export default function Rentals() {
                 <Input
                   type="text"
                   inputMode="decimal"
-                  value={formData.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.extraFeeAmount) : ''}
+                  value={formData.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.extraFeeAmount / 100) : ''}
                   onChange={(e) => {
                     const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
-                    setFormData({ ...formData, extraFeeAmount: floatValue });
+                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                    setFormData({ ...formData, extraFeeAmount: centavos });
                   }}
                   placeholder="R$ 0,00"
                 />
@@ -943,11 +943,11 @@ export default function Rentals() {
                 <Input
                   type="text"
                   inputMode="decimal"
-                  value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate) : ''}
+                  value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate / 100) : ''}
                   onChange={(e) => {
                     const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
-                    setFormData({ ...formData, dailyRate: floatValue });
+                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                    setFormData({ ...formData, dailyRate: centavos });
                   }}
                   placeholder="R$ 0,00"
                 />
@@ -957,11 +957,11 @@ export default function Rentals() {
                 <Input
                   type="text"
                   inputMode="decimal"
-                  value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount) : ''}
+                  value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount / 100) : ''}
                   onChange={(e) => {
                     const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
-                    setFormData({ ...formData, totalAmount: floatValue });
+                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                    setFormData({ ...formData, totalAmount: centavos });
                   }}
                   placeholder="R$ 0,00"
                 />
@@ -988,11 +988,11 @@ export default function Rentals() {
                 <Input
                   type="text"
                   inputMode="decimal"
-                  value={formData.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.extraFeeAmount) : ''}
+                  value={formData.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.extraFeeAmount / 100) : ''}
                   onChange={(e) => {
                     const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const floatValue = numericValue ? parseFloat(numericValue) / 100 : 0;
-                    setFormData({ ...formData, extraFeeAmount: floatValue });
+                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                    setFormData({ ...formData, extraFeeAmount: centavos });
                   }}
                   placeholder="R$ 0,00"
                 />
