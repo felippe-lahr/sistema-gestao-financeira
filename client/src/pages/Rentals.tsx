@@ -553,7 +553,7 @@ export default function Rentals() {
 
       {/* Dialog de Criar Reserva */}
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[900px] flex flex-col p-0">
+        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[650px] flex flex-col p-0">
           {/* Header Fixo */}
           <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Nova Reserva</SheetTitle>
@@ -796,7 +796,7 @@ export default function Rentals() {
 
       {/* Sheet de Editar Reserva */}
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[900px] flex flex-col p-0">
+        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[650px] flex flex-col p-0">
           {/* Header Fixo */}
           <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Reserva</SheetTitle>
