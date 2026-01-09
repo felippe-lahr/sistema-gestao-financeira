@@ -130,9 +130,6 @@ export default function Rentals() {
     createMutation.mutate({
       entityId: parseInt(entityId),
       ...formData,
-      dailyRate: formData.dailyRate ? Math.round(formData.dailyRate * 100) : undefined,
-      totalAmount: formData.totalAmount ? Math.round(formData.totalAmount * 100) : undefined,
-      extraFeeAmount: formData.extraFeeAmount ? Math.round(formData.extraFeeAmount * 100) : undefined,
     });
   };
 
@@ -141,9 +138,6 @@ export default function Rentals() {
     updateMutation.mutate({
       id: editingRental.id,
       ...formData,
-      dailyRate: formData.dailyRate ? Math.round(formData.dailyRate * 100) : undefined,
-      totalAmount: formData.totalAmount ? Math.round(formData.totalAmount * 100) : undefined,
-      extraFeeAmount: formData.extraFeeAmount ? Math.round(formData.extraFeeAmount * 100) : undefined,
     });
   };
 
