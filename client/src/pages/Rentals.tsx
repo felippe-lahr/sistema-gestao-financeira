@@ -574,7 +574,6 @@ export default function Rentals() {
                 <Input
                   type="date"
                   value={formData.startDate}
-                  min={format(new Date(), "yyyy-MM-dd")}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
@@ -868,7 +867,6 @@ export default function Rentals() {
                 <Input
                   type="date"
                   value={formData.startDate}
-                  min={format(new Date(), "yyyy-MM-dd")}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>

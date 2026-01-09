@@ -101,15 +101,6 @@ export async function createRental(data: {
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
   
-  // Validar que startDate não é uma data passada
-  const startDateParsed = parseDate(data.startDate);
-  const today = new Date();
-  const todayStr = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, '0')}-${String(today.getUTCDate()).padStart(2, '0')}`;
-  
-  if (startDateParsed < todayStr) {
-    throw new Error("Não é permitido criar reservas em datas passadas");
-  }
-  
   const result = await db.insert(rentals).values({
     entityId: data.entityId,
     userId: data.userId,
