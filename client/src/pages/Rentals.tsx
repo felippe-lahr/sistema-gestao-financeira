@@ -5,6 +5,7 @@ import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -551,11 +552,11 @@ export default function Rentals() {
       </Card>
 
       {/* Dialog de Criar Reserva */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nova Reserva</DialogTitle>
-          </DialogHeader>
+      <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <SheetContent side="right" className="w-full sm:w-[600px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Nova Reserva</SheetTitle>
+          </SheetHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -783,15 +784,15 @@ export default function Rentals() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
-      {/* Dialog de Editar Reserva */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Reserva</DialogTitle>
-          </DialogHeader>
+      {/* Sheet de Editar Reserva */}
+      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <SheetContent side="right" className="w-full sm:w-[600px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Editar Reserva</SheetTitle>
+          </SheetHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1020,8 +1021,8 @@ export default function Rentals() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
