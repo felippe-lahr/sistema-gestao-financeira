@@ -179,7 +179,10 @@ export function RentalAttachmentUploader({
                 {/* Dropdown de tipo */}
                 <select
                   value={attachment.type}
-                  onChange={(e) => onUpdateType(attachment.id, e.target.value as AttachmentType)}
+                  onChange={(e) => {
+                    const newType = e.target.value as AttachmentType;
+                    onUpdateType(attachment.id, newType);
+                  }}
                   className="text-sm border rounded px-2 py-1 w-full max-w-xs"
                 >
                   {Object.entries(ATTACHMENT_TYPE_LABELS).map(([value, label]) => (

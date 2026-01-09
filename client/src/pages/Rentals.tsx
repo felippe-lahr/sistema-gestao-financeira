@@ -723,9 +723,9 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <Label className="font-semibold mb-3 block">Data de Competência</Label>
-              <div className="flex items-center gap-3">
+            <div>
+              <Label className="font-semibold block">Data de Competência</Label>
+              <div className="flex items-center gap-3 mt-4">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, competencyDate: "CHECK_IN" })}
