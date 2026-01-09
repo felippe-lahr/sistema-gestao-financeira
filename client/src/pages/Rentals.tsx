@@ -18,6 +18,7 @@ import { ptBR } from "date-fns/locale";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { RentalAttachmentUploader } from "@/components/RentalAttachmentUploader";
+import { uploadFile, deleteFile } from "@/lib/supabase";
 
 type RentalAttachment = {
   id: number;
@@ -377,7 +378,7 @@ export default function Rentals() {
                     </div>
 
                     {/* Barras de reservas sobrepostas */}
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                    <div className="absolute inset-0 pointer-events-none overflow-visible">
                       <div className="grid grid-cols-7 gap-1 h-full">
                         {rentals.map((rental, rentalIndex) => {
                           // Usar strings ISO para evitar problemas de timezone
@@ -555,7 +556,7 @@ export default function Rentals() {
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
           {/* Header Fixo */}
-          <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Nova Reserva</SheetTitle>
             <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
               <X className="h-5 w-5" />
@@ -764,16 +765,66 @@ export default function Rentals() {
                 rentalId={undefined}
                 attachments={rentalAttachments}
                 onUpload={async (file, type) => {
-                  // TODO: Implement upload
-                  console.log("Upload:", file, type);
+                  try {
+                    const blobUrl = await uploadFile(file, 'rental-attachments');
+                    if (editingRental?.id) {
+                      await trpc.rentalAttachments.create.mutate({
+                        rentalId: editingRental.id,
+                        filename: file.name,
+                        blobUrl,
+                        fileSize: file.size,
+                        mimeType: file.type,
+                        type,
+                      });
+                      const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
+                        rentalId: editingRental.id,
+                      });
+                      setRentalAttachments(updatedAttachments || []);
+                      toast.success("Arquivo enviado!");
+                    } else {
+                      const newAttachment = {
+                        id: Date.now(),
+                        filename: file.name,
+                        blobUrl,
+                        fileSize: file.size,
+                        mimeType: file.type,
+                        type,
+                        createdAt: new Date().toISOString(),
+                      };
+                      setRentalAttachments([...rentalAttachments, newAttachment]);
+                      toast.success("Arquivo adicionado!");
+                    }
+                  } catch (error) {
+                    toast.error("Erro ao fazer upload");
+                  }
                 }}
                 onDelete={async (id) => {
-                  // TODO: Implement delete
-                  console.log("Delete:", id);
+                  try {
+                    const attachment = rentalAttachments.find(a => a.id === id);
+                    if (!attachment) return;
+                    await deleteFile(attachment.blobUrl, 'rental-attachments');
+                    if (editingRental?.id) {
+                      await trpc.rentalAttachments.delete.mutate({ id });
+                      const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
+                        rentalId: editingRental.id,
+                      });
+                      setRentalAttachments(updatedAttachments || []);
+                    } else {
+                      setRentalAttachments(rentalAttachments.filter(a => a.id !== id));
+                    }
+                    toast.success("Arquivo deletado!");
+                  } catch (error) {
+                    toast.error("Erro ao deletar arquivo");
+                  }
                 }}
                 onUpdateType={async (id, type) => {
-                  // TODO: Implement update type
-                  console.log("Update type:", id, type);
+                  try {
+                    await trpc.rentalAttachments.updateType.mutate({ id, type });
+                    setRentalAttachments(rentalAttachments.map(a => a.id === id ? { ...a, type } : a));
+                    toast.success("Tipo atualizado!");
+                  } catch (error) {
+                    toast.error("Erro ao atualizar tipo");
+                  }
                 }}
                 onPreview={(attachment) => {
                   window.open(attachment.blobUrl, "_blank");
@@ -783,7 +834,7 @@ export default function Rentals() {
           </div>
 
           {/* Footer Fixo */}
-          <div className="sticky bottom-0 z-10 border-t bg-white px-6 py-4 flex gap-2 justify-end">
+          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
               Cancelar
             </Button>
@@ -798,7 +849,7 @@ export default function Rentals() {
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
           {/* Header Fixo */}
-          <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Reserva</SheetTitle>
             <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
               <X className="h-5 w-5" />
@@ -1005,16 +1056,66 @@ export default function Rentals() {
                 rentalId={undefined}
                 attachments={rentalAttachments}
                 onUpload={async (file, type) => {
-                  // TODO: Implement upload
-                  console.log("Upload:", file, type);
+                  try {
+                    const blobUrl = await uploadFile(file, 'rental-attachments');
+                    if (editingRental?.id) {
+                      await trpc.rentalAttachments.create.mutate({
+                        rentalId: editingRental.id,
+                        filename: file.name,
+                        blobUrl,
+                        fileSize: file.size,
+                        mimeType: file.type,
+                        type,
+                      });
+                      const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
+                        rentalId: editingRental.id,
+                      });
+                      setRentalAttachments(updatedAttachments || []);
+                      toast.success("Arquivo enviado!");
+                    } else {
+                      const newAttachment = {
+                        id: Date.now(),
+                        filename: file.name,
+                        blobUrl,
+                        fileSize: file.size,
+                        mimeType: file.type,
+                        type,
+                        createdAt: new Date().toISOString(),
+                      };
+                      setRentalAttachments([...rentalAttachments, newAttachment]);
+                      toast.success("Arquivo adicionado!");
+                    }
+                  } catch (error) {
+                    toast.error("Erro ao fazer upload");
+                  }
                 }}
                 onDelete={async (id) => {
-                  // TODO: Implement delete
-                  console.log("Delete:", id);
+                  try {
+                    const attachment = rentalAttachments.find(a => a.id === id);
+                    if (!attachment) return;
+                    await deleteFile(attachment.blobUrl, 'rental-attachments');
+                    if (editingRental?.id) {
+                      await trpc.rentalAttachments.delete.mutate({ id });
+                      const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
+                        rentalId: editingRental.id,
+                      });
+                      setRentalAttachments(updatedAttachments || []);
+                    } else {
+                      setRentalAttachments(rentalAttachments.filter(a => a.id !== id));
+                    }
+                    toast.success("Arquivo deletado!");
+                  } catch (error) {
+                    toast.error("Erro ao deletar arquivo");
+                  }
                 }}
                 onUpdateType={async (id, type) => {
-                  // TODO: Implement update type
-                  console.log("Update type:", id, type);
+                  try {
+                    await trpc.rentalAttachments.updateType.mutate({ id, type });
+                    setRentalAttachments(rentalAttachments.map(a => a.id === id ? { ...a, type } : a));
+                    toast.success("Tipo atualizado!");
+                  } catch (error) {
+                    toast.error("Erro ao atualizar tipo");
+                  }
                 }}
                 onPreview={(attachment) => {
                   window.open(attachment.blobUrl, "_blank");
@@ -1024,7 +1125,7 @@ export default function Rentals() {
           </div>
 
           {/* Footer Fixo */}
-          <div className="sticky bottom-0 z-10 border-t bg-white px-6 py-4 flex gap-2 justify-end">
+          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
