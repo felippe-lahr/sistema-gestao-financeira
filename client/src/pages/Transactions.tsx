@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -522,82 +523,99 @@ export default function Transactions() {
             </DialogContent>
           </Dialog>
           
-          <Dialog open={isCreateOpen} onOpenChange={(open) => {
+          <Button className="w-full md:w-auto" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Transação
+          </Button>
+
+          <Sheet open={isCreateOpen} onOpenChange={(open) => {
             setIsCreateOpen(open);
             if (!open) resetForm();
           }}>
-            <DialogTrigger asChild>
-              <Button className="w-full md:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Transação
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Nova Transação</DialogTitle>
-                <DialogDescription>Cadastre uma nova receita ou despesa</DialogDescription>
-              </DialogHeader>
-              <TransactionForm
-                formData={formData}
-                setFormData={setFormData}
-                entities={entities || []}
-                categories={categories || []}
-                bankAccounts={bankAccounts || []}
-                paymentMethods={paymentMethods || []}
-                selectedEntityId={selectedEntityId}
-                setSelectedEntityId={setSelectedEntityId}
-                attachments={attachments}
-                setAttachments={setAttachments}
-                editingTransaction={undefined}
-                utils={utils}
-                setPreviewAttachment={setPreviewAttachment}
-              />
-              <DialogFooter>
+            <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+              {/* Header Fixo */}
+              <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+                <SheetTitle className="text-2xl font-bold">Nova Transação</SheetTitle>
+                <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Conteúdo Scrollável */}
+              <div className="flex-1 overflow-y-auto px-8 py-6">
+                <TransactionForm
+                  formData={formData}
+                  setFormData={setFormData}
+                  entities={entities || []}
+                  categories={categories || []}
+                  bankAccounts={bankAccounts || []}
+                  paymentMethods={paymentMethods || []}
+                  selectedEntityId={selectedEntityId}
+                  setSelectedEntityId={setSelectedEntityId}
+                  attachments={attachments}
+                  setAttachments={setAttachments}
+                  editingTransaction={undefined}
+                  utils={utils}
+                  setPreviewAttachment={setPreviewAttachment}
+                />
+              </div>
+
+              {/* Footer Fixo */}
+              <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending} className="w-full md:w-auto">
+                <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
                   {createMutation.isPending ? "Criando..." : "Criar Transação"}
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Transação</DialogTitle>
-            <DialogDescription>Atualize os dados da transação</DialogDescription>
-          </DialogHeader>
-          <TransactionForm
-            formData={formData}
-            setFormData={setFormData}
-            entities={entities || []}
-            categories={categories || []}
-            bankAccounts={bankAccounts || []}
-            paymentMethods={paymentMethods || []}
-            selectedEntityId={selectedEntityId}
-            setSelectedEntityId={setSelectedEntityId}
-            attachments={attachments}
-            setAttachments={setAttachments}
-            editingTransaction={editingTransaction}
-            isEdit
-            utils={utils}
-            setPreviewAttachment={setPreviewAttachment}
-          />
-          <DialogFooter>
+      {/* Edit Sheet */}
+      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+          {/* Header Fixo */}
+          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+            <SheetTitle className="text-2xl font-bold">Editar Transação</SheetTitle>
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Conteúdo Scrollável */}
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+            <TransactionForm
+              formData={formData}
+              setFormData={setFormData}
+              entities={entities || []}
+              categories={categories || []}
+              bankAccounts={bankAccounts || []}
+              paymentMethods={paymentMethods || []}
+              selectedEntityId={selectedEntityId}
+              setSelectedEntityId={setSelectedEntityId}
+              attachments={attachments}
+              setAttachments={setAttachments}
+              editingTransaction={editingTransaction}
+              isEdit
+              utils={utils}
+              setPreviewAttachment={setPreviewAttachment}
+            />
+          </div>
+
+          {/* Footer Fixo */}
+          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
               {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Filtros */}
       {/* Mobile: Drawer de Filtros */}
