@@ -725,7 +725,7 @@ export default function Rentals() {
 
             <div className="space-y-3">
               <Label className="font-semibold">Data de Competência</Label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 mt-3">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, competencyDate: "CHECK_IN" })}
@@ -795,7 +795,8 @@ export default function Rentals() {
                       toast.success("Arquivo adicionado!");
                     }
                   } catch (error) {
-                    toast.error("Erro ao fazer upload");
+                    console.error("Upload error:", error);
+                    toast.error("Erro ao fazer upload: " + (error instanceof Error ? error.message : String(error)));
                   }
                 }}
                 onDelete={async (id) => {
@@ -1086,7 +1087,8 @@ export default function Rentals() {
                       toast.success("Arquivo adicionado!");
                     }
                   } catch (error) {
-                    toast.error("Erro ao fazer upload");
+                    console.error("Upload error:", error);
+                    toast.error("Erro ao fazer upload: " + (error instanceof Error ? error.message : String(error)));
                   }
                 }}
                 onDelete={async (id) => {
