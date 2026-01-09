@@ -299,7 +299,6 @@ export function registerUploadRoutes(app: Express) {
   });
 
   console.log("[Upload] Routes registered with security enhancements");
-}
 
   // ============================================
   // RENTAL ATTACHMENTS ROUTES
