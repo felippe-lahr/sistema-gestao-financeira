@@ -723,9 +723,9 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <Label className="font-semibold">Data de Competência</Label>
-              <div className="flex items-center gap-3 mt-3">
+            <div className="space-y-4">
+              <Label className="font-semibold mb-3 block">Data de Competência</Label>
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, competencyDate: "CHECK_IN" })}
@@ -766,7 +766,7 @@ export default function Rentals() {
                 attachments={rentalAttachments}
                 onUpload={async (file, type) => {
                   try {
-                    const blobUrl = await uploadFile(file, 'rental-attachments');
+                    const blobUrl = await uploadFile(file, 'attachments');
                     if (editingRental?.id) {
                       await trpc.rentalAttachments.create.mutate({
                         rentalId: editingRental.id,
@@ -803,7 +803,7 @@ export default function Rentals() {
                   try {
                     const attachment = rentalAttachments.find(a => a.id === id);
                     if (!attachment) return;
-                    await deleteFile(attachment.blobUrl, 'rental-attachments');
+                    await deleteFile(attachment.blobUrl, 'attachments');
                     if (editingRental?.id) {
                       await trpc.rentalAttachments.delete.mutate({ id });
                       const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
@@ -1058,7 +1058,7 @@ export default function Rentals() {
                 attachments={rentalAttachments}
                 onUpload={async (file, type) => {
                   try {
-                    const blobUrl = await uploadFile(file, 'rental-attachments');
+                    const blobUrl = await uploadFile(file, 'attachments');
                     if (editingRental?.id) {
                       await trpc.rentalAttachments.create.mutate({
                         rentalId: editingRental.id,
@@ -1095,7 +1095,7 @@ export default function Rentals() {
                   try {
                     const attachment = rentalAttachments.find(a => a.id === id);
                     if (!attachment) return;
-                    await deleteFile(attachment.blobUrl, 'rental-attachments');
+                    await deleteFile(attachment.blobUrl, 'attachments');
                     if (editingRental?.id) {
                       await trpc.rentalAttachments.delete.mutate({ id });
                       const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
