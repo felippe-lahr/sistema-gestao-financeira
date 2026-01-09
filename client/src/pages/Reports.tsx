@@ -21,7 +21,7 @@ export function Reports() {
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [exportFormat, setExportFormat] = useState("pdf");
 
-  const { data: rentals, isLoading: rentalsLoading } = trpc.rentals.listByEntity.useQuery(
+  const { data: rentals, isLoading: rentalsLoading } = trpc.rentals.list.useQuery(
     { entityId: parseInt(entityId) },
     { enabled: !!entityId }
   );
