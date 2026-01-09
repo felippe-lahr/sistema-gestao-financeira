@@ -553,11 +553,17 @@ export default function Rentals() {
 
       {/* Dialog de Criar Reserva */}
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <SheetContent side="right" className="w-full sm:w-[600px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Nova Reserva</SheetTitle>
-          </SheetHeader>
-          <div className="space-y-4">
+        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[900px] flex flex-col p-0">
+          {/* Header Fixo */}
+          <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
+            <SheetTitle className="text-2xl font-bold">Nova Reserva</SheetTitle>
+            <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Conteúdo Scrollável */}
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Data de Início *</Label>
@@ -774,26 +780,33 @@ export default function Rentals() {
                 }}
               />
             </div>
+          </div>
 
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
-                Criar Reserva
-              </Button>
-            </div>
+          {/* Footer Fixo */}
+          <div className="sticky bottom-0 z-10 border-t bg-white px-6 py-4 flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
+              Criar Reserva
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
 
       {/* Sheet de Editar Reserva */}
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <SheetContent side="right" className="w-full sm:w-[600px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Editar Reserva</SheetTitle>
-          </SheetHeader>
-          <div className="space-y-4">
+        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[900px] flex flex-col p-0">
+          {/* Header Fixo */}
+          <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
+            <SheetTitle className="text-2xl font-bold">Editar Reserva</SheetTitle>
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Conteúdo Scrollável */}
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Data de Início *</Label>
@@ -1008,18 +1021,19 @@ export default function Rentals() {
                 }}
               />
             </div>
+          </div>
 
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                Cancelar
-              </Button>
-              <Button variant="destructive" onClick={handleDelete}>
-                Deletar
-              </Button>
-              <Button onClick={handleUpdate} className="bg-blue-600 hover:bg-blue-700">
-                Salvar Alterações
-              </Button>
-            </div>
+          {/* Footer Fixo */}
+          <div className="sticky bottom-0 z-10 border-t bg-white px-6 py-4 flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Deletar
+            </Button>
+            <Button onClick={handleUpdate} className="bg-blue-600 hover:bg-blue-700">
+              Salvar Alterações
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
