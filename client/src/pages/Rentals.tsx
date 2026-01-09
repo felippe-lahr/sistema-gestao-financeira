@@ -455,38 +455,40 @@ export default function Rentals() {
                           const daySpan = segmentEnd - segmentStart + 1;
                           const cellWidth = 100 / 7; // ~14.2857%
                           
-                          // Cálculo simplificado: cada célula ocupa exatamente cellWidth%
-                          // A barra começa no início da célula e termina no fim da última célula
+                          // Gap entre reservas consecutivas (checkout de uma / checkin de outra)
+                          const gapBetweenReservations = 0.4; // espaço entre barras em %
+                          
                           let left = segmentStart * cellWidth;
                           let width = daySpan * cellWidth;
-                          
-                          // Margem interna para não encostar nas bordas
-                          const margin = 0.3; // pequena margem em %
                           
                           // Aplicar divisão horizontal 50%/50% no check-in e checkout
                           if (isSegmentStart && isSegmentEnd) {
                             // Reserva que começa E termina nesta semana
                             if (daySpan === 1) {
-                              // Um único dia: ocupa a célula inteira com margem
-                              left = segmentStart * cellWidth + margin;
-                              width = cellWidth - margin * 2;
+                              // Um único dia: ocupa a célula inteira
+                              left = segmentStart * cellWidth;
+                              width = cellWidth;
                             } else {
-                              // Mais de um dia: 50% no primeiro dia, 50% no último dia
-                              left = segmentStart * cellWidth + cellWidth / 2;
-                              width = (daySpan - 1) * cellWidth;
+                              // Mais de um dia: 50% no primeiro dia (direita), 50% no último dia (esquerda)
+                              // Começa no meio do primeiro dia + gap
+                              left = segmentStart * cellWidth + cellWidth / 2 + gapBetweenReservations;
+                              // Termina no meio do último dia - gap
+                              width = (daySpan - 1) * cellWidth - gapBetweenReservations * 2;
                             }
                           } else if (isSegmentStart && !isSegmentEnd) {
-                            // Reserva que começa nesta semana mas não termina: 50% à direita no primeiro dia
-                            left = segmentStart * cellWidth + cellWidth / 2;
-                            width = (daySpan - 0.5) * cellWidth - margin;
+                            // Reserva que começa nesta semana mas não termina
+                            // Começa no meio do primeiro dia + gap, vai até o fim da semana
+                            left = segmentStart * cellWidth + cellWidth / 2 + gapBetweenReservations;
+                            width = (segmentEnd - segmentStart + 0.5) * cellWidth - gapBetweenReservations;
                           } else if (!isSegmentStart && isSegmentEnd) {
-                            // Reserva que termina nesta semana mas não começa: 50% à esquerda no último dia
-                            left = margin;
-                            width = (daySpan - 0.5) * cellWidth - margin;
+                            // Reserva que termina nesta semana mas não começa
+                            // Começa no início da semana, termina no meio do último dia - gap
+                            left = 0;
+                            width = (segmentEnd + 0.5) * cellWidth - gapBetweenReservations;
                           } else {
-                            // Reserva que atravessa a semana inteira
-                            left = margin;
-                            width = daySpan * cellWidth - margin * 2;
+                            // Reserva que atravessa a semana inteira (não começa nem termina aqui)
+                            left = 0;
+                            width = 100;
                           }
 
                           // Bordas arredondadas apenas nas extremidades
