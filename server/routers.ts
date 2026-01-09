@@ -1487,6 +1487,113 @@ export const appRouter = router({
         return await deleteRental(input.id);
       }),
   }),
+
+  rentalAttachments: router({
+    create: protectedProcedure
+      .input(
+        z.object({
+          rentalId: z.number(),
+          filename: z.string(),
+          blobUrl: z.string(),
+          fileSize: z.number(),
+          mimeType: z.string(),
+          type: z.enum(["NOTA_FISCAL", "DOCUMENTOS", "BOLETO", "COMPROVANTE_PAGAMENTO"]),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { getRentalById } = await import("./db-rentals");
+        const rental = await getRentalById(input.rentalId);
+        if (!rental || rental.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const dbInstance = await getDb();
+        if (!dbInstance) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        }
+        const { rentalAttachments } = await import("../drizzle/schema");
+        const result = await dbInstance
+          .insert(rentalAttachments)
+          .values(input)
+          .returning();
+        return result[0];
+      }),
+
+    listByRental: protectedProcedure
+      .input(z.object({ rentalId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const { getRentalById } = await import("./db-rentals");
+        const rental = await getRentalById(input.rentalId);
+        if (!rental || rental.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const dbInstance = await getDb();
+        if (!dbInstance) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        }
+        const { rentalAttachments } = await import("../drizzle/schema");
+        return await dbInstance
+          .select()
+          .from(rentalAttachments)
+          .where(eq(rentalAttachments.rentalId, input.rentalId));
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        }
+        const { rentalAttachments } = await import("../drizzle/schema");
+        const [attachment] = await dbInstance
+          .select()
+          .from(rentalAttachments)
+          .where(eq(rentalAttachments.id, input.id));
+        if (!attachment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Attachment not found" });
+        }
+        const { getRentalById } = await import("./db-rentals");
+        const rental = await getRentalById(attachment.rentalId);
+        if (!rental || rental.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        await dbInstance.delete(rentalAttachments).where(eq(rentalAttachments.id, input.id));
+        return { success: true };
+      }),
+
+    updateType: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          type: z.enum(["NOTA_FISCAL", "DOCUMENTOS", "BOLETO", "COMPROVANTE_PAGAMENTO"]),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        }
+        const { rentalAttachments } = await import("../drizzle/schema");
+        const [attachment] = await dbInstance
+          .select()
+          .from(rentalAttachments)
+          .where(eq(rentalAttachments.id, input.id));
+        if (!attachment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Attachment not found" });
+        }
+        const { getRentalById } = await import("./db-rentals");
+        const rental = await getRentalById(attachment.rentalId);
+        if (!rental || rental.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const result = await dbInstance
+          .update(rentalAttachments)
+          .set({ type: input.type })
+          .where(eq(rentalAttachments.id, input.id))
+          .returning();
+        return result[0];
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
