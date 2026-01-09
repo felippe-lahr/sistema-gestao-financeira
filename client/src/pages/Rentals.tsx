@@ -500,7 +500,7 @@ export default function Rentals() {
                                   {rental.guestName || getSourceLabel(rental.source)} - {totalFormatted}
                                 </button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-80 p-4 bg-white rounded-lg shadow-lg border border-gray-200" onMouseEnter={() => setOpenPopoverId(rental.id)} onMouseLeave={() => setOpenPopoverId(null)}>
+                              <PopoverContent side="top" align="center" className="w-80 p-4 bg-white rounded-lg shadow-lg border border-gray-200 z-[9999]" onMouseEnter={() => setOpenPopoverId(rental.id)} onMouseLeave={() => setOpenPopoverId(null)}>
                                 <div className="space-y-3">
                                   <div className="border-b pb-2">
                                     <h3 className="font-bold text-lg text-gray-900">{rental.guestName || 'Sem hóspede'}</h3>
@@ -563,7 +563,7 @@ export default function Rentals() {
           </div>
 
           {/* Conteúdo Scrollável */}
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="font-semibold">Data de Início *</Label>
@@ -722,7 +722,7 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="font-semibold">Data de Competência</Label>
               <div className="flex items-center gap-2">
                 <button
@@ -806,7 +806,7 @@ export default function Rentals() {
           </div>
 
           {/* Conteúdo Scrollável */}
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="font-semibold">Data de Início *</Label>
