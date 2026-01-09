@@ -1449,9 +1449,9 @@ export const appRouter = router({
       .input(
         z.object({
           id: z.number(),
-          startDate: z.string(),
-          endDate: z.string(),
-          source: z.enum(["AIRBNB", "DIRECT", "BLOCKED"]),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+          source: z.enum(["AIRBNB", "DIRECT", "BLOCKED"]).optional(),
           guestName: z.string().optional(),
           guestEmail: z.string().optional(),
           guestPhone: z.string().optional(),
