@@ -38,7 +38,7 @@ export default function Rentals() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingRental, setEditingRental] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [openPopoverId, setOpenPopoverId] = useState(null);
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [rentalAttachments, setRentalAttachments] = useState<RentalAttachment[]>([]);
 
   const utils = trpc.useUtils();
@@ -486,12 +486,13 @@ export default function Rentals() {
                           const dailyFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.dailyRate || 0);
                           const extraFeeFormatted = rental.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.extraFeeAmount) : 'N/A';
 
+                          const popoverId = `${rental.id}-${weekIndex}`;
                           return (
-                            <Popover key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`} open={openPopoverId === rental.id} onOpenChange={(open) => setOpenPopoverId(open ? rental.id : null)}>
+                            <Popover key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`} open={openPopoverId === popoverId} onOpenChange={(open) => setOpenPopoverId(open ? popoverId : null)}>
                               <PopoverTrigger asChild>
                                 <button
                                   onClick={() => handleEdit(rental)}
-                                  onMouseEnter={() => setOpenPopoverId(rental.id)}
+                                  onMouseEnter={() => setOpenPopoverId(popoverId)}
                                   onMouseLeave={() => setOpenPopoverId(null)}
                                   className={`absolute text-sm md:text-base font-semibold text-white px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 hover:opacity-80 ${getSourceColor(rental.source)}`}
                                   style={{
@@ -503,7 +504,7 @@ export default function Rentals() {
                                   {rental.guestName || getSourceLabel(rental.source)} - {totalFormatted}
                                 </button>
                               </PopoverTrigger>
-                              <PopoverContent side="top" align="center" className="w-80 p-4 bg-white rounded-lg shadow-lg border border-gray-200 z-[9999]" onMouseEnter={() => setOpenPopoverId(rental.id)} onMouseLeave={() => setOpenPopoverId(null)}>
+                              <PopoverContent side="top" align="center" className="w-80 p-4 bg-white rounded-lg shadow-lg border border-gray-200 z-[9999]" onMouseEnter={() => setOpenPopoverId(popoverId)} onMouseLeave={() => setOpenPopoverId(null)}>
                                 <div className="space-y-3">
                                   <div className="border-b pb-2">
                                     <h3 className="font-bold text-lg text-gray-900">{rental.guestName || 'Sem hóspede'}</h3>
