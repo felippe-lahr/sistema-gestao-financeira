@@ -121,6 +121,7 @@ export async function createRental(data: {
     extraFeeType: data.extraFeeType,
     extraFeeAmount: data.extraFeeAmount,
     competencyDate: data.competencyDate || "CHECK_IN",
+    attachmentIds: null,
   }).returning();
   
   return convertRentalDatesToISO(result[0]);
