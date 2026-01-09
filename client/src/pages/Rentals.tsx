@@ -75,8 +75,19 @@ export default function Rentals() {
   });
 
   const createMutation = trpc.rentals.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async (createdRental) => {
       toast.success("Reserva criada com sucesso!");
+      // Recarregar anexos antes de fechar
+      if (createdRental?.id) {
+        try {
+          const attachments = await utils.client.rentalAttachments.listByRental.query({
+            rentalId: createdRental.id,
+          });
+          setRentalAttachments(attachments || []);
+        } catch (error) {
+          console.error("Erro ao recarregar anexos:", error);
+        }
+      }
       setIsCreateOpen(false);
       resetForm();
       refetch();
@@ -87,8 +98,19 @@ export default function Rentals() {
   });
 
   const updateMutation = trpc.rentals.update.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Reserva atualizada com sucesso!");
+      // Recarregar anexos antes de fechar
+      if (editingRental?.id) {
+        try {
+          const updatedAttachments = await utils.client.rentalAttachments.listByRental.query({
+            rentalId: editingRental.id,
+          });
+          setRentalAttachments(updatedAttachments || []);
+        } catch (error) {
+          console.error("Erro ao recarregar anexos:", error);
+        }
+      }
       setIsEditOpen(false);
       resetForm();
       refetch();
