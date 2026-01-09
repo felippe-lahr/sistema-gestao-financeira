@@ -414,99 +414,109 @@ export default function Transactions() {
           <p className="text-muted-foreground">Gerencie receitas e despesas</p>
         </div>
         <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-          <Dialog open={isExportAttachmentsOpen} onOpenChange={setIsExportAttachmentsOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="w-full md:w-auto">
-                <FileArchive className="h-4 w-4 mr-2" />
-                Exportar Anexos
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Exportar Anexos</DialogTitle>
-                <DialogDescription>
+          <Button variant="outline" className="w-full md:w-auto" onClick={() => setIsExportAttachmentsOpen(true)}>
+            <FileArchive className="h-4 w-4 mr-2" />
+            Exportar Anexos
+          </Button>
+
+          <Sheet open={isExportAttachmentsOpen} onOpenChange={setIsExportAttachmentsOpen}>
+            <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+              {/* Header Fixo */}
+              <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+                <SheetTitle className="text-2xl font-bold">Exportar Anexos</SheetTitle>
+                <button onClick={() => setIsExportAttachmentsOpen(false)} className="text-gray-500 hover:text-gray-700">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Conteúdo Scrollável */}
+              <div className="flex-1 overflow-y-auto px-8 py-6">
+                <p className="text-gray-600 mb-6">
                   Selecione os tipos de anexos e período para exportar em um arquivo ZIP
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Tipos de Anexos</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="nota_fiscal"
-                        checked={exportAttachmentsTypes.includes("NOTA_FISCAL")}
-                        onCheckedChange={() => toggleAttachmentType("NOTA_FISCAL")}
-                      />
-                      <label htmlFor="nota_fiscal" className="text-sm cursor-pointer">
-                        Notas Fiscais
-                      </label>
+                </p>
+                
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <Label className="font-semibold">Tipos de Anexos</Label>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="nota_fiscal"
+                          checked={exportAttachmentsTypes.includes("NOTA_FISCAL")}
+                          onCheckedChange={() => toggleAttachmentType("NOTA_FISCAL")}
+                        />
+                        <label htmlFor="nota_fiscal" className="text-sm cursor-pointer">
+                          Notas Fiscais
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="documentos"
+                          checked={exportAttachmentsTypes.includes("DOCUMENTOS")}
+                          onCheckedChange={() => toggleAttachmentType("DOCUMENTOS")}
+                        />
+                        <label htmlFor="documentos" className="text-sm cursor-pointer">
+                          Documentos
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="boleto"
+                          checked={exportAttachmentsTypes.includes("BOLETO")}
+                          onCheckedChange={() => toggleAttachmentType("BOLETO")}
+                        />
+                        <label htmlFor="boleto" className="text-sm cursor-pointer">
+                          Boletos
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="comprovante"
+                          checked={exportAttachmentsTypes.includes("COMPROVANTE_PAGAMENTO")}
+                          onCheckedChange={() => toggleAttachmentType("COMPROVANTE_PAGAMENTO")}
+                        />
+                        <label htmlFor="comprovante" className="text-sm cursor-pointer">
+                          Comprovantes de Pagamento
+                        </label>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="documentos"
-                        checked={exportAttachmentsTypes.includes("DOCUMENTOS")}
-                        onCheckedChange={() => toggleAttachmentType("DOCUMENTOS")}
+                    <p className="text-xs text-muted-foreground">
+                      Deixe vazio para exportar todos os tipos
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="export_start_date">Data Inicial</Label>
+                      <Input
+                        id="export_start_date"
+                        type="date"
+                        value={exportAttachmentsStartDate}
+                        onChange={(e) => setExportAttachmentsStartDate(e.target.value)}
                       />
-                      <label htmlFor="documentos" className="text-sm cursor-pointer">
-                        Documentos
-                      </label>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="boleto"
-                        checked={exportAttachmentsTypes.includes("BOLETO")}
-                        onCheckedChange={() => toggleAttachmentType("BOLETO")}
+                    <div className="space-y-2">
+                      <Label htmlFor="export_end_date">Data Final</Label>
+                      <Input
+                        id="export_end_date"
+                        type="date"
+                        value={exportAttachmentsEndDate}
+                        onChange={(e) => setExportAttachmentsEndDate(e.target.value)}
                       />
-                      <label htmlFor="boleto" className="text-sm cursor-pointer">
-                        Boletos
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="comprovante"
-                        checked={exportAttachmentsTypes.includes("COMPROVANTE_PAGAMENTO")}
-                        onCheckedChange={() => toggleAttachmentType("COMPROVANTE_PAGAMENTO")}
-                      />
-                      <label htmlFor="comprovante" className="text-sm cursor-pointer">
-                        Comprovantes de Pagamento
-                      </label>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Deixe vazio para exportar todos os tipos
+                    Deixe vazio para exportar de todos os períodos
                   </p>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="export_start_date">Data Inicial</Label>
-                    <Input
-                      id="export_start_date"
-                      type="date"
-                      value={exportAttachmentsStartDate}
-                      onChange={(e) => setExportAttachmentsStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="export_end_date">Data Final</Label>
-                    <Input
-                      id="export_end_date"
-                      type="date"
-                      value={exportAttachmentsEndDate}
-                      onChange={(e) => setExportAttachmentsEndDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Deixe vazio para exportar de todos os períodos
-                </p>
               </div>
-              <DialogFooter>
+
+              {/* Footer Fixo */}
+              <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setIsExportAttachmentsOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleExportAttachments} disabled={exportingAttachments}>
+                <Button onClick={handleExportAttachments} disabled={exportingAttachments} className="bg-blue-600 hover:bg-blue-700">
                   {exportingAttachments ? (
                     <>
                       <Download className="h-4 w-4 mr-2 animate-spin" />
@@ -519,9 +529,9 @@ export default function Transactions() {
                     </>
                   )}
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </div>
+            </SheetContent>
+          </Sheet>
           
           <Button className="w-full md:w-auto" onClick={() => setIsCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
