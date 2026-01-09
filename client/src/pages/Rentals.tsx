@@ -19,6 +19,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { RentalAttachmentUploader } from "@/components/RentalAttachmentUploader";
 import { uploadFile, deleteFile } from "@/lib/supabase";
+import { CurrencyInput, parseCurrency, formatCurrency } from "@/components/CurrencyInput";
 
 type RentalAttachment = {
   id: number;
@@ -40,6 +41,11 @@ export default function Rentals() {
   const [isLoading, setIsLoading] = useState(false);
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [rentalAttachments, setRentalAttachments] = useState<RentalAttachment[]>([]);
+  
+  // Estados para exibição dos campos monetários (formato brasileiro: 1.234,56)
+  const [dailyRateDisplay, setDailyRateDisplay] = useState("");
+  const [totalAmountDisplay, setTotalAmountDisplay] = useState("");
+  const [extraFeeAmountDisplay, setExtraFeeAmountDisplay] = useState("");
 
   const utils = trpc.useUtils();
 
@@ -124,6 +130,10 @@ export default function Rentals() {
       rentalId: null,
     });
     setEditingRental(null);
+    // Limpar estados de exibição monetária
+    setDailyRateDisplay("");
+    setTotalAmountDisplay("");
+    setExtraFeeAmountDisplay("");
   };
 
   const handleCreate = () => {
@@ -166,6 +176,11 @@ export default function Rentals() {
       competencyDate: rental.competencyDate || "CHECK_IN",
       rentalId: rental.id,
     });
+    // Definir estados de exibição monetária (converter centavos para formato brasileiro)
+    setDailyRateDisplay(rental.dailyRate ? formatCurrency(rental.dailyRate / 100) : "");
+    setTotalAmountDisplay(rental.totalAmount ? formatCurrency(rental.totalAmount / 100) : "");
+    setExtraFeeAmountDisplay(rental.extraFeeAmount ? formatCurrency(rental.extraFeeAmount / 100) : "");
+    
     // Load attachments for this rental
     if (rental.id) {
       // TODO: Fetch attachments from API
@@ -647,30 +662,27 @@ export default function Rentals() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="font-semibold">Diária (R$)</Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate / 100) : ''}
-                  onChange={(e) => {
-                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                <CurrencyInput
+                  value={dailyRateDisplay}
+                  onChange={(value) => {
+                    setDailyRateDisplay(value);
+                    // Converter valor formatado (1.234,56) para centavos (123456)
+                    const centavos = Math.round(parseCurrency(value) * 100);
                     setFormData({ ...formData, dailyRate: centavos });
                   }}
-                  placeholder="R$ 0,00"
+                  placeholder="0,00"
                 />
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">Total (R$)</Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount / 100) : ''}
-                  onChange={(e) => {
-                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                <CurrencyInput
+                  value={totalAmountDisplay}
+                  onChange={(value) => {
+                    setTotalAmountDisplay(value);
+                    const centavos = Math.round(parseCurrency(value) * 100);
                     setFormData({ ...formData, totalAmount: centavos });
                   }}
-                  placeholder="R$ 0,00"
+                  placeholder="0,00"
                 />
               </div>
             </div>
@@ -692,16 +704,14 @@ export default function Rentals() {
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">Valor da Taxa Extra (R$)</Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.extraFeeAmount / 100) : ''}
-                  onChange={(e) => {
-                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                <CurrencyInput
+                  value={extraFeeAmountDisplay}
+                  onChange={(value) => {
+                    setExtraFeeAmountDisplay(value);
+                    const centavos = Math.round(parseCurrency(value) * 100);
                     setFormData({ ...formData, extraFeeAmount: centavos });
                   }}
-                  placeholder="R$ 0,00"
+                  placeholder="0,00"
                 />
               </div>
             </div>
@@ -940,30 +950,27 @@ export default function Rentals() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="font-semibold">Diária (R$)</Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.dailyRate ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.dailyRate / 100) : ''}
-                  onChange={(e) => {
-                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                <CurrencyInput
+                  value={dailyRateDisplay}
+                  onChange={(value) => {
+                    setDailyRateDisplay(value);
+                    // Converter valor formatado (1.234,56) para centavos (123456)
+                    const centavos = Math.round(parseCurrency(value) * 100);
                     setFormData({ ...formData, dailyRate: centavos });
                   }}
-                  placeholder="R$ 0,00"
+                  placeholder="0,00"
                 />
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">Total (R$)</Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.totalAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.totalAmount / 100) : ''}
-                  onChange={(e) => {
-                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                <CurrencyInput
+                  value={totalAmountDisplay}
+                  onChange={(value) => {
+                    setTotalAmountDisplay(value);
+                    const centavos = Math.round(parseCurrency(value) * 100);
                     setFormData({ ...formData, totalAmount: centavos });
                   }}
-                  placeholder="R$ 0,00"
+                  placeholder="0,00"
                 />
               </div>
             </div>
@@ -985,16 +992,14 @@ export default function Rentals() {
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">Valor da Taxa Extra (R$)</Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.extraFeeAmount / 100) : ''}
-                  onChange={(e) => {
-                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    const centavos = numericValue ? parseInt(numericValue, 10) : 0;
+                <CurrencyInput
+                  value={extraFeeAmountDisplay}
+                  onChange={(value) => {
+                    setExtraFeeAmountDisplay(value);
+                    const centavos = Math.round(parseCurrency(value) * 100);
                     setFormData({ ...formData, extraFeeAmount: centavos });
                   }}
-                  placeholder="R$ 0,00"
+                  placeholder="0,00"
                 />
               </div>
             </div>
