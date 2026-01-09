@@ -482,9 +482,9 @@ export default function Rentals() {
                             borderRadius = "0px 6px 6px 0px"; // Apenas fim
                           }
 
-                          const totalFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.totalAmount || 0);
-                          const dailyFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.dailyRate || 0);
-                          const extraFeeFormatted = rental.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.extraFeeAmount) : 'N/A';
+                          const totalFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((rental.totalAmount || 0) / 100);
+                          const dailyFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((rental.dailyRate || 0) / 100);
+                          const extraFeeFormatted = rental.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.extraFeeAmount / 100) : 'N/A';
 
                           const popoverId = `${rental.id}-${weekIndex}`;
                           return (
