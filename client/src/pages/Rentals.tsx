@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, X, BarChart3 } from "lucide-react";
+import { useLocation } from "wouter";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, differenceInDays, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { trpc } from "@/lib/trpc";
@@ -34,6 +35,7 @@ type RentalAttachment = {
 export default function Rentals() {
   const params = useParams<{ entityId: string }>();
   const entityId = params?.entityId || "";
+  const [, setLocation] = useLocation();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -325,10 +327,16 @@ export default function Rentals() {
           <h1 className="text-3xl font-bold tracking-tight">Reservas</h1>
           <p className="text-muted-foreground mt-2">Gerencie suas reservas e bloqueios de temporada</p>
         </div>
-        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Reserva
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setLocation(`/reports/${entityId}`)} variant="outline" className="gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Relatórios
+          </Button>
+          <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Reserva
+          </Button>
+        </div>
       </div>
 
       {/* Calendário */}
