@@ -406,6 +406,23 @@ export type Rental = typeof rentals.$inferSelect;
 export type InsertRental = typeof rentals.$inferInsert;
 
 /**
+ * Rental Attachments table - Documentos anexados às reservas
+ */
+export const rentalAttachments = pgTable("rental_attachments", {
+  id: serial("id").primaryKey(),
+  rentalId: integer("rentalId").notNull().references(() => rentals.id, { onDelete: "cascade" }),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  blobUrl: text("blobUrl").notNull(), // Vercel Blob URL
+  fileSize: integer("fileSize").notNull(), // Size in bytes
+  mimeType: varchar("mimeType", { length: 127 }).notNull(),
+  type: attachmentTypeEnum("type").default("DOCUMENTOS").notNull(), // NOTA_FISCAL, DOCUMENTOS, BOLETO, COMPROVANTE_PAGAMENTO
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RentalAttachment = typeof rentalAttachments.$inferSelect;
+export type InsertRentalAttachment = typeof rentalAttachments.$inferInsert;
+
+/**
  * Rental Configuration table - Configurações do módulo de locação
  */
 export const rentalConfigs = pgTable("rental_configs", {
