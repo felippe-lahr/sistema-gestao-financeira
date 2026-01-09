@@ -79,7 +79,8 @@ export default function Rentals() {
       toast.success("Reserva criada com sucesso!");
       if (createdRental?.id && rentalAttachments.length > 0) {
         try {
-          const temporaryAttachments = rentalAttachments.filter(a => a.id < 10000000000);
+          // Filtrar apenas anexos temporários (criados com Date.now() = 13 dígitos)
+          const temporaryAttachments = rentalAttachments.filter(a => a.id > 1000000000000);
           for (const attachment of temporaryAttachments) {
             await utils.client.rentalAttachments.create.mutate({
               rentalId: createdRental.id,
