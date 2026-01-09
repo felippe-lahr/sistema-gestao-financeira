@@ -215,9 +215,17 @@ export default function Rentals() {
     setTotalAmountDisplay(rental.totalAmount ? formatCurrency(rental.totalAmount / 100) : "");
     setExtraFeeAmountDisplay(rental.extraFeeAmount ? formatCurrency(rental.extraFeeAmount / 100) : "");
     
-    // Load attachments for this rental
+    // Carregar anexos da reserva
     if (rental.id) {
-      // TODO: Fetch attachments from API
+      utils.client.rentalAttachments.listByRental.query({
+        rentalId: rental.id,
+      }).then((attachments) => {
+        setRentalAttachments(attachments || []);
+      }).catch((error) => {
+        console.error("Erro ao carregar anexos:", error);
+        setRentalAttachments([]);
+      });
+    } else {
       setRentalAttachments([]);
     }
     setIsEditOpen(true);
