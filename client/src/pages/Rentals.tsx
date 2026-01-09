@@ -553,7 +553,7 @@ export default function Rentals() {
 
       {/* Dialog de Criar Reserva */}
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[800px] flex flex-col p-0">
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
           {/* Header Fixo */}
           <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Nova Reserva</SheetTitle>
@@ -722,8 +722,8 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div>
-              <Label>Data de Competência</Label>
+            <div className="space-y-2">
+              <Label className="font-semibold">Data de Competência</Label>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -750,16 +750,16 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div>
-              <Label>Notas</Label>
+            <div className="space-y-2">
+              <Label className="font-semibold">Notas</Label>
               <Textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               />
             </div>
 
-            <div>
-              <Label>Documentos</Label>
+            <div className="space-y-2">
+              <Label className="font-semibold">Documentos</Label>
               <RentalAttachmentUploader
                 rentalId={undefined}
                 attachments={rentalAttachments}
@@ -796,7 +796,7 @@ export default function Rentals() {
 
       {/* Sheet de Editar Reserva */}
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[800px] flex flex-col p-0">
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
           {/* Header Fixo */}
           <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Reserva</SheetTitle>
@@ -991,16 +991,16 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div>
-              <Label>Notas</Label>
+            <div className="space-y-2">
+              <Label className="font-semibold">Notas</Label>
               <Textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               />
             </div>
 
-            <div>
-              <Label>Documentos</Label>
+            <div className="space-y-2">
+              <Label className="font-semibold">Documentos</Label>
               <RentalAttachmentUploader
                 rentalId={undefined}
                 attachments={rentalAttachments}
