@@ -41,6 +41,8 @@ export default function Rentals() {
   const [openPopoverId, setOpenPopoverId] = useState(null);
   const [rentalAttachments, setRentalAttachments] = useState<RentalAttachment[]>([]);
 
+  const utils = trpc.useUtils();
+
   const [formData, setFormData] = useState({
     startDate: "",
     endDate: "",
@@ -768,7 +770,7 @@ export default function Rentals() {
                   try {
                     const blobUrl = await uploadFile(file, 'attachments');
                     if (editingRental?.id) {
-                      await trpc.rentalAttachments.create.mutate({
+                      await utils.client.rentalAttachments.create.mutate({
                         rentalId: editingRental.id,
                         filename: file.name,
                         blobUrl,
@@ -776,7 +778,7 @@ export default function Rentals() {
                         mimeType: file.type,
                         type,
                       });
-                      const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
+                      const updatedAttachments = await utils.client.rentalAttachments.listByRental.query({
                         rentalId: editingRental.id,
                       });
                       setRentalAttachments(updatedAttachments || []);
@@ -805,8 +807,8 @@ export default function Rentals() {
                     if (!attachment) return;
                     await deleteFile(attachment.blobUrl, 'attachments');
                     if (editingRental?.id) {
-                      await trpc.rentalAttachments.delete.mutate({ id });
-                      const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
+                      await utils.client.rentalAttachments.delete.mutate({ id });
+                      const updatedAttachments = await utils.client.rentalAttachments.listByRental.query({
                         rentalId: editingRental.id,
                       });
                       setRentalAttachments(updatedAttachments || []);
@@ -820,7 +822,7 @@ export default function Rentals() {
                 }}
                 onUpdateType={async (id, type) => {
                   try {
-                    await trpc.rentalAttachments.updateType.mutate({ id, type });
+                    await utils.client.rentalAttachments.updateType.mutate({ id, type });
                     setRentalAttachments(rentalAttachments.map(a => a.id === id ? { ...a, type } : a));
                     toast.success("Tipo atualizado!");
                   } catch (error) {
@@ -1018,8 +1020,8 @@ export default function Rentals() {
             </div>
 
             <div>
-              <Label>Data de Competência</Label>
-              <div className="flex gap-2">
+              <Label className="font-semibold block">Data de Competência</Label>
+              <div className="flex items-center gap-3 mt-4">
                 <button
                   onClick={() => setFormData({ ...formData, competencyDate: "CHECK_IN" })}
                   className={`px-4 py-2 rounded font-medium transition-colors ${
@@ -1060,7 +1062,7 @@ export default function Rentals() {
                   try {
                     const blobUrl = await uploadFile(file, 'attachments');
                     if (editingRental?.id) {
-                      await trpc.rentalAttachments.create.mutate({
+                      await utils.client.rentalAttachments.create.mutate({
                         rentalId: editingRental.id,
                         filename: file.name,
                         blobUrl,
@@ -1068,7 +1070,7 @@ export default function Rentals() {
                         mimeType: file.type,
                         type,
                       });
-                      const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
+                      const updatedAttachments = await utils.client.rentalAttachments.listByRental.query({
                         rentalId: editingRental.id,
                       });
                       setRentalAttachments(updatedAttachments || []);
@@ -1097,8 +1099,8 @@ export default function Rentals() {
                     if (!attachment) return;
                     await deleteFile(attachment.blobUrl, 'attachments');
                     if (editingRental?.id) {
-                      await trpc.rentalAttachments.delete.mutate({ id });
-                      const updatedAttachments = await trpc.rentalAttachments.listByRental.query({
+                      await utils.client.rentalAttachments.delete.mutate({ id });
+                      const updatedAttachments = await utils.client.rentalAttachments.listByRental.query({
                         rentalId: editingRental.id,
                       });
                       setRentalAttachments(updatedAttachments || []);
@@ -1112,7 +1114,7 @@ export default function Rentals() {
                 }}
                 onUpdateType={async (id, type) => {
                   try {
-                    await trpc.rentalAttachments.updateType.mutate({ id, type });
+                    await utils.client.rentalAttachments.updateType.mutate({ id, type });
                     setRentalAttachments(rentalAttachments.map(a => a.id === id ? { ...a, type } : a));
                     toast.success("Tipo atualizado!");
                   } catch (error) {
