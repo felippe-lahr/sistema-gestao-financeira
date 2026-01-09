@@ -77,15 +77,26 @@ export default function Rentals() {
   const createMutation = trpc.rentals.create.useMutation({
     onSuccess: async (createdRental) => {
       toast.success("Reserva criada com sucesso!");
-      // Recarregar anexos antes de fechar
-      if (createdRental?.id) {
+      if (createdRental?.id && rentalAttachments.length > 0) {
         try {
+          const temporaryAttachments = rentalAttachments.filter(a => a.id < 10000000000);
+          for (const attachment of temporaryAttachments) {
+            await utils.client.rentalAttachments.create.mutate({
+              rentalId: createdRental.id,
+              filename: attachment.filename,
+              blobUrl: attachment.blobUrl,
+              fileSize: attachment.fileSize,
+              mimeType: attachment.mimeType,
+              type: attachment.type,
+            });
+          }
           const attachments = await utils.client.rentalAttachments.listByRental.query({
             rentalId: createdRental.id,
           });
           setRentalAttachments(attachments || []);
         } catch (error) {
-          console.error("Erro ao recarregar anexos:", error);
+          console.error("Erro ao salvar anexos:", error);
+          toast.error("Erro ao salvar alguns anexos");
         }
       }
       setIsCreateOpen(false);
