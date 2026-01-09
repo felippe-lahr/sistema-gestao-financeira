@@ -40,8 +40,8 @@ export default function Rentals() {
   const [rentalAttachments, setRentalAttachments] = useState<RentalAttachment[]>([]);
 
   const [formData, setFormData] = useState({
-    startDate: format(new Date(), "yyyy-MM-dd"),
-    endDate: format(new Date(), "yyyy-MM-dd"),
+    startDate: "",
+    endDate: "",
     source: "DIRECT",
     guestName: "",
     guestEmail: "",
@@ -102,8 +102,8 @@ export default function Rentals() {
 
   const resetForm = () => {
     setFormData({
-      startDate: format(new Date(), "yyyy-MM-dd"),
-      endDate: format(new Date(), "yyyy-MM-dd"),
+      startDate: "",
+      endDate: "",
       source: "DIRECT",
       guestName: "",
       guestEmail: "",
@@ -264,7 +264,7 @@ export default function Rentals() {
           <h1 className="text-3xl font-bold tracking-tight">Reservas</h1>
           <p className="text-muted-foreground mt-2">Gerencie suas reservas e bloqueios de temporada</p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
           <Plus className="mr-2 h-4 w-4" />
           Nova Reserva
         </Button>
