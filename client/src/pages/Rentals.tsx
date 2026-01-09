@@ -553,7 +553,7 @@ export default function Rentals() {
 
       {/* Dialog de Criar Reserva */}
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[650px] flex flex-col p-0">
+        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[800px] flex flex-col p-0">
           {/* Header Fixo */}
           <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Nova Reserva</SheetTitle>
@@ -565,8 +565,8 @@ export default function Rentals() {
           {/* Conteúdo Scrollável */}
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Data de Início *</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Data de Início *</Label>
                 <Input
                   type="date"
                   value={formData.startDate}
@@ -574,8 +574,8 @@ export default function Rentals() {
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Data de Fim *</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Data de Fim *</Label>
                 <Input
                   type="date"
                   value={formData.endDate}
@@ -599,15 +599,15 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Nome do Hóspede</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Nome do Hóspede</Label>
                 <Input
                   value={formData.guestName}
                   onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Número de Hóspedes</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Número de Hóspedes</Label>
                 <Select value={formData.numberOfGuests.toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -624,16 +624,16 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Email</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Email</Label>
                 <Input
                   type="email"
                   value={formData.guestEmail}
                   onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Telefone</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Telefone</Label>
                 <Input
                   value={formData.guestPhone}
                   onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
@@ -642,8 +642,8 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Diária (R$)</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Diária (R$)</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -656,8 +656,8 @@ export default function Rentals() {
                   placeholder="R$ 0,00"
                 />
               </div>
-              <div>
-                <Label>Total (R$)</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Total (R$)</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -673,8 +673,8 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Tipo de Taxa Extra</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Tipo de Taxa Extra</Label>
                 <Select value={formData.extraFeeType} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Nenhuma" />
@@ -687,8 +687,8 @@ export default function Rentals() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Valor da Taxa Extra (R$)</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Valor da Taxa Extra (R$)</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -704,16 +704,16 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Horário Check-in</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Horário Check-in</Label>
                 <Input
                   type="time"
                   value={formData.checkInTime}
                   onChange={(e) => setFormData({ ...formData, checkInTime: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Horário Check-out</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Horário Check-out</Label>
                 <Input
                   type="time"
                   value={formData.checkOutTime}
@@ -796,7 +796,7 @@ export default function Rentals() {
 
       {/* Sheet de Editar Reserva */}
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[650px] flex flex-col p-0">
+        <SheetContent side="right" className="w-full sm:w-[700px] lg:w-[800px] flex flex-col p-0">
           {/* Header Fixo */}
           <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Reserva</SheetTitle>
@@ -808,8 +808,8 @@ export default function Rentals() {
           {/* Conteúdo Scrollável */}
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Data de Início *</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Data de Início *</Label>
                 <Input
                   type="date"
                   value={formData.startDate}
@@ -817,8 +817,8 @@ export default function Rentals() {
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Data de Fim *</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Data de Fim *</Label>
                 <Input
                   type="date"
                   value={formData.endDate}
@@ -842,15 +842,15 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Nome do Hóspede</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Nome do Hóspede</Label>
                 <Input
                   value={formData.guestName}
                   onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Número de Hóspedes</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Número de Hóspedes</Label>
                 <Select value={formData.numberOfGuests.toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -867,16 +867,16 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Email</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Email</Label>
                 <Input
                   type="email"
                   value={formData.guestEmail}
                   onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Telefone</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Telefone</Label>
                 <Input
                   value={formData.guestPhone}
                   onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
@@ -885,8 +885,8 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Diária (R$)</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Diária (R$)</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -899,8 +899,8 @@ export default function Rentals() {
                   placeholder="R$ 0,00"
                 />
               </div>
-              <div>
-                <Label>Total (R$)</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Total (R$)</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -916,8 +916,8 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Tipo de Taxa Extra</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Tipo de Taxa Extra</Label>
                 <Select value={formData.extraFeeType} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Nenhuma" />
@@ -930,8 +930,8 @@ export default function Rentals() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Valor da Taxa Extra (R$)</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Valor da Taxa Extra (R$)</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -947,16 +947,16 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Horário Check-in</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Horário Check-in</Label>
                 <Input
                   type="time"
                   value={formData.checkInTime}
                   onChange={(e) => setFormData({ ...formData, checkInTime: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Horário Check-out</Label>
+              <div className="space-y-2">
+                <Label className="font-semibold">Horário Check-out</Label>
                 <Input
                   type="time"
                   value={formData.checkOutTime}
