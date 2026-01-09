@@ -453,38 +453,40 @@ export default function Rentals() {
 
                           // Calcular span e posição
                           const daySpan = segmentEnd - segmentStart + 1;
-                          const cellWidth = 100 / 7;
-                          // gap-1 do Tailwind = 0.25rem ≈ 4px
-                          // Em um container de ~1000px, isso é ~0.4% por gap
-                          // Usamos 0.2% para ser mais conservador
-                          const gapPercentage = 0.2;
-                          let left = segmentStart * (cellWidth + gapPercentage);
-                          let width = daySpan * cellWidth + (daySpan - 1) * gapPercentage;
-
-                          // Aplicar divisão horizontal 50%/50% no check-in e checkout
-                          const gapBetweenBars = 0.25;
+                          const cellWidth = 100 / 7; // ~14.2857%
                           
+                          // Cálculo simplificado: cada célula ocupa exatamente cellWidth%
+                          // A barra começa no início da célula e termina no fim da última célula
+                          let left = segmentStart * cellWidth;
+                          let width = daySpan * cellWidth;
+                          
+                          // Margem interna para não encostar nas bordas
+                          const margin = 0.3; // pequena margem em %
+                          
+                          // Aplicar divisão horizontal 50%/50% no check-in e checkout
                           if (isSegmentStart && isSegmentEnd) {
                             // Reserva que começa E termina nesta semana
                             if (daySpan === 1) {
-                              // Um único dia: ocupa 100%
+                              // Um único dia: ocupa a célula inteira com margem
+                              left = segmentStart * cellWidth + margin;
+                              width = cellWidth - margin * 2;
                             } else {
-                              // Mais de um dia: 50% no primeiro, 100% nos intermediários, 50% no último
-                              const firstDayWidth = (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
-                              const lastDayWidth = (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
-                              const middleDaysWidth = (daySpan - 2) * cellWidth + (daySpan - 3) * gapPercentage;
-                              left = segmentStart * (cellWidth + gapPercentage) + (cellWidth + gapPercentage) / 2 + gapBetweenBars / 2;
-                              width = firstDayWidth + middleDaysWidth + lastDayWidth;
+                              // Mais de um dia: 50% no primeiro dia, 50% no último dia
+                              left = segmentStart * cellWidth + cellWidth / 2;
+                              width = (daySpan - 1) * cellWidth;
                             }
                           } else if (isSegmentStart && !isSegmentEnd) {
                             // Reserva que começa nesta semana mas não termina: 50% à direita no primeiro dia
-                            const firstDayWidth = (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
-                            const restWidth = (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage;
-                            left = segmentStart * (cellWidth + gapPercentage) + (cellWidth + gapPercentage) / 2 + gapBetweenBars / 2;
-                            width = firstDayWidth + restWidth;
+                            left = segmentStart * cellWidth + cellWidth / 2;
+                            width = (daySpan - 0.5) * cellWidth - margin;
                           } else if (!isSegmentStart && isSegmentEnd) {
                             // Reserva que termina nesta semana mas não começa: 50% à esquerda no último dia
-                            width = (daySpan - 1) * cellWidth + (daySpan - 2) * gapPercentage + (cellWidth + gapPercentage) / 2 - gapBetweenBars / 2;
+                            left = margin;
+                            width = (daySpan - 0.5) * cellWidth - margin;
+                          } else {
+                            // Reserva que atravessa a semana inteira
+                            left = margin;
+                            width = daySpan * cellWidth - margin * 2;
                           }
 
                           // Bordas arredondadas apenas nas extremidades
