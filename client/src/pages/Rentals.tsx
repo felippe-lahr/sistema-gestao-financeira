@@ -16,6 +16,17 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMont
 import { ptBR } from "date-fns/locale";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { RentalAttachmentUploader } from "@/components/RentalAttachmentUploader";
+
+type RentalAttachment = {
+  id: number;
+  filename: string;
+  blobUrl: string;
+  fileSize: number;
+  mimeType: string;
+  type: "NOTA_FISCAL" | "DOCUMENTOS" | "BOLETO" | "COMPROVANTE_PAGAMENTO";
+  createdAt: string;
+};
 
 export default function Rentals() {
   const params = useParams<{ entityId: string }>();
@@ -26,6 +37,7 @@ export default function Rentals() {
   const [editingRental, setEditingRental] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [openPopoverId, setOpenPopoverId] = useState(null);
+  const [rentalAttachments, setRentalAttachments] = useState<RentalAttachment[]>([]);
 
   const [formData, setFormData] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -43,6 +55,7 @@ export default function Rentals() {
     checkOutTime: "11:00",
     notes: "",
     competencyDate: "CHECK_IN",
+    rentalId: null as number | null,
   });
 
   const { data: rentals = [], isLoading: rentalsLoading, refetch } = trpc.rentals.list.useQuery({
@@ -104,6 +117,7 @@ export default function Rentals() {
       checkOutTime: "11:00",
       notes: "",
       competencyDate: "CHECK_IN",
+      rentalId: null,
     });
     setEditingRental(null);
   };
@@ -146,7 +160,13 @@ export default function Rentals() {
       checkOutTime: rental.checkOutTime || "11:00",
       notes: rental.notes || "",
       competencyDate: rental.competencyDate || "CHECK_IN",
+      rentalId: rental.id,
     });
+    // Load attachments for this rental
+    if (rental.id) {
+      // TODO: Fetch attachments from API
+      setRentalAttachments([]);
+    }
     setIsEditOpen(true);
   };
 
@@ -731,6 +751,29 @@ export default function Rentals() {
               />
             </div>
 
+            <div>
+              <Label>Documentos</Label>
+              <RentalAttachmentUploader
+                rentalId={undefined}
+                attachments={rentalAttachments}
+                onUpload={async (file, type) => {
+                  // TODO: Implement upload
+                  console.log("Upload:", file, type);
+                }}
+                onDelete={async (id) => {
+                  // TODO: Implement delete
+                  console.log("Delete:", id);
+                }}
+                onUpdateType={async (id, type) => {
+                  // TODO: Implement update type
+                  console.log("Update type:", id, type);
+                }}
+                onPreview={(attachment) => {
+                  window.open(attachment.blobUrl, "_blank");
+                }}
+              />
+            </div>
+
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                 Cancelar
@@ -939,6 +982,29 @@ export default function Rentals() {
               <Textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label>Documentos</Label>
+              <RentalAttachmentUploader
+                rentalId={undefined}
+                attachments={rentalAttachments}
+                onUpload={async (file, type) => {
+                  // TODO: Implement upload
+                  console.log("Upload:", file, type);
+                }}
+                onDelete={async (id) => {
+                  // TODO: Implement delete
+                  console.log("Delete:", id);
+                }}
+                onUpdateType={async (id, type) => {
+                  // TODO: Implement update type
+                  console.log("Update type:", id, type);
+                }}
+                onPreview={(attachment) => {
+                  window.open(attachment.blobUrl, "_blank");
+                }}
               />
             </div>
 
