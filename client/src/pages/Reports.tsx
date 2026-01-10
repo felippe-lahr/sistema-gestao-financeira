@@ -38,8 +38,11 @@ export function Reports() {
     if (!rentals || rentals.length === 0) return [];
 
     const monthlyData: Record<string, { occupied: number; total: number }> = {};
-    const filterStart = new Date(startDate);
-    const filterEnd = new Date(endDate);
+    // Parse dates manually to avoid timezone issues
+    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+    const filterStart = new Date(startYear, startMonth - 1, startDay);
+    const filterEnd = new Date(endYear, endMonth - 1, endDay);
 
     // Inicializar todos os meses que têm dias no intervalo
     let current = new Date(filterStart.getFullYear(), filterStart.getMonth(), 1);
