@@ -41,12 +41,24 @@ export function Reports() {
     const filterStart = new Date(startDate);
     const filterEnd = new Date(endDate);
 
-    // Inicializar todos os meses no intervalo com 0 dias ocupados
+    // Inicializar todos os meses que têm dias no intervalo
     let current = new Date(filterStart.getFullYear(), filterStart.getMonth(), 1);
-    while (current <= filterEnd) {
+    const endOfLastMonth = new Date(filterEnd.getFullYear(), filterEnd.getMonth() + 1, 0);
+    
+    while (current <= endOfLastMonth) {
       const monthKey = format(current, "yyyy-MM");
-      const daysInMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate();
-      monthlyData[monthKey] = { occupied: 0, total: daysInMonth };
+      const monthStart = new Date(current.getFullYear(), current.getMonth(), 1);
+      const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+      
+      // Se o mês está dentro do período, adicionar
+      if (monthStart <= filterEnd && monthEnd >= filterStart) {
+        // Calcular quantos dias deste mês estão no intervalo do filtro
+        const rangeStart = new Date(Math.max(monthStart.getTime(), filterStart.getTime()));
+        const rangeEnd = new Date(Math.min(monthEnd.getTime(), filterEnd.getTime()));
+        const daysInRange = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        monthlyData[monthKey] = { occupied: 0, total: daysInRange };
+      }
+      
       current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
     }
 
