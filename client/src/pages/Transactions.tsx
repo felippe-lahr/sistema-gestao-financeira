@@ -1109,11 +1109,21 @@ export default function Transactions() {
           </DialogHeader>
           <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
             {previewAttachment?.mimeType === 'application/pdf' ? (
-              <iframe
-                src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewAttachment.blobUrl)}&embedded=true`}
-                className="w-full h-[600px] border-0"
-                title="Preview PDF"
-              />
+              <div className="flex flex-col items-center justify-center p-8 space-y-4">
+                <div className="w-24 h-24 bg-red-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-12 h-12 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M10.92,12.31C10.68,11.54 10.15,9.08 11.55,9.04C12.95,9 12.03,12.16 12.03,12.16C12.42,13.65 14.05,14.72 14.05,14.72C14.55,14.57 17.4,14.24 17,15.72C16.57,17.2 13.5,15.81 13.5,15.81C11.55,15.95 10.09,16.47 10.09,16.47C8.96,18.58 7.64,19.5 7.1,18.61C6.43,17.5 9.23,16.07 9.23,16.07C10.68,13.72 10.9,12.35 10.92,12.31Z" />
+                  </svg>
+                </div>
+                <p className="text-lg font-medium text-gray-900">{previewAttachment.filename}</p>
+                <p className="text-sm text-gray-500">Tamanho: {(previewAttachment.fileSize / 1024).toFixed(1)} KB</p>
+                <button
+                  onClick={() => window.open(previewAttachment.blobUrl, 'PDFViewer', 'width=900,height=700,scrollbars=yes,resizable=yes')}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Abrir PDF em nova janela
+                </button>
+              </div>
             ) : previewAttachment?.mimeType?.startsWith('image/') ? (
               <img
                 src={previewAttachment.blobUrl}
