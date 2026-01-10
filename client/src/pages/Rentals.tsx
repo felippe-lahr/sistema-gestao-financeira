@@ -646,7 +646,10 @@ export default function Rentals() {
                       <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${holiday.type === "national" ? "bg-red-400" : "bg-yellow-400"}`}></span>
                       <div>
                         <p className="font-medium text-gray-800">{holiday.name}</p>
-                        <p className="text-gray-500 text-xs mt-0.5">{format(new Date(holiday.date), "dd/MM/yyyy")}</p>
+                        <p className="text-gray-500 text-xs mt-0.5">{(() => {
+                          const [year, month, day] = holiday.date.split('-').map(Number);
+                          return format(new Date(year, month - 1, day), "dd/MM/yyyy");
+                        })()}</p>
                       </div>
                     </div>
                   ))
