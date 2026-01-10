@@ -1110,10 +1110,9 @@ export default function Transactions() {
           <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
             {previewAttachment?.mimeType === 'application/pdf' ? (
               <iframe
-                src={previewAttachment.blobUrl}
+                src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewAttachment.blobUrl)}&embedded=true`}
                 className="w-full h-[600px] border-0"
                 title="Preview PDF"
-                sandbox="allow-same-origin allow-scripts allow-popups"
               />
             ) : previewAttachment?.mimeType?.startsWith('image/') ? (
               <img

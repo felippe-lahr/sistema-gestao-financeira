@@ -44,10 +44,9 @@ export function AttachmentPreview({ attachment, onClose }: AttachmentPreviewProp
         <div className="w-full h-full flex items-center justify-center mt-16">
           {isPDF && (
             <iframe
-              src={previewUrl}
+              src={`https://docs.google.com/viewer?url=${encodeURIComponent(attachment.blobUrl)}&embedded=true`}
               className="w-full h-full bg-white rounded-lg shadow-2xl"
               title={attachment.filename}
-              sandbox="allow-same-origin allow-scripts allow-popups"
             />
           )}
 
