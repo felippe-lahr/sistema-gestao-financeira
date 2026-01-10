@@ -215,8 +215,149 @@ export function Reports() {
   };
 
   const handleExport = (format: string) => {
-    toast.info(`Exportando relatório em ${format.toUpperCase()}...`);
-    // TODO: Implementar exportação
+    try {
+      if (format === "pdf") {
+        exportToPDF();
+      } else if (format === "excel") {
+        exportToExcel();
+      } else if (format === "csv") {
+        exportToCSV();
+      }
+      toast.success(`Relatório exportado com sucesso em ${format.toUpperCase()}!`);
+    } catch (error) {
+      toast.error(`Erro ao exportar relatório: ${error}`);
+    }
+  };
+
+  const exportToPDF = () => {
+    // Criar conteúdo HTML para o PDF
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Relatório de Ocupação</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 20px; }
+          .card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+          .card h3 { margin: 0 0 10px 0; color: #666; }
+          .card .value { font-size: 24px; font-weight: bold; color: #333; }
+        </style>
+      </head>
+      <body>
+        <h1>Relatório de Ocupação</h1>
+        <p>Período: ${startDate} a ${endDate}</p>
+        
+        <div class="summary">
+          <div class="card">
+            <h3>Ocupação Média</h3>
+            <div class="value">${occupancyData.length > 0 ? Math.round(occupancyData.reduce((sum, m) => sum + m.occupancy, 0) / occupancyData.length) : 0}%</div>
+          </div>
+          <div class="card">
+            <h3>Dias Ocupados</h3>
+            <div class="value">${occupancyData.reduce((sum, m) => sum + m.occupied, 0)}</div>
+          </div>
+          <div class="card">
+            <h3>Total de Reservas</h3>
+            <div class="value">${rentals?.length || 0}</div>
+          </div>
+        </div>
+        
+        <h2>Ocupação por Mês</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Mês</th>
+              <th>Ocupação (%)</th>
+              <th>Dias Ocupados</th>
+              <th>Total de Dias</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${occupancyData.map(m => `
+              <tr>
+                <td>${m.month}</td>
+                <td>${m.occupancy}%</td>
+                <td>${m.occupied}</td>
+                <td>${m.total}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    // Usar html2pdf se disponível, senão usar print
+    const printWindow = window.open('', '', 'height=400,width=800');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
+  const exportToExcel = () => {
+    // Criar dados para Excel
+    const data = [
+      ['Relatório de Ocupação'],
+      ['Período:', `${startDate} a ${endDate}`],
+      [],
+      ['Resumo'],
+      ['Ocupação Média', occupancyData.length > 0 ? Math.round(occupancyData.reduce((sum, m) => sum + m.occupancy, 0) / occupancyData.length) : 0],
+      ['Dias Ocupados', occupancyData.reduce((sum, m) => sum + m.occupied, 0)],
+      ['Total de Reservas', rentals?.length || 0],
+      [],
+      ['Ocupação por Mês'],
+      ['Mês', 'Ocupação (%)', 'Dias Ocupados', 'Total de Dias'],
+      ...occupancyData.map(m => [m.month, m.occupancy, m.occupied, m.total]),
+    ];
+
+    // Converter para CSV
+    const csv = data.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `relatorio-ocupacao-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToCSV = () => {
+    // Criar dados para CSV
+    const data = [
+      ['Relatório de Ocupação'],
+      ['Período:', `${startDate} a ${endDate}`],
+      [],
+      ['Resumo'],
+      ['Ocupação Média', occupancyData.length > 0 ? Math.round(occupancyData.reduce((sum, m) => sum + m.occupancy, 0) / occupancyData.length) : 0],
+      ['Dias Ocupados', occupancyData.reduce((sum, m) => sum + m.occupied, 0)],
+      ['Total de Reservas', rentals?.length || 0],
+      [],
+      ['Ocupação por Mês'],
+      ['Mês', 'Ocupação (%)', 'Dias Ocupados', 'Total de Dias'],
+      ...occupancyData.map(m => [m.month, m.occupancy, m.occupied, m.total]),
+    ];
+
+    // Converter para CSV
+    const csv = data.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `relatorio-ocupacao-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (rentalsLoading || transactionsLoading) {
