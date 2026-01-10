@@ -474,7 +474,19 @@ export function Reports() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value) => `${value}%`} />
+                  <Tooltip content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-white p-2 border border-gray-300 rounded shadow-lg text-sm">
+                          <p className="font-semibold">{data.month}</p>
+                          <p>Ocupação: {data.occupancy}%</p>
+                          <p>Dias Alugados: {data.occupied}/{data.total}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }} />
                   <Legend />
                   <Line
                     type="monotone"
