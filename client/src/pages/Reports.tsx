@@ -84,12 +84,16 @@ export function Reports() {
 
     return Object.entries(monthlyData)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, data]) => ({
-        month: format(new Date(month + "-01"), "MMM/yy", { locale: ptBR }),
-        occupancy: data.total > 0 ? Math.round((data.occupied / data.total) * 100) : 0,
-        occupied: data.occupied,
-        total: data.total,
-      }));
+      .map(([month, data]) => {
+        const [year, monthNum] = month.split('-').map(Number);
+        const monthDate = new Date(year, monthNum - 1, 1);
+        return {
+          month: format(monthDate, "MMM/yy", { locale: ptBR }),
+          occupancy: data.total > 0 ? Math.round((data.occupied / data.total) * 100) : 0,
+          occupied: data.occupied,
+          total: data.total,
+        };
+      });
   };
 
   // Calcular dados financeiros
