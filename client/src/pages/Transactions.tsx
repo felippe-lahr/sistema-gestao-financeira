@@ -1113,6 +1113,7 @@ export default function Transactions() {
                 src={previewAttachment.blobUrl}
                 className="w-full h-[600px] border-0"
                 title="Preview PDF"
+                sandbox="allow-same-origin allow-scripts allow-popups"
               />
             ) : previewAttachment?.mimeType?.startsWith('image/') ? (
               <img

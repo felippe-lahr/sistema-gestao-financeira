@@ -47,6 +47,7 @@ export function AttachmentPreview({ attachment, onClose }: AttachmentPreviewProp
               src={previewUrl}
               className="w-full h-full bg-white rounded-lg shadow-2xl"
               title={attachment.filename}
+              sandbox="allow-same-origin allow-scripts allow-popups"
             />
           )}
 
