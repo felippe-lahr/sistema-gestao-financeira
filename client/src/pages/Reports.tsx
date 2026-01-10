@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, FileText, BarChart3, TrendingUp, Users, Zap } from "lucide-react";
+import { Download, FileText, BarChart3, TrendingUp, Users, Zap, ChevronLeft } from "lucide-react";
+import { useLocation } from "wouter";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { trpc } from "@/lib/trpc";
@@ -15,6 +16,7 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 
 export function Reports() {
   const { entityId } = useParams();
+  const [, setLocation] = useLocation();
   const [reportType, setReportType] = useState("occupancy");
   const [periodType, setPeriodType] = useState("month");
   const [startDate, setStartDate] = useState(format(subMonths(new Date(), 12), "yyyy-MM-dd"));
@@ -205,6 +207,10 @@ export function Reports() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
+        <Button onClick={() => setLocation(`/rentals/${entityId}`)} variant="ghost" className="gap-2">
+          <ChevronLeft className="w-4 h-4" />
+          Voltar para Reservas
+        </Button>
         <h1 className="text-3xl font-bold">Relatórios</h1>
         <div className="flex gap-2">
           <Select value={exportFormat} onValueChange={setExportFormat}>

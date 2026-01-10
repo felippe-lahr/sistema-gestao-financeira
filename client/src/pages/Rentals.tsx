@@ -323,9 +323,15 @@ export default function Rentals() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Reservas</h1>
-          <p className="text-muted-foreground mt-2">Gerencie suas reservas e bloqueios de temporada</p>
+        <div className="flex items-center gap-4">
+          <Button onClick={() => setLocation(`/dashboard/${entityId}`)} variant="ghost" className="gap-2">
+            <ChevronLeft className="w-4 h-4" />
+            Voltar para Dashboard
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Reservas</h1>
+            <p className="text-muted-foreground mt-2">Gerencie suas reservas e bloqueios de temporada</p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => setLocation(`/reports/${entityId}`)} variant="outline" className="gap-2">
