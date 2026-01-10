@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -194,11 +194,11 @@ export function Reports() {
     };
   };
 
-  const occupancyData = calculateOccupancyData();
-  const financialData = calculateFinancialData();
-  const guestData = calculateGuestData();
-  const sourcePerformance = calculateSourcePerformance();
-  const forecast = calculateForecast();
+  const occupancyData = useMemo(() => calculateOccupancyData(), [startDate, endDate, rentals]);
+  const financialData = useMemo(() => calculateFinancialData(), [rentals]);
+  const guestData = useMemo(() => calculateGuestData(), [rentals]);
+  const sourcePerformance = useMemo(() => calculateSourcePerformance(), [rentals]);
+  const forecast = useMemo(() => calculateForecast(), [rentals, startDate, endDate]);
 
   const sourceColors: Record<string, string> = {
     AIRBNB: "#FF5A5F",
