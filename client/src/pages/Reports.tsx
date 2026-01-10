@@ -33,43 +33,43 @@ export function Reports() {
 
   // Calcular dados de ocupação
   const calculateOccupancyData = () => {
-    if (!rentals) return [];
+    if (!rentals || rentals.length === 0) return [];
 
     const monthlyData: Record<string, { occupied: number; total: number }> = {};
+    const filterStart = new Date(startDate);
+    const filterEnd = new Date(endDate);
 
+    // Inicializar todos os meses no intervalo com 0 dias ocupados
+    let current = new Date(filterStart.getFullYear(), filterStart.getMonth(), 1);
+    while (current <= filterEnd) {
+      const monthKey = format(current, "yyyy-MM");
+      const daysInMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate();
+      monthlyData[monthKey] = { occupied: 0, total: daysInMonth };
+      current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+    }
+
+    // Contar dias ocupados por mês
     rentals.forEach((rental) => {
       const start = new Date(rental.startDate);
       const end = new Date(rental.endDate);
 
-      let current = new Date(start);
-      while (current < end) {
+      let current = new Date(Math.max(start.getTime(), filterStart.getTime()));
+      const endDateLimit = new Date(Math.min(end.getTime(), filterEnd.getTime()));
+
+      while (current < endDateLimit) {
         const monthKey = format(current, "yyyy-MM");
-        if (!monthlyData[monthKey]) {
-          monthlyData[monthKey] = { occupied: 0, total: 0 };
+        if (monthlyData[monthKey]) {
+          monthlyData[monthKey].occupied++;
         }
-        monthlyData[monthKey].occupied++;
         current.setDate(current.getDate() + 1);
       }
     });
-
-    // Preencher todos os meses com 0 se não tiverem dados
-    let current = new Date(startDate);
-    while (current <= new Date(endDate)) {
-      const monthKey = format(current, "yyyy-MM");
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = { occupied: 0, total: 0 };
-      }
-      // Calcular total de dias no mês
-      const daysInMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate();
-      monthlyData[monthKey].total = daysInMonth;
-      current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
-    }
 
     return Object.entries(monthlyData)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, data]) => ({
         month: format(new Date(month + "-01"), "MMM/yy", { locale: ptBR }),
-        occupancy: Math.round((data.occupied / data.total) * 100),
+        occupancy: data.total > 0 ? Math.round((data.occupied / data.total) * 100) : 0,
         occupied: data.occupied,
         total: data.total,
       }));
