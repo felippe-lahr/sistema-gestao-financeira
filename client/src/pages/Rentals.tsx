@@ -325,7 +325,7 @@ export default function Rentals() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button onClick={() => setLocation(`/dashboard/${entityId}`)} variant="ghost" className="gap-2">
+          <Button onClick={() => setLocation(`/dashboard/${entityId}`)} variant="ghost" className="gap-3">
             <ChevronLeft className="w-4 h-4" />
             Voltar para Dashboard
           </Button>
@@ -334,8 +334,8 @@ export default function Rentals() {
             <p className="text-muted-foreground mt-2">Gerencie suas reservas e bloqueios de temporada</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setLocation(`/reports/${entityId}`)} variant="outline" className="gap-2">
+        <div className="flex gap-3">
+          <Button onClick={() => setLocation(`/reports/${entityId}`)} variant="outline" className="gap-3">
             <BarChart3 className="w-4 h-4" />
             Relatórios
           </Button>
@@ -354,7 +354,7 @@ export default function Rentals() {
               <CardTitle>{format(currentMonth, "MMMM yyyy", { locale: ptBR })}</CardTitle>
               <CardDescription>Visualize suas reservas mês a mês</CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <Button
                 variant="outline"
                 size="sm"
@@ -380,7 +380,7 @@ export default function Rentals() {
               ))}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {/* Cabeçalho com dias da semana */}
               <div className="grid grid-cols-7 gap-1">
                 {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
@@ -441,7 +441,7 @@ export default function Rentals() {
                         } else if (!isCurrentMonth) {
                           bgColor = "bg-muted/30";
                         } else if (holiday) {
-                          bgColor = holiday.type === 'national' ? "bg-red-100 border-red-300" : "bg-yellow-100 border-yellow-300";
+                          bgColor = holiday.type === 'national' ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200";
                         }
 
                         return (
@@ -589,36 +589,36 @@ export default function Rentals() {
                               <PopoverContent side="top" align="center" className="w-80 p-4 bg-white rounded-lg shadow-lg border border-gray-200 z-[9999]" onMouseEnter={() => setOpenPopoverId(popoverId)} onMouseLeave={() => setOpenPopoverId(null)}>
                                 <div className="space-y-3">
                                   <div className="border-b pb-2">
-                                    <h3 className="font-bold text-lg text-gray-900">{rental.guestName || 'Sem hóspede'}</h3>
+                                    <h3 className="font-bold text-lg text-gray-800">{rental.guestName || 'Sem hóspede'}</h3>
                                     <p className="text-sm text-gray-600">{getSourceLabel(rental.source)}</p>
                                   </div>
                                   <div className="grid grid-cols-2 gap-3 text-sm">
                                     <div>
                                       <p className="text-gray-600 font-medium">Entrada</p>
-                                      <p className="text-gray-900">{new Date(rental.startDate).toLocaleDateString('pt-BR')}</p>
+                                      <p className="text-gray-800">{new Date(rental.startDate).toLocaleDateString('pt-BR')}</p>
                                     </div>
                                     <div>
                                       <p className="text-gray-600 font-medium">Saída</p>
-                                      <p className="text-gray-900">{new Date(rental.endDate).toLocaleDateString('pt-BR')}</p>
+                                      <p className="text-gray-800">{new Date(rental.endDate).toLocaleDateString('pt-BR')}</p>
                                     </div>
                                     <div>
                                       <p className="text-gray-600 font-medium">Hóspedes</p>
-                                      <p className="text-gray-900">{rental.numberOfGuests || 1}</p>
+                                      <p className="text-gray-800">{rental.numberOfGuests || 1}</p>
                                     </div>
                                     <div>
                                       <p className="text-gray-600 font-medium">Diária</p>
-                                      <p className="text-gray-900">{dailyFormatted}</p>
+                                      <p className="text-gray-800">{dailyFormatted}</p>
                                     </div>
                                   </div>
                                   <div className="border-t pt-2">
                                     <div className="flex justify-between items-center">
-                                      <span className="font-medium text-gray-900">Total</span>
+                                      <span className="font-medium text-gray-800">Total</span>
                                       <span className="font-bold text-lg text-green-600">{totalFormatted}</span>
                                     </div>
                                     {rental.extraFeeAmount > 0 && (
                                       <div className="flex justify-between items-center text-sm mt-2 border-t pt-2">
                                         <span className="text-gray-600">{rental.extraFeeType === 'IMPOSTO' ? 'Imposto' : rental.extraFeeType === 'TAXA_PET' ? 'Taxa Pet' : rental.extraFeeType === 'LIMPEZA' ? 'Limpeza' : rental.extraFeeType || 'Taxa Extra'}</span>
-                                        <span className="text-gray-900 font-medium">{extraFeeFormatted}</span>
+                                        <span className="text-gray-800 font-medium">{extraFeeFormatted}</span>
                                       </div>
                                     )}
                                   </div>
@@ -637,16 +637,16 @@ export default function Rentals() {
         </CardContent>
             
             {/* Rodapé com feriados do mês */}
-            <div className="mt-6 pt-4 border-t">
-              <h3 className="font-semibold text-sm mb-3">Feriados do mês</h3>
-              <div className="space-y-2">
+            <div className="mt-6 pt-4 border-t pl-4">
+              <h3 className="font-semibold text-sm mb-4">Feriados do mês</h3>
+              <div className="space-y-3">
                 {getHolidaysByMonth(currentMonth.getFullYear(), currentMonth.getMonth() + 1).length > 0 ? (
                   getHolidaysByMonth(currentMonth.getFullYear(), currentMonth.getMonth() + 1).map((holiday) => (
-                    <div key={holiday.date} className="flex items-start gap-2 text-sm">
-                      <span className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${holiday.type === "national" ? "bg-red-400" : "bg-yellow-400"}`}></span>
+                    <div key={holiday.date} className="flex items-start gap-3 text-sm">
+                      <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${holiday.type === "national" ? "bg-red-400" : "bg-yellow-400"}`}></span>
                       <div>
-                        <p className="font-medium text-gray-900">{holiday.name}</p>
-                        <p className="text-gray-500 text-xs">{format(new Date(holiday.date), "dd/MM/yyyy")}</p>
+                        <p className="font-medium text-gray-800">{holiday.name}</p>
+                        <p className="text-gray-500 text-xs mt-0.5">{format(new Date(holiday.date), "dd/MM/yyyy")}</p>
                       </div>
                     </div>
                   ))
@@ -671,7 +671,7 @@ export default function Rentals() {
           {/* Conteúdo Scrollável */}
           <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Data de Início *</Label>
                 <Input
                   type="date"
@@ -679,7 +679,7 @@ export default function Rentals() {
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Data de Fim *</Label>
                 <Input
                   type="date"
@@ -704,14 +704,14 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Nome do Hóspede</Label>
                 <Input
                   value={formData.guestName}
                   onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Número de Hóspedes</Label>
                 <Select value={formData.numberOfGuests.toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
                   <SelectTrigger>
@@ -729,7 +729,7 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Email</Label>
                 <Input
                   type="email"
@@ -737,7 +737,7 @@ export default function Rentals() {
                   onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Telefone</Label>
                 <Input
                   value={formData.guestPhone}
@@ -747,7 +747,7 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Diária (R$)</Label>
                 <CurrencyInput
                   value={dailyRateDisplay}
@@ -760,7 +760,7 @@ export default function Rentals() {
                   placeholder="0,00"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Total (R$)</Label>
                 <CurrencyInput
                   value={totalAmountDisplay}
@@ -775,7 +775,7 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Tipo de Taxa Extra</Label>
                 <Select value={formData.extraFeeType} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
                   <SelectTrigger>
@@ -789,7 +789,7 @@ export default function Rentals() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Valor da Taxa Extra (R$)</Label>
                 <CurrencyInput
                   value={extraFeeAmountDisplay}
@@ -804,7 +804,7 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Horário Check-in</Label>
                 <Input
                   type="time"
@@ -812,7 +812,7 @@ export default function Rentals() {
                   onChange={(e) => setFormData({ ...formData, checkInTime: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Horário Check-out</Label>
                 <Input
                   type="time"
@@ -850,7 +850,7 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="font-semibold">Notas</Label>
               <Textarea
                 value={formData.notes}
@@ -858,7 +858,7 @@ export default function Rentals() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="font-semibold">Documentos</Label>
               <RentalAttachmentUploader
                 rentalId={undefined}
@@ -934,7 +934,7 @@ export default function Rentals() {
           </div>
 
           {/* Footer Fixo */}
-          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
               Cancelar
             </Button>
@@ -959,7 +959,7 @@ export default function Rentals() {
           {/* Conteúdo Scrollável */}
           <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Data de Início *</Label>
                 <Input
                   type="date"
@@ -967,7 +967,7 @@ export default function Rentals() {
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Data de Fim *</Label>
                 <Input
                   type="date"
@@ -992,14 +992,14 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Nome do Hóspede</Label>
                 <Input
                   value={formData.guestName}
                   onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Número de Hóspedes</Label>
                 <Select value={formData.numberOfGuests.toString()} onValueChange={(value) => setFormData({ ...formData, numberOfGuests: parseInt(value) })}>
                   <SelectTrigger>
@@ -1017,7 +1017,7 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Email</Label>
                 <Input
                   type="email"
@@ -1025,7 +1025,7 @@ export default function Rentals() {
                   onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Telefone</Label>
                 <Input
                   value={formData.guestPhone}
@@ -1035,7 +1035,7 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Diária (R$)</Label>
                 <CurrencyInput
                   value={dailyRateDisplay}
@@ -1048,7 +1048,7 @@ export default function Rentals() {
                   placeholder="0,00"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Total (R$)</Label>
                 <CurrencyInput
                   value={totalAmountDisplay}
@@ -1063,7 +1063,7 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Tipo de Taxa Extra</Label>
                 <Select value={formData.extraFeeType} onValueChange={(value) => setFormData({ ...formData, extraFeeType: value })}>
                   <SelectTrigger>
@@ -1077,7 +1077,7 @@ export default function Rentals() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Valor da Taxa Extra (R$)</Label>
                 <CurrencyInput
                   value={extraFeeAmountDisplay}
@@ -1092,7 +1092,7 @@ export default function Rentals() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Horário Check-in</Label>
                 <Input
                   type="time"
@@ -1100,7 +1100,7 @@ export default function Rentals() {
                   onChange={(e) => setFormData({ ...formData, checkInTime: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="font-semibold">Horário Check-out</Label>
                 <Input
                   type="time"
@@ -1136,7 +1136,7 @@ export default function Rentals() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="font-semibold">Notas</Label>
               <Textarea
                 value={formData.notes}
@@ -1144,7 +1144,7 @@ export default function Rentals() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="font-semibold">Documentos</Label>
               <RentalAttachmentUploader
                 rentalId={undefined}
@@ -1220,7 +1220,7 @@ export default function Rentals() {
           </div>
 
           {/* Footer Fixo */}
-          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
