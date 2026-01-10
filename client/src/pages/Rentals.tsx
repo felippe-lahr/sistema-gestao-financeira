@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { RentalAttachmentUploader } from "@/components/RentalAttachmentUploader";
 import { uploadFile, deleteFile } from "@/lib/supabase";
 import { CurrencyInput, parseCurrency, formatCurrency } from "@/components/CurrencyInput";
+import { getHolidayByDate, getHolidaysByMonth } from "@/lib/holidays";
 
 type RentalAttachment = {
   id: number;
@@ -424,6 +425,8 @@ export default function Rentals() {
                     <div className="grid grid-cols-7 gap-1">
                       {week.map((day, dayIndex) => {
                         const isCurrentMonth = isSameMonth(day, currentMonth);
+                        const dayStr = format(day, 'yyyy-MM-dd');
+                        const holiday = getHolidayByDate(dayStr);
                         
                         // Verificar se a data já passou
                         const today = new Date();
@@ -432,16 +435,20 @@ export default function Rentals() {
                         dayNormalized.setHours(0, 0, 0, 0);
                         const isPastDate = dayNormalized < today;
 
+                        let bgColor = "bg-background";
+                        if (isPastDate) {
+                          bgColor = "bg-gray-100 text-gray-400";
+                        } else if (!isCurrentMonth) {
+                          bgColor = "bg-muted/30";
+                        } else if (holiday) {
+                          bgColor = holiday.type === 'national' ? "bg-red-100 border-red-300" : "bg-yellow-100 border-yellow-300";
+                        }
+
                         return (
                           <div
                             key={day.toISOString()}
-                            className={`min-h-32 border rounded p-2 relative ${
-                              isPastDate
-                                ? "bg-gray-100 text-gray-400"
-                                : isCurrentMonth
-                                ? "bg-background"
-                                : "bg-muted/30"
-                            }`}
+                            className={`min-h-32 border rounded p-2 relative ${bgColor}`}
+                            title={holiday ? `${holiday.name}` : ""}
                           >
                             {/* Número do dia */}
                             <div className="text-sm font-semibold">{format(day, "d")}</div>
@@ -628,6 +635,26 @@ export default function Rentals() {
             </div>
           )}
         </CardContent>
+            
+            {/* Rodapé com feriados do mês */}
+            <div className="mt-6 pt-4 border-t">
+              <h3 className="font-semibold text-sm mb-3">Feriados do mês</h3>
+              <div className="space-y-2">
+                {getHolidaysByMonth(currentMonth.getFullYear(), currentMonth.getMonth() + 1).length > 0 ? (
+                  getHolidaysByMonth(currentMonth.getFullYear(), currentMonth.getMonth() + 1).map((holiday) => (
+                    <div key={holiday.date} className="flex items-start gap-2 text-sm">
+                      <span className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${holiday.type === "national" ? "bg-red-400" : "bg-yellow-400"}`}></span>
+                      <div>
+                        <p className="font-medium text-gray-900">{holiday.name}</p>
+                        <p className="text-gray-500 text-xs">{format(new Date(holiday.date), "dd/MM/yyyy")}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm">Nenhum feriado neste mês</p>
+                )}
+              </div>
+            </div>
       </Card>
 
       {/* Dialog de Criar Reserva */}
