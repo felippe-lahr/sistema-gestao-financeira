@@ -366,15 +366,21 @@ export function Reports() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <Button onClick={() => setLocation(`/rentals/${entityId}`)} variant="ghost" className="gap-2">
-          <ChevronLeft className="w-4 h-4" />
-          Voltar para Reservas
-        </Button>
-        <h1 className="text-3xl font-bold">Relatórios</h1>
-        <div className="flex gap-2">
+      {/* Header Responsivo */}
+      <div className="space-y-4">
+        {/* Linha superior: botão voltar e título */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <Button onClick={() => setLocation(`/rentals/${entityId}`)} variant="ghost" className="gap-2 self-start">
+            <ChevronLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Voltar para Reservas</span>
+            <span className="sm:hidden">Voltar</span>
+          </Button>
+          <h1 className="text-2xl sm:text-3xl font-bold flex-1">Relatórios</h1>
+        </div>
+        {/* Linha inferior: botões de exportação */}
+        <div className="flex flex-wrap gap-2">
           <Select value={exportFormat} onValueChange={setExportFormat}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-28 sm:w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -383,9 +389,9 @@ export function Reports() {
               <SelectItem value="csv">CSV</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={() => handleExport(exportFormat)} className="gap-2">
+          <Button onClick={() => handleExport(exportFormat)} className="gap-2 flex-1 sm:flex-none">
             <Download className="w-4 h-4" />
-            Exportar
+            <span>Exportar</span>
           </Button>
         </div>
       </div>

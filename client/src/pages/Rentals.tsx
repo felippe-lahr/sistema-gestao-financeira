@@ -323,25 +323,28 @@ export default function Rentals() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button onClick={() => setLocation(`/dashboard/${entityId}`)} variant="ghost" className="gap-3">
+      <div className="space-y-4">
+        {/* Linha superior: botão voltar e título */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <Button onClick={() => setLocation(`/dashboard/${entityId}`)} variant="ghost" className="gap-2 self-start">
             <ChevronLeft className="w-4 h-4" />
-            Voltar para Dashboard
+            <span className="hidden sm:inline">Voltar para Dashboard</span>
+            <span className="sm:hidden">Voltar</span>
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Reservas</h1>
-            <p className="text-muted-foreground mt-2">Gerencie suas reservas e bloqueios de temporada</p>
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Reservas</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Gerencie suas reservas e bloqueios de temporada</p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <Button onClick={() => setLocation(`/reports/${entityId}`)} variant="outline" className="gap-3">
+        {/* Linha inferior: botões de ação */}
+        <div className="flex flex-wrap gap-2 sm:gap-3">
+          <Button onClick={() => setLocation(`/reports/${entityId}`)} variant="outline" className="gap-2 flex-1 sm:flex-none">
             <BarChart3 className="w-4 h-4" />
-            Relatórios
+            <span>Relatórios</span>
           </Button>
-          <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Reserva
+          <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700 gap-2 flex-1 sm:flex-none">
+            <Plus className="h-4 w-4" />
+            <span>Nova Reserva</span>
           </Button>
         </div>
       </div>
