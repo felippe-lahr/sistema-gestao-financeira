@@ -43,6 +43,7 @@ export default function Transactions() {
   
   // Resetar mês e ano para o atual ao abrir a página
   useEffect(() => {
+    setFilterPeriod("month");
     setFilterYear(new Date().getFullYear());
     setFilterMonth(new Date().getMonth() + 1);
   }, []);
