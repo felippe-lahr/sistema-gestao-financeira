@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, ChevronLeft, ChevronRight, X, BarChart3 } from "lucide-react";
 import { useLocation } from "wouter";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, differenceInDays, isSameMonth } from "date-fns";
@@ -49,6 +50,9 @@ export default function Rentals() {
   const [dailyRateDisplay, setDailyRateDisplay] = useState("");
   const [totalAmountDisplay, setTotalAmountDisplay] = useState("");
   const [extraFeeAmountDisplay, setExtraFeeAmountDisplay] = useState("");
+  
+  // Estado para controlar cálculo automático da diária
+  const [autoCalculateDailyRate, setAutoCalculateDailyRate] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -171,6 +175,8 @@ export default function Rentals() {
     setDailyRateDisplay("");
     setTotalAmountDisplay("");
     setExtraFeeAmountDisplay("");
+    // Resetar checkbox de cálculo automático
+    setAutoCalculateDailyRate(false);
   };
 
   const handleCreate = () => {
@@ -764,7 +770,36 @@ export default function Rentals() {
                     setFormData({ ...formData, dailyRate: centavos });
                   }}
                   placeholder="0,00"
+                  disabled={autoCalculateDailyRate}
                 />
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="autoCalcDaily"
+                    checked={autoCalculateDailyRate}
+                    onCheckedChange={(checked) => {
+                      setAutoCalculateDailyRate(checked as boolean);
+                      if (checked && formData.startDate && formData.endDate && formData.totalAmount > 0) {
+                        // Calcular número de diárias
+                        const [startYear, startMonth, startDay] = formData.startDate.split('-').map(Number);
+                        const [endYear, endMonth, endDay] = formData.endDate.split('-').map(Number);
+                        const start = new Date(startYear, startMonth - 1, startDay);
+                        const end = new Date(endYear, endMonth - 1, endDay);
+                        const nights = differenceInDays(end, start);
+                        if (nights > 0) {
+                          const dailyRateCents = Math.round(formData.totalAmount / nights);
+                          setFormData(prev => ({ ...prev, dailyRate: dailyRateCents }));
+                          setDailyRateDisplay(formatCurrency(dailyRateCents / 100));
+                        }
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="autoCalcDaily"
+                    className="text-sm text-muted-foreground cursor-pointer"
+                  >
+                    Calcular a partir do total
+                  </label>
+                </div>
               </div>
               <div className="space-y-3">
                 <Label className="font-semibold">Total (R$)</Label>
@@ -773,7 +808,20 @@ export default function Rentals() {
                   onChange={(value) => {
                     setTotalAmountDisplay(value);
                     const centavos = Math.round(parseCurrency(value) * 100);
-                    setFormData({ ...formData, totalAmount: centavos });
+                    setFormData(prev => ({ ...prev, totalAmount: centavos }));
+                    // Se o checkbox estiver marcado, recalcular a diária
+                    if (autoCalculateDailyRate && formData.startDate && formData.endDate) {
+                      const [startYear, startMonth, startDay] = formData.startDate.split('-').map(Number);
+                      const [endYear, endMonth, endDay] = formData.endDate.split('-').map(Number);
+                      const start = new Date(startYear, startMonth - 1, startDay);
+                      const end = new Date(endYear, endMonth - 1, endDay);
+                      const nights = differenceInDays(end, start);
+                      if (nights > 0 && centavos > 0) {
+                        const dailyRateCents = Math.round(centavos / nights);
+                        setFormData(prev => ({ ...prev, totalAmount: centavos, dailyRate: dailyRateCents }));
+                        setDailyRateDisplay(formatCurrency(dailyRateCents / 100));
+                      }
+                    }
                   }}
                   placeholder="0,00"
                 />
@@ -1052,7 +1100,36 @@ export default function Rentals() {
                     setFormData({ ...formData, dailyRate: centavos });
                   }}
                   placeholder="0,00"
+                  disabled={autoCalculateDailyRate}
                 />
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="autoCalcDaily"
+                    checked={autoCalculateDailyRate}
+                    onCheckedChange={(checked) => {
+                      setAutoCalculateDailyRate(checked as boolean);
+                      if (checked && formData.startDate && formData.endDate && formData.totalAmount > 0) {
+                        // Calcular número de diárias
+                        const [startYear, startMonth, startDay] = formData.startDate.split('-').map(Number);
+                        const [endYear, endMonth, endDay] = formData.endDate.split('-').map(Number);
+                        const start = new Date(startYear, startMonth - 1, startDay);
+                        const end = new Date(endYear, endMonth - 1, endDay);
+                        const nights = differenceInDays(end, start);
+                        if (nights > 0) {
+                          const dailyRateCents = Math.round(formData.totalAmount / nights);
+                          setFormData(prev => ({ ...prev, dailyRate: dailyRateCents }));
+                          setDailyRateDisplay(formatCurrency(dailyRateCents / 100));
+                        }
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="autoCalcDaily"
+                    className="text-sm text-muted-foreground cursor-pointer"
+                  >
+                    Calcular a partir do total
+                  </label>
+                </div>
               </div>
               <div className="space-y-3">
                 <Label className="font-semibold">Total (R$)</Label>
@@ -1061,7 +1138,20 @@ export default function Rentals() {
                   onChange={(value) => {
                     setTotalAmountDisplay(value);
                     const centavos = Math.round(parseCurrency(value) * 100);
-                    setFormData({ ...formData, totalAmount: centavos });
+                    setFormData(prev => ({ ...prev, totalAmount: centavos }));
+                    // Se o checkbox estiver marcado, recalcular a diária
+                    if (autoCalculateDailyRate && formData.startDate && formData.endDate) {
+                      const [startYear, startMonth, startDay] = formData.startDate.split('-').map(Number);
+                      const [endYear, endMonth, endDay] = formData.endDate.split('-').map(Number);
+                      const start = new Date(startYear, startMonth - 1, startDay);
+                      const end = new Date(endYear, endMonth - 1, endDay);
+                      const nights = differenceInDays(end, start);
+                      if (nights > 0 && centavos > 0) {
+                        const dailyRateCents = Math.round(centavos / nights);
+                        setFormData(prev => ({ ...prev, totalAmount: centavos, dailyRate: dailyRateCents }));
+                        setDailyRateDisplay(formatCurrency(dailyRateCents / 100));
+                      }
+                    }
                   }}
                   placeholder="0,00"
                 />
