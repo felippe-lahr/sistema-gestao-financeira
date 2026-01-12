@@ -611,6 +611,10 @@ export default function Rentals() {
                                       <p className="text-gray-800">{new Date(rental.endDate).toLocaleDateString('pt-BR')}</p>
                                     </div>
                                     <div>
+                                      <p className="text-gray-600 font-medium">Diárias</p>
+                                      <p className="text-gray-800">{differenceInDays(new Date(rental.endDate), new Date(rental.startDate))}</p>
+                                    </div>
+                                    <div>
                                       <p className="text-gray-600 font-medium">Hóspedes</p>
                                       <p className="text-gray-800">{rental.numberOfGuests || 1}</p>
                                     </div>
