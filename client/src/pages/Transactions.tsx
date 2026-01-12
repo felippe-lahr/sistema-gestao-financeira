@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,12 @@ export default function Transactions() {
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  
+  // Resetar mês e ano para o atual ao abrir a página
+  useEffect(() => {
+    setFilterYear(new Date().getFullYear());
+    setFilterMonth(new Date().getMonth() + 1);
+  }, []);
   
   // Calcular quantos filtros estao ativos
   const activeFiltersCount = [
