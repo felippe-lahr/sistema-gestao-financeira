@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, ChevronLeft, ChevronRight, X, BarChart3 } from "lucide-react";
 import { useLocation } from "wouter";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, differenceInDays, isSameMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, differenceInDays, isSameMonth, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -604,15 +604,15 @@ export default function Rentals() {
                                   <div className="grid grid-cols-2 gap-3 text-sm">
                                     <div>
                                       <p className="text-gray-600 font-medium">Entrada</p>
-                                      <p className="text-gray-800">{new Date(rental.startDate).toLocaleDateString('pt-BR')}</p>
+                                      <p className="text-gray-800">{format(parseISO(rental.startDate), 'dd/MM/yyyy')}</p>
                                     </div>
                                     <div>
                                       <p className="text-gray-600 font-medium">Saída</p>
-                                      <p className="text-gray-800">{new Date(rental.endDate).toLocaleDateString('pt-BR')}</p>
+                                      <p className="text-gray-800">{format(parseISO(rental.endDate), 'dd/MM/yyyy')}</p>
                                     </div>
                                     <div>
                                       <p className="text-gray-600 font-medium">Diárias</p>
-                                      <p className="text-gray-800">{differenceInDays(new Date(rental.endDate), new Date(rental.startDate))}</p>
+                                      <p className="text-gray-800">{differenceInDays(parseISO(rental.endDate), parseISO(rental.startDate))}</p>
                                     </div>
                                     <div>
                                       <p className="text-gray-600 font-medium">Hóspedes</p>
