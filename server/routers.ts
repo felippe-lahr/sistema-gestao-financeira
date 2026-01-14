@@ -1627,7 +1627,134 @@ export const appRouter = router({
           .returning();
         return result[0];
       }),
+   }),
+
+  // ========== TASKS ==========
+  tasks: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getTasksByUserId(ctx.user.id);
+    }),
+
+    listByEntity: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await db.getTasksByEntityId(input.entityId);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const task = await db.getTaskById(input.id);
+        if (!task) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+        }
+        if (task.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return task;
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number().optional(),
+          title: z.string().min(1).max(255),
+          description: z.string().optional(),
+          dueDate: z.date(),
+          dueTime: z.string().max(5).optional(),
+          endDate: z.date().optional(),
+          endTime: z.string().max(5).optional(),
+          allDay: z.boolean().optional(),
+          priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
+          status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+          reminderMinutes: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        if (input.entityId) {
+          const entity = await db.getEntityById(input.entityId);
+          if (!entity || entity.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        const taskId = await db.createTask({
+          userId: ctx.user.id,
+          entityId: input.entityId,
+          title: input.title,
+          description: input.description,
+          dueDate: input.dueDate,
+          dueTime: input.dueTime,
+          endDate: input.endDate,
+          endTime: input.endTime,
+          allDay: input.allDay,
+          priority: input.priority,
+          status: input.status,
+          color: input.color,
+          reminderMinutes: input.reminderMinutes,
+        });
+        return { id: taskId };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          entityId: z.number().optional().nullable(),
+          title: z.string().min(1).max(255).optional(),
+          description: z.string().optional().nullable(),
+          dueDate: z.date().optional(),
+          dueTime: z.string().max(5).optional().nullable(),
+          endDate: z.date().optional().nullable(),
+          endTime: z.string().max(5).optional().nullable(),
+          allDay: z.boolean().optional(),
+          priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
+          status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+          reminderMinutes: z.number().optional().nullable(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const task = await db.getTaskById(input.id);
+        if (!task || task.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        if (input.entityId) {
+          const entity = await db.getEntityById(input.entityId);
+          if (!entity || entity.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        const { id, ...updateData } = input;
+        await db.updateTask(id, updateData);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const task = await db.getTaskById(input.id);
+        if (!task || task.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        await db.deleteTask(input.id);
+        return { success: true };
+      }),
+
+    complete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const task = await db.getTaskById(input.id);
+        if (!task || task.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        await db.completeTask(input.id);
+        return { success: true };
+      }),
   }),
 });
-
 export type AppRouter = typeof appRouter;

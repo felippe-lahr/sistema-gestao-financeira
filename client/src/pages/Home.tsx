@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Plus, TrendingUp, TrendingDown, DollarSign, Eye, EyeOff, BarChart3 } from "lucide-react";
+import { Building2, Plus, TrendingUp, TrendingDown, DollarSign, Eye, EyeOff, BarChart3, Calendar } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 
@@ -97,6 +97,10 @@ export default function Home() {
           <Button onClick={() => setLocation("/overall-dashboard")} variant="outline" className="w-full sm:w-auto">
             <BarChart3 className="mr-2 h-4 w-4" />
             Dashboard Overall
+          </Button>
+          <Button onClick={() => setLocation("/agenda")} variant="outline" className="w-full sm:w-auto">
+            <Calendar className="mr-2 h-4 w-4" />
+            Agenda
           </Button>
           <Button onClick={() => setLocation("/entities")} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />

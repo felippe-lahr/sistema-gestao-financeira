@@ -472,3 +472,52 @@ export const rentalSyncLogs = pgTable("rental_sync_logs", {
 
 export type RentalSyncLog = typeof rentalSyncLogs.$inferSelect;
 export type InsertRentalSyncLog = typeof rentalSyncLogs.$inferInsert;
+
+
+/**
+ * Task Priority enum
+ */
+export const taskPriorityEnum = pgEnum("task_priority", ["LOW", "MEDIUM", "HIGH"]);
+
+/**
+ * Task Status enum
+ */
+export const taskStatusEnum = pgEnum("task_status", ["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
+
+/**
+ * Tasks table - Tarefas e compromissos por entidade
+ */
+export const tasks = pgTable("tasks", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  entityId: integer("entityId").references(() => entities.id, { onDelete: "cascade" }),
+  
+  // Informações da tarefa
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  
+  // Data e hora
+  dueDate: timestamp("dueDate").notNull(),
+  dueTime: varchar("dueTime", { length: 5 }), // Formato HH:MM
+  endDate: timestamp("endDate"), // Para eventos com duração
+  endTime: varchar("endTime", { length: 5 }), // Formato HH:MM
+  allDay: boolean("allDay").default(false).notNull(),
+  
+  // Status e prioridade
+  priority: taskPriorityEnum("priority").default("MEDIUM").notNull(),
+  status: taskStatusEnum("status").default("PENDING").notNull(),
+  
+  // Cor personalizada (opcional)
+  color: varchar("color", { length: 7 }),
+  
+  // Lembrete
+  reminderMinutes: integer("reminderMinutes"), // Minutos antes para lembrar
+  
+  // Metadados
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = typeof tasks.$inferInsert;

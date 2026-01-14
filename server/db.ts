@@ -26,6 +26,8 @@ import {
   InsertInvestmentTransaction,
   treasurySelic,
   InsertTreasurySelic,
+  tasks,
+  InsertTask,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1236,4 +1238,93 @@ export async function updateUserName(userId: number, name: string): Promise<void
   if (!db) throw new Error("Database not available");
 
   await db.update(users).set({ name, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+
+// ========== TASKS OPERATIONS ==========
+
+export async function getTasksByUserId(userId: number): Promise<typeof tasks.$inferSelect[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(tasks).where(eq(tasks.userId, userId)).orderBy(tasks.dueDate);
+}
+
+export async function getTasksByEntityId(entityId: number): Promise<typeof tasks.$inferSelect[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(tasks).where(eq(tasks.entityId, entityId)).orderBy(tasks.dueDate);
+}
+
+export async function getTaskById(id: number): Promise<typeof tasks.$inferSelect | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function createTask(task: InsertTask): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Criar tabela se não existir
+  try {
+    await db.execute(sql`
+      DO $$ BEGIN
+        CREATE TYPE task_priority AS ENUM ('LOW', 'MEDIUM', 'HIGH');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+    await db.execute(sql`
+      DO $$ BEGIN
+        CREATE TYPE task_status AS ENUM ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL,
+        "entityId" INTEGER REFERENCES entities(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        "dueDate" TIMESTAMP NOT NULL,
+        "dueTime" VARCHAR(5),
+        "endDate" TIMESTAMP,
+        "endTime" VARCHAR(5),
+        "allDay" BOOLEAN DEFAULT FALSE NOT NULL,
+        priority task_priority DEFAULT 'MEDIUM' NOT NULL,
+        status task_status DEFAULT 'PENDING' NOT NULL,
+        color VARCHAR(7),
+        "reminderMinutes" INTEGER,
+        "completedAt" TIMESTAMP,
+        "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+        "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `);
+  } catch (e) {
+    console.log("[DB] Tabela tasks já existe ou erro ao criar:", e);
+  }
+  
+  const result = await db.insert(tasks).values(task).returning({ id: tasks.id });
+  return result[0].id;
+}
+
+export async function updateTask(id: number, data: Partial<InsertTask>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(tasks).set({ ...data, updatedAt: new Date() }).where(eq(tasks.id, id));
+}
+
+export async function deleteTask(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(tasks).where(eq(tasks.id, id));
+}
+
+export async function completeTask(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(tasks).set({ status: "COMPLETED", completedAt: new Date(), updatedAt: new Date() }).where(eq(tasks.id, id));
 }
