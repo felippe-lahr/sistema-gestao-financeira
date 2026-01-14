@@ -1761,6 +1761,18 @@ export const appRouter = router({
         await db.completeTask(input.id);
         return { success: true };
       }),
+
+    toggleComplete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const task = await db.getTaskById(input.id);
+        if (!task || task.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        const newStatus = task.status === "COMPLETED" ? "PENDING" : "COMPLETED";
+        await db.updateTask(input.id, { status: newStatus });
+        return { success: true, status: newStatus };
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;
