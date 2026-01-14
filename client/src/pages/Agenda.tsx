@@ -378,34 +378,41 @@ export default function Agenda() {
                   </div>
                   
                   {/* Tarefas do dia */}
-                  <div className="space-y-0.5 overflow-hidden">
+                  <div className="space-y-0.5 overflow-visible relative">
                     {dayTasks.slice(0, 3).map((task, taskIndex) => {
                       const isStart = isTaskStart(task, day);
                       const isEnd = isTaskEnd(task, day);
-                      const span = isStart ? getTaskSpanInWeek(task, day) : 0;
+                      const dayOfWeek = day.getDay();
                       
                       // Só renderiza a barra se for o início da tarefa ou início de uma nova semana
-                      const dayOfWeek = day.getDay();
                       const shouldRenderBar = isStart || dayOfWeek === 0;
                       
-                      if (!shouldRenderBar) return null;
+                      // Calcular span apenas quando deve renderizar
+                      const span = shouldRenderBar ? getTaskSpanInWeek(task, day) : 1;
+                      
+                      // Se não deve renderizar a barra (dia do meio), retorna espaço vazio para manter alinhamento
+                      if (!shouldRenderBar) {
+                        return (
+                          <div key={task.id} className="h-5" />
+                        );
+                      }
                       
                       return (
                         <div
                           key={task.id}
                           className={`
-                            text-xs px-1 py-0.5 truncate text-white
+                            text-xs px-1 py-0.5 truncate text-white h-5
                             ${PRIORITY_COLORS[task.priority as keyof typeof PRIORITY_COLORS]}
                             ${isStart ? "rounded-l" : ""}
-                            ${isEnd ? "rounded-r" : ""}
+                            ${isEnd || (dayOfWeek + span - 1 >= 6) ? "rounded-r" : ""}
                             ${task.status === "COMPLETED" ? "opacity-50 line-through" : ""}
                           `}
                           style={{
                             width: span > 1 ? `calc(${span * 100}% + ${(span - 1) * 1}px)` : "100%",
-                            position: span > 1 ? "relative" : "static",
+                            position: "relative",
                             zIndex: 10,
                           }}
-                          title={`${task.title}${task.endDate && task.endDate !== task.dueDate ? ` (${format(task.startDate, "dd/MM")} - ${format(task.endDate, "dd/MM")})` : ""}`}
+                          title={`${task.title}${task.duration > 1 ? ` (${format(task.startDate, "dd/MM")} - ${format(task.endDate, "dd/MM")})` : ""}`}
                         >
                           {task.title}
                         </div>
