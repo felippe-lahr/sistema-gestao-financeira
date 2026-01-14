@@ -468,7 +468,13 @@ export const appRouter = router({
             transactionIds.push(transactionId);
           }
 
-          return { id: transactionIds[0], count: transactionIds.length };
+          // Buscar as transações criadas para retornar os dados completos
+          const createdTransactions = [];
+          for (const tid of transactionIds) {
+            const t = await db.getTransactionById(tid);
+            if (t) createdTransactions.push(t);
+          }
+          return { id: transactionIds[0], count: transactionIds.length, transactions: createdTransactions };
         }
 
         // Se não for recorrente, criar apenas uma transação

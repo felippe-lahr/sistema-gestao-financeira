@@ -142,21 +142,22 @@ export default function Transactions() {
       // Criar tarefa na agenda se solicitado
       if (formData.addToAgenda && selectedEntityId) {
         try {
-          const taskTitle = formData.type === "EXPENSE" ? "Pagamento de Conta" : "Recebimento";
-          const taskDescription = formData.description;
+          const taskTitle = formData.type === "EXPENSE" 
+            ? `Pagamento: ${formData.description}` 
+            : `Recebimento: ${formData.description}`;
           
           // Se for recorrente, criar uma tarefa para cada parcela
-          if (formData.isRecurring && data.transactions) {
+          if (formData.isRecurring && data.transactions && data.transactions.length > 0) {
             for (const transaction of data.transactions) {
               await utils.client.tasks.create.mutate({
                 entityId: selectedEntityId,
                 title: taskTitle,
-                description: taskDescription,
-                startDate: new Date(transaction.dueDate),
+                description: `Valor: R$ ${(transaction.amount / 100).toFixed(2).replace('.', ',')}`,
+                dueDate: new Date(transaction.dueDate),
                 endDate: new Date(transaction.dueDate),
-                startTime: "09:00",
+                dueTime: "09:00",
                 endTime: "10:00",
-                isAllDay: true,
+                allDay: true,
                 priority: "MEDIUM",
                 status: "PENDING",
               });
@@ -166,16 +167,17 @@ export default function Transactions() {
             await utils.client.tasks.create.mutate({
               entityId: selectedEntityId,
               title: taskTitle,
-              description: taskDescription,
-              startDate: new Date(formData.dueDate + "T12:00:00"),
+              description: `Valor: R$ ${(parseCurrency(formData.amount) / 100).toFixed(2).replace('.', ',')}`,
+              dueDate: new Date(formData.dueDate + "T12:00:00"),
               endDate: new Date(formData.dueDate + "T12:00:00"),
-              startTime: "09:00",
+              dueTime: "09:00",
               endTime: "10:00",
-              isAllDay: true,
+              allDay: true,
               priority: "MEDIUM",
               status: "PENDING",
             });
           }
+          toast.success("Tarefa adicionada na agenda!");
         } catch (error) {
           console.error("Erro ao criar tarefa na agenda:", error);
           toast.error("Transação criada mas houve erro ao adicionar na agenda");
@@ -194,7 +196,33 @@ export default function Transactions() {
   });
 
   const updateMutation = trpc.transactions.update.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Criar tarefa na agenda se solicitado durante edição
+      if (formData.addToAgenda && selectedEntityId && editingTransaction) {
+        try {
+          const taskTitle = formData.type === "EXPENSE" 
+            ? `Pagamento: ${formData.description}` 
+            : `Recebimento: ${formData.description}`;
+          
+          await utils.client.tasks.create.mutate({
+            entityId: selectedEntityId,
+            title: taskTitle,
+            description: `Valor: R$ ${(parseCurrency(formData.amount) / 100).toFixed(2).replace('.', ',')}`,
+            dueDate: new Date(formData.dueDate + "T12:00:00"),
+            endDate: new Date(formData.dueDate + "T12:00:00"),
+            dueTime: "09:00",
+            endTime: "10:00",
+            allDay: true,
+            priority: "MEDIUM",
+            status: "PENDING",
+          });
+          toast.success("Tarefa adicionada na agenda!");
+        } catch (error) {
+          console.error("Erro ao criar tarefa na agenda:", error);
+          toast.error("Transação atualizada mas houve erro ao adicionar na agenda");
+        }
+      }
+      
       utils.transactions.listByEntity.invalidate();
       utils.dashboard.metrics.invalidate();
       setIsEditOpen(false);
@@ -1463,22 +1491,20 @@ function TransactionForm({
       </div>
 
       {!isEdit && (
-        <>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="recurring" checked={formData.isRecurring} onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: checked as boolean })} />
-            <Label htmlFor="recurring" className="cursor-pointer">
-              Despesa recorrente
-            </Label>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox id="addToAgenda" checked={formData.addToAgenda} onCheckedChange={(checked) => setFormData({ ...formData, addToAgenda: checked as boolean })} />
-            <Label htmlFor="addToAgenda" className="cursor-pointer">
-              Adicionar na agenda
-            </Label>
-          </div>
-        </>
+        <div className="flex items-center space-x-2">
+          <Checkbox id="recurring" checked={formData.isRecurring} onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: checked as boolean })} />
+          <Label htmlFor="recurring" className="cursor-pointer">
+            Despesa recorrente
+          </Label>
+        </div>
       )}
+      
+      <div className="flex items-center space-x-2">
+        <Checkbox id="addToAgenda" checked={formData.addToAgenda} onCheckedChange={(checked) => setFormData({ ...formData, addToAgenda: checked as boolean })} />
+        <Label htmlFor="addToAgenda" className="cursor-pointer">
+          Adicionar na agenda
+        </Label>
+      </div>
 
       {formData.isRecurring && !isEdit && (
         <div className="space-y-4">
