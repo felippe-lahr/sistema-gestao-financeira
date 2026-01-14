@@ -141,7 +141,7 @@ export default function Agenda() {
       endTime: formData.endTime || undefined,
       allDay: formData.allDay,
       priority: formData.priority,
-      entityId: formData.entityId ? parseInt(formData.entityId) : undefined,
+        entityId: formData.entityId && formData.entityId !== "none" ? parseInt(formData.entityId) : undefined,
       color: formData.color || undefined,
     });
   };
@@ -162,7 +162,7 @@ export default function Agenda() {
       endTime: formData.endTime || null,
       allDay: formData.allDay,
       priority: formData.priority,
-      entityId: formData.entityId ? parseInt(formData.entityId) : null,
+      entityId: formData.entityId && formData.entityId !== "none" ? parseInt(formData.entityId) : null,
       color: formData.color || null,
     });
   };
@@ -481,12 +481,12 @@ export default function Agenda() {
 
             <div>
               <Label>Entidade (opcional)</Label>
-              <Select value={formData.entityId} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
+              <Select value={formData.entityId || undefined} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma entidade" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="none">Nenhuma</SelectItem>
                   {entities.map((entity) => (
                     <SelectItem key={entity.id} value={entity.id.toString()}>
                       {entity.name}
@@ -579,12 +579,12 @@ export default function Agenda() {
 
             <div>
               <Label>Entidade (opcional)</Label>
-              <Select value={formData.entityId} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
+              <Select value={formData.entityId || undefined} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma entidade" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="none">Nenhuma</SelectItem>
                   {entities.map((entity) => (
                     <SelectItem key={entity.id} value={entity.id.toString()}>
                       {entity.name}
