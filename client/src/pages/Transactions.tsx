@@ -71,6 +71,7 @@ export default function Transactions() {
     recurrenceCount: "1",
     recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
     attachments: [] as number[],
+    addToAgenda: false,
   });
 
   // Estado para gerenciar anexos
@@ -135,6 +136,49 @@ export default function Transactions() {
         } catch (error) {
           console.error("Erro ao salvar anexos:", error);
           toast.error("Transação criada mas houve erro ao salvar anexos");
+        }
+      }
+      
+      // Criar tarefa na agenda se solicitado
+      if (formData.addToAgenda && selectedEntityId) {
+        try {
+          const taskTitle = formData.type === "EXPENSE" ? "Pagamento de Conta" : "Recebimento";
+          const taskDescription = formData.description;
+          
+          // Se for recorrente, criar uma tarefa para cada parcela
+          if (formData.isRecurring && data.transactions) {
+            for (const transaction of data.transactions) {
+              await utils.client.tasks.create.mutate({
+                entityId: selectedEntityId,
+                title: taskTitle,
+                description: taskDescription,
+                startDate: new Date(transaction.dueDate),
+                endDate: new Date(transaction.dueDate),
+                startTime: "09:00",
+                endTime: "10:00",
+                isAllDay: true,
+                priority: "MEDIUM",
+                status: "PENDING",
+              });
+            }
+          } else {
+            // Criar apenas uma tarefa para transação única
+            await utils.client.tasks.create.mutate({
+              entityId: selectedEntityId,
+              title: taskTitle,
+              description: taskDescription,
+              startDate: new Date(formData.dueDate + "T12:00:00"),
+              endDate: new Date(formData.dueDate + "T12:00:00"),
+              startTime: "09:00",
+              endTime: "10:00",
+              isAllDay: true,
+              priority: "MEDIUM",
+              status: "PENDING",
+            });
+          }
+        } catch (error) {
+          console.error("Erro ao criar tarefa na agenda:", error);
+          toast.error("Transação criada mas houve erro ao adicionar na agenda");
         }
       }
       
@@ -274,6 +318,7 @@ export default function Transactions() {
       recurrenceCount: "1",
       recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
       attachments: [],
+      addToAgenda: false,
     });
     setAttachments([]);
     setEditingTransaction(null);
@@ -317,6 +362,7 @@ export default function Transactions() {
       recurrenceCount: "1",
       recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
       attachments: [],
+      addToAgenda: false,
     });
     
     // Carregar anexos da transação
@@ -1417,12 +1463,21 @@ function TransactionForm({
       </div>
 
       {!isEdit && (
-        <div className="flex items-center space-x-2">
-          <Checkbox id="recurring" checked={formData.isRecurring} onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: checked as boolean })} />
-          <Label htmlFor="recurring" className="cursor-pointer">
-            Despesa recorrente
-          </Label>
-        </div>
+        <>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="recurring" checked={formData.isRecurring} onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: checked as boolean })} />
+            <Label htmlFor="recurring" className="cursor-pointer">
+              Despesa recorrente
+            </Label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox id="addToAgenda" checked={formData.addToAgenda} onCheckedChange={(checked) => setFormData({ ...formData, addToAgenda: checked as boolean })} />
+            <Label htmlFor="addToAgenda" className="cursor-pointer">
+              Adicionar na agenda
+            </Label>
+          </div>
+        </>
       )}
 
       {formData.isRecurring && !isEdit && (
