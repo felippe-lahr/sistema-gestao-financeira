@@ -366,23 +366,23 @@ export default function OverallDashboard() {
                 <p className="text-sm text-gray-500 py-4 text-center">Nenhuma conta a vencer nos próximos 7 dias</p>
               ) : (
                 upcomingBills.map((bill) => (
-                  <div key={bill.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm">{bill.description}</span>
-                        <Badge 
-                          variant="outline" 
-                          className="text-xs"
-                          style={{ borderColor: bill.entityColor, color: bill.entityColor }}
-                        >
-                          {bill.entityName}
-                        </Badge>
-                      </div>
+                  <div key={bill.id} className="p-3 bg-gray-50 rounded-lg border">
+                    <div className="mb-2">
+                      <span className="font-medium text-sm">{bill.description}</span>
+                    </div>
+                    <div className="mb-2">
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs"
+                        style={{ borderColor: bill.entityColor, color: bill.entityColor }}
+                      >
+                        {bill.entityName}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
                       <div className="text-xs text-gray-500">
                         Vence em {format(new Date(bill.dueDate), "dd/MM/yyyy")}
                       </div>
-                    </div>
-                    <div className="text-right">
                       <div className="font-semibold text-orange-600">
                         {formatCurrency(bill.amount)}
                       </div>
@@ -405,23 +405,23 @@ export default function OverallDashboard() {
                 <p className="text-sm text-gray-500 py-4 text-center">Nenhuma conta vencida</p>
               ) : (
                 overdueBills.map((bill) => (
-                  <div key={bill.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm">{bill.description}</span>
-                        <Badge 
-                          variant="outline" 
-                          className="text-xs"
-                          style={{ borderColor: bill.entityColor, color: bill.entityColor }}
-                        >
-                          {bill.entityName}
-                        </Badge>
-                      </div>
+                  <div key={bill.id} className="p-3 bg-red-50 rounded-lg border border-red-100">
+                    <div className="mb-2">
+                      <span className="font-medium text-sm">{bill.description}</span>
+                    </div>
+                    <div className="mb-2">
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs"
+                        style={{ borderColor: bill.entityColor, color: bill.entityColor }}
+                      >
+                        {bill.entityName}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
                       <div className="text-xs text-red-600">
                         Venceu em {format(new Date(bill.dueDate), "dd/MM/yyyy")}
                       </div>
-                    </div>
-                    <div className="text-right">
                       <div className="font-semibold text-red-600">
                         {formatCurrency(bill.amount)}
                       </div>
