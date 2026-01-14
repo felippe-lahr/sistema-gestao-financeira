@@ -1,24 +1,29 @@
-"use client";
+import { trpc } from "@/lib/trpc";
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Flag, Check, Trash2, Edit2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Edit2, X } from "lucide-react";
 import { useLocation } from "wouter";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isBefore, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isBefore, startOfWeek, endOfWeek, parseISO, addDays, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 const PRIORITY_COLORS = {
+  LOW: "bg-blue-500",
+  MEDIUM: "bg-yellow-500",
+  HIGH: "bg-red-500",
+};
+
+const PRIORITY_BADGE_COLORS = {
   LOW: "bg-blue-100 text-blue-800 border-blue-200",
   MEDIUM: "bg-yellow-100 text-yellow-800 border-yellow-200",
   HIGH: "bg-red-100 text-red-800 border-red-200",
@@ -30,17 +35,10 @@ const PRIORITY_LABELS = {
   HIGH: "Alta",
 };
 
-const STATUS_LABELS = {
-  PENDING: "Pendente",
-  IN_PROGRESS: "Em Andamento",
-  COMPLETED: "Concluída",
-  CANCELLED: "Cancelada",
-};
-
 export default function Agenda() {
   const [, setLocation] = useLocation();
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
@@ -62,7 +60,6 @@ export default function Agenda() {
 
   const { data: entities = [] } = trpc.entities.list.useQuery();
   const { data: tasks = [], refetch: refetchTasks } = trpc.tasks.list.useQuery();
-  const utils = trpc.useUtils();
 
   const createTask = trpc.tasks.create.useMutation({
     onSuccess: () => {
@@ -101,13 +98,9 @@ export default function Agenda() {
     },
   });
 
-  const completeTask = trpc.tasks.complete.useMutation({
+  const toggleComplete = trpc.tasks.toggleComplete.useMutation({
     onSuccess: () => {
-      toast.success("Tarefa concluída!");
       refetchTasks();
-    },
-    onError: (error) => {
-      toast.error("Erro ao concluir tarefa: " + error.message);
     },
   });
 
@@ -126,39 +119,65 @@ export default function Agenda() {
     });
   };
 
+  // Função para converter data ISO para string local (corrige timezone)
+  const formatDateToLocal = (dateStr: string) => {
+    const date = parseISO(dateStr);
+    return format(date, "yyyy-MM-dd");
+  };
+
   const handleCreateTask = () => {
     if (!formData.title || !formData.dueDate) {
-      toast.error("Preencha o título e a data");
+      toast.error("Preencha o título e a data de início");
       return;
+    }
+
+    // Criar data com timezone correto (meio-dia para evitar problemas de timezone)
+    const dueDateParts = formData.dueDate.split('-');
+    const dueDate = new Date(parseInt(dueDateParts[0]), parseInt(dueDateParts[1]) - 1, parseInt(dueDateParts[2]), 12, 0, 0);
+    
+    let endDate = undefined;
+    if (formData.endDate) {
+      const endDateParts = formData.endDate.split('-');
+      endDate = new Date(parseInt(endDateParts[0]), parseInt(endDateParts[1]) - 1, parseInt(endDateParts[2]), 12, 0, 0);
     }
 
     createTask.mutate({
       title: formData.title,
       description: formData.description || undefined,
-      dueDate: new Date(formData.dueDate),
+      dueDate: dueDate,
       dueTime: formData.dueTime || undefined,
-      endDate: formData.endDate ? new Date(formData.endDate) : undefined,
+      endDate: endDate,
       endTime: formData.endTime || undefined,
       allDay: formData.allDay,
       priority: formData.priority,
-        entityId: formData.entityId && formData.entityId !== "none" ? parseInt(formData.entityId) : undefined,
+      entityId: formData.entityId && formData.entityId !== "none" ? parseInt(formData.entityId) : undefined,
       color: formData.color || undefined,
     });
   };
 
   const handleUpdateTask = () => {
     if (!editingTask || !formData.title || !formData.dueDate) {
-      toast.error("Preencha o título e a data");
+      toast.error("Preencha o título e a data de início");
       return;
+    }
+
+    // Criar data com timezone correto
+    const dueDateParts = formData.dueDate.split('-');
+    const dueDate = new Date(parseInt(dueDateParts[0]), parseInt(dueDateParts[1]) - 1, parseInt(dueDateParts[2]), 12, 0, 0);
+    
+    let endDate = null;
+    if (formData.endDate) {
+      const endDateParts = formData.endDate.split('-');
+      endDate = new Date(parseInt(endDateParts[0]), parseInt(endDateParts[1]) - 1, parseInt(endDateParts[2]), 12, 0, 0);
     }
 
     updateTask.mutate({
       id: editingTask.id,
       title: formData.title,
       description: formData.description || null,
-      dueDate: new Date(formData.dueDate),
+      dueDate: dueDate,
       dueTime: formData.dueTime || null,
-      endDate: formData.endDate ? new Date(formData.endDate) : null,
+      endDate: endDate,
       endTime: formData.endTime || null,
       allDay: formData.allDay,
       priority: formData.priority,
@@ -172,9 +191,9 @@ export default function Agenda() {
     setFormData({
       title: task.title,
       description: task.description || "",
-      dueDate: format(new Date(task.dueDate), "yyyy-MM-dd"),
+      dueDate: formatDateToLocal(task.dueDate),
       dueTime: task.dueTime || "",
-      endDate: task.endDate ? format(new Date(task.endDate), "yyyy-MM-dd") : "",
+      endDate: task.endDate ? formatDateToLocal(task.endDate) : "",
       endTime: task.endTime || "",
       allDay: task.allDay,
       priority: task.priority,
@@ -205,25 +224,56 @@ export default function Agenda() {
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [currentMonth]);
 
-  // Agrupar tarefas por data
-  const tasksByDate = useMemo(() => {
-    const grouped: Record<string, any[]> = {};
-    tasks.forEach((task) => {
-      const dateKey = format(new Date(task.dueDate), "yyyy-MM-dd");
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
-      }
-      grouped[dateKey].push(task);
+  // Processar tarefas para exibição no calendário (incluindo barras contínuas)
+  const processedTasks = useMemo(() => {
+    return tasks.map(task => {
+      const startDate = parseISO(task.dueDate);
+      const endDate = task.endDate ? parseISO(task.endDate) : startDate;
+      const duration = differenceInDays(endDate, startDate) + 1;
+      
+      return {
+        ...task,
+        startDate,
+        endDate,
+        duration,
+      };
     });
-    return grouped;
   }, [tasks]);
+
+  // Verificar se uma tarefa deve aparecer em um dia específico
+  const getTasksForDay = (day: Date) => {
+    return processedTasks.filter(task => {
+      const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+      const taskStart = new Date(task.startDate.getFullYear(), task.startDate.getMonth(), task.startDate.getDate());
+      const taskEnd = new Date(task.endDate.getFullYear(), task.endDate.getMonth(), task.endDate.getDate());
+      
+      return dayStart >= taskStart && dayStart <= taskEnd;
+    });
+  };
+
+  // Verificar se é o primeiro dia de uma tarefa
+  const isTaskStart = (task: any, day: Date) => {
+    return isSameDay(task.startDate, day);
+  };
+
+  // Verificar se é o último dia de uma tarefa
+  const isTaskEnd = (task: any, day: Date) => {
+    return isSameDay(task.endDate, day);
+  };
+
+  // Calcular quantos dias a tarefa continua a partir deste dia na semana atual
+  const getTaskSpanInWeek = (task: any, day: Date) => {
+    const dayOfWeek = day.getDay();
+    const daysUntilEndOfWeek = 6 - dayOfWeek;
+    const daysUntilTaskEnd = differenceInDays(task.endDate, day);
+    return Math.min(daysUntilEndOfWeek, daysUntilTaskEnd) + 1;
+  };
 
   // Tarefas do dia selecionado
   const selectedDayTasks = useMemo(() => {
     if (!selectedDate) return [];
-    const dateKey = format(selectedDate, "yyyy-MM-dd");
-    return tasksByDate[dateKey] || [];
-  }, [selectedDate, tasksByDate]);
+    return getTasksForDay(selectedDate);
+  }, [selectedDate, processedTasks]);
 
   const getEntityName = (entityId: number | null) => {
     if (!entityId) return null;
@@ -238,9 +288,9 @@ export default function Agenda() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4">
         <Button
           variant="ghost"
           onClick={() => setLocation("/")}
@@ -261,390 +311,471 @@ export default function Agenda() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Calendário */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xl capitalize">
-                {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
-              </CardTitle>
-              <div className="flex gap-2">
-                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())}>
-                  Hoje
-                </Button>
-                <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+      {/* Calendário - Largura total */}
+      <Card className="mb-6">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl capitalize">
+              {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())}>
+                Hoje
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Dias da semana */}
+          <div className="grid grid-cols-7 mb-2">
+            {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
+              <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
+                {day}
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Dias da semana */}
-            <div className="grid grid-cols-7 mb-2">
-              {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
-                <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
-                  {day}
-                </div>
-              ))}
-            </div>
+            ))}
+          </div>
 
-            {/* Dias do mês */}
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((day) => {
-                const dateKey = format(day, "yyyy-MM-dd");
-                const dayTasks = tasksByDate[dateKey] || [];
-                const isCurrentMonth = isSameMonth(day, currentMonth);
-                const isSelected = selectedDate && isSameDay(day, selectedDate);
-                const isPast = isBefore(day, new Date()) && !isToday(day);
+          {/* Dias do mês */}
+          <div className="grid grid-cols-7 gap-px bg-gray-200">
+            {calendarDays.map((day, index) => {
+              const dayTasks = getTasksForDay(day);
+              const isCurrentMonth = isSameMonth(day, currentMonth);
+              const isSelected = selectedDate && isSameDay(day, selectedDate);
+              const isPast = isBefore(day, new Date()) && !isToday(day);
 
-                return (
-                  <div
-                    key={dateKey}
-                    onClick={() => setSelectedDate(day)}
-                    className={`
-                      min-h-[80px] p-1 border rounded-lg cursor-pointer transition-colors
-                      ${isCurrentMonth ? "bg-white" : "bg-gray-50"}
-                      ${isSelected ? "ring-2 ring-blue-500 border-blue-500" : "border-gray-200"}
-                      ${isPast && isCurrentMonth ? "opacity-60" : ""}
-                      hover:border-blue-300
-                    `}
-                  >
-                    <div className={`
-                      text-sm font-medium mb-1
-                      ${isToday(day) ? "bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center" : ""}
-                      ${!isCurrentMonth ? "text-gray-400" : "text-gray-900"}
-                    `}>
-                      {format(day, "d")}
-                    </div>
-                    <div className="space-y-0.5">
-                      {dayTasks.slice(0, 3).map((task) => (
+              return (
+                <div
+                  key={index}
+                  onClick={() => setSelectedDate(day)}
+                  className={`
+                    min-h-[100px] p-1 cursor-pointer transition-colors bg-white
+                    ${!isCurrentMonth ? "bg-gray-50" : ""}
+                    ${isSelected ? "ring-2 ring-blue-500 ring-inset" : ""}
+                    ${isToday(day) ? "bg-blue-50" : ""}
+                    hover:bg-gray-100
+                  `}
+                >
+                  <div className={`
+                    text-sm font-medium mb-1
+                    ${!isCurrentMonth ? "text-gray-400" : ""}
+                    ${isPast && isCurrentMonth ? "text-gray-400" : ""}
+                    ${isToday(day) ? "text-blue-600 font-bold" : ""}
+                  `}>
+                    {format(day, "d")}
+                  </div>
+                  
+                  {/* Tarefas do dia */}
+                  <div className="space-y-0.5 overflow-hidden">
+                    {dayTasks.slice(0, 3).map((task, taskIndex) => {
+                      const isStart = isTaskStart(task, day);
+                      const isEnd = isTaskEnd(task, day);
+                      const span = isStart ? getTaskSpanInWeek(task, day) : 0;
+                      
+                      // Só renderiza a barra se for o início da tarefa ou início de uma nova semana
+                      const dayOfWeek = day.getDay();
+                      const shouldRenderBar = isStart || dayOfWeek === 0;
+                      
+                      if (!shouldRenderBar) return null;
+                      
+                      return (
                         <div
                           key={task.id}
                           className={`
-                            text-xs px-1 py-0.5 rounded truncate
-                            ${task.status === "COMPLETED" ? "bg-green-100 text-green-800 line-through" : ""}
-                            ${task.status !== "COMPLETED" && task.priority === "HIGH" ? "bg-red-100 text-red-800" : ""}
-                            ${task.status !== "COMPLETED" && task.priority === "MEDIUM" ? "bg-yellow-100 text-yellow-800" : ""}
-                            ${task.status !== "COMPLETED" && task.priority === "LOW" ? "bg-blue-100 text-blue-800" : ""}
+                            text-xs px-1 py-0.5 truncate text-white
+                            ${PRIORITY_COLORS[task.priority as keyof typeof PRIORITY_COLORS]}
+                            ${isStart ? "rounded-l" : ""}
+                            ${isEnd ? "rounded-r" : ""}
+                            ${task.status === "COMPLETED" ? "opacity-50 line-through" : ""}
                           `}
-                          style={task.color ? { backgroundColor: task.color + "20", color: task.color } : {}}
+                          style={{
+                            width: span > 1 ? `calc(${span * 100}% + ${(span - 1) * 1}px)` : "100%",
+                            position: span > 1 ? "relative" : "static",
+                            zIndex: 10,
+                          }}
+                          title={`${task.title}${task.endDate && task.endDate !== task.dueDate ? ` (${format(task.startDate, "dd/MM")} - ${format(task.endDate, "dd/MM")})` : ""}`}
                         >
                           {task.title}
                         </div>
-                      ))}
-                      {dayTasks.length > 3 && (
-                        <div className="text-xs text-gray-500 px-1">
-                          +{dayTasks.length - 3} mais
-                        </div>
-                      )}
-                    </div>
+                      );
+                    })}
+                    {dayTasks.length > 3 && (
+                      <div className="text-xs text-gray-500 px-1">
+                        +{dayTasks.length - 3} mais
+                      </div>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Tarefas do dia selecionado */}
-        <Card>
-          <CardHeader>
+      {/* Painel de Tarefas do Dia Selecionado - Abaixo do calendário */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
             <CardTitle className="text-lg">
-              {selectedDate ? format(selectedDate, "dd 'de' MMMM", { locale: ptBR }) : "Selecione um dia"}
+              {selectedDate ? format(selectedDate, "d 'de' MMMM", { locale: ptBR }) : "Selecione um dia"}
             </CardTitle>
-            <CardDescription>
-              {selectedDayTasks.length} tarefa{selectedDayTasks.length !== 1 ? "s" : ""}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
             {selectedDate && (
-              <Button 
-                variant="outline" 
-                className="w-full mb-4"
-                onClick={() => openCreateSheet(selectedDate)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar tarefa
-              </Button>
+              <span className="text-sm text-gray-500">
+                {selectedDayTasks.length} {selectedDayTasks.length === 1 ? "tarefa" : "tarefas"}
+              </span>
             )}
-
-            <div className="space-y-3 max-h-[500px] overflow-y-auto">
-              {selectedDayTasks.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-8">
-                  {selectedDate ? "Nenhuma tarefa para este dia" : "Selecione um dia no calendário"}
-                </p>
-              ) : (
-                selectedDayTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className={`
-                      p-3 rounded-lg border
-                      ${task.status === "COMPLETED" ? "bg-gray-50 border-gray-200" : "bg-white border-gray-200"}
-                    `}
-                  >
-                    <div className="flex items-start justify-between gap-2">
+          </div>
+        </CardHeader>
+        <CardContent>
+          {selectedDate && (
+            <Button
+              variant="outline"
+              className="w-full mb-4"
+              onClick={() => openCreateSheet(selectedDate)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar tarefa
+            </Button>
+          )}
+          
+          {selectedDayTasks.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">Nenhuma tarefa para este dia</p>
+          ) : (
+            <div className="space-y-3">
+              {selectedDayTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className={`p-3 rounded-lg border ${task.status === "COMPLETED" ? "bg-gray-50 opacity-70" : "bg-white"}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 flex-1">
+                      <Checkbox
+                        checked={task.status === "COMPLETED"}
+                        onCheckedChange={() => toggleComplete.mutate({ id: task.id })}
+                        className="mt-1"
+                      />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Checkbox
-                            checked={task.status === "COMPLETED"}
-                            onCheckedChange={() => {
-                              if (task.status !== "COMPLETED") {
-                                completeTask.mutate({ id: task.id });
-                              }
-                            }}
-                          />
-                          <span className={`font-medium text-sm ${task.status === "COMPLETED" ? "line-through text-gray-500" : ""}`}>
-                            {task.title}
-                          </span>
-                        </div>
-                        
+                        <p className={`font-medium ${task.status === "COMPLETED" ? "line-through text-gray-500" : ""}`}>
+                          {task.title}
+                        </p>
                         {task.entityId && (
                           <Badge 
                             variant="outline" 
-                            className="text-xs mb-1"
-                            style={{ borderColor: getEntityColor(task.entityId), color: getEntityColor(task.entityId) }}
+                            className="mt-1 text-xs"
+                            style={{ 
+                              borderColor: getEntityColor(task.entityId),
+                              color: getEntityColor(task.entityId)
+                            }}
                           >
                             {getEntityName(task.entityId)}
                           </Badge>
                         )}
-
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          {task.dueTime && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {task.dueTime}
-                            </span>
-                          )}
-                          <Badge variant="outline" className={`text-xs ${PRIORITY_COLORS[task.priority as keyof typeof PRIORITY_COLORS]}`}>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <Badge className={PRIORITY_BADGE_COLORS[task.priority as keyof typeof PRIORITY_BADGE_COLORS]}>
                             {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS]}
                           </Badge>
+                          {task.endDate && task.endDate !== task.dueDate && (
+                            <Badge variant="secondary" className="text-xs">
+                              {format(task.startDate, "dd/MM")} - {format(task.endDate, "dd/MM")}
+                            </Badge>
+                          )}
                         </div>
-
                         {task.description && (
-                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">{task.description}</p>
+                          <p className="text-sm text-gray-500 mt-1">{task.description}</p>
                         )}
                       </div>
-
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditSheet(task)}>
-                          <Edit2 className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-7 w-7 text-red-600 hover:text-red-700"
-                          onClick={() => {
-                            setTaskToDelete(task.id);
-                            setDeleteConfirmOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEditSheet(task)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => {
+                          setTaskToDelete(task.id);
+                          setDeleteConfirmOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
                     </div>
                   </div>
-                ))
-              )}
+                </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Sheet de Criar Tarefa */}
+      {/* Sheet de Criar Tarefa - Estilo igual aos demais */}
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <SheetContent className="overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Nova Tarefa</SheetTitle>
-          </SheetHeader>
-          <div className="space-y-4 mt-6">
-            <div>
-              <Label>Título *</Label>
-              <Input
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Digite o título da tarefa"
-              />
-            </div>
-
-            <div>
-              <Label>Descrição</Label>
-              <Textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Descrição opcional"
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <Label>Entidade (opcional)</Label>
-              <Select value={formData.entityId || undefined} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma entidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhuma</SelectItem>
-                  {entities.map((entity) => (
-                    <SelectItem key={entity.id} value={entity.id.toString()}>
-                      {entity.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
+          {/* Header Fixo */}
+          <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
+            <SheetTitle className="text-xl font-bold">Nova Tarefa</SheetTitle>
+            <Button variant="ghost" size="icon" onClick={() => setIsCreateOpen(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Conteúdo com scroll */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-4">
               <div>
-                <Label>Data *</Label>
+                <Label>Título *</Label>
                 <Input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Digite o título da tarefa"
                 />
               </div>
+
               <div>
-                <Label>Horário</Label>
-                <Input
-                  type="time"
-                  value={formData.dueTime}
-                  onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
-                  disabled={formData.allDay}
+                <Label>Descrição</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Descrição opcional"
+                  rows={3}
                 />
               </div>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="allDay"
-                checked={formData.allDay}
-                onCheckedChange={(checked) => setFormData({ ...formData, allDay: !!checked })}
-              />
-              <label htmlFor="allDay" className="text-sm">Dia inteiro</label>
-            </div>
+              <div>
+                <Label>Entidade (opcional)</Label>
+                <Select value={formData.entityId || undefined} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma entidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma</SelectItem>
+                    {entities.map((entity) => (
+                      <SelectItem key={entity.id} value={entity.id.toString()}>
+                        {entity.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <Label>Prioridade</Label>
-              <Select value={formData.priority} onValueChange={(v: any) => setFormData({ ...formData, priority: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LOW">Baixa</SelectItem>
-                  <SelectItem value="MEDIUM">Média</SelectItem>
-                  <SelectItem value="HIGH">Alta</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Data de Início *</Label>
+                  <Input
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Data de Término</Label>
+                  <Input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    min={formData.dueDate}
+                  />
+                </div>
+              </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button variant="outline" className="flex-1" onClick={() => setIsCreateOpen(false)}>
-                Cancelar
-              </Button>
-              <Button className="flex-1" onClick={handleCreateTask} disabled={createTask.isPending}>
-                {createTask.isPending ? "Salvando..." : "Criar Tarefa"}
-              </Button>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Horário Início</Label>
+                  <Input
+                    type="time"
+                    value={formData.dueTime}
+                    onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
+                    disabled={formData.allDay}
+                  />
+                </div>
+                <div>
+                  <Label>Horário Término</Label>
+                  <Input
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    disabled={formData.allDay}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="allDay"
+                  checked={formData.allDay}
+                  onCheckedChange={(checked) => setFormData({ ...formData, allDay: !!checked })}
+                />
+                <label htmlFor="allDay" className="text-sm">Dia inteiro</label>
+              </div>
+
+              <div>
+                <Label>Prioridade</Label>
+                <Select value={formData.priority} onValueChange={(v: any) => setFormData({ ...formData, priority: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LOW">Baixa</SelectItem>
+                    <SelectItem value="MEDIUM">Média</SelectItem>
+                    <SelectItem value="HIGH">Alta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </div>
+          
+          {/* Footer Fixo */}
+          <div className="sticky bottom-0 z-10 border-t bg-white px-6 py-4 flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setIsCreateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button className="flex-1" onClick={handleCreateTask} disabled={createTask.isPending}>
+              {createTask.isPending ? "Salvando..." : "Criar Tarefa"}
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
 
-      {/* Sheet de Editar Tarefa */}
+      {/* Sheet de Editar Tarefa - Estilo igual aos demais */}
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <SheetContent className="overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Editar Tarefa</SheetTitle>
-          </SheetHeader>
-          <div className="space-y-4 mt-6">
-            <div>
-              <Label>Título *</Label>
-              <Input
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Digite o título da tarefa"
-              />
-            </div>
-
-            <div>
-              <Label>Descrição</Label>
-              <Textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Descrição opcional"
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <Label>Entidade (opcional)</Label>
-              <Select value={formData.entityId || undefined} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma entidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhuma</SelectItem>
-                  {entities.map((entity) => (
-                    <SelectItem key={entity.id} value={entity.id.toString()}>
-                      {entity.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
+          {/* Header Fixo */}
+          <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
+            <SheetTitle className="text-xl font-bold">Editar Tarefa</SheetTitle>
+            <Button variant="ghost" size="icon" onClick={() => setIsEditOpen(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Conteúdo com scroll */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-4">
               <div>
-                <Label>Data *</Label>
+                <Label>Título *</Label>
                 <Input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Digite o título da tarefa"
                 />
               </div>
+
               <div>
-                <Label>Horário</Label>
-                <Input
-                  type="time"
-                  value={formData.dueTime}
-                  onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
-                  disabled={formData.allDay}
+                <Label>Descrição</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Descrição opcional"
+                  rows={3}
                 />
               </div>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="allDayEdit"
-                checked={formData.allDay}
-                onCheckedChange={(checked) => setFormData({ ...formData, allDay: !!checked })}
-              />
-              <label htmlFor="allDayEdit" className="text-sm">Dia inteiro</label>
-            </div>
+              <div>
+                <Label>Entidade (opcional)</Label>
+                <Select value={formData.entityId || undefined} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma entidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma</SelectItem>
+                    {entities.map((entity) => (
+                      <SelectItem key={entity.id} value={entity.id.toString()}>
+                        {entity.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <Label>Prioridade</Label>
-              <Select value={formData.priority} onValueChange={(v: any) => setFormData({ ...formData, priority: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LOW">Baixa</SelectItem>
-                  <SelectItem value="MEDIUM">Média</SelectItem>
-                  <SelectItem value="HIGH">Alta</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Data de Início *</Label>
+                  <Input
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Data de Término</Label>
+                  <Input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    min={formData.dueDate}
+                  />
+                </div>
+              </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button variant="outline" className="flex-1" onClick={() => setIsEditOpen(false)}>
-                Cancelar
-              </Button>
-              <Button className="flex-1" onClick={handleUpdateTask} disabled={updateTask.isPending}>
-                {updateTask.isPending ? "Salvando..." : "Salvar Alterações"}
-              </Button>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Horário Início</Label>
+                  <Input
+                    type="time"
+                    value={formData.dueTime}
+                    onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
+                    disabled={formData.allDay}
+                  />
+                </div>
+                <div>
+                  <Label>Horário Término</Label>
+                  <Input
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    disabled={formData.allDay}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="allDayEdit"
+                  checked={formData.allDay}
+                  onCheckedChange={(checked) => setFormData({ ...formData, allDay: !!checked })}
+                />
+                <label htmlFor="allDayEdit" className="text-sm">Dia inteiro</label>
+              </div>
+
+              <div>
+                <Label>Prioridade</Label>
+                <Select value={formData.priority} onValueChange={(v: any) => setFormData({ ...formData, priority: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LOW">Baixa</SelectItem>
+                    <SelectItem value="MEDIUM">Média</SelectItem>
+                    <SelectItem value="HIGH">Alta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </div>
+          
+          {/* Footer Fixo */}
+          <div className="sticky bottom-0 z-10 border-t bg-white px-6 py-4 flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setIsEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                if (editingTask) {
+                  setTaskToDelete(editingTask.id);
+                  setDeleteConfirmOpen(true);
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button className="flex-1" onClick={handleUpdateTask} disabled={updateTask.isPending}>
+              {updateTask.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -653,16 +784,21 @@ export default function Agenda() {
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Tarefa</AlertDialogTitle>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.
+              Esta ação não pode ser desfeita. A tarefa será permanentemente removida.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
+              onClick={() => {
+                if (taskToDelete) {
+                  deleteTask.mutate({ id: taskToDelete });
+                  setIsEditOpen(false);
+                }
+              }}
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => taskToDelete && deleteTask.mutate({ id: taskToDelete })}
             >
               Excluir
             </AlertDialogAction>
