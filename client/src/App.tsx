@@ -10,6 +10,7 @@ import Investments from "@/pages/Investments";
 import Rentals from "@/pages/Rentals";
 import { Reports } from "@/pages/Reports";
 import TreasurySelix from "@/pages/TreasurySelix";
+import OverallDashboard from "@/pages/OverallDashboard";
 import Settings from "@/pages/Settings";
 import UserProfile from "@/pages/UserProfile";
 import { Route, Switch } from "wouter";
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/rentals/:entityId" component={() => <DashboardLayout><Rentals /></DashboardLayout>} />
       <Route path="/reports/:entityId" component={() => <DashboardLayout><Reports /></DashboardLayout>} />
       <Route path="/treasury-selic/:entityId" component={() => <DashboardLayout><TreasurySelix /></DashboardLayout>} />
+      <Route path="/overall-dashboard" component={() => <DashboardLayout><OverallDashboard /></DashboardLayout>} />
       <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
       <Route path="/profile" component={() => <DashboardLayout><UserProfile /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
