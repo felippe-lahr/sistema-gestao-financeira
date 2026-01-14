@@ -151,6 +151,40 @@ export const appRouter = router({
         return { id: categoryId };
       }),
 
+    listByEntities: protectedProcedure
+      .input(
+        z.object({
+          entityIds: z.array(z.number()),
+          startDate: z.date().optional(),
+          endDate: z.date().optional(),
+          status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
+          type: z.enum(["INCOME", "EXPENSE"]).optional(),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        // Verify all entities belong to user
+        for (const entityId of input.entityIds) {
+          const entity = await db.getEntityById(entityId);
+          if (!entity || entity.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        
+        // Get transactions from all entities
+        const allTransactions = [];
+        for (const entityId of input.entityIds) {
+          const transactions = await db.getTransactionsByEntityId(entityId, {
+            startDate: input.startDate,
+            endDate: input.endDate,
+            status: input.status,
+            type: input.type,
+          });
+          allTransactions.push(...transactions);
+        }
+        
+        return allTransactions;
+      }),
+
     update: protectedProcedure
       .input(
         z.object({
