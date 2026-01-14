@@ -119,9 +119,16 @@ export default function Agenda() {
     });
   };
 
+  // Função para converter data para Date object
+  const toDate = (dateValue: string | Date): Date => {
+    if (dateValue instanceof Date) return dateValue;
+    if (typeof dateValue === 'string') return parseISO(dateValue);
+    return new Date(dateValue);
+  };
+
   // Função para converter data ISO para string local (corrige timezone)
-  const formatDateToLocal = (dateStr: string) => {
-    const date = parseISO(dateStr);
+  const formatDateToLocal = (dateValue: string | Date) => {
+    const date = toDate(dateValue);
     return format(date, "yyyy-MM-dd");
   };
 
@@ -227,8 +234,8 @@ export default function Agenda() {
   // Processar tarefas para exibição no calendário (incluindo barras contínuas)
   const processedTasks = useMemo(() => {
     return tasks.map(task => {
-      const startDate = parseISO(task.dueDate);
-      const endDate = task.endDate ? parseISO(task.endDate) : startDate;
+      const startDate = toDate(task.dueDate);
+      const endDate = task.endDate ? toDate(task.endDate) : startDate;
       const duration = differenceInDays(endDate, startDate) + 1;
       
       return {
