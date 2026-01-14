@@ -233,7 +233,7 @@ export default function Agenda() {
 
   // Processar tarefas para exibição no calendário (incluindo barras contínuas)
   const processedTasks = useMemo(() => {
-    return tasks.map(task => {
+    const tasksWithDates = tasks.map(task => {
       const startDate = toDate(task.dueDate);
       const endDate = task.endDate ? toDate(task.endDate) : startDate;
       const duration = differenceInDays(endDate, startDate) + 1;
@@ -245,6 +245,42 @@ export default function Agenda() {
         duration,
       };
     });
+
+    // Ordenar tarefas por data de início e duração (tarefas mais longas primeiro)
+    tasksWithDates.sort((a, b) => {
+      const startDiff = a.startDate.getTime() - b.startDate.getTime();
+      if (startDiff !== 0) return startDiff;
+      return b.duration - a.duration; // Tarefas mais longas primeiro
+    });
+
+    // Calcular linha (row) para cada tarefa para evitar sobreposição
+    const taskRows: Map<number, number> = new Map();
+    const occupiedRows: { endDate: Date; row: number }[] = [];
+
+    tasksWithDates.forEach(task => {
+      // Encontrar a primeira linha disponível
+      let row = 0;
+      const taskStartTime = task.startDate.getTime();
+      
+      // Verificar quais linhas estão ocupadas neste período
+      const occupiedRowNumbers = occupiedRows
+        .filter(or => or.endDate.getTime() >= taskStartTime)
+        .map(or => or.row);
+      
+      // Encontrar a primeira linha livre
+      while (occupiedRowNumbers.includes(row)) {
+        row++;
+      }
+      
+      taskRows.set(task.id, row);
+      occupiedRows.push({ endDate: task.endDate, row });
+    });
+
+    // Adicionar row a cada tarefa
+    return tasksWithDates.map(task => ({
+      ...task,
+      row: taskRows.get(task.id) || 0,
+    }));
   }, [tasks]);
 
   // Verificar se uma tarefa deve aparecer em um dia específico
@@ -255,7 +291,7 @@ export default function Agenda() {
       const taskEnd = new Date(task.endDate.getFullYear(), task.endDate.getMonth(), task.endDate.getDate());
       
       return dayStart >= taskStart && dayStart <= taskEnd;
-    });
+    }).sort((a, b) => a.row - b.row); // Ordenar por linha para manter posição consistente
   };
 
   // Verificar se é o primeiro dia de uma tarefa
@@ -378,8 +414,8 @@ export default function Agenda() {
                   </div>
                   
                   {/* Tarefas do dia */}
-                  <div className="space-y-0.5 overflow-visible relative">
-                    {dayTasks.slice(0, 3).map((task, taskIndex) => {
+                  <div className="overflow-visible relative" style={{ minHeight: `${Math.max(dayTasks.length, 1) * 22 + 4}px` }}>
+                    {dayTasks.map((task) => {
                       const isStart = isTaskStart(task, day);
                       const isEnd = isTaskEnd(task, day);
                       const dayOfWeek = day.getDay();
@@ -387,29 +423,27 @@ export default function Agenda() {
                       // Só renderiza a barra se for o início da tarefa ou início de uma nova semana
                       const shouldRenderBar = isStart || dayOfWeek === 0;
                       
-                      // Calcular span apenas quando deve renderizar
-                      const span = shouldRenderBar ? getTaskSpanInWeek(task, day) : 1;
-                      
-                      // Se não deve renderizar a barra (dia do meio), retorna espaço vazio para manter alinhamento
+                      // Se não deve renderizar a barra (dia do meio), não renderiza nada
                       if (!shouldRenderBar) {
-                        return (
-                          <div key={task.id} className="h-5" />
-                        );
+                        return null;
                       }
+                      
+                      // Calcular span
+                      const span = getTaskSpanInWeek(task, day);
                       
                       return (
                         <div
                           key={task.id}
                           className={`
-                            text-xs px-1 py-0.5 truncate text-white h-5
+                            text-xs px-1 py-0.5 truncate text-white h-5 absolute left-0
                             ${PRIORITY_COLORS[task.priority as keyof typeof PRIORITY_COLORS]}
                             ${isStart ? "rounded-l" : ""}
                             ${isEnd || (dayOfWeek + span - 1 >= 6) ? "rounded-r" : ""}
                             ${task.status === "COMPLETED" ? "opacity-50 line-through" : ""}
                           `}
                           style={{
-                            width: span > 1 ? `calc(${span * 100}% + ${(span - 1) * 1}px)` : "100%",
-                            position: "relative",
+                            width: span > 1 ? `calc(${span * 100}% + ${(span - 1) * 1}px)` : "calc(100% - 4px)",
+                            top: `${task.row * 22}px`,
                             zIndex: 10,
                           }}
                           title={`${task.title}${task.duration > 1 ? ` (${format(task.startDate, "dd/MM")} - ${format(task.endDate, "dd/MM")})` : ""}`}
@@ -418,11 +452,6 @@ export default function Agenda() {
                         </div>
                       );
                     })}
-                    {dayTasks.length > 3 && (
-                      <div className="text-xs text-gray-500 px-1">
-                        +{dayTasks.length - 3} mais
-                      </div>
-                    )}
                   </div>
                 </div>
               );
