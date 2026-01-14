@@ -200,23 +200,74 @@ export default function Transactions() {
       // Criar tarefa na agenda se solicitado durante edição
       if (formData.addToAgenda && selectedEntityId && editingTransaction) {
         try {
-          const taskTitle = formData.type === "EXPENSE" 
-            ? `Pagamento: ${formData.description}` 
-            : `Recebimento: ${formData.description}`;
+          // Verificar se a transação faz parte de uma recorrência
+          const parentId = editingTransaction.parentTransactionId;
           
-          await utils.client.tasks.create.mutate({
-            entityId: selectedEntityId,
-            title: taskTitle,
-            description: `Valor: R$ ${(parseCurrency(formData.amount) / 100).toFixed(2).replace('.', ',')}`,
-            dueDate: new Date(formData.dueDate + "T12:00:00"),
-            endDate: new Date(formData.dueDate + "T12:00:00"),
-            dueTime: "09:00",
-            endTime: "10:00",
-            allDay: true,
-            priority: "MEDIUM",
-            status: "PENDING",
-          });
-          toast.success("Tarefa adicionada na agenda!");
+          if (parentId) {
+            // Buscar todas as transações relacionadas (mesma recorrência)
+            const allTransactions = transactions?.filter(t => t.parentTransactionId === parentId) || [];
+            
+            if (allTransactions.length > 1) {
+              // Criar tarefa para cada transação da recorrência
+              for (const t of allTransactions) {
+                const taskTitle = t.type === "EXPENSE" 
+                  ? `Pagamento: ${t.description}` 
+                  : `Recebimento: ${t.description}`;
+                
+                await utils.client.tasks.create.mutate({
+                  entityId: selectedEntityId,
+                  title: taskTitle,
+                  description: `Valor: R$ ${(t.amount / 100).toFixed(2).replace('.', ',')}`,
+                  dueDate: new Date(t.dueDate),
+                  endDate: new Date(t.dueDate),
+                  dueTime: "09:00",
+                  endTime: "10:00",
+                  allDay: true,
+                  priority: "MEDIUM",
+                  status: "PENDING",
+                });
+              }
+              toast.success(`${allTransactions.length} tarefas adicionadas na agenda!`);
+            } else {
+              // Apenas uma transação, criar tarefa única
+              const taskTitle = formData.type === "EXPENSE" 
+                ? `Pagamento: ${formData.description}` 
+                : `Recebimento: ${formData.description}`;
+              
+              await utils.client.tasks.create.mutate({
+                entityId: selectedEntityId,
+                title: taskTitle,
+                description: `Valor: R$ ${(parseCurrency(formData.amount) / 100).toFixed(2).replace('.', ',')}`,
+                dueDate: new Date(formData.dueDate + "T12:00:00"),
+                endDate: new Date(formData.dueDate + "T12:00:00"),
+                dueTime: "09:00",
+                endTime: "10:00",
+                allDay: true,
+                priority: "MEDIUM",
+                status: "PENDING",
+              });
+              toast.success("Tarefa adicionada na agenda!");
+            }
+          } else {
+            // Transação sem recorrência, criar tarefa única
+            const taskTitle = formData.type === "EXPENSE" 
+              ? `Pagamento: ${formData.description}` 
+              : `Recebimento: ${formData.description}`;
+            
+            await utils.client.tasks.create.mutate({
+              entityId: selectedEntityId,
+              title: taskTitle,
+              description: `Valor: R$ ${(parseCurrency(formData.amount) / 100).toFixed(2).replace('.', ',')}`,
+              dueDate: new Date(formData.dueDate + "T12:00:00"),
+              endDate: new Date(formData.dueDate + "T12:00:00"),
+              dueTime: "09:00",
+              endTime: "10:00",
+              allDay: true,
+              priority: "MEDIUM",
+              status: "PENDING",
+            });
+            toast.success("Tarefa adicionada na agenda!");
+          }
         } catch (error) {
           console.error("Erro ao criar tarefa na agenda:", error);
           toast.error("Transação atualizada mas houve erro ao adicionar na agenda");
