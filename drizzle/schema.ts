@@ -491,6 +491,7 @@ export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   userId: integer("userId").notNull(),
   entityId: integer("entityId").references(() => entities.id, { onDelete: "cascade" }),
+  transactionId: integer("transactionId").references(() => transactions.id, { onDelete: "cascade" }), // Relacionamento com transação
   
   // Informações da tarefa
   title: varchar("title", { length: 255 }).notNull(),

@@ -1262,6 +1262,12 @@ export async function getTaskById(id: number): Promise<typeof tasks.$inferSelect
   return result.length > 0 ? result[0] : null;
 }
 
+export async function getTasksByTransactionId(transactionId: number): Promise<typeof tasks.$inferSelect[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(tasks).where(eq(tasks.transactionId, transactionId));
+}
+
 export async function createTask(task: InsertTask): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1287,6 +1293,7 @@ export async function createTask(task: InsertTask): Promise<number> {
         id SERIAL PRIMARY KEY,
         "userId" INTEGER NOT NULL,
         "entityId" INTEGER REFERENCES entities(id) ON DELETE CASCADE,
+        "transactionId" INTEGER REFERENCES transactions(id) ON DELETE CASCADE,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         "dueDate" TIMESTAMP NOT NULL,

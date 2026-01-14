@@ -151,6 +151,7 @@ export default function Transactions() {
             for (const transaction of data.transactions) {
               await utils.client.tasks.create.mutate({
                 entityId: selectedEntityId,
+                transactionId: transaction.id,
                 title: taskTitle,
                 description: `Valor: R$ ${(transaction.amount / 100).toFixed(2).replace('.', ',')}`,
                 dueDate: new Date(transaction.dueDate),
@@ -166,6 +167,7 @@ export default function Transactions() {
             // Criar apenas uma tarefa para transação única
             await utils.client.tasks.create.mutate({
               entityId: selectedEntityId,
+              transactionId: data.id,
               title: taskTitle,
               description: `Valor: R$ ${(parseCurrency(formData.amount) / 100).toFixed(2).replace('.', ',')}`,
               dueDate: new Date(formData.dueDate + "T12:00:00"),
@@ -216,6 +218,7 @@ export default function Transactions() {
                 
                 await utils.client.tasks.create.mutate({
                   entityId: selectedEntityId,
+                  transactionId: t.id,
                   title: taskTitle,
                   description: `Valor: R$ ${(t.amount / 100).toFixed(2).replace('.', ',')}`,
                   dueDate: new Date(t.dueDate),
@@ -236,6 +239,7 @@ export default function Transactions() {
               
               await utils.client.tasks.create.mutate({
                 entityId: selectedEntityId,
+                transactionId: editingTransaction.id,
                 title: taskTitle,
                 description: `Valor: R$ ${(parseCurrency(formData.amount) / 100).toFixed(2).replace('.', ',')}`,
                 dueDate: new Date(formData.dueDate + "T12:00:00"),
@@ -256,6 +260,7 @@ export default function Transactions() {
             
             await utils.client.tasks.create.mutate({
               entityId: selectedEntityId,
+              transactionId: editingTransaction.id,
               title: taskTitle,
               description: `Valor: R$ ${(parseCurrency(formData.amount) / 100).toFixed(2).replace('.', ',')}`,
               dueDate: new Date(formData.dueDate + "T12:00:00"),

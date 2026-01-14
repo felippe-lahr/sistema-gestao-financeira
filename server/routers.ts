@@ -540,6 +540,17 @@ export const appRouter = router({
         }
 
         await db.updateTransaction(input.id, updateData);
+        
+        // Se o status foi alterado para PAID, marcar tarefas relacionadas como concluídas
+        if (input.status === "PAID") {
+          const relatedTasks = await db.getTasksByTransactionId(input.id);
+          for (const task of relatedTasks) {
+            if (task.status !== "COMPLETED") {
+              await db.updateTask(task.id, { status: "COMPLETED" });
+            }
+          }
+        }
+        
         return { success: true };
       }),
 
@@ -1668,6 +1679,7 @@ export const appRouter = router({
       .input(
         z.object({
           entityId: z.number().optional(),
+          transactionId: z.number().optional(),
           title: z.string().min(1).max(255),
           description: z.string().optional(),
           dueDate: z.date(),
@@ -1691,6 +1703,7 @@ export const appRouter = router({
         const taskId = await db.createTask({
           userId: ctx.user.id,
           entityId: input.entityId,
+          transactionId: input.transactionId,
           title: input.title,
           description: input.description,
           dueDate: input.dueDate,
