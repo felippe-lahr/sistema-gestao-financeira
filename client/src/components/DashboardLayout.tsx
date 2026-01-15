@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -124,6 +124,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Inicio", path: "/" },
   { icon: Building2, label: "Entidades", path: "/entities" },
   { icon: Receipt, label: "Transacoes", path: "/transactions" },
+  { icon: Calendar, label: "Agenda", path: "/agenda" },
   { icon: Settings, label: "Configuracoes", path: "/settings" },
 ];
 
