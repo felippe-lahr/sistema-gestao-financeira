@@ -56,6 +56,9 @@ export default function Agenda() {
     priority: "MEDIUM" as "LOW" | "MEDIUM" | "HIGH",
     entityId: "" as string,
     color: "",
+    isRecurring: false,
+    recurrenceCount: "1",
+    recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
   });
 
   const { data: entities = [] } = trpc.entities.list.useQuery();
@@ -116,6 +119,9 @@ export default function Agenda() {
       priority: "MEDIUM",
       entityId: "",
       color: "",
+      isRecurring: false,
+      recurrenceCount: "1",
+      recurrenceFrequency: "MONTH",
     });
   };
 
@@ -159,6 +165,9 @@ export default function Agenda() {
       priority: formData.priority,
       entityId: formData.entityId && formData.entityId !== "none" ? parseInt(formData.entityId) : undefined,
       color: formData.color || undefined,
+      isRecurring: formData.isRecurring,
+      recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
+      recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
     });
   };
 
@@ -571,7 +580,7 @@ export default function Agenda() {
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <div className="space-y-4">
               <div>
-                <Label>Título *</Label>
+                <Label className="mb-2 block">Título *</Label>
                 <Input
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -580,7 +589,7 @@ export default function Agenda() {
               </div>
 
               <div>
-                <Label>Descrição</Label>
+                <Label className="mb-2 block">Descrição</Label>
                 <Textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -590,7 +599,7 @@ export default function Agenda() {
               </div>
 
               <div>
-                <Label>Entidade (opcional)</Label>
+                <Label className="mb-2 block">Entidade (opcional)</Label>
                 <Select value={formData.entityId || undefined} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma entidade" />
@@ -608,7 +617,7 @@ export default function Agenda() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Data de Início *</Label>
+                  <Label className="mb-2 block">Data de Início *</Label>
                   <Input
                     type="date"
                     value={formData.dueDate}
@@ -616,7 +625,7 @@ export default function Agenda() {
                   />
                 </div>
                 <div>
-                  <Label>Data de Término</Label>
+                  <Label className="mb-2 block">Data de Término</Label>
                   <Input
                     type="date"
                     value={formData.endDate}
@@ -628,7 +637,7 @@ export default function Agenda() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Horário Início</Label>
+                  <Label className="mb-2 block">Horário Início</Label>
                   <Input
                     type="time"
                     value={formData.dueTime}
@@ -637,7 +646,7 @@ export default function Agenda() {
                   />
                 </div>
                 <div>
-                  <Label>Horário Término</Label>
+                  <Label className="mb-2 block">Horário Término</Label>
                   <Input
                     type="time"
                     value={formData.endTime}
@@ -657,7 +666,7 @@ export default function Agenda() {
               </div>
 
               <div>
-                <Label>Prioridade</Label>
+                <Label className="mb-2 block">Prioridade</Label>
                 <Select value={formData.priority} onValueChange={(v: any) => setFormData({ ...formData, priority: v })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -669,6 +678,49 @@ export default function Agenda() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="recurring-create"
+                  checked={formData.isRecurring}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: !!checked })}
+                />
+                <Label htmlFor="recurring-create" className="cursor-pointer">Tarefa recorrente</Label>
+              </div>
+
+              {formData.isRecurring && (
+                <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="recurrenceCount" className="mb-2 block">Repetir por</Label>
+                      <Input
+                        id="recurrenceCount"
+                        type="number"
+                        min="1"
+                        value={formData.recurrenceCount}
+                        onChange={(e) => setFormData({ ...formData, recurrenceCount: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="recurrenceFrequency" className="mb-2 block">Frequência</Label>
+                      <Select
+                        value={formData.recurrenceFrequency}
+                        onValueChange={(value: "DAY" | "WEEK" | "MONTH" | "YEAR") => setFormData({ ...formData, recurrenceFrequency: value })}
+                      >
+                        <SelectTrigger id="recurrenceFrequency">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DAY">Dia(s)</SelectItem>
+                          <SelectItem value="WEEK">Semana(s)</SelectItem>
+                          <SelectItem value="MONTH">Mês(es)</SelectItem>
+                          <SelectItem value="YEAR">Ano(s)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
@@ -699,7 +751,7 @@ export default function Agenda() {
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <div className="space-y-4">
               <div>
-                <Label>Título *</Label>
+                <Label className="mb-2 block">Título *</Label>
                 <Input
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -708,7 +760,7 @@ export default function Agenda() {
               </div>
 
               <div>
-                <Label>Descrição</Label>
+                <Label className="mb-2 block">Descrição</Label>
                 <Textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -718,7 +770,7 @@ export default function Agenda() {
               </div>
 
               <div>
-                <Label>Entidade (opcional)</Label>
+                <Label className="mb-2 block">Entidade (opcional)</Label>
                 <Select value={formData.entityId || undefined} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma entidade" />
@@ -736,7 +788,7 @@ export default function Agenda() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Data de Início *</Label>
+                  <Label className="mb-2 block">Data de Início *</Label>
                   <Input
                     type="date"
                     value={formData.dueDate}
@@ -744,7 +796,7 @@ export default function Agenda() {
                   />
                 </div>
                 <div>
-                  <Label>Data de Término</Label>
+                  <Label className="mb-2 block">Data de Término</Label>
                   <Input
                     type="date"
                     value={formData.endDate}
@@ -756,7 +808,7 @@ export default function Agenda() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Horário Início</Label>
+                  <Label className="mb-2 block">Horário Início</Label>
                   <Input
                     type="time"
                     value={formData.dueTime}
@@ -765,7 +817,7 @@ export default function Agenda() {
                   />
                 </div>
                 <div>
-                  <Label>Horário Término</Label>
+                  <Label className="mb-2 block">Horário Término</Label>
                   <Input
                     type="time"
                     value={formData.endTime}
@@ -785,7 +837,7 @@ export default function Agenda() {
               </div>
 
               <div>
-                <Label>Prioridade</Label>
+                <Label className="mb-2 block">Prioridade</Label>
                 <Select value={formData.priority} onValueChange={(v: any) => setFormData({ ...formData, priority: v })}>
                   <SelectTrigger>
                     <SelectValue />

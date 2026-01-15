@@ -1305,6 +1305,9 @@ export async function createTask(task: InsertTask): Promise<number> {
         status task_status DEFAULT 'PENDING' NOT NULL,
         color VARCHAR(7),
         "reminderMinutes" INTEGER,
+        "isRecurring" BOOLEAN DEFAULT FALSE NOT NULL,
+        "recurrencePattern" TEXT,
+        "parentTaskId" INTEGER,
         "completedAt" TIMESTAMP,
         "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
         "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL

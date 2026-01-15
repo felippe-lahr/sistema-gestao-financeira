@@ -508,6 +508,11 @@ export const tasks = pgTable("tasks", {
   priority: taskPriorityEnum("priority").default("MEDIUM").notNull(),
   status: taskStatusEnum("status").default("PENDING").notNull(),
   
+  // Recorrência
+  isRecurring: boolean("isRecurring").default(false).notNull(),
+  recurrencePattern: text("recurrencePattern"), // JSON: { frequency: 'daily'|'weekly'|'monthly'|'yearly', interval: number, endDate?: string }
+  parentTaskId: integer("parentTaskId"), // Para tarefas recorrentes
+  
   // Cor personalizada (opcional)
   color: varchar("color", { length: 7 }),
   

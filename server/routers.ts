@@ -1691,6 +1691,9 @@ export const appRouter = router({
           status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
           reminderMinutes: z.number().optional(),
+          isRecurring: z.boolean().optional(),
+          recurrenceCount: z.number().optional(),
+          recurrenceFrequency: z.enum(["DAY", "WEEK", "MONTH", "YEAR"]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -1700,23 +1703,104 @@ export const appRouter = router({
             throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
           }
         }
-        const taskId = await db.createTask({
-          userId: ctx.user.id,
-          entityId: input.entityId,
-          transactionId: input.transactionId,
-          title: input.title,
-          description: input.description,
-          dueDate: input.dueDate,
-          dueTime: input.dueTime,
-          endDate: input.endDate,
-          endTime: input.endTime,
-          allDay: input.allDay,
-          priority: input.priority,
-          status: input.status,
-          color: input.color,
-          reminderMinutes: input.reminderMinutes,
-        });
-        return { id: taskId };
+        // Se for recorrente, criar múltiplas tarefas
+        if (input.isRecurring && input.recurrenceCount && input.recurrenceFrequency) {
+          const tasks = [];
+          const count = input.recurrenceCount;
+          const frequency = input.recurrenceFrequency;
+          
+          // Criar tarefa pai
+          const parentTaskId = await db.createTask({
+            userId: ctx.user.id,
+            entityId: input.entityId,
+            transactionId: input.transactionId,
+            title: input.title,
+            description: input.description,
+            dueDate: input.dueDate,
+            dueTime: input.dueTime,
+            endDate: input.endDate,
+            endTime: input.endTime,
+            allDay: input.allDay,
+            priority: input.priority,
+            status: input.status,
+            color: input.color,
+            reminderMinutes: input.reminderMinutes,
+            isRecurring: true,
+            recurrencePattern: JSON.stringify({ frequency, interval: 1, count }),
+            parentTaskId: null,
+          });
+          tasks.push(parentTaskId);
+          
+          // Criar tarefas filhas
+          for (let i = 1; i < count; i++) {
+            const newDueDate = new Date(input.dueDate);
+            const newEndDate = input.endDate ? new Date(input.endDate) : undefined;
+            
+            switch (frequency) {
+              case "DAY":
+                newDueDate.setDate(newDueDate.getDate() + i);
+                if (newEndDate) newEndDate.setDate(newEndDate.getDate() + i);
+                break;
+              case "WEEK":
+                newDueDate.setDate(newDueDate.getDate() + (i * 7));
+                if (newEndDate) newEndDate.setDate(newEndDate.getDate() + (i * 7));
+                break;
+              case "MONTH":
+                newDueDate.setMonth(newDueDate.getMonth() + i);
+                if (newEndDate) newEndDate.setMonth(newEndDate.getMonth() + i);
+                break;
+              case "YEAR":
+                newDueDate.setFullYear(newDueDate.getFullYear() + i);
+                if (newEndDate) newEndDate.setFullYear(newEndDate.getFullYear() + i);
+                break;
+            }
+            
+            const childTaskId = await db.createTask({
+              userId: ctx.user.id,
+              entityId: input.entityId,
+              transactionId: input.transactionId,
+              title: input.title,
+              description: input.description,
+              dueDate: newDueDate,
+              dueTime: input.dueTime,
+              endDate: newEndDate,
+              endTime: input.endTime,
+              allDay: input.allDay,
+              priority: input.priority,
+              status: input.status,
+              color: input.color,
+              reminderMinutes: input.reminderMinutes,
+              isRecurring: false,
+              recurrencePattern: null,
+              parentTaskId: parentTaskId,
+            });
+            tasks.push(childTaskId);
+          }
+          
+          return { id: parentTaskId, tasks };
+        } else {
+          // Tarefa única
+          const taskId = await db.createTask({
+            userId: ctx.user.id,
+            entityId: input.entityId,
+            transactionId: input.transactionId,
+            title: input.title,
+            description: input.description,
+            dueDate: input.dueDate,
+            dueTime: input.dueTime,
+            endDate: input.endDate,
+            endTime: input.endTime,
+            allDay: input.allDay,
+            priority: input.priority,
+            status: input.status,
+            color: input.color,
+            reminderMinutes: input.reminderMinutes,
+            isRecurring: false,
+            recurrencePattern: null,
+            parentTaskId: null,
+          });
+          return { id: taskId };
+        }
       }),
 
     update: protectedProcedure
