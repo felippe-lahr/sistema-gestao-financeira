@@ -44,6 +44,10 @@ export default function Agenda() {
   const [editingTask, setEditingTask] = useState<any>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<number | null>(null);
+  const [taskToDeleteIsRecurring, setTaskToDeleteIsRecurring] = useState(false);
+  const [deleteAllRecurring, setDeleteAllRecurring] = useState(false);
+  const [updateAllRecurring, setUpdateAllRecurring] = useState(false);
+  const [showUpdateAllDialog, setShowUpdateAllDialog] = useState(false);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -177,6 +181,19 @@ export default function Agenda() {
       return;
     }
 
+    // Se a tarefa é recorrente, mostrar dialog de confirmação
+    if (editingTask.isRecurring || editingTask.parentTaskId) {
+      setShowUpdateAllDialog(true);
+      return;
+    }
+
+    // Se não é recorrente, atualizar diretamente
+    performUpdate(false);
+  };
+
+  const performUpdate = (updateAll: boolean) => {
+    if (!editingTask || !formData.title || !formData.dueDate) return;
+
     // Criar data com timezone correto
     const dueDateParts = formData.dueDate.split('-');
     const dueDate = new Date(parseInt(dueDateParts[0]), parseInt(dueDateParts[1]) - 1, parseInt(dueDateParts[2]), 12, 0, 0);
@@ -199,7 +216,11 @@ export default function Agenda() {
       priority: formData.priority,
       entityId: formData.entityId && formData.entityId !== "none" ? parseInt(formData.entityId) : null,
       color: formData.color || null,
+      updateAll: updateAll,
     });
+    
+    setShowUpdateAllDialog(false);
+    setUpdateAllRecurring(false);
   };
 
   const openEditSheet = (task: any) => {
@@ -551,6 +572,7 @@ export default function Agenda() {
                         size="icon" 
                         onClick={() => {
                           setTaskToDelete(task.id);
+                          setTaskToDeleteIsRecurring(task.isRecurring || !!task.parentTaskId);
                           setDeleteConfirmOpen(true);
                         }}
                       >
@@ -862,6 +884,7 @@ export default function Agenda() {
               onClick={() => {
                 if (editingTask) {
                   setTaskToDelete(editingTask.id);
+                  setTaskToDeleteIsRecurring(editingTask.isRecurring || !!editingTask.parentTaskId);
                   setDeleteConfirmOpen(true);
                 }
               }}
@@ -876,7 +899,12 @@ export default function Agenda() {
       </Sheet>
 
       {/* Dialog de Confirmação de Exclusão */}
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={(open) => {
+        setDeleteConfirmOpen(open);
+        if (!open) {
+          setDeleteAllRecurring(false);
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
@@ -884,18 +912,72 @@ export default function Agenda() {
               Esta ação não pode ser desfeita. A tarefa será permanentemente removida.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
+          {taskToDeleteIsRecurring && (
+            <div className="flex items-center space-x-2 px-6 py-2">
+              <Checkbox
+                id="deleteAllRecurring"
+                checked={deleteAllRecurring}
+                onCheckedChange={(checked) => setDeleteAllRecurring(!!checked)}
+              />
+              <Label htmlFor="deleteAllRecurring" className="cursor-pointer text-sm">
+                Excluir todas as tarefas recorrentes relacionadas
+              </Label>
+            </div>
+          )}
+          
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (taskToDelete) {
-                  deleteTask.mutate({ id: taskToDelete });
+                  deleteTask.mutate({ id: taskToDelete, deleteAll: deleteAllRecurring });
                   setIsEditOpen(false);
+                  setDeleteAllRecurring(false);
                 }
               }}
               className="bg-red-600 hover:bg-red-700"
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de Confirmação de Atualização de Recorrentes */}
+      <AlertDialog open={showUpdateAllDialog} onOpenChange={(open) => {
+        setShowUpdateAllDialog(open);
+        if (!open) {
+          setUpdateAllRecurring(false);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Atualizar tarefa recorrente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta tarefa faz parte de uma série de tarefas recorrentes. Deseja aplicar as alterações para todas?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="flex items-center space-x-2 px-6 py-2">
+            <Checkbox
+              id="updateAllRecurring"
+              checked={updateAllRecurring}
+              onCheckedChange={(checked) => setUpdateAllRecurring(!!checked)}
+            />
+            <Label htmlFor="updateAllRecurring" className="cursor-pointer text-sm">
+              Aplicar alterações para todas as tarefas recorrentes relacionadas
+            </Label>
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                performUpdate(updateAllRecurring);
+              }}
+            >
+              Salvar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

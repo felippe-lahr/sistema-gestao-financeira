@@ -1819,6 +1819,7 @@ export const appRouter = router({
           status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
           reminderMinutes: z.number().optional().nullable(),
+          updateAll: z.boolean().optional(), // Atualizar todas as tarefas recorrentes
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -1832,19 +1833,59 @@ export const appRouter = router({
             throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
           }
         }
-        const { id, ...updateData } = input;
-        await db.updateTask(id, updateData);
+        
+        const { id, updateAll, ...updateData } = input;
+        
+        // Se updateAll = true e a tarefa tem parentTaskId ou é pai, atualizar todas
+        if (updateAll && (task.parentTaskId || task.isRecurring)) {
+          const parentId = task.parentTaskId || task.id;
+          // Buscar todas as tarefas relacionadas
+          const relatedTasks = await db.getTasksByParentId(parentId);
+          
+          // Atualizar tarefa pai
+          await db.updateTask(parentId, updateData);
+          
+          // Atualizar todas as tarefas filhas
+          for (const relatedTask of relatedTasks) {
+            await db.updateTask(relatedTask.id, updateData);
+          }
+        } else {
+          // Atualizar apenas a tarefa atual
+          await db.updateTask(id, updateData);
+        }
+        
         return { success: true };
       }),
 
     delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
+      .input(z.object({ 
+        id: z.number(),
+        deleteAll: z.boolean().optional() // Deletar todas as tarefas recorrentes
+      }))
       .mutation(async ({ input, ctx }) => {
         const task = await db.getTaskById(input.id);
         if (!task || task.userId !== ctx.user.id) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
-        await db.deleteTask(input.id);
+        
+        // Se deleteAll = true e a tarefa tem parentTaskId ou é pai, deletar todas
+        if (input.deleteAll && (task.parentTaskId || task.isRecurring)) {
+          const parentId = task.parentTaskId || task.id;
+          // Buscar todas as tarefas relacionadas
+          const relatedTasks = await db.getTasksByParentId(parentId);
+          
+          // Deletar tarefa pai
+          await db.deleteTask(parentId);
+          
+          // Deletar todas as tarefas filhas
+          for (const relatedTask of relatedTasks) {
+            await db.deleteTask(relatedTask.id);
+          }
+        } else {
+          // Deletar apenas a tarefa atual
+          await db.deleteTask(input.id);
+        }
+        
         return { success: true };
       }),
 

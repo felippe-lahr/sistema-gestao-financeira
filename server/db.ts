@@ -1268,6 +1268,12 @@ export async function getTasksByTransactionId(transactionId: number): Promise<ty
   return await db.select().from(tasks).where(eq(tasks.transactionId, transactionId));
 }
 
+export async function getTasksByParentId(parentId: number): Promise<typeof tasks.$inferSelect[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(tasks).where(eq(tasks.parentTaskId, parentId)).orderBy(tasks.dueDate);
+}
+
 export async function createTask(task: InsertTask): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
