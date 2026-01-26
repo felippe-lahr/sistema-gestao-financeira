@@ -847,6 +847,9 @@ export async function getAttachmentsByEntityWithFilters(
     endDate?: Date;
   }
 ) {
+  console.log("[getAttachmentsByEntityWithFilters] entityId:", entityId);
+  console.log("[getAttachmentsByEntityWithFilters] options:", JSON.stringify(options, null, 2));
+  
   const db = await getDb();
   if (!db) return [];
 
@@ -884,11 +887,16 @@ export async function getAttachmentsByEntityWithFilters(
     conditions.push(lte(transactions.dueDate, options.endDate));
   }
 
+  console.log("[getAttachmentsByEntityWithFilters] conditions count:", conditions.length);
+  
   if (conditions.length > 1) {
     query = query.where(and(...conditions));
   }
 
-  return await query.orderBy(asc(transactions.dueDate));
+  const result = await query.orderBy(asc(transactions.dueDate));
+  console.log("[getAttachmentsByEntityWithFilters] result count:", result.length);
+  
+  return result;
 }
 
 
