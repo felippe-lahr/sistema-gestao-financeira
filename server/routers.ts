@@ -923,18 +923,19 @@ export const appRouter = router({
           console.log("[ZIP Export] Entidade encontrada:", entity.name);
 
           // Converter datas corretamente (formato YYYY-MM-DD)
+          // Usar UTC para consistência com como as transações são salvas
           let startDate: Date | undefined;
           let endDate: Date | undefined;
           
           if (input.startDate) {
-            const [year, month, day] = input.startDate.split('-').map(Number);
-            startDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+            // Criar data no início do dia em UTC
+            startDate = new Date(input.startDate + "T00:00:00.000Z");
             console.log("[ZIP Export] Data inicial:", input.startDate, "->", startDate.toISOString());
           }
           
           if (input.endDate) {
-            const [year, month, day] = input.endDate.split('-').map(Number);
-            endDate = new Date(year, month - 1, day, 23, 59, 59, 999);
+            // Criar data no final do dia em UTC
+            endDate = new Date(input.endDate + "T23:59:59.999Z");
             console.log("[ZIP Export] Data final:", input.endDate, "->", endDate.toISOString());
           }
           
