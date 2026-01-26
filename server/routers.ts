@@ -922,10 +922,28 @@ export const appRouter = router({
           }
           console.log("[ZIP Export] Entidade encontrada:", entity.name);
 
+          // Converter datas corretamente (formato YYYY-MM-DD)
+          let startDate: Date | undefined;
+          let endDate: Date | undefined;
+          
+          if (input.startDate) {
+            const [year, month, day] = input.startDate.split('-').map(Number);
+            startDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+            console.log("[ZIP Export] Data inicial:", input.startDate, "->", startDate.toISOString());
+          }
+          
+          if (input.endDate) {
+            const [year, month, day] = input.endDate.split('-').map(Number);
+            endDate = new Date(year, month - 1, day, 23, 59, 59, 999);
+            console.log("[ZIP Export] Data final:", input.endDate, "->", endDate.toISOString());
+          }
+          
+          console.log("[ZIP Export] Tipos selecionados:", input.types);
+          
           const attachments = await db.getAttachmentsByEntityWithFilters(input.entityId, {
             types: input.types,
-            startDate: input.startDate ? new Date(input.startDate) : undefined,
-            endDate: input.endDate ? new Date(input.endDate) : undefined,
+            startDate,
+            endDate,
           });
           console.log("[ZIP Export] Anexos encontrados:", attachments.length);
 
