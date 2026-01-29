@@ -129,6 +129,24 @@ export default function OverallDashboard() {
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [allTransactions]);
 
+  // Receitas a receber nos próximos 7 dias
+  const upcomingIncome = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDaysFromNow = addDays(today, 7);
+    
+    return allTransactions
+      .filter(t => {
+        const dueDate = new Date(t.dueDate);
+        dueDate.setHours(0, 0, 0, 0);
+        return t.status === 'PENDING' && 
+               t.type === 'INCOME' &&
+               dueDate >= today && 
+               dueDate <= sevenDaysFromNow;
+      })
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [allTransactions]);
+
   // Contas vencidas
   const overdueBills = useMemo(() => {
     const today = new Date();
@@ -353,8 +371,8 @@ export default function OverallDashboard() {
         </Card>
       </div>
 
-      {/* Contas a Vencer e Vencidas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Contas a Vencer, Receitas a Receber e Vencidas */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Contas a Vencer (Próximos 7 dias)</CardTitle>
@@ -385,6 +403,48 @@ export default function OverallDashboard() {
                       </div>
                       <div className="font-semibold text-orange-600">
                         {formatCurrency(bill.amount)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-500" />
+              Receitas a Receber (Próximos 7 dias)
+            </CardTitle>
+            <CardDescription>Receitas pendentes nos próximos 7 dias</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {upcomingIncome.length === 0 ? (
+                <p className="text-sm text-gray-500 py-4 text-center">Nenhuma receita a receber nos próximos 7 dias</p>
+              ) : (
+                upcomingIncome.map((income) => (
+                  <div key={income.id} className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                    <div className="mb-2">
+                      <span className="font-medium text-sm">{income.description}</span>
+                    </div>
+                    <div className="mb-2">
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs"
+                        style={{ borderColor: income.entityColor, color: income.entityColor }}
+                      >
+                        {income.entityName}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-gray-500">
+                        Receber em {format(new Date(income.dueDate), "dd/MM/yyyy")}
+                      </div>
+                      <div className="font-semibold text-emerald-600">
+                        +{formatCurrency(income.amount)}
                       </div>
                     </div>
                   </div>

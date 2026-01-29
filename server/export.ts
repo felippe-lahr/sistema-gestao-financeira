@@ -160,6 +160,7 @@ export function generateTransactionsPDF(data: {
   categoryData?: any[];
   categoryExpenses?: any[];
   upcomingTransactions?: any[];
+  upcomingIncomeTransactions?: any[];
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: "A4" });
@@ -312,6 +313,66 @@ export function generateTransactionsPDF(data: {
       });
 
       doc.y = upcomingRowY;
+      doc.moveDown(2);
+    }
+
+    // Seção de Receitas a Receber
+    if (data.upcomingIncomeTransactions && data.upcomingIncomeTransactions.length > 0) {
+      doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Receitas a Receber");
+      doc.fontSize(10).font("Helvetica").fillColor("#6B7280").text("Próximos 7 dias");
+      doc.moveDown(0.5);
+
+      const incomeTableTop = doc.y;
+      const incomeColWidths = [200, 100, 80, 100];
+      const incomeHeaders = ["Descrição", "Categoria", "Recebimento", "Valor"];
+
+      let incomeXPos = 50;
+      incomeHeaders.forEach((header, i) => {
+        doc
+          .fontSize(9)
+          .font("Helvetica-Bold")
+          .fillColor("#FFFFFF")
+          .rect(incomeXPos, incomeTableTop, incomeColWidths[i], 20)
+          .fillAndStroke("#10B981", "#10B981")
+          .fillColor("#FFFFFF")
+          .text(header, incomeXPos + 5, incomeTableTop + 6, { width: incomeColWidths[i] - 10 });
+        incomeXPos += incomeColWidths[i];
+      });
+
+      let incomeRowY = incomeTableTop + 20;
+
+      data.upcomingIncomeTransactions.slice(0, 5).forEach((transaction: any, index: number) => {
+        const bgColor = "#D1FAE5"; // Verde claro para destacar receitas
+
+        incomeXPos = 50;
+        const daysText = transaction.daysUntilDue === 0 
+          ? "Hoje" 
+          : transaction.daysUntilDue === 1 
+          ? "Amanhã" 
+          : `${transaction.daysUntilDue} dias`;
+        
+        const rowData = [
+          transaction.description.substring(0, 35),
+          (transaction.categoryName || "Sem Categoria").substring(0, 15),
+          daysText,
+          "+" + formatBRL(transaction.amount / 100),
+        ];
+
+        rowData.forEach((cellData, i) => {
+          doc
+            .rect(incomeXPos, incomeRowY, incomeColWidths[i], 20)
+            .fillAndStroke(bgColor, "#E5E7EB")
+            .fontSize(8)
+            .font("Helvetica")
+            .fillColor(i === 3 ? "#10B981" : "#000000")
+            .text(cellData, incomeXPos + 5, incomeRowY + 6, { width: incomeColWidths[i] - 10 });
+          incomeXPos += incomeColWidths[i];
+        });
+
+        incomeRowY += 20;
+      });
+
+      doc.y = incomeRowY;
       doc.moveDown(2);
     }
 

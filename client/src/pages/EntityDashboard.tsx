@@ -39,8 +39,14 @@ export default function EntityDashboard() {
   const exportExcelMutation = trpc.exports.exportTransactionsExcel.useMutation();
   const exportPDFMutation = trpc.exports.exportTransactionsPDF.useMutation();
 
-  // Query para transações a vencer
+  // Query para transações a vencer (despesas)
   const { data: upcomingTransactions, isLoading: upcomingLoading } = trpc.dashboard.upcomingTransactions.useQuery(
+    { entityId: entityId!, daysAhead: 7 },
+    { enabled: !!entityId }
+  );
+
+  // Query para receitas a receber
+  const { data: upcomingIncomeTransactions, isLoading: upcomingIncomeLoading } = trpc.dashboard.upcomingIncomeTransactions.useQuery(
     { entityId: entityId!, daysAhead: 7 },
     { enabled: !!entityId }
   );
@@ -816,6 +822,82 @@ export default function EntityDashboard() {
                       <div className="text-right flex-shrink-0 ml-4">
                         <p className="font-semibold text-red-600">
                           -R$ {transaction.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(transaction.dueDate!), "dd/MM/yyyy")}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upcoming Income Transactions */}
+      {upcomingIncomeTransactions && upcomingIncomeTransactions.length > 0 && (
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-500" />
+              Receitas a Receber
+            </CardTitle>
+            <CardDescription>Próximos 7 dias</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {upcomingIncomeLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcomingIncomeTransactions.map((transaction) => {
+                  const urgencyColor = 
+                    transaction.daysUntilDue === 0 ? "bg-emerald-50 border-emerald-300 hover:bg-emerald-100" :
+                    transaction.daysUntilDue <= 3 ? "bg-emerald-50 border-emerald-200 hover:bg-emerald-100" :
+                    "bg-green-50 border-green-200 hover:bg-green-100";
+                  
+                  const urgencyBadge = 
+                    transaction.daysUntilDue === 0 ? "bg-emerald-600" :
+                    transaction.daysUntilDue <= 3 ? "bg-emerald-500" :
+                    "bg-green-500";
+
+                  return (
+                    <div
+                      key={transaction.id}
+                      className={`flex items-center justify-between p-4 rounded-lg border transition-all ${urgencyColor}`}
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className={`w-2 h-2 rounded-full ${urgencyBadge}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm truncate">{transaction.description}</p>
+                            <span 
+                              className="inline-block w-3 h-3 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: transaction.categoryColor }}
+                              title={transaction.categoryName}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-muted-foreground">
+                              {transaction.categoryName}
+                            </p>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <p className="text-xs text-muted-foreground">
+                              {transaction.daysUntilDue === 0 ? "Receber hoje" :
+                               transaction.daysUntilDue === 1 ? "Receber amanhã" :
+                               `Receber em ${transaction.daysUntilDue} dias`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-4">
+                        <p className="font-semibold text-emerald-600">
+                          +R$ {transaction.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(transaction.dueDate!), "dd/MM/yyyy")}

@@ -839,6 +839,69 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
   return mapped;
 }
 
+// Buscar receitas a receber nos próximos X dias
+export async function getUpcomingIncomeTransactions(entityId: number, daysAhead: number = 7) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Criar data em São Paulo (GMT-3)
+  const today = new Date();
+  const offset = 3 * 60 * 60 * 1000; // GMT-3 em milissegundos
+  const localDate = new Date(today.getTime() - offset);
+  localDate.setUTCHours(0, 0, 0, 0);
+  
+  // Converter para string no formato YYYY-MM-DD usando a data local
+  const todayDateString = localDate.toISOString().split('T')[0];
+  
+  // Calcular a data futura
+  const futureDateObj = new Date(localDate);
+  futureDateObj.setUTCDate(futureDateObj.getUTCDate() + daysAhead);
+  const futureDateString = futureDateObj.toISOString().split('T')[0];
+
+  const result = await db
+    .select({
+      id: transactions.id,
+      description: transactions.description,
+      amount: transactions.amount,
+      dueDate: transactions.dueDate,
+      status: transactions.status,
+      type: transactions.type,
+      categoryId: transactions.categoryId,
+      categoryName: categories.name,
+      categoryColor: categories.color,
+    })
+    .from(transactions)
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(
+      and(
+        eq(transactions.entityId, entityId),
+        eq(transactions.type, "INCOME"),
+        or(
+          eq(transactions.status, "PENDING"),
+          eq(transactions.status, "OVERDUE")
+        ),
+        gte(transactions.dueDate, new Date(todayDateString)),
+        lte(transactions.dueDate, new Date(futureDateString))
+      )
+    )
+    .orderBy(asc(transactions.dueDate));
+
+  const mapped = result.map((row) => ({
+    id: row.id,
+    description: row.description,
+    amount: row.amount,
+    dueDate: row.dueDate,
+    status: row.status,
+    type: row.type,
+    categoryId: row.categoryId,
+    categoryName: row.categoryName || "Sem Categoria",
+    categoryColor: row.categoryColor || "#6B7280",
+    daysUntilDue: Math.floor((new Date(row.dueDate!).getTime() - localDate.getTime()) / (1000 * 60 * 60 * 24)),
+  }));
+
+  return mapped;
+}
+
 export async function getAttachmentsByEntityWithFilters(
   entityId: number,
   options?: {

@@ -708,6 +708,28 @@ export const appRouter = router({
         }));
       }),
 
+    upcomingIncomeTransactions: protectedProcedure
+      .input(z.object({ 
+        entityId: z.number(),
+        daysAhead: z.number().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const transactions = await db.getUpcomingIncomeTransactions(
+          input.entityId,
+          input.daysAhead || 7
+        );
+
+        return transactions.map((t) => ({
+          ...t,
+          amount: t.amount / 100,
+        }));
+      }),
+
     categoryExpensesByStatus: protectedProcedure
       .input(z.object({ 
         entityId: z.number(),
@@ -869,6 +891,10 @@ export const appRouter = router({
           const upcomingTransactions = await db.getUpcomingTransactions(input.entityId, 7);
           console.log("[PDF Export] Transações a vencer:", upcomingTransactions.length);
 
+          // Buscar receitas a receber (próximos 7 dias)
+          const upcomingIncomeTransactions = await db.getUpcomingIncomeTransactions(input.entityId, 7);
+          console.log("[PDF Export] Receitas a receber:", upcomingIncomeTransactions.length);
+
           // Preparar dados do gráfico de pizza
           const categoryData = categoryExpenses.map((cat) => ({
             name: cat.categoryName || "Sem Categoria",
@@ -887,6 +913,7 @@ export const appRouter = router({
             categoryExpenses,
             categoryData,
             upcomingTransactions,
+            upcomingIncomeTransactions,
           });
           console.log("[PDF Export] PDF gerado com sucesso. Tamanho:", buffer.length, "bytes");
 
