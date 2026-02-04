@@ -590,6 +590,17 @@ export const appRouter = router({
 
   // ========== DASHBOARD ==========
   dashboard: router({
+    // Endpoint de diagnóstico para investigar cálculo do Saldo Atual
+    balanceDiagnostic: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
+      const entity = await db.getEntityById(input.entityId);
+      if (!entity || entity.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+
+      const diagnostic = await db.getBalanceDiagnostic(input.entityId);
+      return diagnostic;
+    }),
+
     metrics: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
       const entity = await db.getEntityById(input.entityId);
       if (!entity || entity.userId !== ctx.user.id) {

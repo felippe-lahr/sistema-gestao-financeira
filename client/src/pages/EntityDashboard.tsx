@@ -39,6 +39,15 @@ export default function EntityDashboard() {
   const exportExcelMutation = trpc.exports.exportTransactionsExcel.useMutation();
   const exportPDFMutation = trpc.exports.exportTransactionsPDF.useMutation();
 
+  // Estado para mostrar diagnóstico do saldo
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
+  
+  // Query para diagnóstico do saldo (só carrega quando solicitado)
+  const { data: balanceDiagnostic, isLoading: diagnosticLoading, refetch: refetchDiagnostic } = trpc.dashboard.balanceDiagnostic.useQuery(
+    { entityId: entityId! },
+    { enabled: !!entityId && showDiagnostic }
+  );
+
   // Query para transações a vencer (despesas)
   const { data: upcomingTransactions, isLoading: upcomingLoading } = trpc.dashboard.upcomingTransactions.useQuery(
     { entityId: entityId!, daysAhead: 7 },
@@ -545,6 +554,14 @@ export default function EntityDashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(metrics.currentBalance)}</div>
               <p className="text-xs text-muted-foreground">Todas as transações pagas</p>
+              <Button 
+                variant="link" 
+                size="sm" 
+                className="p-0 h-auto mt-1 text-xs text-blue-500"
+                onClick={() => setShowDiagnostic(true)}
+              >
+                Ver detalhes do cálculo
+              </Button>
             </CardContent>
           </Card>
 
@@ -980,6 +997,114 @@ export default function EntityDashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Diagnóstico do Saldo */}
+      {showDiagnostic && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Diagnóstico do Saldo Atual</h2>
+                <Button variant="ghost" size="sm" onClick={() => setShowDiagnostic(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {diagnosticLoading ? (
+                <div className="py-8 text-center">Carregando diagnóstico...</div>
+              ) : balanceDiagnostic ? (
+                <div className="space-y-6">
+                  {/* Resumo */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-3">Resumo do Cálculo</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-500">Total Receitas Pagas</p>
+                        <p className="text-lg font-bold text-green-600">
+                          {balanceDiagnostic.summary.totalIncomeCount} transações = {formatCurrency(balanceDiagnostic.summary.totalIncomeAmount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Total Despesas Pagas</p>
+                        <p className="text-lg font-bold text-red-600">
+                          {balanceDiagnostic.summary.totalExpenseCount} transações = {formatCurrency(balanceDiagnostic.summary.totalExpenseAmount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Saldo Calculado</p>
+                        <p className="text-lg font-bold">
+                          {formatCurrency(balanceDiagnostic.summary.calculatedBalance)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <p className="text-sm">
+                        <strong>Fórmula:</strong> Receitas Pagas ({formatCurrency(balanceDiagnostic.summary.totalIncomeAmount)}) - Despesas Pagas ({formatCurrency(balanceDiagnostic.summary.totalExpenseAmount)}) = <strong>{formatCurrency(balanceDiagnostic.summary.calculatedBalance)}</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Lista de Receitas Pagas */}
+                  <div>
+                    <h3 className="font-semibold mb-2 text-green-700">Receitas Pagas ({balanceDiagnostic.paidIncomeTransactions.length})</h3>
+                    <div className="max-h-60 overflow-y-auto border rounded">
+                      <table className="w-full text-sm">
+                        <thead className="bg-green-50 sticky top-0">
+                          <tr>
+                            <th className="text-left p-2">ID</th>
+                            <th className="text-left p-2">Descrição</th>
+                            <th className="text-left p-2">Data</th>
+                            <th className="text-right p-2">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {balanceDiagnostic.paidIncomeTransactions.map((t: any) => (
+                            <tr key={t.id} className="border-t">
+                              <td className="p-2">{t.id}</td>
+                              <td className="p-2">{t.description}</td>
+                              <td className="p-2">{t.dueDate ? format(new Date(t.dueDate), 'dd/MM/yyyy') : '-'}</td>
+                              <td className="p-2 text-right text-green-600">{formatCurrency(t.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Lista de Despesas Pagas */}
+                  <div>
+                    <h3 className="font-semibold mb-2 text-red-700">Despesas Pagas ({balanceDiagnostic.paidExpenseTransactions.length})</h3>
+                    <div className="max-h-60 overflow-y-auto border rounded">
+                      <table className="w-full text-sm">
+                        <thead className="bg-red-50 sticky top-0">
+                          <tr>
+                            <th className="text-left p-2">ID</th>
+                            <th className="text-left p-2">Descrição</th>
+                            <th className="text-left p-2">Data</th>
+                            <th className="text-right p-2">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {balanceDiagnostic.paidExpenseTransactions.map((t: any) => (
+                            <tr key={t.id} className="border-t">
+                              <td className="p-2">{t.id}</td>
+                              <td className="p-2">{t.description}</td>
+                              <td className="p-2">{t.dueDate ? format(new Date(t.dueDate), 'dd/MM/yyyy') : '-'}</td>
+                              <td className="p-2 text-right text-red-600">-{formatCurrency(t.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8 text-center text-gray-500">Não foi possível carregar o diagnóstico</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
