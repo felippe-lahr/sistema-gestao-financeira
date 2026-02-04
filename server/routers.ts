@@ -620,28 +620,39 @@ export const appRouter = router({
       }
     }),
 
-    metrics: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
+    metrics: protectedProcedure.input(z.object({ 
+      entityId: z.number(),
+      startDate: z.date().optional(),
+      endDate: z.date().optional(),
+    })).query(async ({ input, ctx }) => {
       const entity = await db.getEntityById(input.entityId);
       if (!entity || entity.userId !== ctx.user.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 
-      const metrics = await db.getDashboardMetrics(input.entityId);
+      const metrics = await db.getDashboardMetrics(input.entityId, {
+        startDate: input.startDate,
+        endDate: input.endDate,
+      });
       if (!metrics) {
         return {
           currentBalance: 0,
+          periodBalance: 0,
           monthIncome: 0,
           monthExpenses: 0,
           pendingExpenses: 0,
+          periodPendingExpenses: 0,
         };
       }
 
       // Convert from cents to currency
       return {
         currentBalance: metrics.currentBalance / 100,
+        periodBalance: metrics.periodBalance / 100,
         monthIncome: metrics.monthIncome / 100,
         monthExpenses: metrics.monthExpenses / 100,
         pendingExpenses: metrics.pendingExpenses / 100,
+        periodPendingExpenses: metrics.periodPendingExpenses / 100,
       };
     }),
 

@@ -369,7 +369,7 @@ export async function deleteRecurringTransaction(
 
 // ========== DASHBOARD METRICS ==========
 
-export async function getDashboardMetrics(entityId: number) {
+export async function getDashboardMetrics(entityId: number, options?: { startDate?: Date; endDate?: Date }) {
   const db = await getDb();
   if (!db) return null;
 
@@ -377,7 +377,7 @@ export async function getDashboardMetrics(entityId: number) {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  // Get current balance (all paid transactions)
+  // Get current balance (all paid transactions - TODO PERÍODO)
   const balanceResult = await db
     .select({
       total: sql<number>`COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END), 0)`,
@@ -386,6 +386,25 @@ export async function getDashboardMetrics(entityId: number) {
     .where(and(eq(transactions.entityId, entityId), eq(transactions.status, "PAID")));
 
   const currentBalance = Number(balanceResult[0]?.total) || 0;
+
+  // Get period balance (filtered by date range if provided)
+  let periodBalance = 0;
+  if (options?.startDate && options?.endDate) {
+    const periodBalanceResult = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END), 0)`,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.entityId, entityId),
+          eq(transactions.status, "PAID"),
+          gte(transactions.dueDate, options.startDate),
+          lte(transactions.dueDate, options.endDate)
+        )
+      );
+    periodBalance = Number(periodBalanceResult[0]?.total) || 0;
+  }
 
   // Get month income
   const incomeResult = await db
@@ -423,7 +442,7 @@ export async function getDashboardMetrics(entityId: number) {
 
   const monthExpenses = Number(expenseResult[0]?.total) || 0;
 
-  // Get pending expenses
+  // Get ALL pending expenses (todo período)
   const pendingResult = await db
     .select({
       total: sql<number>`COALESCE(SUM(amount), 0)`,
@@ -435,11 +454,33 @@ export async function getDashboardMetrics(entityId: number) {
 
   const pendingExpenses = Number(pendingResult[0]?.total) || 0;
 
+  // Get pending expenses filtered by period
+  let periodPendingExpenses = 0;
+  if (options?.startDate && options?.endDate) {
+    const periodPendingResult = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(amount), 0)`,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.entityId, entityId),
+          eq(transactions.type, "EXPENSE"),
+          eq(transactions.status, "PENDING"),
+          gte(transactions.dueDate, options.startDate),
+          lte(transactions.dueDate, options.endDate)
+        )
+      );
+    periodPendingExpenses = Number(periodPendingResult[0]?.total) || 0;
+  }
+
   return {
     currentBalance,
+    periodBalance,
     monthIncome,
     monthExpenses,
     pendingExpenses,
+    periodPendingExpenses,
   };
 }
 
@@ -459,7 +500,7 @@ export async function getBalanceDiagnostic(entityId: number) {
         description: transactions.description,
         amount: transactions.amount,
         dueDate: transactions.dueDate,
-        paidAt: transactions.paidAt,
+        paymentDate: transactions.paymentDate,
         type: transactions.type,
         status: transactions.status,
       })
@@ -480,7 +521,7 @@ export async function getBalanceDiagnostic(entityId: number) {
         description: transactions.description,
         amount: transactions.amount,
         dueDate: transactions.dueDate,
-        paidAt: transactions.paidAt,
+        paymentDate: transactions.paymentDate,
         type: transactions.type,
         status: transactions.status,
       })
@@ -514,7 +555,7 @@ export async function getBalanceDiagnostic(entityId: number) {
         description: t.description,
         amount: Number(t.amount) / 100,
         dueDate: t.dueDate,
-        paidAt: t.paidAt,
+        paymentDate: t.paymentDate,
       })),
       // Lista de despesas pagas
       paidExpenseTransactions: paidExpenseTransactions.map(t => ({
@@ -522,7 +563,7 @@ export async function getBalanceDiagnostic(entityId: number) {
         description: t.description,
         amount: Number(t.amount) / 100,
         dueDate: t.dueDate,
-        paidAt: t.paidAt,
+        paymentDate: t.paymentDate,
       })),
     };
   } catch (error) {
