@@ -597,8 +597,27 @@ export const appRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 
-      const diagnostic = await db.getBalanceDiagnostic(input.entityId);
-      return diagnostic;
+      try {
+        const diagnostic = await db.getBalanceDiagnostic(input.entityId);
+        if (!diagnostic) {
+          // Retornar estrutura vazia se não houver dados
+          return {
+            summary: {
+              totalIncomeCount: 0,
+              totalIncomeAmount: 0,
+              totalExpenseCount: 0,
+              totalExpenseAmount: 0,
+              calculatedBalance: 0,
+            },
+            paidIncomeTransactions: [],
+            paidExpenseTransactions: [],
+          };
+        }
+        return diagnostic;
+      } catch (error) {
+        console.error('[balanceDiagnostic] Error:', error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to load diagnostic" });
+      }
     }),
 
     metrics: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {

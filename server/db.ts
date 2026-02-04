@@ -446,93 +446,89 @@ export async function getDashboardMetrics(entityId: number) {
 // Função de diagnóstico para investigar cálculo do Saldo Atual
 export async function getBalanceDiagnostic(entityId: number) {
   const db = await getDb();
-  if (!db) return null;
+  if (!db) {
+    console.error('[getBalanceDiagnostic] Database not available');
+    return null;
+  }
 
-  // Buscar TODAS as transações PAGAS (INCOME)
-  const paidIncomeTransactions = await db
-    .select({
-      id: transactions.id,
-      description: transactions.description,
-      amount: transactions.amount,
-      dueDate: transactions.dueDate,
-      paidAt: transactions.paidAt,
-      type: transactions.type,
-      status: transactions.status,
-    })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.entityId, entityId),
-        eq(transactions.type, "INCOME"),
-        eq(transactions.status, "PAID")
+  try {
+    // Buscar TODAS as transações PAGAS (INCOME)
+    const paidIncomeTransactions = await db
+      .select({
+        id: transactions.id,
+        description: transactions.description,
+        amount: transactions.amount,
+        dueDate: transactions.dueDate,
+        paidAt: transactions.paidAt,
+        type: transactions.type,
+        status: transactions.status,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.entityId, entityId),
+          eq(transactions.type, "INCOME"),
+          eq(transactions.status, "PAID")
+        )
       )
-    )
-    .orderBy(transactions.dueDate);
+      .orderBy(transactions.dueDate);
 
-  // Buscar TODAS as transações PAGAS (EXPENSE)
-  const paidExpenseTransactions = await db
-    .select({
-      id: transactions.id,
-      description: transactions.description,
-      amount: transactions.amount,
-      dueDate: transactions.dueDate,
-      paidAt: transactions.paidAt,
-      type: transactions.type,
-      status: transactions.status,
-    })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.entityId, entityId),
-        eq(transactions.type, "EXPENSE"),
-        eq(transactions.status, "PAID")
+    // Buscar TODAS as transações PAGAS (EXPENSE)
+    const paidExpenseTransactions = await db
+      .select({
+        id: transactions.id,
+        description: transactions.description,
+        amount: transactions.amount,
+        dueDate: transactions.dueDate,
+        paidAt: transactions.paidAt,
+        type: transactions.type,
+        status: transactions.status,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.entityId, entityId),
+          eq(transactions.type, "EXPENSE"),
+          eq(transactions.status, "PAID")
+        )
       )
-    )
-    .orderBy(transactions.dueDate);
+      .orderBy(transactions.dueDate);
 
-  // Calcular totais
-  const totalIncome = paidIncomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const totalExpenses = paidExpenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const calculatedBalance = totalIncome - totalExpenses;
+    // Calcular totais
+    const totalIncome = paidIncomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalExpenses = paidExpenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const calculatedBalance = totalIncome - totalExpenses;
 
-  // Buscar o saldo calculado pelo método original para comparar
-  const balanceResult = await db
-    .select({
-      total: sql<number>`COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END), 0)`,
-    })
-    .from(transactions)
-    .where(and(eq(transactions.entityId, entityId), eq(transactions.status, "PAID")));
-
-  const originalBalance = Number(balanceResult[0]?.total) || 0;
-
-  return {
-    // Resumo
-    summary: {
-      totalIncomeCount: paidIncomeTransactions.length,
-      totalIncomeAmount: totalIncome / 100, // Converter de centavos
-      totalExpenseCount: paidExpenseTransactions.length,
-      totalExpenseAmount: totalExpenses / 100, // Converter de centavos
-      calculatedBalance: calculatedBalance / 100, // Converter de centavos
-      originalBalance: originalBalance / 100, // Converter de centavos
-      difference: (calculatedBalance - originalBalance) / 100,
-    },
-    // Lista de receitas pagas
-    paidIncomeTransactions: paidIncomeTransactions.map(t => ({
-      id: t.id,
-      description: t.description,
-      amount: Number(t.amount) / 100,
-      dueDate: t.dueDate,
-      paidAt: t.paidAt,
-    })),
-    // Lista de despesas pagas
-    paidExpenseTransactions: paidExpenseTransactions.map(t => ({
-      id: t.id,
-      description: t.description,
-      amount: Number(t.amount) / 100,
-      dueDate: t.dueDate,
-      paidAt: t.paidAt,
-    })),
-  };
+    return {
+      // Resumo
+      summary: {
+        totalIncomeCount: paidIncomeTransactions.length,
+        totalIncomeAmount: totalIncome / 100, // Converter de centavos
+        totalExpenseCount: paidExpenseTransactions.length,
+        totalExpenseAmount: totalExpenses / 100, // Converter de centavos
+        calculatedBalance: calculatedBalance / 100, // Converter de centavos
+      },
+      // Lista de receitas pagas
+      paidIncomeTransactions: paidIncomeTransactions.map(t => ({
+        id: t.id,
+        description: t.description,
+        amount: Number(t.amount) / 100,
+        dueDate: t.dueDate,
+        paidAt: t.paidAt,
+      })),
+      // Lista de despesas pagas
+      paidExpenseTransactions: paidExpenseTransactions.map(t => ({
+        id: t.id,
+        description: t.description,
+        amount: Number(t.amount) / 100,
+        dueDate: t.dueDate,
+        paidAt: t.paidAt,
+      })),
+    };
+  } catch (error) {
+    console.error('[getBalanceDiagnostic] Error:', error);
+    return null;
+  }
 }
 
 // ========== ATTACHMENT OPERATIONS ==========
