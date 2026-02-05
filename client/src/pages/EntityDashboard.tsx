@@ -26,7 +26,7 @@ export default function EntityDashboard() {
   
   // Filtros específicos para o gráfico mensal de categorias
   const [monthlyChartPeriod, setMonthlyChartPeriod] = useState<"year" | "custom">("year");
-  const [monthlyChartCategoryId, setMonthlyChartCategoryId] = useState<string>("");
+  const [monthlyChartCategoryId, setMonthlyChartCategoryId] = useState<string>("all");
   const [monthlyChartStartDate, setMonthlyChartStartDate] = useState("");
   const [monthlyChartEndDate, setMonthlyChartEndDate] = useState("");
   
@@ -142,7 +142,7 @@ export default function EntityDashboard() {
       entityId: entityId!, 
       startDate: monthlyStartDate, 
       endDate: monthlyEndDate,
-      categoryId: monthlyChartCategoryId ? parseInt(monthlyChartCategoryId) : undefined 
+      categoryId: monthlyChartCategoryId !== "all" ? parseInt(monthlyChartCategoryId) : undefined 
     },
     { enabled: !!entityId }
   );
@@ -807,7 +807,7 @@ export default function EntityDashboard() {
                   <SelectValue placeholder="Todas as categorias" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as categorias</SelectItem>
+                  <SelectItem value="all">Todas as categorias</SelectItem>
                   {categories?.filter(c => c.type === "EXPENSE").map((cat) => (
                     <SelectItem key={cat.id} value={cat.id.toString()}>
                       {cat.name}
