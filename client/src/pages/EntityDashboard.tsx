@@ -130,6 +130,11 @@ export default function EntityDashboard() {
   };
 
   const getPeriodDescription = () => {
+    // Usar as datas calculadas pelo getFilterDates para garantir consistência
+    if (startDate && endDate) {
+      return `Receitas e despesas de ${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}`;
+    }
+    
     switch (filterPeriod) {
       case "month":
         return "Receitas e despesas do mês atual";
@@ -137,11 +142,6 @@ export default function EntityDashboard() {
         return "Receitas e despesas dos últimos 3 meses";
       case "year":
         return "Receitas e despesas do ano atual";
-      case "custom":
-        if (customStartDate && customEndDate) {
-          return `Receitas e despesas de ${format(new Date(customStartDate), "dd/MM/yyyy")} a ${format(new Date(customEndDate), "dd/MM/yyyy")}`;
-        }
-        return "Receitas e despesas do período selecionado";
       case "all":
       default:
         return "Receitas e despesas de todos os períodos";
