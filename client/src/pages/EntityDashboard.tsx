@@ -148,7 +148,7 @@ export default function EntityDashboard() {
   );
   
   // Query para lista de categorias (para o filtro)
-  const { data: categories } = trpc.categories.list.useQuery(
+  const { data: categories } = trpc.categories.listByEntity.useQuery(
     { entityId: entityId! },
     { enabled: !!entityId }
   );
