@@ -24,6 +24,12 @@ export default function EntityDashboard() {
   const [customEndDate, setCustomEndDate] = useState("");
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   
+  // Filtros específicos para o gráfico mensal de categorias
+  const [monthlyChartPeriod, setMonthlyChartPeriod] = useState<"year" | "custom">("year");
+  const [monthlyChartCategoryId, setMonthlyChartCategoryId] = useState<string>("");
+  const [monthlyChartStartDate, setMonthlyChartStartDate] = useState("");
+  const [monthlyChartEndDate, setMonthlyChartEndDate] = useState("");
+  
   // Calcular quantos filtros estao ativos
   const activeFiltersCount = [
     filterPeriod !== "month",
@@ -109,6 +115,41 @@ export default function EntityDashboard() {
   
   const { data: categoryExpenses, isLoading: categoryExpensesLoading } = trpc.dashboard.categoryExpensesByStatus.useQuery(
     { entityId: entityId!, startDate, endDate },
+    { enabled: !!entityId }
+  );
+  
+  // Query para gastos mensais por categoria
+  const getMonthlyChartDates = () => {
+    const now = new Date();
+    if (monthlyChartPeriod === "year") {
+      return { 
+        startDate: new Date(now.getFullYear(), 0, 1), 
+        endDate: new Date(now.getFullYear(), 11, 31) 
+      };
+    } else if (monthlyChartPeriod === "custom" && monthlyChartStartDate && monthlyChartEndDate) {
+      return { 
+        startDate: new Date(monthlyChartStartDate + "T00:00:00"), 
+        endDate: new Date(monthlyChartEndDate + "T23:59:59") 
+      };
+    }
+    return { startDate: undefined, endDate: undefined };
+  };
+  
+  const { startDate: monthlyStartDate, endDate: monthlyEndDate } = getMonthlyChartDates();
+  
+  const { data: monthlyCategoryData, isLoading: monthlyCategoryLoading } = trpc.dashboard.monthlyCategoryExpenses.useQuery(
+    { 
+      entityId: entityId!, 
+      startDate: monthlyStartDate, 
+      endDate: monthlyEndDate,
+      categoryId: monthlyChartCategoryId ? parseInt(monthlyChartCategoryId) : undefined 
+    },
+    { enabled: !!entityId }
+  );
+  
+  // Query para lista de categorias (para o filtro)
+  const { data: categories } = trpc.categories.list.useQuery(
+    { entityId: entityId! },
     { enabled: !!entityId }
   );
 
@@ -735,6 +776,147 @@ export default function EntityDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gastos Mensais por Categoria */}
+      <Card className="flex flex-col">
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <CardTitle>Gastos Mensais por Categoria</CardTitle>
+              <CardDescription>
+                {monthlyChartPeriod === "year" 
+                  ? `Despesas pagas em ${new Date().getFullYear()}`
+                  : monthlyChartStartDate && monthlyChartEndDate
+                    ? `Despesas pagas de ${format(new Date(monthlyChartStartDate), "dd/MM/yyyy")} a ${format(new Date(monthlyChartEndDate), "dd/MM/yyyy")}`
+                    : "Selecione um período"}
+              </CardDescription>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select value={monthlyChartPeriod} onValueChange={(value: "year" | "custom") => setMonthlyChartPeriod(value)}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="year">Ano Atual</SelectItem>
+                  <SelectItem value="custom">Período Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={monthlyChartCategoryId} onValueChange={setMonthlyChartCategoryId}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Todas as categorias" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas as categorias</SelectItem>
+                  {categories?.filter(c => c.type === "EXPENSE").map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id.toString()}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {monthlyChartPeriod === "custom" && (
+            <div className="flex flex-col sm:flex-row gap-2 mt-4">
+              <div className="flex-1">
+                <Label htmlFor="monthly-start-date" className="text-xs">Data Início</Label>
+                <input
+                  id="monthly-start-date"
+                  type="date"
+                  value={monthlyChartStartDate}
+                  onChange={(e) => setMonthlyChartStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md text-sm"
+                />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="monthly-end-date" className="text-xs">Data Fim</Label>
+                <input
+                  id="monthly-end-date"
+                  type="date"
+                  value={monthlyChartEndDate}
+                  onChange={(e) => setMonthlyChartEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md text-sm"
+                />
+              </div>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="flex-1 w-full p-4">
+          <div className="h-[400px] w-full">
+            {monthlyCategoryLoading ? (
+              <Skeleton className="h-full w-full" />
+            ) : monthlyCategoryData && monthlyCategoryData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={(() => {
+                    // Agrupar dados por mês
+                    const monthsMap = new Map<string, any>();
+                    
+                    monthlyCategoryData.forEach(item => {
+                      if (!monthsMap.has(item.month)) {
+                        monthsMap.set(item.month, { month: item.month });
+                      }
+                      const monthData = monthsMap.get(item.month)!;
+                      monthData[item.categoryName] = item.totalAmount;
+                    });
+                    
+                    return Array.from(monthsMap.values()).sort((a, b) => a.month.localeCompare(b.month));
+                  })()}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="month" 
+                    tickFormatter={(value) => {
+                      const [year, month] = value.split('-');
+                      return `${month}/${year.slice(2)}`;
+                    }}
+                  />
+                  <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                  <Tooltip 
+                    formatter={(value: number) => formatCurrency(value)}
+                    labelFormatter={(label) => {
+                      const [year, month] = label.split('-');
+                      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                      return `${monthNames[parseInt(month) - 1]}/${year}`;
+                    }}
+                  />
+                  <Legend />
+                  {(() => {
+                    // Obter todas as categorias únicas
+                    const uniqueCategories = Array.from(
+                      new Set(monthlyCategoryData.map(item => item.categoryName))
+                    );
+                    
+                    // Criar uma barra para cada categoria
+                    return uniqueCategories.map((categoryName, index) => {
+                      const categoryColor = monthlyCategoryData.find(
+                        item => item.categoryName === categoryName
+                      )?.categoryColor || `hsl(${index * 360 / uniqueCategories.length}, 70%, 50%)`;
+                      
+                      return (
+                        <Bar 
+                          key={categoryName}
+                          dataKey={categoryName} 
+                          stackId="a" 
+                          fill={categoryColor}
+                          name={categoryName}
+                        />
+                      );
+                    });
+                  })()}
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                Sem dados para exibir
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Despesas por Categoria e Status */}
       <Card>

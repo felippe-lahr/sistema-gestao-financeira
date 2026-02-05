@@ -5,6 +5,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import * as exportUtils from "./export";
+import { getMonthlyCategoryExpenses } from "./db-monthly-category";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { treasurySelic } from "../drizzle/schema";
@@ -698,6 +699,33 @@ export const appRouter = router({
         return distribution.map((item) => ({
           ...item,
           value: item.value / 100,
+        }));
+      }),
+
+    monthlyCategoryExpenses: protectedProcedure
+      .input(z.object({ 
+        entityId: z.number(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+        categoryId: z.number().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const data = await getMonthlyCategoryExpenses(
+          input.entityId, 
+          input.startDate, 
+          input.endDate,
+          input.categoryId
+        );
+        
+        // Convert amounts from cents
+        return data.map((item) => ({
+          ...item,
+          totalAmount: item.totalAmount / 100,
         }));
       }),
 
