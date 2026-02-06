@@ -59,9 +59,60 @@ export async function getTransactionSummary(
   const totalExpenses = Number(expenseResult[0]?.total || 0);
   const balance = totalIncome - totalExpenses;
 
+  // Get breakdown by status for income
+  const incomeByStatus = await db
+    .select({
+      status: transactions.status,
+      total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.entityId, entityId),
+        eq(transactions.type, "INCOME"),
+        options?.startDate ? gte(transactions.dueDate, options.startDate) : sql`true`,
+        options?.endDate ? lte(transactions.dueDate, options.endDate) : sql`true`,
+        options?.categoryId ? eq(transactions.categoryId, options.categoryId) : sql`true`
+      )
+    )
+    .groupBy(transactions.status);
+
+  // Get breakdown by status for expenses
+  const expensesByStatus = await db
+    .select({
+      status: transactions.status,
+      total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.entityId, entityId),
+        eq(transactions.type, "EXPENSE"),
+        options?.startDate ? gte(transactions.dueDate, options.startDate) : sql`true`,
+        options?.endDate ? lte(transactions.dueDate, options.endDate) : sql`true`,
+        options?.categoryId ? eq(transactions.categoryId, options.categoryId) : sql`true`
+      )
+    )
+    .groupBy(transactions.status);
+
+  // Build breakdown objects
+  const incomeBreakdown = {
+    paid: Number(incomeByStatus.find(s => s.status === "PAID")?.total || 0),
+    pending: Number(incomeByStatus.find(s => s.status === "PENDING")?.total || 0),
+    overdue: Number(incomeByStatus.find(s => s.status === "OVERDUE")?.total || 0),
+  };
+
+  const expensesBreakdown = {
+    paid: Number(expensesByStatus.find(s => s.status === "PAID")?.total || 0),
+    pending: Number(expensesByStatus.find(s => s.status === "PENDING")?.total || 0),
+    overdue: Number(expensesByStatus.find(s => s.status === "OVERDUE")?.total || 0),
+  };
+
   return {
     totalIncome,
     totalExpenses,
     balance,
+    incomeBreakdown,
+    expensesBreakdown,
   };
 }
