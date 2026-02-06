@@ -6,6 +6,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import * as exportUtils from "./export";
 import { getMonthlyCategoryExpenses } from "./db-monthly-category";
+import { getTransactionSummary } from "./db-transaction-summary";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { treasurySelic } from "../drizzle/schema";
@@ -353,6 +354,29 @@ export const appRouter = router({
 
   // ========== TRANSACTIONS ==========
   transactions: router({
+    summary: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          startDate: z.date().optional(),
+          endDate: z.date().optional(),
+          status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
+          categoryId: z.number().optional(),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return await getTransactionSummary(input.entityId, {
+          startDate: input.startDate,
+          endDate: input.endDate,
+          status: input.status,
+          categoryId: input.categoryId,
+        });
+      }),
+
     listByEntity: protectedProcedure
       .input(
         z.object({

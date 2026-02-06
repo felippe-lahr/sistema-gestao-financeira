@@ -117,6 +117,41 @@ export default function Transactions() {
     { entityId: selectedEntityId! },
     { enabled: !!selectedEntityId }
   );
+  
+  // Helper function to get filter dates
+  const getFilterDates = () => {
+    if (filterPeriod === "month") {
+      return {
+        startDate: startOfMonth(new Date(filterYear, filterMonth - 1)),
+        endDate: endOfMonth(new Date(filterYear, filterMonth - 1)),
+      };
+    } else if (filterPeriod === "year") {
+      return {
+        startDate: startOfYear(new Date(filterYear, 0)),
+        endDate: endOfYear(new Date(filterYear, 0)),
+      };
+    } else if (filterPeriod === "custom" && filterStartDate && filterEndDate) {
+      return {
+        startDate: new Date(filterStartDate + "T00:00:00"),
+        endDate: new Date(filterEndDate + "T23:59:59"),
+      };
+    }
+    return { startDate: undefined, endDate: undefined };
+  };
+  
+  const { startDate, endDate } = getFilterDates();
+  
+  // Fetch transaction summary
+  const { data: summary, isLoading: summaryLoading } = trpc.transactions.summary.useQuery(
+    {
+      entityId: selectedEntityId!,
+      startDate,
+      endDate,
+      status: filterStatus && filterStatus !== "all" ? (filterStatus as "PENDING" | "PAID" | "OVERDUE") : undefined,
+      categoryId: filterCategoryId && filterCategoryId !== "all" ? parseInt(filterCategoryId) : undefined,
+    },
+    { enabled: !!selectedEntityId }
+  );
 
   const createMutation = trpc.transactions.create.useMutation({
     onSuccess: async (data) => {
@@ -1062,6 +1097,63 @@ export default function Transactions() {
         </Button>
         </div>
       </div>
+
+      {/* Transaction Summary */}
+      {!summaryLoading && summary && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-lg p-4 md:p-6 mb-4">
+          {activeTab === "all" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Receitas</span>
+                  <ArrowUpRight className="h-4 w-4 text-green-600" />
+                </div>
+                <p className="text-2xl font-bold text-green-600">
+                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.totalIncome / 100)}
+                </p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Despesas</span>
+                  <ArrowDownRight className="h-4 w-4 text-red-600" />
+                </div>
+                <p className="text-2xl font-bold text-red-600">
+                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.totalExpenses / 100)}
+                </p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Saldo</span>
+                  <div className={`h-2 w-2 rounded-full ${summary.balance >= 0 ? 'bg-green-600' : 'bg-red-600'}`} />
+                </div>
+                <p className={`text-2xl font-bold ${summary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.balance / 100)}
+                </p>
+              </div>
+            </div>
+          ) : activeTab === "income" ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Receitas</span>
+                <ArrowUpRight className="h-5 w-5 text-green-600" />
+              </div>
+              <p className="text-3xl font-bold text-green-600">
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.totalIncome / 100)}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Despesas</span>
+                <ArrowDownRight className="h-5 w-5 text-red-600" />
+              </div>
+              <p className="text-3xl font-bold text-red-600">
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.totalExpenses / 100)}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
         <TabsList>
