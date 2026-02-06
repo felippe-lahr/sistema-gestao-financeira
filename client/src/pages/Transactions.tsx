@@ -222,6 +222,7 @@ export default function Transactions() {
       }
       
       utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
       utils.dashboard.metrics.invalidate();
       setIsCreateOpen(false);
       resetForm();
@@ -315,6 +316,7 @@ export default function Transactions() {
       }
       
       utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
       utils.dashboard.metrics.invalidate();
       setIsEditOpen(false);
       setEditingTransaction(null);
@@ -330,6 +332,7 @@ export default function Transactions() {
   const deleteRecurringMutation = trpc.transactions.deleteRecurring.useMutation({
     onSuccess: () => {
       utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
       utils.dashboard.metrics.invalidate();
       setDeleteDialogOpen(false);
       setDeletingTransactionId(null);
@@ -344,6 +347,7 @@ export default function Transactions() {
   const deleteMutation = trpc.transactions.delete.useMutation({
     onSuccess: () => {
       utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
       utils.dashboard.metrics.invalidate();
       setDeleteDialogOpen(false);
       setDeletingTransactionId(null);
