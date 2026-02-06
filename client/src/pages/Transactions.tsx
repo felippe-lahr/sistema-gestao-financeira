@@ -1113,18 +1113,18 @@ export default function Transactions() {
                 </p>
                 {summary.incomeBreakdown && (
                   <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1 md:gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <div className="flex justify-between md:flex-1">
+                    <div className="flex flex-col md:flex-row md:divide-x md:divide-gray-300 dark:md:divide-gray-600 gap-2 md:gap-0 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex justify-between md:flex-1 md:pr-3">
                         <span>Pago:</span>
-                        <span className="font-medium md:ml-1">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.paid / 100)}</span>
+                        <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.paid / 100)}</span>
                       </div>
-                      <div className="flex justify-between md:flex-1">
+                      <div className="flex justify-between md:flex-1 md:px-3">
                         <span>Pendente:</span>
-                        <span className="font-medium md:ml-1">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.pending / 100)}</span>
+                        <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.pending / 100)}</span>
                       </div>
-                      <div className="flex justify-between md:flex-1">
+                      <div className="flex justify-between md:flex-1 md:pl-3">
                         <span>Vencido:</span>
-                        <span className="font-medium md:ml-1">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.overdue / 100)}</span>
+                        <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.overdue / 100)}</span>
                       </div>
                     </div>
                   </div>
@@ -1140,18 +1140,18 @@ export default function Transactions() {
                 </p>
                 {summary.expensesBreakdown && (
                   <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1 md:gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <div className="flex justify-between md:flex-1">
+                    <div className="flex flex-col md:flex-row md:divide-x md:divide-gray-300 dark:md:divide-gray-600 gap-2 md:gap-0 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex justify-between md:flex-1 md:pr-3">
                         <span>Pago:</span>
-                        <span className="font-medium md:ml-1">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.paid / 100)}</span>
+                        <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.paid / 100)}</span>
                       </div>
-                      <div className="flex justify-between md:flex-1">
+                      <div className="flex justify-between md:flex-1 md:px-3">
                         <span>Pendente:</span>
-                        <span className="font-medium md:ml-1">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.pending / 100)}</span>
+                        <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.pending / 100)}</span>
                       </div>
-                      <div className="flex justify-between md:flex-1">
+                      <div className="flex justify-between md:flex-1 md:pl-3">
                         <span>Vencido:</span>
-                        <span className="font-medium md:ml-1">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.overdue / 100)}</span>
+                        <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.overdue / 100)}</span>
                       </div>
                     </div>
                   </div>
@@ -1178,18 +1178,18 @@ export default function Transactions() {
               </p>
               {summary.incomeBreakdown && (
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2 md:gap-4 text-xs text-gray-500 dark:text-gray-400">
-                    <div className="flex justify-between md:flex-1">
+                  <div className="flex flex-col md:flex-row md:divide-x md:divide-gray-300 dark:md:divide-gray-600 gap-2 md:gap-0 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex justify-between md:flex-1 md:pr-4">
                       <span>Pago:</span>
-                      <span className="font-medium md:ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.paid / 100)}</span>
+                      <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.paid / 100)}</span>
                     </div>
-                    <div className="flex justify-between md:flex-1">
+                    <div className="flex justify-between md:flex-1 md:px-4">
                       <span>Pendente:</span>
-                      <span className="font-medium md:ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.pending / 100)}</span>
+                      <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.pending / 100)}</span>
                     </div>
-                    <div className="flex justify-between md:flex-1">
+                    <div className="flex justify-between md:flex-1 md:pl-4">
                       <span>Vencido:</span>
-                      <span className="font-medium md:ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.overdue / 100)}</span>
+                      <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.incomeBreakdown.overdue / 100)}</span>
                     </div>
                   </div>
                 </div>
@@ -1206,18 +1206,18 @@ export default function Transactions() {
               </p>
               {summary.expensesBreakdown && (
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2 md:gap-4 text-xs text-gray-500 dark:text-gray-400">
-                    <div className="flex justify-between md:flex-1">
+                  <div className="flex flex-col md:flex-row md:divide-x md:divide-gray-300 dark:md:divide-gray-600 gap-2 md:gap-0 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex justify-between md:flex-1 md:pr-4">
                       <span>Pago:</span>
-                      <span className="font-medium md:ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.paid / 100)}</span>
+                      <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.paid / 100)}</span>
                     </div>
-                    <div className="flex justify-between md:flex-1">
+                    <div className="flex justify-between md:flex-1 md:px-4">
                       <span>Pendente:</span>
-                      <span className="font-medium md:ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.pending / 100)}</span>
+                      <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.pending / 100)}</span>
                     </div>
-                    <div className="flex justify-between md:flex-1">
+                    <div className="flex justify-between md:flex-1 md:pl-4">
                       <span>Vencido:</span>
-                      <span className="font-medium md:ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.overdue / 100)}</span>
+                      <span className="font-medium ml-2">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.expensesBreakdown.overdue / 100)}</span>
                     </div>
                   </div>
                 </div>
