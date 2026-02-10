@@ -1045,25 +1045,7 @@ export async function getAttachmentsByEntityWithFilters(
   const db = await getDb();
   if (!db) return [];
 
-  let query = db
-    .select({
-      id: attachments.id,
-      filename: attachments.filename,
-      blobUrl: attachments.blobUrl,
-      fileSize: attachments.fileSize,
-      mimeType: attachments.mimeType,
-      type: attachments.type,
-      createdAt: attachments.createdAt,
-      transactionId: attachments.transactionId,
-      transactionDescription: transactions.description,
-      transactionDueDate: transactions.dueDate,
-    })
-    .from(attachments)
-    .innerJoin(transactions, eq(attachments.transactionId, transactions.id))
-    .where(eq(transactions.entityId, entityId))
-    .$dynamic();
-
-  const conditions = [eq(transactions.entityId, entityId)];
+  const conditions: any[] = [eq(transactions.entityId, entityId)];
 
   if (options?.types && options.types.length > 0) {
     conditions.push(
@@ -1080,12 +1062,24 @@ export async function getAttachmentsByEntityWithFilters(
   }
 
   console.log("[getAttachmentsByEntityWithFilters] conditions count:", conditions.length);
-  
-  if (conditions.length > 1) {
-    query = query.where(and(...conditions));
-  }
 
-  const result = await query.orderBy(asc(transactions.dueDate));
+  const result = await db
+    .select({
+      id: attachments.id,
+      filename: attachments.filename,
+      blobUrl: attachments.blobUrl,
+      fileSize: attachments.fileSize,
+      mimeType: attachments.mimeType,
+      type: attachments.type,
+      createdAt: attachments.createdAt,
+      transactionId: attachments.transactionId,
+      transactionDescription: transactions.description,
+      transactionDueDate: transactions.dueDate,
+    })
+    .from(attachments)
+    .innerJoin(transactions, eq(attachments.transactionId, transactions.id))
+    .where(and(...conditions))
+    .orderBy(asc(transactions.dueDate));
   console.log("[getAttachmentsByEntityWithFilters] result count:", result.length);
   
   return result;

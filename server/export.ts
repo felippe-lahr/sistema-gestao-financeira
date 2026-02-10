@@ -653,13 +653,13 @@ export async function generateAttachmentsZip(data: {
           const arrayBuffer = await response.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
 
-          // Criar nome de arquivo seguro
+          // Criar nome de arquivo seguro com ID do anexo para garantir unicidade
           const transactionDesc = attachment.transactionDescription
             ?.replace(/[^a-zA-Z0-9]/g, "_")
             .substring(0, 30) || "sem_descricao";
           
           const extension = attachment.filename.split(".").pop() || "bin";
-          const safeFilename = `transacao_${attachment.transactionId}_${transactionDesc}.${extension}`;
+          const safeFilename = `transacao_${attachment.transactionId}_${transactionDesc}_anexo${attachment.id}.${extension}`;
 
           // Adicionar ao ZIP
           archive.append(buffer, { 
