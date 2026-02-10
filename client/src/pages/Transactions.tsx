@@ -1443,10 +1443,25 @@ export default function Transactions() {
             <Button variant="outline" onClick={() => setPreviewAttachment(null)}>
               Fechar
             </Button>
-            <Button asChild>
-              <a href={previewAttachment?.blobUrl} download={previewAttachment?.filename}>
-                Baixar
-              </a>
+            <Button onClick={async () => {
+              if (!previewAttachment) return;
+              try {
+                const response = await fetch(previewAttachment.blobUrl);
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = previewAttachment.filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+              } catch (error) {
+                console.error('Erro ao baixar arquivo:', error);
+                window.open(previewAttachment.blobUrl, '_blank');
+              }
+            }}>
+              Baixar
             </Button>
           </DialogFooter>
         </DialogContent>

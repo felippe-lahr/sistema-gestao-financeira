@@ -115,6 +115,28 @@ export function RentalAttachmentUploader({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const handleDownload = async (attachment: RentalAttachment) => {
+    try {
+      const response = await fetch(attachment.blobUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = attachment.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Erro ao baixar arquivo:', error);
+      window.open(attachment.blobUrl, '_blank');
+    }
+  };
+
+  const handlePreview = (attachment: RentalAttachment) => {
+    window.open(attachment.blobUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="space-y-4">
       {/* Área de Upload */}
@@ -196,21 +218,20 @@ export function RentalAttachmentUploader({
               {/* Botões de ação */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
-                  onClick={() => onPreview(attachment)}
+                  onClick={() => handlePreview(attachment)}
                   className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
                   title="Visualizar"
                 >
                   <Eye className="w-4 h-4" />
                 </button>
 
-                <a
-                  href={attachment.blobUrl}
-                  download
+                <button
+                  onClick={() => handleDownload(attachment)}
                   className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded"
                   title="Baixar"
                 >
                   <Download className="w-4 h-4" />
-                </a>
+                </button>
 
                 <button
                   onClick={() => {
