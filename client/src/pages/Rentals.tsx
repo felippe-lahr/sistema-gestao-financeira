@@ -393,7 +393,7 @@ export default function Rentals() {
               {/* Cabeçalho com dias da semana */}
               <div className="grid grid-cols-7 gap-1">
                 {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
-                  <div key={day} className="text-center font-semibold text-sm p-2 border rounded bg-muted">
+                  <div key={day} className="text-center font-semibold text-sm p-2 border dark:border-gray-700 rounded bg-muted">
                     {day}
                   </div>
                 ))}
@@ -595,43 +595,43 @@ export default function Rentals() {
                                   {rental.guestName || getSourceLabel(rental.source)} - {totalFormatted}
                                 </button>
                               </PopoverTrigger>
-                              <PopoverContent side="top" align="center" className="w-80 p-4 bg-white rounded-lg shadow-lg border border-gray-200 z-[9999]" onMouseEnter={() => setOpenPopoverId(popoverId)} onMouseLeave={() => setOpenPopoverId(null)}>
+                              <PopoverContent side="top" align="center" className="w-80 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border dark:border-gray-700-gray-200 z-[9999]" onMouseEnter={() => setOpenPopoverId(popoverId)} onMouseLeave={() => setOpenPopoverId(null)}>
                                 <div className="space-y-3">
-                                  <div className="border-b pb-2">
-                                    <h3 className="font-bold text-lg text-gray-800">{rental.guestName || 'Sem hóspede'}</h3>
-                                    <p className="text-sm text-gray-600">{getSourceLabel(rental.source)}</p>
+                                  <div className="border dark:border-gray-700-b pb-2">
+                                    <h3 className="font-bold text-lg text-gray-800 dark:text-gray-200">{rental.guestName || 'Sem hóspede'}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">{getSourceLabel(rental.source)}</p>
                                   </div>
                                   <div className="grid grid-cols-2 gap-3 text-sm">
                                     <div>
-                                      <p className="text-gray-600 font-medium">Entrada</p>
-                                      <p className="text-gray-800">{format(parseISO(rental.startDate), 'dd/MM/yyyy')}</p>
+                                      <p className="text-gray-600 dark:text-gray-400 font-medium">Entrada</p>
+                                      <p className="text-gray-800 dark:text-gray-200">{format(parseISO(rental.startDate), 'dd/MM/yyyy')}</p>
                                     </div>
                                     <div>
-                                      <p className="text-gray-600 font-medium">Saída</p>
-                                      <p className="text-gray-800">{format(parseISO(rental.endDate), 'dd/MM/yyyy')}</p>
+                                      <p className="text-gray-600 dark:text-gray-400 font-medium">Saída</p>
+                                      <p className="text-gray-800 dark:text-gray-200">{format(parseISO(rental.endDate), 'dd/MM/yyyy')}</p>
                                     </div>
                                     <div>
-                                      <p className="text-gray-600 font-medium">Diárias</p>
-                                      <p className="text-gray-800">{differenceInDays(parseISO(rental.endDate), parseISO(rental.startDate))}</p>
+                                      <p className="text-gray-600 dark:text-gray-400 font-medium">Diárias</p>
+                                      <p className="text-gray-800 dark:text-gray-200">{differenceInDays(parseISO(rental.endDate), parseISO(rental.startDate))}</p>
                                     </div>
                                     <div>
-                                      <p className="text-gray-600 font-medium">Hóspedes</p>
-                                      <p className="text-gray-800">{rental.numberOfGuests || 1}</p>
+                                      <p className="text-gray-600 dark:text-gray-400 font-medium">Hóspedes</p>
+                                      <p className="text-gray-800 dark:text-gray-200">{rental.numberOfGuests || 1}</p>
                                     </div>
                                     <div>
-                                      <p className="text-gray-600 font-medium">Diária</p>
-                                      <p className="text-gray-800">{dailyFormatted}</p>
+                                      <p className="text-gray-600 dark:text-gray-400 font-medium">Diária</p>
+                                      <p className="text-gray-800 dark:text-gray-200">{dailyFormatted}</p>
                                     </div>
                                   </div>
-                                  <div className="border-t pt-2">
+                                  <div className="border dark:border-gray-700-t pt-2">
                                     <div className="flex justify-between items-center">
-                                      <span className="font-medium text-gray-800">Total</span>
+                                      <span className="font-medium text-gray-800 dark:text-gray-200">Total</span>
                                       <span className="font-bold text-lg text-green-600">{totalFormatted}</span>
                                     </div>
                                     {rental.extraFeeAmount > 0 && (
-                                      <div className="flex justify-between items-center text-sm mt-2 border-t pt-2">
-                                        <span className="text-gray-600">{rental.extraFeeType === 'IMPOSTO' ? 'Imposto' : rental.extraFeeType === 'TAXA_PET' ? 'Taxa Pet' : rental.extraFeeType === 'LIMPEZA' ? 'Limpeza' : rental.extraFeeType || 'Taxa Extra'}</span>
-                                        <span className="text-gray-800 font-medium">{extraFeeFormatted}</span>
+                                      <div className="flex justify-between items-center text-sm mt-2 border dark:border-gray-700-t pt-2">
+                                        <span className="text-gray-600 dark:text-gray-400">{rental.extraFeeType === 'IMPOSTO' ? 'Imposto' : rental.extraFeeType === 'TAXA_PET' ? 'Taxa Pet' : rental.extraFeeType === 'LIMPEZA' ? 'Limpeza' : rental.extraFeeType || 'Taxa Extra'}</span>
+                                        <span className="text-gray-800 dark:text-gray-200 font-medium">{extraFeeFormatted}</span>
                                       </div>
                                     )}
                                   </div>
@@ -650,7 +650,7 @@ export default function Rentals() {
         </CardContent>
             
             {/* Rodapé com feriados do mês */}
-            <div className="mt-6 pt-4 border-t pl-4">
+            <div className="mt-6 pt-4 border dark:border-gray-700-t pl-4">
               <h3 className="font-semibold text-sm mb-4">Feriados do mês</h3>
               <div className="space-y-3">
                 {getHolidaysByMonth(currentMonth.getFullYear(), currentMonth.getMonth() + 1).length > 0 ? (
@@ -658,8 +658,8 @@ export default function Rentals() {
                     <div key={holiday.date} className="flex items-start gap-3 text-sm">
                       <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${holiday.type === "national" ? "bg-red-400" : "bg-yellow-400"}`}></span>
                       <div>
-                        <p className="font-medium text-gray-800">{holiday.name}</p>
-                        <p className="text-gray-500 text-xs mt-0.5">{(() => {
+                        <p className="font-medium text-gray-800 dark:text-gray-200">{holiday.name}</p>
+                        <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">{(() => {
                           const [year, month, day] = holiday.date.split('-').map(Number);
                           return format(new Date(year, month - 1, day), "dd/MM/yyyy");
                         })()}</p>
@@ -667,7 +667,7 @@ export default function Rentals() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-500 text-sm">Nenhum feriado neste mês</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">Nenhum feriado neste mês</p>
                 )}
               </div>
             </div>
@@ -677,9 +677,9 @@ export default function Rentals() {
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
           {/* Header Fixo */}
-          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Nova Reserva</SheetTitle>
-            <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+            <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -992,7 +992,7 @@ export default function Rentals() {
           </div>
 
           {/* Footer Fixo */}
-          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-3 justify-end">
+          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
               Cancelar
             </Button>
@@ -1007,9 +1007,9 @@ export default function Rentals() {
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
           {/* Header Fixo */}
-          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Reserva</SheetTitle>
-            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -1320,7 +1320,7 @@ export default function Rentals() {
           </div>
 
           {/* Footer Fixo */}
-          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-3 justify-end">
+          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>

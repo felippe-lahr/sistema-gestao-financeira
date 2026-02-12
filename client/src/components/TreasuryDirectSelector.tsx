@@ -61,7 +61,7 @@ export function TreasuryDirectSelector({ onTitleSelected, isLoading }: TreasuryD
   }, [handleTitleSelected]);
 
   return (
-    <div className="space-y-4 border-t pt-4">
+    <div className="space-y-4 border dark:border-gray-700-t pt-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">Tesouro Direto</h3>
         <Button
@@ -110,7 +110,7 @@ export function TreasuryDirectSelector({ onTitleSelected, isLoading }: TreasuryD
       </div>
 
       {selectedTitleData && (
-        <div className="bg-blue-50 p-3 rounded text-sm text-blue-900">
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded text-sm text-blue-900">
           <p>
             <strong>Preço Unitário:</strong> R${((selectedTitleData.unitaryPrice || 0) / 100).toFixed(2)}
           </p>

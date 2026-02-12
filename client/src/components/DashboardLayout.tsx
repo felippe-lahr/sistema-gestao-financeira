@@ -117,7 +117,7 @@ function LoginForm() {
                 id="rememberMe"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border dark:border-gray-700-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
                 Manter conectado por 24 horas
@@ -180,7 +180,7 @@ function LiveClock() {
   }
 
   return (
-    <div className="flex flex-col gap-0.5 px-2 py-1.5 text-center border-b border-border/40">
+    <div className="flex flex-col gap-0.5 px-2 py-1.5 text-center border dark:border-gray-700-b border dark:border-gray-700-border dark:border-gray-700/40">
       <div className="text-xs font-mono text-muted-foreground">
         {formatDate(time)}
       </div>
@@ -313,7 +313,7 @@ function DashboardLayoutContent({
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"
-          className="border-r-0"
+          className="border dark:border-gray-700-r-0"
           disableTransition={isResizing}
         >
           <SidebarHeader className="h-16 justify-center">
@@ -366,7 +366,7 @@ function DashboardLayoutContent({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-9 w-9 border shrink-0">
+                  <Avatar className="h-9 w-9 border dark:border-gray-700 shrink-0">
                     <AvatarFallback className="text-xs font-medium">
                       {user?.name?.charAt(0).toUpperCase()}
                     </AvatarFallback>
@@ -412,7 +412,7 @@ function DashboardLayoutContent({
 
       <SidebarInset>
         {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+          <div className="flex border dark:border-gray-700-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-10 w-10 rounded-lg bg-background" />
               <div className="flex items-center gap-3">

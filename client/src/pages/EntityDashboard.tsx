@@ -390,7 +390,7 @@ export default function EntityDashboard() {
             <Filter className="h-4 w-4 mr-2" />
             Filtros
             {activeFiltersCount > 0 && (
-              <Badge className="ml-2 bg-blue-500 text-white">{activeFiltersCount}</Badge>
+              <Badge className="ml-2 bg-blue-50 dark:bg-blue-900/200 text-white">{activeFiltersCount}</Badge>
             )}
           </Button>
 
@@ -433,7 +433,7 @@ export default function EntityDashboard() {
                       type="date"
                       value={customStartDate}
                       onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      className="w-full px-3 py-2 border dark:border-gray-700 rounded-md text-sm"
                     />
                   </div>
                   <div className="space-y-2">
@@ -442,7 +442,7 @@ export default function EntityDashboard() {
                       type="date"
                       value={customEndDate}
                       onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      className="w-full px-3 py-2 border dark:border-gray-700 rounded-md text-sm"
                     />
                   </div>
                 </>
@@ -504,7 +504,7 @@ export default function EntityDashboard() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Período:</span>
             <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
-              <SelectTrigger className="w-[180px] bg-white">
+              <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -523,13 +523,13 @@ export default function EntityDashboard() {
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="px-3 py-2 border rounded-md text-sm w-[140px]"
+                className="px-3 py-2 border dark:border-gray-700 rounded-md text-sm w-[140px]"
               />
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="px-3 py-2 border rounded-md text-sm w-[140px]"
+                className="px-3 py-2 border dark:border-gray-700 rounded-md text-sm w-[140px]"
               />
             </>
           )}
@@ -750,7 +750,7 @@ export default function EntityDashboard() {
                       if (active && payload && payload[0]) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-card border border-border rounded p-2 text-sm">
+                          <div className="bg-card border border dark:border-gray-700-border dark:border-gray-700 rounded p-2 text-sm">
                             <p className="font-semibold">{data.name}</p>
                             <p className="text-primary">{formatCurrency(data.value)}</p>
                             <p className="text-muted-foreground font-medium">{data.percentage || '0'}% do total</p>
@@ -827,7 +827,7 @@ export default function EntityDashboard() {
                   type="date"
                   value={monthlyChartStartDate}
                   onChange={(e) => setMonthlyChartStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md text-sm"
+                  className="w-full px-3 py-2 border dark:border-gray-700 rounded-md text-sm"
                 />
               </div>
               <div className="flex-1">
@@ -837,7 +837,7 @@ export default function EntityDashboard() {
                   type="date"
                   value={monthlyChartEndDate}
                   onChange={(e) => setMonthlyChartEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md text-sm"
+                  className="w-full px-3 py-2 border dark:border-gray-700 rounded-md text-sm"
                 />
               </div>
             </div>
@@ -931,7 +931,7 @@ export default function EntityDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b">
+                  <tr className="border dark:border-gray-700-b">
                     <th className="text-left py-3 px-4 font-medium">Categoria</th>
                     <th className="text-right py-3 px-4 font-medium text-green-600">Pago</th>
                     <th className="text-right py-3 px-4 font-medium text-yellow-600">Pendente</th>
@@ -941,7 +941,7 @@ export default function EntityDashboard() {
                 </thead>
                 <tbody>
                   {categoryExpenses.map((cat, index) => (
-                    <tr key={index} className="border-b hover:bg-muted/50 transition-colors">
+                    <tr key={index} className="border dark:border-gray-700-b hover:bg-muted/50 transition-colors">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <div
@@ -965,7 +965,7 @@ export default function EntityDashboard() {
                       </td>
                     </tr>
                   ))}
-                  <tr className="border-t-2 font-bold">
+                  <tr className="border dark:border-gray-700-t-2 font-bold">
                     <td className="py-3 px-4">Total Geral</td>
                     <td className="text-right py-3 px-4 text-green-600">
                       {formatCurrency(categoryExpenses.reduce((sum, cat) => sum + cat.paid, 0))}
@@ -991,7 +991,7 @@ export default function EntityDashboard() {
 
       {/* Upcoming Transactions */}
       {upcomingTransactions && upcomingTransactions.length > 0 && (
-        <Card className="border-l-4 border-l-orange-500">
+        <Card className="border dark:border-gray-700-l-4 border dark:border-gray-700-l-orange-500">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-orange-500" />
@@ -1067,7 +1067,7 @@ export default function EntityDashboard() {
 
       {/* Upcoming Income Transactions */}
       {upcomingIncomeTransactions && upcomingIncomeTransactions.length > 0 && (
-        <Card className="border-l-4 border-l-emerald-500">
+        <Card className="border dark:border-gray-700-l-4 border dark:border-gray-700-l-emerald-500">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-500" />
@@ -1159,7 +1159,7 @@ export default function EntityDashboard() {
               {recentTransactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                  className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4 p-3 rounded-lg border dark:border-gray-700 hover:bg-muted/50 transition-colors"
                 >
                   {/* Mobile: Flex Column, Desktop: Flex Row */}
                   <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3 md:flex-1">
@@ -1186,7 +1186,7 @@ export default function EntityDashboard() {
                   </div>
 
                   {/* Valor + Status */}
-                  <div className="flex items-center justify-between md:gap-4 md:flex-shrink-0 pt-2 md:pt-0 md:border-t-0 border-t">
+                  <div className="flex items-center justify-between md:gap-4 md:flex-shrink-0 pt-2 md:pt-0 md:border dark:border-gray-700-t-0 border dark:border-gray-700-t">
                     <p
                       className={`text-base sm:text-lg font-bold ${
                         transaction.type === "INCOME" ? "text-green-600" : "text-red-600"
@@ -1213,7 +1213,7 @@ export default function EntityDashboard() {
       {/* Modal de Diagnóstico do Saldo */}
       {showDiagnostic && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold">Diagnóstico do Saldo Atual</h2>
@@ -1227,29 +1227,29 @@ export default function EntityDashboard() {
               ) : balanceDiagnostic ? (
                 <div className="space-y-6">
                   {/* Resumo */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                     <h3 className="font-semibold mb-3">Resumo do Cálculo</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div>
-                        <p className="text-sm text-gray-500">Total Receitas Pagas</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Receitas Pagas</p>
                         <p className="text-lg font-bold text-green-600">
                           {balanceDiagnostic.summary.totalIncomeCount} transações = {formatCurrency(balanceDiagnostic.summary.totalIncomeAmount)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">Total Despesas Pagas</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Despesas Pagas</p>
                         <p className="text-lg font-bold text-red-600">
                           {balanceDiagnostic.summary.totalExpenseCount} transações = {formatCurrency(balanceDiagnostic.summary.totalExpenseAmount)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">Saldo Calculado</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Saldo Calculado</p>
                         <p className="text-lg font-bold">
                           {formatCurrency(balanceDiagnostic.summary.calculatedBalance)}
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 pt-4 border-t">
+                    <div className="mt-4 pt-4 border dark:border-gray-700-t">
                       <p className="text-sm">
                         <strong>Fórmula:</strong> Receitas Pagas ({formatCurrency(balanceDiagnostic.summary.totalIncomeAmount)}) - Despesas Pagas ({formatCurrency(balanceDiagnostic.summary.totalExpenseAmount)}) = <strong>{formatCurrency(balanceDiagnostic.summary.calculatedBalance)}</strong>
                       </p>
@@ -1259,7 +1259,7 @@ export default function EntityDashboard() {
                   {/* Lista de Receitas Pagas */}
                   <div>
                     <h3 className="font-semibold mb-2 text-green-700">Receitas Pagas ({balanceDiagnostic.paidIncomeTransactions.length})</h3>
-                    <div className="max-h-60 overflow-y-auto border rounded">
+                    <div className="max-h-60 overflow-y-auto border dark:border-gray-700 rounded">
                       <table className="w-full text-sm">
                         <thead className="bg-green-50 sticky top-0">
                           <tr>
@@ -1271,7 +1271,7 @@ export default function EntityDashboard() {
                         </thead>
                         <tbody>
                           {balanceDiagnostic.paidIncomeTransactions.map((t: any) => (
-                            <tr key={t.id} className="border-t">
+                            <tr key={t.id} className="border dark:border-gray-700-t">
                               <td className="p-2">{t.id}</td>
                               <td className="p-2">{t.description}</td>
                               <td className="p-2">{t.dueDate ? format(new Date(t.dueDate), 'dd/MM/yyyy') : '-'}</td>
@@ -1286,9 +1286,9 @@ export default function EntityDashboard() {
                   {/* Lista de Despesas Pagas */}
                   <div>
                     <h3 className="font-semibold mb-2 text-red-700">Despesas Pagas ({balanceDiagnostic.paidExpenseTransactions.length})</h3>
-                    <div className="max-h-60 overflow-y-auto border rounded">
+                    <div className="max-h-60 overflow-y-auto border dark:border-gray-700 rounded">
                       <table className="w-full text-sm">
-                        <thead className="bg-red-50 sticky top-0">
+                        <thead className="bg-red-50 dark:bg-red-900/20 sticky top-0">
                           <tr>
                             <th className="text-left p-2">ID</th>
                             <th className="text-left p-2">Descrição</th>
@@ -1298,7 +1298,7 @@ export default function EntityDashboard() {
                         </thead>
                         <tbody>
                           {balanceDiagnostic.paidExpenseTransactions.map((t: any) => (
-                            <tr key={t.id} className="border-t">
+                            <tr key={t.id} className="border dark:border-gray-700-t">
                               <td className="p-2">{t.id}</td>
                               <td className="p-2">{t.description}</td>
                               <td className="p-2">{t.dueDate ? format(new Date(t.dueDate), 'dd/MM/yyyy') : '-'}</td>
@@ -1311,7 +1311,7 @@ export default function EntityDashboard() {
                   </div>
                 </div>
               ) : (
-                <div className="py-8 text-center text-gray-500">Não foi possível carregar o diagnóstico</div>
+                <div className="py-8 text-center text-gray-500 dark:text-gray-400">Não foi possível carregar o diagnóstico</div>
               )}
             </div>
           </div>

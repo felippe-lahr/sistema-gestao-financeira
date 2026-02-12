@@ -484,7 +484,7 @@ export function Reports() {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
-                        <div className="bg-white p-2 border border-gray-300 rounded shadow-lg text-sm">
+                        <div className="bg-white dark:bg-gray-800 p-2 border border dark:border-gray-700-gray-300 rounded shadow-lg text-sm">
                           <p className="font-semibold">{data.month}</p>
                           <p>Ocupação: {data.occupancy}%</p>
                           <p>Dias Alugados: {data.occupied}/{data.total}</p>
@@ -679,17 +679,17 @@ export function Reports() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div>
-                    <span className="text-gray-600">Reservas:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Reservas:</span>
                     <span className="float-right font-semibold">{source.count}</span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Receita:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Receita:</span>
                     <span className="float-right font-semibold">
                       R$ {source.revenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Ticket Médio:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Ticket Médio:</span>
                     <span className="float-right font-semibold">
                       R$ {source.avgTicket.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
@@ -732,7 +732,7 @@ export function Reports() {
               <CardContent>
                 <div className="space-y-2">
                   {forecast.lowOccupancyMonths.map((month) => (
-                    <div key={month} className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div key={month} className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border dark:border-gray-700-yellow-200 rounded-lg">
                       {month}
                     </div>
                   ))}

@@ -171,7 +171,7 @@ export default function OverallDashboard() {
   const totalEntitiesCount = entities.length;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8">
       {/* Header */}
       <div className="mb-6">
         <Button
@@ -182,12 +182,12 @@ export default function OverallDashboard() {
           <ChevronLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard Overall</h1>
-        <p className="text-gray-600">Consolidado de todas as entidades</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Dashboard Overall</h1>
+        <p className="text-gray-600 dark:text-gray-400">Consolidado de todas as entidades</p>
       </div>
 
       {/* Filtros Compactos */}
-      <div className="flex flex-wrap gap-3 mb-6 items-center bg-white p-4 rounded-lg border shadow-sm">
+      <div className="flex flex-wrap gap-3 mb-6 items-center bg-white dark:bg-gray-800 p-4 rounded-lg border dark:border dark:border-gray-700-gray-700 shadow-sm">
         {/* Seleção de Entidades - Dropdown */}
         <Popover>
           <PopoverTrigger asChild>
@@ -203,7 +203,7 @@ export default function OverallDashboard() {
           </PopoverTrigger>
           <PopoverContent className="w-64 p-3" align="start">
             <div className="space-y-2">
-              <div className="flex items-center justify-between pb-2 border-b">
+              <div className="flex items-center justify-between pb-2 border dark:border-gray-700-b">
                 <span className="text-sm font-medium">Entidades</span>
                 <Button 
                   variant="ghost" 
@@ -301,7 +301,7 @@ export default function OverallDashboard() {
               onChange={(e) => setFilterStartDate(e.target.value)}
               className="w-[150px]"
             />
-            <span className="text-gray-500">até</span>
+            <span className="text-gray-500 dark:text-gray-400">até</span>
             <Input
               type="date"
               value={filterEndDate}
@@ -316,7 +316,7 @@ export default function OverallDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total de Receita</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Receita</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
@@ -330,7 +330,7 @@ export default function OverallDashboard() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total de Despesa</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Despesa</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
@@ -344,7 +344,7 @@ export default function OverallDashboard() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Saldo</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Saldo</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
@@ -358,7 +358,7 @@ export default function OverallDashboard() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Contas a Pagar</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Contas a Pagar</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
@@ -381,10 +381,10 @@ export default function OverallDashboard() {
           <CardContent>
             <div className="space-y-3 max-h-80 overflow-y-auto">
               {upcomingBills.length === 0 ? (
-                <p className="text-sm text-gray-500 py-4 text-center">Nenhuma conta a vencer nos próximos 7 dias</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">Nenhuma conta a vencer nos próximos 7 dias</p>
               ) : (
                 upcomingBills.map((bill) => (
-                  <div key={bill.id} className="p-3 bg-gray-50 rounded-lg border">
+                  <div key={bill.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border dark:border dark:border-gray-700-gray-600">
                     <div className="mb-2">
                       <span className="font-medium text-sm">{bill.description}</span>
                     </div>
@@ -398,7 +398,7 @@ export default function OverallDashboard() {
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         Vence em {format(new Date(bill.dueDate), "dd/MM/yyyy")}
                       </div>
                       <div className="font-semibold text-orange-600">
@@ -423,10 +423,10 @@ export default function OverallDashboard() {
           <CardContent>
             <div className="space-y-3 max-h-80 overflow-y-auto">
               {upcomingIncome.length === 0 ? (
-                <p className="text-sm text-gray-500 py-4 text-center">Nenhuma receita a receber nos próximos 7 dias</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">Nenhuma receita a receber nos próximos 7 dias</p>
               ) : (
                 upcomingIncome.map((income) => (
-                  <div key={income.id} className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <div key={income.id} className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border dark:border-gray-700-emerald-100 dark:border dark:border-gray-700-emerald-800">
                     <div className="mb-2">
                       <span className="font-medium text-sm">{income.description}</span>
                     </div>
@@ -440,7 +440,7 @@ export default function OverallDashboard() {
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         Receber em {format(new Date(income.dueDate), "dd/MM/yyyy")}
                       </div>
                       <div className="font-semibold text-emerald-600">
@@ -462,10 +462,10 @@ export default function OverallDashboard() {
           <CardContent>
             <div className="space-y-3 max-h-80 overflow-y-auto">
               {overdueBills.length === 0 ? (
-                <p className="text-sm text-gray-500 py-4 text-center">Nenhuma conta vencida</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">Nenhuma conta vencida</p>
               ) : (
                 overdueBills.map((bill) => (
-                  <div key={bill.id} className="p-3 bg-red-50 rounded-lg border border-red-100">
+                  <div key={bill.id} className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border dark:border-gray-700-red-100 dark:border dark:border-gray-700-red-800">
                     <div className="mb-2">
                       <span className="font-medium text-sm">{bill.description}</span>
                     </div>

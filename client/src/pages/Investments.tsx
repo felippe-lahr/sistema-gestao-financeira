@@ -341,7 +341,7 @@ export default function Investments() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b">
+                  <tr className="border dark:border-gray-700-b">
                     <th className="text-left p-2">Nome</th>
                     <th className="text-left p-2">Tipo</th>
                     <th className="text-left p-2">Ticker</th>
@@ -353,7 +353,7 @@ export default function Investments() {
                 <tbody>
                   {investments.map((investment) => {
                     return (
-                      <tr key={investment.id} className="border-b hover:bg-muted/50">
+                      <tr key={investment.id} className="border dark:border-gray-700-b hover:bg-muted/50">
                         <td className="p-2 font-medium">{investment.name}</td>
                         <td className="p-2">
                           <span className="text-xs bg-secondary px-2 py-1 rounded">

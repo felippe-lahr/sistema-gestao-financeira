@@ -358,19 +358,19 @@ export default function ComponentsShowcase() {
                       Destructive background with foreground text
                     </p>
                   </div>
-                  <div className="bg-card text-card-foreground rounded-lg p-4 border">
+                  <div className="bg-card text-card-foreground rounded-lg p-4 border dark:border-gray-700">
                     <p className="font-medium mb-1">Card</p>
                     <p className="text-sm opacity-90">
                       Card background with foreground text
                     </p>
                   </div>
-                  <div className="bg-popover text-popover-foreground rounded-lg p-4 border">
+                  <div className="bg-popover text-popover-foreground rounded-lg p-4 border dark:border-gray-700">
                     <p className="font-medium mb-1">Popover</p>
                     <p className="text-sm opacity-90">
                       Popover background with foreground text
                     </p>
                   </div>
-                  <div className="bg-background text-foreground rounded-lg p-4 border">
+                  <div className="bg-background text-foreground rounded-lg p-4 border dark:border-gray-700">
                     <p className="font-medium mb-1">Background</p>
                     <p className="text-sm opacity-90">
                       Default background with foreground text
@@ -495,7 +495,7 @@ export default function ComponentsShowcase() {
                           selected={datePickerDate}
                           onSelect={setDatePickerDate}
                         />
-                        <div className="border-t pt-3 space-y-2">
+                        <div className="border dark:border-gray-700-t pt-3 space-y-2">
                           <Label className="flex items-center gap-2">
                             <Clock className="h-4 w-4" />
                             Time
@@ -998,13 +998,13 @@ export default function ComponentsShowcase() {
                 <CollapsibleContent>
                   <CardContent>
                     <div className="space-y-2">
-                      <div className="rounded-md border px-4 py-3 font-mono text-sm">
+                      <div className="rounded-md border dark:border-gray-700 px-4 py-3 font-mono text-sm">
                         @radix-ui/primitives
                       </div>
-                      <div className="rounded-md border px-4 py-3 font-mono text-sm">
+                      <div className="rounded-md border dark:border-gray-700 px-4 py-3 font-mono text-sm">
                         @radix-ui/colors
                       </div>
-                      <div className="rounded-md border px-4 py-3 font-mono text-sm">
+                      <div className="rounded-md border dark:border-gray-700 px-4 py-3 font-mono text-sm">
                         @stitches/react
                       </div>
                     </div>
@@ -1178,7 +1178,7 @@ export default function ComponentsShowcase() {
                   mode="single"
                   selected={date}
                   onSelect={setDate}
-                  className="rounded-md border"
+                  className="rounded-md border dark:border-gray-700"
                 />
               </CardContent>
             </Card>
@@ -1269,7 +1269,7 @@ export default function ComponentsShowcase() {
                 <Separator />
                 <div className="space-y-2">
                   <Label>Scroll Area</Label>
-                  <ScrollArea className="h-[200px] w-full rounded-md border overflow-hidden">
+                  <ScrollArea className="h-[200px] w-full rounded-md border dark:border-gray-700 overflow-hidden">
                     <div className="p-4">
                       <div className="space-y-4">
                         {Array.from({ length: 20 }).map((_, i) => (
@@ -1292,7 +1292,7 @@ export default function ComponentsShowcase() {
               <CardContent className="pt-6">
                 <ResizablePanelGroup
                   direction="horizontal"
-                  className="min-h-[200px] rounded-lg border"
+                  className="min-h-[200px] rounded-lg border dark:border-gray-700"
                 >
                   <ResizablePanel defaultSize={50}>
                     <div className="flex h-full items-center justify-center p-6">
@@ -1427,7 +1427,7 @@ export default function ComponentsShowcase() {
         </div>
       </main>
 
-      <footer className="border-t py-6 mt-12">
+      <footer className="border dark:border-gray-700-t py-6 mt-12">
         <div className="container text-center text-sm text-muted-foreground">
           <p>Shadcn/ui Component Showcase</p>
         </div>

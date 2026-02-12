@@ -106,7 +106,7 @@ export function RentalAttachmentUploader({
     if (mimeType === "image/png") {
       return <Image className="w-8 h-8 text-green-500" />;
     }
-    return <FileText className="w-8 h-8 text-gray-500" />;
+    return <FileText className="w-8 h-8 text-gray-500 dark:text-gray-400" />;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -161,10 +161,10 @@ export function RentalAttachmentUploader({
         />
 
         <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-        <p className="text-lg font-medium text-gray-700 mb-2">
+        <p className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
           {uploading ? "Fazendo upload..." : "Arraste arquivos aqui"}
         </p>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           PDF, JPEG, PNG • Máximo 3MB por arquivo
         </p>
         <button
@@ -180,20 +180,20 @@ export function RentalAttachmentUploader({
       {/* Lista de Anexos */}
       {attachments.length > 0 && (
         <div className="space-y-2">
-          <h3 className="font-medium text-gray-700">Documentos Anexados ({attachments.length})</h3>
+          <h3 className="font-medium text-gray-700 dark:text-gray-300">Documentos Anexados ({attachments.length})</h3>
           
           {attachments.map((attachment) => (
             <div
               key={attachment.id}
-              className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-gray-50"
+              className="flex items-start justify-between gap-3 p-3 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
             >
               {/* Informações do arquivo */}
               <div className="flex-1 min-w-0 space-y-2">
                 <div>
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                     {attachment.filename}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     {formatFileSize(attachment.fileSize)}
                   </p>
                 </div>
@@ -205,7 +205,7 @@ export function RentalAttachmentUploader({
                     const newType = e.target.value as AttachmentType;
                     onUpdateType(attachment.id, newType);
                   }}
-                  className="text-sm border rounded px-2 py-1 w-full max-w-xs"
+                  className="text-sm border dark:border-gray-700 rounded px-2 py-1 w-full max-w-xs"
                 >
                   {Object.entries(ATTACHMENT_TYPE_LABELS).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -219,7 +219,7 @@ export function RentalAttachmentUploader({
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={() => handlePreview(attachment)}
-                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:bg-blue-900/20 rounded"
                   title="Visualizar"
                 >
                   <Eye className="w-4 h-4" />
@@ -227,7 +227,7 @@ export function RentalAttachmentUploader({
 
                 <button
                   onClick={() => handleDownload(attachment)}
-                  className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded"
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-green-600 hover:bg-green-50 rounded"
                   title="Baixar"
                 >
                   <Download className="w-4 h-4" />
@@ -239,7 +239,7 @@ export function RentalAttachmentUploader({
                       onDelete(attachment.id);
                     }
                   }}
-                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 dark:bg-red-900/20 rounded"
                   title="Deletar"
                 >
                   <Trash2 className="w-4 h-4" />

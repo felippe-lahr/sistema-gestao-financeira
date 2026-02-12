@@ -165,7 +165,7 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
         ) : (
           <div className="space-y-4">
             {/* Saldo */}
-            <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border dark:border-gray-700-blue-200 dark:border dark:border-gray-700-blue-800">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">Saldo</span>
@@ -177,7 +177,7 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
 
             {/* Receitas e Despesas */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border-emerald-200 dark:border-emerald-800">
+              <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border dark:border-gray-700-emerald-200 dark:border dark:border-gray-700-emerald-800">
                 <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 font-semibold mb-1">
                   <TrendingUp className="h-3 w-3" />
                   <span>Receitas</span>
@@ -186,7 +186,7 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
                   {maskValue(metrics.monthIncome)}
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800">
+              <div className="p-3 rounded-lg bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border dark:border-gray-700-red-200 dark:border dark:border-gray-700-red-800">
                 <div className="flex items-center gap-1 text-xs text-red-700 dark:text-red-300 font-semibold mb-1">
                   <TrendingDown className="h-3 w-3" />
                   <span>Despesas</span>
@@ -198,7 +198,7 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
             </div>
 
             {metrics.pendingExpenses > 0 && (
-              <div className="p-3 rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border border-amber-200 dark:border-amber-800">
+              <div className="p-3 rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border border dark:border-gray-700-amber-200 dark:border dark:border-gray-700-amber-800">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Despesas pendentes</span>
                   <span className="font-bold text-amber-600 dark:text-amber-400">

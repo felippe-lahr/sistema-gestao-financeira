@@ -30,14 +30,14 @@ export function AttachmentPreview({ attachment, onClose }: AttachmentPreviewProp
         {/* Botão de fechar */}
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 z-10 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100"
+          className="absolute top-6 right-6 z-10 p-2 bg-white dark:bg-gray-800 rounded-full shadow-lg hover:bg-gray-100 dark:bg-gray-800"
         >
           <X className="w-6 h-6" />
         </button>
 
         {/* Título */}
-        <div className="absolute top-6 left-6 z-10 bg-white px-4 py-2 rounded-lg shadow-lg">
-          <p className="font-medium text-gray-900">{attachment.filename}</p>
+        <div className="absolute top-6 left-6 z-10 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-lg">
+          <p className="font-medium text-gray-900 dark:text-gray-100">{attachment.filename}</p>
         </div>
 
         {/* Conteúdo do preview */}
@@ -45,7 +45,7 @@ export function AttachmentPreview({ attachment, onClose }: AttachmentPreviewProp
           {isPDF && (
             <iframe
               src={`https://docs.google.com/viewer?url=${encodeURIComponent(attachment.blobUrl)}&embedded=true`}
-              className="w-full h-full bg-white rounded-lg shadow-2xl"
+              className="w-full h-full bg-white dark:bg-gray-800 rounded-lg shadow-2xl"
               title={attachment.filename}
             />
           )}
@@ -59,8 +59,8 @@ export function AttachmentPreview({ attachment, onClose }: AttachmentPreviewProp
           )}
 
           {!isPDF && !isImage && (
-            <div className="bg-white p-8 rounded-lg shadow-2xl">
-              <p className="text-gray-600">
+            <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-2xl">
+              <p className="text-gray-600 dark:text-gray-400">
                 Preview não disponível para este tipo de arquivo.
               </p>
               <a

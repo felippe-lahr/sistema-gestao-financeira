@@ -361,7 +361,7 @@ export default function Agenda() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
       {/* Header */}
       <div className="mb-4">
         <Button
@@ -374,8 +374,8 @@ export default function Agenda() {
         </Button>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
-            <p className="text-gray-600">Gerencie suas tarefas e compromissos</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Agenda</h1>
+            <p className="text-gray-600 dark:text-gray-400">Gerencie suas tarefas e compromissos</p>
           </div>
           <Button onClick={() => openCreateSheet()}>
             <Plus className="h-4 w-4 mr-2" />
@@ -408,14 +408,14 @@ export default function Agenda() {
           {/* Dias da semana */}
           <div className="grid grid-cols-7 mb-2">
             {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
-              <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
+              <div key={day} className="text-center text-sm font-medium text-gray-500 dark:text-gray-400 py-2">
                 {day}
               </div>
             ))}
           </div>
 
           {/* Dias do mês */}
-          <div className="grid grid-cols-7 gap-px bg-gray-200">
+          <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700">
             {calendarDays.map((day, index) => {
               const dayTasks = getTasksForDay(day);
               const isCurrentMonth = isSameMonth(day, currentMonth);
@@ -498,7 +498,7 @@ export default function Agenda() {
               {selectedDate ? format(selectedDate, "d 'de' MMMM", { locale: ptBR }) : "Selecione um dia"}
             </CardTitle>
             {selectedDate && (
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
                 {selectedDayTasks.length} {selectedDayTasks.length === 1 ? "tarefa" : "tarefas"}
               </span>
             )}
@@ -517,7 +517,7 @@ export default function Agenda() {
           )}
           
           {selectedDayTasks.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">Nenhuma tarefa para este dia</p>
+            <p className="text-gray-500 dark:text-gray-400 text-center py-4">Nenhuma tarefa para este dia</p>
           ) : (
             <div className="space-y-3">
               {selectedDayTasks.map((task) => (
@@ -559,7 +559,7 @@ export default function Agenda() {
                           )}
                         </div>
                         {task.description && (
-                          <p className="text-sm text-gray-500 mt-1">{task.description}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{task.description}</p>
                         )}
                       </div>
                     </div>
@@ -591,7 +591,7 @@ export default function Agenda() {
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
           {/* Header Fixo */}
-          <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-6 py-4 flex items-center justify-between">
             <SheetTitle className="text-xl font-bold">Nova Tarefa</SheetTitle>
             <Button variant="ghost" size="icon" onClick={() => setIsCreateOpen(false)}>
               <X className="h-4 w-4" />
@@ -711,7 +711,7 @@ export default function Agenda() {
               </div>
 
               {formData.isRecurring && (
-                <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border dark:border-gray-700">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="recurrenceCount" className="mb-2 block">Repetir por</Label>
@@ -747,7 +747,7 @@ export default function Agenda() {
           </div>
           
           {/* Footer Fixo */}
-          <div className="sticky bottom-0 z-10 border-t bg-white px-6 py-4 flex gap-2">
+          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-6 py-4 flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setIsCreateOpen(false)}>
               Cancelar
             </Button>
@@ -762,7 +762,7 @@ export default function Agenda() {
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
           {/* Header Fixo */}
-          <div className="sticky top-0 z-10 border-b bg-white px-6 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-6 py-4 flex items-center justify-between">
             <SheetTitle className="text-xl font-bold">Editar Tarefa</SheetTitle>
             <Button variant="ghost" size="icon" onClick={() => setIsEditOpen(false)}>
               <X className="h-4 w-4" />
@@ -875,7 +875,7 @@ export default function Agenda() {
           </div>
           
           {/* Footer Fixo */}
-          <div className="sticky bottom-0 z-10 border-t bg-white px-6 py-4 flex gap-2">
+          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-6 py-4 flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>

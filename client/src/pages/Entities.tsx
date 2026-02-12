@@ -335,9 +335,9 @@ export default function Entities() {
             </div>
             
             {/* Módulos Section */}
-            <div className="space-y-3 border-t pt-4">
+            <div className="space-y-3 border dark:border-gray-700-t pt-4">
               <Label className="text-base font-semibold">Módulos</Label>
-              <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+              <div className="flex items-center justify-between p-3 border dark:border-gray-700 rounded-lg hover:bg-accent/50 transition-colors">
                 <div className="flex items-center gap-3">
                   <Calendar className="h-5 w-5 text-blue-600" />
                   <div>
@@ -436,7 +436,7 @@ function SortableEntityCard({ entity, onEdit, onDelete }: { entity: any; onEdit:
             <button
               {...attributes}
               {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded"
+              className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 dark:bg-gray-800 rounded"
               title="Arrastar para reordenar"
             >
               <GripVertical className="h-5 w-5 text-muted-foreground" />

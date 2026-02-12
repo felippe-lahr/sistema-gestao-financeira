@@ -243,9 +243,9 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
 
         <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-            <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+            <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
               <SheetTitle className="text-2xl font-bold">Nova Conta Corrente</SheetTitle>
-              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -304,7 +304,7 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
                 </div>
               </div>
             </div>
-            <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+            <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                 Cancelar
               </Button>
@@ -374,9 +374,9 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
       {/* Edit Sheet */}
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Conta Corrente</SheetTitle>
-            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -435,7 +435,7 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
               </div>
             </div>
           </div>
-          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
@@ -584,9 +584,9 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
 
         <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-            <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+            <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
               <SheetTitle className="text-2xl font-bold">Novo Meio de Pagamento</SheetTitle>
-              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -642,7 +642,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
                 </div>
               </div>
             </div>
-            <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+            <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                 Cancelar
               </Button>
@@ -705,9 +705,9 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
       {/* Edit Sheet */}
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Meio de Pagamento</SheetTitle>
-            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -763,7 +763,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
               </div>
             </div>
           </div>
-          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
@@ -897,9 +897,9 @@ function CategoriesTab({ entityId }: { entityId: number }) {
 
         <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-            <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+            <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
               <SheetTitle className="text-2xl font-bold">Nova Categoria</SheetTitle>
-              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -939,7 +939,7 @@ function CategoriesTab({ entityId }: { entityId: number }) {
                 </div>
               </div>
             </div>
-            <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+            <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                 Cancelar
               </Button>
@@ -1046,9 +1046,9 @@ function CategoriesTab({ entityId }: { entityId: number }) {
       {/* Edit Sheet */}
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Categoria</SheetTitle>
-            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -1080,7 +1080,7 @@ function CategoriesTab({ entityId }: { entityId: number }) {
               </div>
             </div>
           </div>
-          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>

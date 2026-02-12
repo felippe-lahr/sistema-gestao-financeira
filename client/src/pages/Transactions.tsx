@@ -598,16 +598,16 @@ export default function Transactions() {
           <Sheet open={isExportAttachmentsOpen} onOpenChange={setIsExportAttachmentsOpen}>
             <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
               {/* Header Fixo */}
-              <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+              <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
                 <SheetTitle className="text-2xl font-bold">Exportar Anexos</SheetTitle>
-                <button onClick={() => setIsExportAttachmentsOpen(false)} className="text-gray-500 hover:text-gray-700">
+                <button onClick={() => setIsExportAttachmentsOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
               {/* Conteúdo Scrollável */}
               <div className="flex-1 overflow-y-auto px-8 py-6">
-                <p className="text-gray-600 mb-6">
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
                   Selecione os tipos de anexos e período para exportar em um arquivo ZIP
                 </p>
                 
@@ -688,7 +688,7 @@ export default function Transactions() {
               </div>
 
               {/* Footer Fixo */}
-              <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+              <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setIsExportAttachmentsOpen(false)}>
                   Cancelar
                 </Button>
@@ -720,9 +720,9 @@ export default function Transactions() {
           }}>
             <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
               {/* Header Fixo */}
-              <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+              <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
                 <SheetTitle className="text-2xl font-bold">Nova Transação</SheetTitle>
-                <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700">
+                <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -747,7 +747,7 @@ export default function Transactions() {
               </div>
 
               {/* Footer Fixo */}
-              <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+              <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancelar
                 </Button>
@@ -764,9 +764,9 @@ export default function Transactions() {
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
           {/* Header Fixo */}
-          <div className="sticky top-0 z-10 border-b bg-white px-8 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Transação</SheetTitle>
-            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700">
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -792,7 +792,7 @@ export default function Transactions() {
           </div>
 
           {/* Footer Fixo */}
-          <div className="sticky bottom-0 z-10 border-t bg-white px-8 py-4 flex gap-2 justify-end">
+          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
@@ -815,7 +815,7 @@ export default function Transactions() {
             <Filter className="h-4 w-4 mr-2" />
             Filtros
             {activeFiltersCount > 0 && (
-              <Badge className="ml-2 bg-blue-500 text-white">{activeFiltersCount}</Badge>
+              <Badge className="ml-2 bg-blue-50 dark:bg-blue-900/200 text-white">{activeFiltersCount}</Badge>
             )}
           </Button>
 
@@ -980,7 +980,7 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Entidade:</span>
           <Select value={selectedEntityId?.toString() || ""} onValueChange={(v) => setSelectedEntityId(parseInt(v))}>
-            <SelectTrigger className="w-[200px] bg-white">
+            <SelectTrigger className="w-[200px] bg-white dark:bg-gray-800">
               <SelectValue placeholder="Selecione" />
             </SelectTrigger>
             <SelectContent>
@@ -997,7 +997,7 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Período:</span>
           <Select value={filterPeriod} onValueChange={(v: any) => setFilterPeriod(v)}>
-            <SelectTrigger className="w-[140px] bg-white">
+            <SelectTrigger className="w-[140px] bg-white dark:bg-gray-800">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1013,7 +1013,7 @@ export default function Transactions() {
         {filterPeriod === "month" && (
           <>
             <Select value={filterMonth.toString()} onValueChange={(v) => setFilterMonth(parseInt(v))}>
-              <SelectTrigger className="w-[120px] bg-white">
+              <SelectTrigger className="w-[120px] bg-white dark:bg-gray-800">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1043,7 +1043,7 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Categoria:</span>
           <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
-            <SelectTrigger className="w-[150px] bg-white">
+            <SelectTrigger className="w-[150px] bg-white dark:bg-gray-800">
               <SelectValue placeholder="Todas" />
             </SelectTrigger>
             <SelectContent>
@@ -1061,7 +1061,7 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Status:</span>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[130px] bg-white">
+            <SelectTrigger className="w-[130px] bg-white dark:bg-gray-800">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -1116,7 +1116,7 @@ export default function Transactions() {
                   {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.totalIncome / 100)}
                 </p>
                 {summary.incomeBreakdown && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="mt-3 pt-3 border dark:border-gray-700-t border dark:border-gray-700-gray-200 dark:border dark:border-gray-700-gray-700">
                     <div className="flex flex-col md:flex-row md:divide-x md:divide-gray-300 dark:md:divide-gray-600 gap-2 md:gap-0 text-xs text-gray-500 dark:text-gray-400">
                       <div className="flex md:flex-1 md:pr-3">
                         <span>Pago:</span>
@@ -1143,7 +1143,7 @@ export default function Transactions() {
                   {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.totalExpenses / 100)}
                 </p>
                 {summary.expensesBreakdown && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="mt-3 pt-3 border dark:border-gray-700-t border dark:border-gray-700-gray-200 dark:border dark:border-gray-700-gray-700">
                     <div className="flex flex-col md:flex-row md:divide-x md:divide-gray-300 dark:md:divide-gray-600 gap-2 md:gap-0 text-xs text-gray-500 dark:text-gray-400">
                       <div className="flex md:flex-1 md:pr-3">
                         <span>Pago:</span>
@@ -1181,7 +1181,7 @@ export default function Transactions() {
                 {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.totalIncome / 100)}
               </p>
               {summary.incomeBreakdown && (
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="mt-4 pt-4 border dark:border-gray-700-t border dark:border-gray-700-gray-200 dark:border dark:border-gray-700-gray-700">
                   <div className="flex flex-col md:flex-row md:divide-x md:divide-gray-300 dark:md:divide-gray-600 gap-2 md:gap-0 text-xs text-gray-500 dark:text-gray-400">
                     <div className="flex md:flex-1 md:pr-4">
                       <span>Pago:</span>
@@ -1209,7 +1209,7 @@ export default function Transactions() {
                 {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.totalExpenses / 100)}
               </p>
               {summary.expensesBreakdown && (
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="mt-4 pt-4 border dark:border-gray-700-t border dark:border-gray-700-gray-200 dark:border dark:border-gray-700-gray-700">
                   <div className="flex flex-col md:flex-row md:divide-x md:divide-gray-300 dark:md:divide-gray-600 gap-2 md:gap-0 text-xs text-gray-500 dark:text-gray-400">
                     <div className="flex md:flex-1 md:pr-4">
                       <span>Pago:</span>
@@ -1412,7 +1412,7 @@ export default function Transactions() {
               {previewAttachment?.mimeType} • {previewAttachment?.fileSize ? `${(previewAttachment.fileSize / 1024).toFixed(1)} KB` : ''}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
             {previewAttachment?.mimeType === 'application/pdf' ? (
               <div className="flex flex-col items-center justify-center p-8 space-y-4">
                 <div className="w-24 h-24 bg-red-100 rounded-lg flex items-center justify-center">
@@ -1420,8 +1420,8 @@ export default function Transactions() {
                     <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M10.92,12.31C10.68,11.54 10.15,9.08 11.55,9.04C12.95,9 12.03,12.16 12.03,12.16C12.42,13.65 14.05,14.72 14.05,14.72C14.55,14.57 17.4,14.24 17,15.72C16.57,17.2 13.5,15.81 13.5,15.81C11.55,15.95 10.09,16.47 10.09,16.47C8.96,18.58 7.64,19.5 7.1,18.61C6.43,17.5 9.23,16.07 9.23,16.07C10.68,13.72 10.9,12.35 10.92,12.31Z" />
                   </svg>
                 </div>
-                <p className="text-lg font-medium text-gray-900">{previewAttachment.filename}</p>
-                <p className="text-sm text-gray-500">Tamanho: {(previewAttachment.fileSize / 1024).toFixed(1)} KB</p>
+                <p className="text-lg font-medium text-gray-900 dark:text-gray-100">{previewAttachment.filename}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Tamanho: {(previewAttachment.fileSize / 1024).toFixed(1)} KB</p>
                 <button
                   onClick={() => window.open(previewAttachment.blobUrl, 'PDFViewer', 'width=900,height=700,scrollbars=yes,resizable=yes')}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -1436,7 +1436,7 @@ export default function Transactions() {
                 className="max-w-full max-h-[600px] object-contain"
               />
             ) : (
-              <p className="text-gray-500">Preview não disponível para este tipo de arquivo</p>
+              <p className="text-gray-500 dark:text-gray-400">Preview não disponível para este tipo de arquivo</p>
             )}
           </div>
           <DialogFooter>
