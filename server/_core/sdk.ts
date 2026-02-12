@@ -192,6 +192,12 @@ class SDKServer {
     const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
+    
+    console.log("[SDK] signSession - expiresInMs received:", options.expiresInMs);
+    console.log("[SDK] signSession - expiresInMs used:", expiresInMs);
+    console.log("[SDK] signSession - expiresInMs (hours):", expiresInMs / (60 * 60 * 1000));
+    console.log("[SDK] signSession - expirationSeconds:", expirationSeconds);
+    console.log("[SDK] signSession - current time:", Math.floor(issuedAt / 1000));
 
     return new SignJWT({
       openId: payload.openId,

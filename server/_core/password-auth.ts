@@ -51,6 +51,10 @@ export function registerPasswordAuthRoutes(app: Express) {
       const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
       const sessionDuration = rememberMe ? TWENTY_FOUR_HOURS_MS : THIRTY_MINUTES_MS;
       
+      console.log("[Password Auth] Login - rememberMe:", rememberMe);
+      console.log("[Password Auth] Login - sessionDuration (ms):", sessionDuration);
+      console.log("[Password Auth] Login - sessionDuration (hours):", sessionDuration / (60 * 60 * 1000));
+      
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || "",
         expiresInMs: sessionDuration,
