@@ -29,21 +29,33 @@ export async function createContext(
         // Verificar sessão para obter tempo de expiração
         const session = await sdk.verifySession(sessionCookie);
         
-        if (session) {
-          // Renovar cookie com o mesmo token mas com maxAge atualizado
-          // Isso mantém o cookie "vivo" no navegador
+        if (session && session.exp) {
           const cookieOptions = getSessionCookieOptions(opts.req);
+          const now = Math.floor(Date.now() / 1000);
+          const expiresInSeconds = session.exp - now;
           
-          // Determinar maxAge baseado no tempo restante do JWT
-          // Por padrão, usar 24 horas (assumindo rememberMe)
-          const maxAge = 24 * 60 * 60 * 1000; // 24 horas
-          
-          opts.res.cookie(COOKIE_NAME, sessionCookie, { 
-            ...cookieOptions, 
-            maxAge 
-          });
-          
-          console.log("[Auth] Cookie renewed for user:", user.id);
+          if (expiresInSeconds > 0) {
+            let maxAge: number;
+            
+            if (session.rememberMe === true) {
+              // SESSÃO FIXA (24h): Renovar cookie mas manter expiração original
+              // Cookie expira no mesmo momento que o JWT (não estende)
+              maxAge = expiresInSeconds * 1000;
+              const hoursRemaining = (expiresInSeconds / 3600).toFixed(2);
+              console.log(`[Auth] Cookie renewed (FIXED 24h) for user ${user.id} - expires in ${hoursRemaining}h`);
+            } else {
+              // SESSÃO DESLIZANTE (30min inatividade): Renovar cookie com 30min completos
+              // A cada requisição, o cookie é estendido por mais 30min
+              const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+              maxAge = THIRTY_MINUTES_MS;
+              console.log(`[Auth] Cookie renewed (SLIDING 30min) for user ${user.id} - 30min from now`);
+            }
+            
+            opts.res.cookie(COOKIE_NAME, sessionCookie, { 
+              ...cookieOptions, 
+              maxAge 
+            });
+          }
         }
       }
     }

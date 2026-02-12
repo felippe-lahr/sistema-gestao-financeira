@@ -28,6 +28,7 @@ export type SessionPayload = {
   openId: string;
   appId: string;
   name: string;
+  rememberMe?: boolean;
 };
 
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
@@ -179,13 +180,14 @@ class SDKServer {
    */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string } = {}
+    options: { expiresInMs?: number; name?: string; rememberMe?: boolean } = {}
   ): Promise<string> {
     return this.signSession(
       {
         openId,
         appId: ENV.appId,
         name: options.name || "",
+        rememberMe: options.rememberMe,
       },
       options
     );
@@ -210,6 +212,7 @@ class SDKServer {
       openId: payload.openId,
       appId: payload.appId,
       name: payload.name,
+      rememberMe: payload.rememberMe,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setExpirationTime(expirationSeconds)
@@ -218,7 +221,7 @@ class SDKServer {
 
   async verifySession(
     cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string } | null> {
+  ): Promise<{ openId: string; appId: string; name: string; exp?: number; rememberMe?: boolean } | null> {
     if (!cookieValue) {
       console.warn("[Auth] Missing session cookie");
       return null;
@@ -229,7 +232,7 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name, exp } = payload as Record<string, unknown>;
+      const { openId, appId, name, exp, rememberMe } = payload as Record<string, unknown>;
       
       // Log session verification details
       const now = Math.floor(Date.now() / 1000);
@@ -250,6 +253,8 @@ class SDKServer {
         openId,
         appId,
         name: typeof name === 'string' ? name : '',
+        exp: typeof exp === 'number' ? exp : undefined,
+        rememberMe: typeof rememberMe === 'boolean' ? rememberMe : undefined,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

@@ -58,6 +58,7 @@ export function registerPasswordAuthRoutes(app: Express) {
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || "",
         expiresInMs: sessionDuration,
+        rememberMe: rememberMe,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
