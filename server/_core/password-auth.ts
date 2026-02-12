@@ -9,7 +9,7 @@ export function registerPasswordAuthRoutes(app: Express) {
   // Login com email e senha
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
-      const { email, password } = req.body;
+      const { email, password, rememberMe } = req.body;
 
       if (!email || !password) {
         res.status(400).json({ error: "Email e senha sao obrigatorios" });
@@ -45,14 +45,19 @@ export function registerPasswordAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
-      // Criar sessao
+      // Criar sessao com duração baseada em rememberMe
+      // 30 minutos (1800000 ms) por padrão, 24 horas (86400000 ms) se rememberMe = true
+      const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+      const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+      const sessionDuration = rememberMe ? TWENTY_FOUR_HOURS_MS : THIRTY_MINUTES_MS;
+      
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || "",
-        expiresInMs: ONE_YEAR_MS,
+        expiresInMs: sessionDuration,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: sessionDuration });
 
       res.json({ success: true, user: { id: user.id, name: user.name, email: user.email } });
     } catch (error) {
