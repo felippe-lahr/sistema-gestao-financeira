@@ -427,11 +427,11 @@ export default function Agenda() {
                   key={index}
                   onClick={() => setSelectedDate(day)}
                   className={`
-                    min-h-[100px] p-1 cursor-pointer transition-colors bg-white
-                    ${!isCurrentMonth ? "bg-gray-50" : ""}
+                    min-h-[100px] p-1 cursor-pointer transition-colors bg-white dark:bg-gray-800
+                    ${!isCurrentMonth ? "bg-gray-50 dark:bg-gray-700" : ""}
                     ${isSelected ? "ring-2 ring-blue-500 ring-inset" : ""}
-                    ${isToday(day) ? "bg-blue-50" : ""}
-                    hover:bg-gray-100
+                    ${isToday(day) ? "bg-blue-50 dark:bg-blue-900/30" : ""}
+                    hover:bg-gray-100 dark:hover:bg-gray-700
                   `}
                 >
                   <div className={`
@@ -523,7 +523,7 @@ export default function Agenda() {
               {selectedDayTasks.map((task) => (
                 <div
                   key={task.id}
-                  className={`p-3 rounded-lg border ${task.status === "COMPLETED" ? "bg-gray-50 opacity-70" : "bg-white"}`}
+                  className={`p-3 rounded-lg border dark:border-gray-700 ${task.status === "COMPLETED" ? "bg-gray-50 dark:bg-gray-700 opacity-70" : "bg-white dark:bg-gray-800"}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2 flex-1">

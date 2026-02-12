@@ -1010,9 +1010,9 @@ export default function EntityDashboard() {
               <div className="space-y-3">
                 {upcomingTransactions.map((transaction) => {
                   const urgencyColor = 
-                    transaction.daysUntilDue === 0 ? "bg-red-50 border-red-200 hover:bg-red-100" :
-                    transaction.daysUntilDue <= 3 ? "bg-yellow-50 border-yellow-200 hover:bg-yellow-100" :
-                    "bg-blue-50 border-blue-200 hover:bg-blue-100";
+                    transaction.daysUntilDue === 0 ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30" :
+                    transaction.daysUntilDue <= 3 ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/30" :
+                    "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30";
                   
                   const urgencyBadge = 
                     transaction.daysUntilDue === 0 ? "bg-red-500" :
@@ -1086,9 +1086,9 @@ export default function EntityDashboard() {
               <div className="space-y-3">
                 {upcomingIncomeTransactions.map((transaction) => {
                   const urgencyColor = 
-                    transaction.daysUntilDue === 0 ? "bg-emerald-50 border-emerald-300 hover:bg-emerald-100" :
-                    transaction.daysUntilDue <= 3 ? "bg-emerald-50 border-emerald-200 hover:bg-emerald-100" :
-                    "bg-green-50 border-green-200 hover:bg-green-100";
+                    transaction.daysUntilDue === 0 ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30" :
+                    transaction.daysUntilDue <= 3 ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30" :
+                    "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30";
                   
                   const urgencyBadge = 
                     transaction.daysUntilDue === 0 ? "bg-emerald-600" :
