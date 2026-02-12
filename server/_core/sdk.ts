@@ -222,7 +222,14 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name } = payload as Record<string, unknown>;
+      const { openId, appId, name, exp } = payload as Record<string, unknown>;
+      
+      // Log session verification details
+      const now = Math.floor(Date.now() / 1000);
+      const expiresIn = typeof exp === 'number' ? exp - now : 'unknown';
+      console.log("[Auth] Session verified successfully");
+      console.log("[Auth] Session expires in (seconds):", expiresIn);
+      console.log("[Auth] Session expires in (hours):", typeof expiresIn === 'number' ? (expiresIn / 3600).toFixed(2) : 'unknown');
 
       if (
         !isNonEmptyString(openId) ||
@@ -238,7 +245,16 @@ class SDKServer {
         name: typeof name === 'string' ? name : '',
       };
     } catch (error) {
-      console.warn("[Auth] Session verification failed", String(error));
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn("[Auth] Session verification FAILED");
+      console.warn("[Auth] Error type:", error instanceof Error ? error.constructor.name : typeof error);
+      console.warn("[Auth] Error message:", errorMessage);
+      
+      // Check if it's an expiration error
+      if (errorMessage.includes('exp') || errorMessage.includes('expired')) {
+        console.warn("[Auth] Session EXPIRED - JWT exp claim is in the past");
+      }
+      
       return null;
     }
   }
