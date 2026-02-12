@@ -3,6 +3,8 @@ import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { sdk } from "./sdk";
 import { ENV } from "./env";
+import { COOKIE_NAME } from "@shared/const";
+import { getSessionCookieOptions } from "./cookies";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -17,6 +19,34 @@ export async function createContext(
 
   try {
     user = await sdk.authenticateRequest(opts.req);
+    
+    // Renovar cookie de sessão a cada requisição autenticada com sucesso
+    if (user) {
+      const cookies = sdk.parseCookiesPublic(opts.req.headers.cookie);
+      const sessionCookie = cookies.get(COOKIE_NAME);
+      
+      if (sessionCookie) {
+        // Verificar sessão para obter tempo de expiração
+        const session = await sdk.verifySession(sessionCookie);
+        
+        if (session) {
+          // Renovar cookie com o mesmo token mas com maxAge atualizado
+          // Isso mantém o cookie "vivo" no navegador
+          const cookieOptions = getSessionCookieOptions(opts.req);
+          
+          // Determinar maxAge baseado no tempo restante do JWT
+          // Por padrão, usar 24 horas (assumindo rememberMe)
+          const maxAge = 24 * 60 * 60 * 1000; // 24 horas
+          
+          opts.res.cookie(COOKIE_NAME, sessionCookie, { 
+            ...cookieOptions, 
+            maxAge 
+          });
+          
+          console.log("[Auth] Cookie renewed for user:", user.id);
+        }
+      }
+    }
   } catch (error) {
     // Authentication is optional for public procedures.
     user = null;

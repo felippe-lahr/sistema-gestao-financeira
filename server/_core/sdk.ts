@@ -160,6 +160,13 @@ class SDKServer {
     return new Map(Object.entries(parsed));
   }
 
+  /**
+   * Public method to parse cookies (used by context.ts for cookie renewal)
+   */
+  parseCookiesPublic(cookieHeader: string | undefined) {
+    return this.parseCookies(cookieHeader);
+  }
+
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
     return new TextEncoder().encode(secret);
