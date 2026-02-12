@@ -58,6 +58,8 @@ function LoginForm() {
         toast.success("Login realizado com sucesso!");
         // Definir valores como ocultos por padrão
         localStorage.setItem('showFinancialValues', JSON.stringify(false));
+        // Salvar preferência de rememberMe para controle de inatividade
+        localStorage.setItem('rememberMe', JSON.stringify(rememberMe));
         // Redirecionar para página de entidades
         window.location.href = '/';
       } else {
@@ -214,10 +216,22 @@ export default function DashboardLayout({
   }, [sidebarWidth]);
 
   useEffect(() => {
+    // Verificar se o usuário marcou "Manter conectado por 24h"
+    const rememberMe = JSON.parse(localStorage.getItem('rememberMe') || 'false');
+    
+    // Se rememberMe está ativo, não aplicar timer de inatividade
+    // A sessão será controlada apenas pelo JWT (24h fixas)
+    if (rememberMe) {
+      console.log('[Auth] RememberMe ativo - timer de inatividade desabilitado');
+      return;
+    }
+    
+    // Sem rememberMe: logout após 30min de inatividade
     const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
     const resetTimer = () => {
       if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
       inactivityTimeoutRef.current = setTimeout(() => {
+        localStorage.removeItem('rememberMe');
         logout();
         setLocation('/');
       }, INACTIVITY_TIMEOUT);
