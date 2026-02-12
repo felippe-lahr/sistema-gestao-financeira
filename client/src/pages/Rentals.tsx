@@ -446,11 +446,11 @@ export default function Rentals() {
 
                         let bgColor = "bg-background";
                         if (isPastDate) {
-                          bgColor = "bg-gray-100 text-gray-400";
+                          bgColor = "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500";
                         } else if (!isCurrentMonth) {
                           bgColor = "bg-muted/30";
                         } else if (holiday) {
-                          bgColor = holiday.type === 'national' ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200";
+                          bgColor = holiday.type === 'national' ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800" : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800";
                         }
 
                         return (
