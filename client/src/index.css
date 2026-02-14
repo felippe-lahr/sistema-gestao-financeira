@@ -230,7 +230,7 @@
       max-width: 1280px; /* Standard content width */
     }
   }
-}
+
   /* Card enhancements */
   .card-hover {
     @apply transition-all duration-200 hover:shadow-lg hover:border-primary/50;
