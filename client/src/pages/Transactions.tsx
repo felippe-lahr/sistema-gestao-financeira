@@ -1559,7 +1559,7 @@ function TransactionForm({
 
         <div className="space-y-2">
           <Label htmlFor="paymentDate">Data de Pagamento</Label>
-          <Input id="paymentDate" type="date" value={formData.paymentDate} onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })} />
+          <Input id="paymentDate" type="date" value={formData.paymentDate} onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })} min={formData.dueDate || undefined} />
         </div>
       </div>
 

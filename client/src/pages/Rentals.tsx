@@ -701,6 +701,7 @@ export default function Rentals() {
                   type="date"
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  min={formData.startDate || undefined}
                 />
               </div>
             </div>
@@ -1031,6 +1032,7 @@ export default function Rentals() {
                   type="date"
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  min={formData.startDate || undefined}
                 />
               </div>
             </div>
