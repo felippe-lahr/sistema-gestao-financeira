@@ -961,19 +961,36 @@ export default function Rentals() {
                   try {
                     const attachment = rentalAttachments.find(a => a.id === id);
                     if (!attachment) return;
-                    await deleteFile(attachment.blobUrl, 'attachments');
-                    if (editingRental?.id) {
+                    
+                    // Check if it's a temporary attachment (not saved to DB yet)
+                    const isTemporary = id > 1000000000000;
+                    
+                    if (!isTemporary && editingRental?.id) {
+                      // First delete from database
                       await utils.client.rentalAttachments.delete.mutate({ id });
+                      // Then try to delete from Supabase (don't fail if this errors)
+                      try {
+                        await deleteFile(attachment.blobUrl, 'attachments');
+                      } catch (storageError) {
+                        console.warn("Aviso: arquivo não encontrado no storage", storageError);
+                      }
                       const updatedAttachments = await utils.client.rentalAttachments.listByRental.query({
                         rentalId: editingRental.id,
                       });
                       setRentalAttachments(updatedAttachments || []);
                     } else {
+                      // Temporary attachment - just delete from storage
+                      try {
+                        await deleteFile(attachment.blobUrl, 'attachments');
+                      } catch (storageError) {
+                        console.warn("Aviso: arquivo não encontrado no storage", storageError);
+                      }
                       setRentalAttachments(rentalAttachments.filter(a => a.id !== id));
                     }
                     toast.success("Arquivo deletado!");
                   } catch (error) {
-                    toast.error("Erro ao deletar arquivo");
+                    console.error("Erro ao deletar anexo:", error);
+                    toast.error("Erro ao deletar arquivo: " + (error instanceof Error ? error.message : String(error)));
                   }
                 }}
                 onUpdateType={async (id, type) => {
@@ -982,7 +999,8 @@ export default function Rentals() {
                     setRentalAttachments(rentalAttachments.map(a => a.id === id ? { ...a, type } : a));
                     toast.success("Tipo atualizado!");
                   } catch (error) {
-                    toast.error("Erro ao atualizar tipo");
+                    console.error("Erro ao atualizar tipo:", error);
+                    toast.error("Erro ao atualizar tipo: " + (error instanceof Error ? error.message : String(error)));
                   }
                 }}
                 onPreview={(attachment) => {
@@ -1290,19 +1308,36 @@ export default function Rentals() {
                   try {
                     const attachment = rentalAttachments.find(a => a.id === id);
                     if (!attachment) return;
-                    await deleteFile(attachment.blobUrl, 'attachments');
-                    if (editingRental?.id) {
+                    
+                    // Check if it's a temporary attachment (not saved to DB yet)
+                    const isTemporary = id > 1000000000000;
+                    
+                    if (!isTemporary && editingRental?.id) {
+                      // First delete from database
                       await utils.client.rentalAttachments.delete.mutate({ id });
+                      // Then try to delete from Supabase (don't fail if this errors)
+                      try {
+                        await deleteFile(attachment.blobUrl, 'attachments');
+                      } catch (storageError) {
+                        console.warn("Aviso: arquivo não encontrado no storage", storageError);
+                      }
                       const updatedAttachments = await utils.client.rentalAttachments.listByRental.query({
                         rentalId: editingRental.id,
                       });
                       setRentalAttachments(updatedAttachments || []);
                     } else {
+                      // Temporary attachment - just delete from storage
+                      try {
+                        await deleteFile(attachment.blobUrl, 'attachments');
+                      } catch (storageError) {
+                        console.warn("Aviso: arquivo não encontrado no storage", storageError);
+                      }
                       setRentalAttachments(rentalAttachments.filter(a => a.id !== id));
                     }
                     toast.success("Arquivo deletado!");
                   } catch (error) {
-                    toast.error("Erro ao deletar arquivo");
+                    console.error("Erro ao deletar anexo:", error);
+                    toast.error("Erro ao deletar arquivo: " + (error instanceof Error ? error.message : String(error)));
                   }
                 }}
                 onUpdateType={async (id, type) => {
@@ -1311,7 +1346,8 @@ export default function Rentals() {
                     setRentalAttachments(rentalAttachments.map(a => a.id === id ? { ...a, type } : a));
                     toast.success("Tipo atualizado!");
                   } catch (error) {
-                    toast.error("Erro ao atualizar tipo");
+                    console.error("Erro ao atualizar tipo:", error);
+                    toast.error("Erro ao atualizar tipo: " + (error instanceof Error ? error.message : String(error)));
                   }
                 }}
                 onPreview={(attachment) => {
