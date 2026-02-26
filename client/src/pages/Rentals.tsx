@@ -1,4 +1,5 @@
-"use client";
+// Rentals page - Gestão de Reservas
+// Fix: Correção de exclusão e visualização de anexos
 
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
