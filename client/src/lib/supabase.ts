@@ -1,12 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Credenciais públicas do Supabase (seguro expor a chave anon)
-const supabaseUrl = 'https://jyibtqwkjthsdnahtdvd.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5aWJ0cXdranRoc2RuYWh0ZHZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MjgwMjMsImV4cCI6MjA4MTAwNDAyM30.kW8NTVCrqiH6c8jNS-aUxOCktKKORe6u8BqZtYmYzLU';
+// Credenciais do Supabase via variáveis de ambiente (nunca hardcoded no código)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('[Supabase] VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY não configurados. Uploads de arquivos não funcionarão.');
+}
 
 console.log('[Supabase] Initializing with URL:', supabaseUrl);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '');
 
 // Helper function to upload file to Supabase Storage
 export async function uploadFile(file: File, bucket: string = 'attachments'): Promise<string> {

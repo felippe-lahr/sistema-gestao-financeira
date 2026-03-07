@@ -185,6 +185,13 @@ export async function getCategoriesByEntityId(entityId: number, userId?: number)
   return await db.select().from(categories).where(eq(categories.entityId, entityId)).orderBy(categories.name);
 }
 
+export async function getCategoryById(categoryId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(categories).where(eq(categories.id, categoryId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
 export async function createCategory(category: InsertCategory) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

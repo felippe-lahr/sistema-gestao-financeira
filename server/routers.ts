@@ -196,7 +196,11 @@ export const appRouter = router({
           icon: z.string().max(50).optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        const category = await db.getCategoryById(input.id);
+        if (!category || category.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
         await db.updateCategory(input.id, {
           name: input.name,
           color: input.color,
@@ -204,8 +208,11 @@ export const appRouter = router({
         });
         return { success: true };
       }),
-
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+      const category = await db.getCategoryById(input.id);
+      if (!category || category.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
       await db.deleteCategory(input.id);
       return { success: true };
     }),
@@ -264,7 +271,11 @@ export const appRouter = router({
           isActive: z.boolean().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        const account = await db.getBankAccountById(input.id);
+        if (!account || account.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
         const updateData: any = {
           name: input.name,
           bank: input.bank,
@@ -281,7 +292,11 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+      const account = await db.getBankAccountById(input.id);
+      if (!account || account.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
       await db.deleteBankAccount(input.id);
       return { success: true };
     }),
@@ -335,7 +350,11 @@ export const appRouter = router({
           isActive: z.boolean().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        const method = await db.getPaymentMethodById(input.id);
+        if (!method || method.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
         await db.updatePaymentMethod(input.id, {
           name: input.name,
           type: input.type,
@@ -346,7 +365,11 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+      const method = await db.getPaymentMethodById(input.id);
+      if (!method || method.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
       await db.deletePaymentMethod(input.id);
       return { success: true };
     }),
