@@ -64,23 +64,6 @@ export async function createContext(
     user = null;
   }
 
-  // DEMO MODE: If no OAuth server is configured, create a demo user
-  if (!user && !ENV.oAuthServerUrl) {
-    console.log("[Auth] OAuth not configured, using demo user");
-    const demoOpenId = ENV.ownerOpenId || "demo@sistema-gestao-financeira.com";
-    
-    // Ensure demo user exists in database
-    await db.upsertUser({
-      openId: demoOpenId,
-      name: "Demo User",
-      email: demoOpenId,
-      loginMethod: "demo",
-      lastSignedIn: new Date(),
-    });
-    
-    user = await db.getUserByOpenId(demoOpenId) || null;
-  }
-
   return {
     req: opts.req,
     res: opts.res,
