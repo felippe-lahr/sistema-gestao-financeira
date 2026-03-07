@@ -8,6 +8,9 @@ export const whatsappStatusEnum = pgEnum("whatsapp_status", ["RECEIVED", "TRANSC
 export const paymentMethodTypeEnum = pgEnum("payment_method_type", ["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "OTHER"]);
 export const attachmentTypeEnum = pgEnum("attachment_type", ["NOTA_FISCAL", "DOCUMENTOS", "BOLETO", "COMPROVANTE_PAGAMENTO"]);
 
+// Organization plan enum
+export const orgPlanEnum = pgEnum("org_plan", ["free", "pro", "enterprise"]);
+
 /**
  * Core user table backing auth flow.
  */
@@ -27,10 +30,51 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
+ * Organizations table - Tenant isolation for SaaS multi-tenancy.
+ * Each organization represents a customer account (company, individual, etc.)
+ */
+export const organizations = pgTable("organizations", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 100 }).unique(), // URL-friendly identifier (future use)
+  plan: orgPlanEnum("plan").default("free").notNull(),
+  ownerId: integer("ownerId").notNull().references(() => users.id, { onDelete: "restrict" }),
+  // Billing info (future use)
+  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
+  trialEndsAt: timestamp("trialEndsAt"),
+  planExpiresAt: timestamp("planExpiresAt"),
+  // Metadata
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Organization = typeof organizations.$inferSelect;
+export type InsertOrganization = typeof organizations.$inferInsert;
+
+/**
+ * Organization Members table - Users belonging to an organization.
+ * Supports multiple users per organization (team feature, future use).
+ */
+export const orgMemberRoleEnum = pgEnum("org_member_role", ["owner", "admin", "member"]);
+
+export const organizationMembers = pgTable("organization_members", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: orgMemberRoleEnum("role").default("member").notNull(),
+  joinedAt: timestamp("joinedAt").defaultNow().notNull(),
+});
+
+export type OrganizationMember = typeof organizationMembers.$inferSelect;
+export type InsertOrganizationMember = typeof organizationMembers.$inferInsert;
+
+/**
  * Entities table - Dynamic financial modules (Fazenda 1, Fazenda 2, Empresa, etc.)
  */
 export const entities = pgTable("entities", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").references(() => organizations.id, { onDelete: "cascade" }), // Multi-tenancy
   userId: integer("userId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
@@ -49,6 +93,7 @@ export type InsertEntity = typeof entities.$inferInsert;
  */
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").references(() => organizations.id, { onDelete: "cascade" }), // Multi-tenancy
   userId: integer("userId").notNull(), // Owner of the category
   entityId: integer("entityId"), // Optional: if set, category is exclusive to this entity
   name: varchar("name", { length: 255 }).notNull(),
@@ -110,6 +155,7 @@ export type InsertAttachment = typeof attachments.$inferInsert;
  */
 export const whatsappMessages = pgTable("whatsapp_messages", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").references(() => organizations.id, { onDelete: "cascade" }), // Multi-tenancy
   userId: integer("userId").notNull(),
   messageId: varchar("messageId", { length: 255 }).notNull().unique(),
   from: varchar("from", { length: 50 }).notNull(),
@@ -130,6 +176,7 @@ export type InsertWhatsAppMessage = typeof whatsappMessages.$inferInsert;
  */
 export const bankAccounts = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").references(() => organizations.id, { onDelete: "cascade" }), // Multi-tenancy
   userId: integer("userId").notNull(), // Owner of the account
   entityId: integer("entityId"), // Optional: if set, account is exclusive to this entity
   name: varchar("name", { length: 255 }).notNull(),
@@ -150,6 +197,7 @@ export type InsertBankAccount = typeof bankAccounts.$inferInsert;
  */
 export const paymentMethods = pgTable("payment_methods", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").references(() => organizations.id, { onDelete: "cascade" }), // Multi-tenancy
   userId: integer("userId").notNull(), // Owner of the payment method
   entityId: integer("entityId"), // Optional: if set, payment method is exclusive to this entity
   name: varchar("name", { length: 255 }).notNull(),
@@ -198,6 +246,7 @@ export const priceSourceEnum = pgEnum("price_source", [
  */
 export const investments = pgTable("investments", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").references(() => organizations.id, { onDelete: "cascade" }), // Multi-tenancy
   entityId: integer("entityId").notNull(),
   userId: integer("userId").notNull(),
   
@@ -489,6 +538,7 @@ export const taskStatusEnum = pgEnum("task_status", ["PENDING", "IN_PROGRESS", "
  */
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").references(() => organizations.id, { onDelete: "cascade" }), // Multi-tenancy
   userId: integer("userId").notNull(),
   entityId: integer("entityId").references(() => entities.id, { onDelete: "cascade" }),
   transactionId: integer("transactionId").references(() => transactions.id, { onDelete: "cascade" }), // Relacionamento com transação

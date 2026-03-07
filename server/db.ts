@@ -28,6 +28,8 @@ import {
   InsertTreasurySelic,
   tasks,
   InsertTask,
+  organizations,
+  organizationMembers,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1544,4 +1546,100 @@ export async function completeTask(id: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(tasks).set({ status: "COMPLETED", completedAt: new Date(), updatedAt: new Date() }).where(eq(tasks.id, id));
+}
+
+// ========== ORGANIZATION OPERATIONS ==========
+
+export async function createOrganization(data: {
+  name: string;
+  ownerId: number;
+  slug?: string;
+}): Promise<typeof organizations.$inferSelect> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(organizations).values({
+    name: data.name,
+    ownerId: data.ownerId,
+    slug: data.slug ?? null,
+    plan: "free",
+  }).returning();
+
+  return result[0];
+}
+
+export async function getOrganizationsByUserId(userId: number): Promise<typeof organizations.$inferSelect[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Retorna organizações onde o usuário é owner OU membro
+  const owned = await db
+    .select({ org: organizations })
+    .from(organizations)
+    .where(eq(organizations.ownerId, userId));
+
+  const membered = await db
+    .select({ org: organizations })
+    .from(organizations)
+    .innerJoin(organizationMembers, eq(organizationMembers.organizationId, organizations.id))
+    .where(eq(organizationMembers.userId, userId));
+
+  const allOrgs = [...owned.map(r => r.org), ...membered.map(r => r.org)];
+  // Deduplicar por id
+  const seen = new Set<number>();
+  return allOrgs.filter(org => {
+    if (seen.has(org.id)) return false;
+    seen.add(org.id);
+    return true;
+  });
+}
+
+export async function getOrganizationById(orgId: number): Promise<typeof organizations.$inferSelect | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function addOrganizationMember(data: {
+  organizationId: number;
+  userId: number;
+  role?: "owner" | "admin" | "member";
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(organizationMembers).values({
+    organizationId: data.organizationId,
+    userId: data.userId,
+    role: data.role ?? "member",
+  }).onConflictDoNothing();
+}
+
+export async function getOrFirstOrganizationForUser(userId: number): Promise<typeof organizations.$inferSelect | null> {
+  const orgs = await getOrganizationsByUserId(userId);
+  return orgs.length > 0 ? orgs[0] : null;
+}
+
+export async function ensureOrganizationForUser(user: { id: number; name: string | null; email: string | null }): Promise<typeof organizations.$inferSelect> {
+  // Verifica se o usuário já tem uma organização
+  const existing = await getOrFirstOrganizationForUser(user.id);
+  if (existing) return existing;
+
+  // Cria uma organização padrão para o usuário
+  const orgName = user.name ?? user.email ?? `Organização ${user.id}`;
+  const org = await createOrganization({
+    name: orgName,
+    ownerId: user.id,
+  });
+
+  // Adiciona o usuário como owner na tabela de membros também
+  await addOrganizationMember({
+    organizationId: org.id,
+    userId: user.id,
+    role: "owner",
+  });
+
+  return org;
 }

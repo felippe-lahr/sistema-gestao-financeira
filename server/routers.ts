@@ -2074,5 +2074,58 @@ export const appRouter = router({
         return { success: true, status: newStatus };
       }),
   }),
+
+  // ========== ORGANIZATIONS ==========
+  organizations: router({
+    // Listar todas as organizações do usuário
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getOrganizationsByUserId(ctx.user.id);
+    }),
+
+    // Obter organização por ID (com verificação de acesso)
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const org = await db.getOrganizationById(input.id);
+        if (!org) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+        }
+        const userOrgs = await db.getOrganizationsByUserId(ctx.user.id);
+        if (!userOrgs.some(o => o.id === org.id)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return org;
+      }),
+
+    // Criar nova organização
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1).max(255),
+        slug: z.string().min(1).max(100).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const org = await db.createOrganization({
+          name: input.name,
+          ownerId: ctx.user.id,
+          slug: input.slug,
+        });
+        await db.addOrganizationMember({
+          organizationId: org.id,
+          userId: ctx.user.id,
+          role: "owner",
+        });
+        return org;
+      }),
+
+    // Garantir que o usuário tem uma organização padrão (cria se não tiver)
+    ensureDefault: protectedProcedure.mutation(async ({ ctx }) => {
+      const org = await db.ensureOrganizationForUser({
+        id: ctx.user.id,
+        name: ctx.user.name,
+        email: ctx.user.email,
+      });
+      return org;
+    }),
+  }),
 });
 export type AppRouter = typeof appRouter;
