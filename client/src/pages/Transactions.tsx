@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
 import { AttachmentUploader } from "@/components/AttachmentUploader";
-import { uploadFile, deleteFile } from "@/lib/supabase";
+import { uploadFile, deleteFile } from "@/lib/storage";
 import { CurrencyInput, parseCurrency, formatCurrencyValue } from "@/components/CurrencyInput";
 
 export default function Transactions() {

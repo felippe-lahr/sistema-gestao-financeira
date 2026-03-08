@@ -1,5 +1,5 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
+import type { User, Organization } from "../../drizzle/schema";
 import * as db from "../db";
 import { sdk } from "./sdk";
 import { ENV } from "./env";
@@ -10,12 +10,14 @@ export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
+  organization: Organization | null;
 };
 
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
   let user: User | null = null;
+  let organization: Organization | null = null;
 
   try {
     user = await sdk.authenticateRequest(opts.req);
@@ -39,13 +41,11 @@ export async function createContext(
             
             if (session.rememberMe === true) {
               // SESSÃO FIXA (24h): Renovar cookie mas manter expiração original
-              // Cookie expira no mesmo momento que o JWT (não estende)
               maxAge = expiresInSeconds * 1000;
               const hoursRemaining = (expiresInSeconds / 3600).toFixed(2);
               console.log(`[Auth] Cookie renewed (FIXED 24h) for user ${user.id} - expires in ${hoursRemaining}h`);
             } else {
               // SESSÃO DESLIZANTE (30min inatividade): Renovar cookie com 30min completos
-              // A cada requisição, o cookie é estendido por mais 30min
               const THIRTY_MINUTES_MS = 30 * 60 * 1000;
               maxAge = THIRTY_MINUTES_MS;
               console.log(`[Auth] Cookie renewed (SLIDING 30min) for user ${user.id} - 30min from now`);
@@ -58,32 +58,45 @@ export async function createContext(
           }
         }
       }
+
+      // Carregar organização ativa do usuário (multi-tenancy)
+      // Por enquanto, usamos a primeira organização do usuário.
+      // No futuro, o usuário poderá selecionar a organização ativa via header ou cookie.
+      try {
+        const orgIdHeader = opts.req.headers["x-organization-id"];
+        if (orgIdHeader && typeof orgIdHeader === "string") {
+          const orgId = parseInt(orgIdHeader, 10);
+          if (!isNaN(orgId)) {
+            const org = await db.getOrganizationById(orgId);
+            if (org) {
+              const userOrgs = await db.getOrganizationsByUserId(user.id);
+              if (userOrgs.some(o => o.id === org.id)) {
+                organization = org;
+              }
+            }
+          }
+        }
+        
+        // Se não encontrou via header, usar a primeira organização do usuário
+        if (!organization) {
+          organization = await db.getOrFirstOrganizationForUser(user.id);
+        }
+      } catch (orgError) {
+        // Organização é opcional por enquanto — não bloqueia o sistema
+        console.warn("[Auth] Could not load organization for user:", user.id, orgError);
+        organization = null;
+      }
     }
   } catch (error) {
     // Authentication is optional for public procedures.
     user = null;
-  }
-
-  // DEMO MODE: If no OAuth server is configured, create a demo user
-  if (!user && !ENV.oAuthServerUrl) {
-    console.log("[Auth] OAuth not configured, using demo user");
-    const demoOpenId = ENV.ownerOpenId || "demo@sistema-gestao-financeira.com";
-    
-    // Ensure demo user exists in database
-    await db.upsertUser({
-      openId: demoOpenId,
-      name: "Demo User",
-      email: demoOpenId,
-      loginMethod: "demo",
-      lastSignedIn: new Date(),
-    });
-    
-    user = await db.getUserByOpenId(demoOpenId) || null;
+    organization = null;
   }
 
   return {
     req: opts.req,
     res: opts.res,
     user,
+    organization,
   };
 }
