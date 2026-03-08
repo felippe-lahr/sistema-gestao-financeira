@@ -1,24 +1,14 @@
 import { Express, Request, Response } from "express";
-import { upload, deleteFile, getFilePath, fileExists } from "./upload";
-import { getDb } from "../db";
+import { upload, uploadFile, deleteFile } from "./upload";
+import { getPresignedUrl } from "./s3";
+import { getDb, getEntityById } from "../db";
 import { attachments, transactions } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 /**
- * Middleware to verify user authentication
- */
-function requireAuth(req: Request, res: Response, next: Function) {
-  const user = (req as any).user;
-  if (!user) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  next();
-}
-
-/**
  * Verify that user owns the transaction
  */
-async function verifyTransactionOwnership(transactionId: number, userId: string): Promise<boolean> {
+async function verifyTransactionOwnership(transactionId: number, userId: number): Promise<boolean> {
   try {
     const db = await getDb();
     if (!db) return false;
@@ -30,8 +20,7 @@ async function verifyTransactionOwnership(transactionId: number, userId: string)
 
     if (!transaction) return false;
 
-    // Verify user owns the entity
-    const entity = await db.getEntityById(transaction.entityId);
+    const entity = await getEntityById(transaction.entityId);
     return entity?.userId === userId;
   } catch (error) {
     console.error("[Upload] Error verifying ownership:", error);
@@ -40,7 +29,7 @@ async function verifyTransactionOwnership(transactionId: number, userId: string)
 }
 
 export function registerUploadRoutes(app: Express) {
-  // POST /api/attachments/upload - Upload de arquivo
+  // POST /api/attachments/upload - Upload de arquivo para S3
   app.post(
     "/api/attachments/upload",
     upload.single("file"),
@@ -51,29 +40,27 @@ export function registerUploadRoutes(app: Express) {
         }
 
         const { transactionId, type } = req.body;
-        const userId = (req as any).user?.id;
+        const userId = (req as any).user?.id as number;
 
         if (!userId) {
-          deleteFile(req.file.filename);
           return res.status(401).json({ error: "Unauthorized" });
         }
 
         if (!transactionId) {
-          deleteFile(req.file.filename);
           return res.status(400).json({ error: "transactionId é obrigatório" });
         }
 
-        // Verify user owns the transaction
         const ownsTransaction = await verifyTransactionOwnership(parseInt(transactionId), userId);
         if (!ownsTransaction) {
-          deleteFile(req.file.filename);
           return res.status(403).json({ error: "Access denied" });
         }
 
-        // Salvar no banco de dados
+        // Fazer upload para S3
+        const s3Url = await uploadFile(req.file, "attachments");
+
         const db = await getDb();
         if (!db) {
-          deleteFile(req.file.filename);
+          await deleteFile(s3Url);
           return res.status(500).json({ error: "Database not available" });
         }
 
@@ -81,127 +68,121 @@ export function registerUploadRoutes(app: Express) {
           .insert(attachments)
           .values({
             transactionId: parseInt(transactionId),
-            filename: req.file.filename,
-            blobUrl: `/api/attachments/${req.file.filename}/download`,
+            filename: req.file.originalname,
+            blobUrl: s3Url,
             fileSize: req.file.size,
             mimeType: req.file.mimetype,
             type: type || "DOCUMENTOS",
           })
           .returning();
 
-        return res.json({
-          success: true,
-          attachment: result[0],
-        });
+        return res.json({ success: true, attachment: result[0] });
       } catch (error) {
         console.error("[Upload] Error:", error);
-        if (req.file) {
-          deleteFile(req.file.filename);
-        }
         return res.status(500).json({ error: "Erro ao fazer upload" });
       }
     }
   );
 
-  // GET /api/attachments/:filename/download - Download de arquivo
-  app.get("/api/attachments/:filename/download", async (req: Request, res: Response) => {
+  // GET /api/attachments/:id/download - Redireciona para URL pré-assinada do S3
+  app.get("/api/attachments/:id/download", async (req: Request, res: Response) => {
     try {
-      const { filename } = req.params;
-      const userId = (req as any).user?.id;
+      const attachmentId = parseInt(req.params.id);
+      const userId = (req as any)?.user?.id as number;
 
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (isNaN(attachmentId)) return res.status(400).json({ error: "ID inválido" });
 
-      // Validate filename to prevent path traversal
-      if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-        return res.status(400).json({ error: "Invalid filename" });
-      }
-
-      const filePath = getFilePath(filename);
-
-      if (!fileExists(filename)) {
-        return res.status(404).json({ error: "Arquivo não encontrado" });
-      }
-
-      // Verify user has access to this attachment
       const db = await getDb();
-      if (!db) {
-        return res.status(500).json({ error: "Database not available" });
-      }
+      if (!db) return res.status(500).json({ error: "Database not available" });
 
       const [attachment] = await db
         .select()
         .from(attachments)
-        .where(eq(attachments.filename, filename));
+        .where(eq(attachments.id, attachmentId));
 
-      if (!attachment) {
-        return res.status(404).json({ error: "Arquivo não encontrado" });
-      }
+      if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
 
-      // Verify user owns the transaction
       const ownsTransaction = await verifyTransactionOwnership(attachment.transactionId, userId);
-      if (!ownsTransaction) {
-        return res.status(403).json({ error: "Access denied" });
+      if (!ownsTransaction) return res.status(403).json({ error: "Access denied" });
+
+      if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
+        const presignedUrl = await getPresignedUrl(attachment.blobUrl, 3600);
+        return res.redirect(presignedUrl);
       }
 
-      // Enviar arquivo para download
-      res.download(filePath);
+      // Fallback para Supabase ou outros providers
+      return res.redirect(attachment.blobUrl);
     } catch (error) {
       console.error("[Upload] Download error:", error);
       return res.status(500).json({ error: "Erro ao baixar arquivo" });
     }
   });
 
-  // GET /api/attachments/:filename/preview - Preview de arquivo
-  app.get("/api/attachments/:filename/preview", async (req: Request, res: Response) => {
+  // GET /api/attachments/:id/preview - Preview via URL pré-assinada
+  app.get("/api/attachments/:id/preview", async (req: Request, res: Response) => {
+    try {
+      const attachmentId = parseInt(req.params.id);
+      const userId = (req as any)?.user?.id as number;
+
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (isNaN(attachmentId)) return res.status(400).json({ error: "ID inválido" });
+
+      const db = await getDb();
+      if (!db) return res.status(500).json({ error: "Database not available" });
+
+      const [attachment] = await db
+        .select()
+        .from(attachments)
+        .where(eq(attachments.id, attachmentId));
+
+      if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
+
+      const ownsTransaction = await verifyTransactionOwnership(attachment.transactionId, userId);
+      if (!ownsTransaction) return res.status(403).json({ error: "Access denied" });
+
+      if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
+        const presignedUrl = await getPresignedUrl(attachment.blobUrl, 3600);
+        return res.redirect(presignedUrl);
+      }
+
+      return res.redirect(attachment.blobUrl);
+    } catch (error) {
+      console.error("[Upload] Preview error:", error);
+      return res.status(500).json({ error: "Erro ao visualizar arquivo" });
+    }
+  });
+
+  // Rota legada por filename (compatibilidade com arquivos migrados do Supabase)
+  app.get("/api/attachments/:filename/download-legacy", async (req: Request, res: Response) => {
     try {
       const { filename } = req.params;
-      const userId = (req as any).user?.id;
+      const userId = (req as any)?.user?.id as number;
 
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      // Validate filename to prevent path traversal
-      if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-        return res.status(400).json({ error: "Invalid filename" });
-      }
-
-      const filePath = getFilePath(filename);
-
-      if (!fileExists(filename)) {
-        return res.status(404).json({ error: "Arquivo não encontrado" });
-      }
-
-      // Verify user has access to this attachment
       const db = await getDb();
-      if (!db) {
-        return res.status(500).json({ error: "Database not available" });
-      }
+      if (!db) return res.status(500).json({ error: "Database not available" });
 
       const [attachment] = await db
         .select()
         .from(attachments)
         .where(eq(attachments.filename, filename));
 
-      if (!attachment) {
-        return res.status(404).json({ error: "Arquivo não encontrado" });
-      }
+      if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
 
-      // Verify user owns the transaction
       const ownsTransaction = await verifyTransactionOwnership(attachment.transactionId, userId);
-      if (!ownsTransaction) {
-        return res.status(403).json({ error: "Access denied" });
+      if (!ownsTransaction) return res.status(403).json({ error: "Access denied" });
+
+      if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
+        const presignedUrl = await getPresignedUrl(attachment.blobUrl, 3600);
+        return res.redirect(presignedUrl);
       }
 
-      // Set proper headers for inline display
-      res.setHeader('Content-Type', attachment.mimeType);
-      res.setHeader('Content-Disposition', 'inline');
-      res.sendFile(filePath);
+      return res.redirect(attachment.blobUrl);
     } catch (error) {
-      console.error("[Upload] Preview error:", error);
-      return res.status(500).json({ error: "Erro ao visualizar arquivo" });
+      console.error("[Upload] Legacy download error:", error);
+      return res.status(500).json({ error: "Erro ao baixar arquivo" });
     }
   });
 
@@ -209,38 +190,28 @@ export function registerUploadRoutes(app: Express) {
   app.delete("/api/attachments/:id", async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
-      const userId = (req as any).user?.id;
+      const userId = (req as any)?.user?.id as number;
 
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const db = await getDb();
-      if (!db) {
-        return res.status(500).json({ error: "Database not available" });
-      }
+      if (!db) return res.status(500).json({ error: "Database not available" });
 
-      // Buscar anexo no banco
       const [attachment] = await db
         .select()
         .from(attachments)
         .where(eq(attachments.id, attachmentId));
 
-      if (!attachment) {
-        return res.status(404).json({ error: "Anexo não encontrado" });
-      }
+      if (!attachment) return res.status(404).json({ error: "Anexo não encontrado" });
 
-      // Verify user owns the transaction
       const ownsTransaction = await verifyTransactionOwnership(attachment.transactionId, userId);
-      if (!ownsTransaction) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+      if (!ownsTransaction) return res.status(403).json({ error: "Access denied" });
 
-      // Deletar do filesystem
-      deleteFile(attachment.filename);
-
-      // Deletar do banco de dados
+      // Deletar do banco primeiro
       await db.delete(attachments).where(eq(attachments.id, attachmentId));
+
+      // Deletar do S3 (ou Supabase - deleteFile lida com ambos)
+      await deleteFile(attachment.blobUrl);
 
       return res.json({ success: true });
     } catch (error) {
@@ -254,36 +225,23 @@ export function registerUploadRoutes(app: Express) {
     try {
       const attachmentId = parseInt(req.params.id);
       const { type } = req.body;
-      const userId = (req as any).user?.id;
+      const userId = (req as any)?.user?.id as number;
 
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
-      if (!type) {
-        return res.status(400).json({ error: "type é obrigatório" });
-      }
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!type) return res.status(400).json({ error: "type é obrigatório" });
 
       const db = await getDb();
-      if (!db) {
-        return res.status(500).json({ error: "Database not available" });
-      }
+      if (!db) return res.status(500).json({ error: "Database not available" });
 
-      // Buscar anexo
       const [attachment] = await db
         .select()
         .from(attachments)
         .where(eq(attachments.id, attachmentId));
 
-      if (!attachment) {
-        return res.status(404).json({ error: "Anexo não encontrado" });
-      }
+      if (!attachment) return res.status(404).json({ error: "Anexo não encontrado" });
 
-      // Verify user owns the transaction
       const ownsTransaction = await verifyTransactionOwnership(attachment.transactionId, userId);
-      if (!ownsTransaction) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+      if (!ownsTransaction) return res.status(403).json({ error: "Access denied" });
 
       const result = await db
         .update(attachments)
@@ -298,16 +256,41 @@ export function registerUploadRoutes(app: Express) {
     }
   });
 
-  console.log("[Upload] Routes registered with security enhancements");
+  // POST /api/attachments/upload-temp - Upload temporário (sem transação associada)
+  // Usado para uploads antes de criar/editar uma transação
+  app.post(
+    "/api/attachments/upload-temp",
+    upload.single("file"),
+    async (req: Request, res: Response) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+        }
+
+        const userId = (req as any)?.user?.id as number;
+
+        if (!userId) {
+          return res.status(401).json({ error: "Unauthorized" });
+        }
+
+        // Fazer upload para S3 na pasta temp
+        const s3Url = await uploadFile(req.file, "attachments/temp");
+
+        return res.json({ success: true, s3Url });
+      } catch (error) {
+        console.error("[Upload] Temp upload error:", error);
+        return res.status(500).json({ error: "Erro ao fazer upload" });
+      }
+    }
+  );
+
+  console.log("[Upload] Routes registered with S3 storage");
 
   // ============================================
   // RENTAL ATTACHMENTS ROUTES
   // ============================================
 
-  /**
-   * Verify that user owns the rental
-   */
-  async function verifyRentalOwnership(rentalId: number, userId: string): Promise<boolean> {
+  async function verifyRentalOwnership(rentalId: number, userId: number): Promise<boolean> {
     try {
       const db = await getDb();
       if (!db) return false;
@@ -320,8 +303,7 @@ export function registerUploadRoutes(app: Express) {
 
       if (!rental) return false;
 
-      // Verify user owns the entity
-      const entity = await db.getEntityById(rental.entityId);
+      const entity = await getEntityById(rental.entityId);
       return entity?.userId === userId;
     } catch (error) {
       console.error("[Upload] Error verifying rental ownership:", error);
@@ -340,29 +322,20 @@ export function registerUploadRoutes(app: Express) {
         }
 
         const { rentalId, type } = req.body;
-        const userId = (req as any).user?.id;
+        const userId = (req as any)?.user?.id as number;
 
-        if (!userId) {
-          deleteFile(req.file.filename);
-          return res.status(401).json({ error: "Unauthorized" });
-        }
+        if (!userId) return res.status(401).json({ error: "Unauthorized" });
+        if (!rentalId) return res.status(400).json({ error: "rentalId é obrigatório" });
 
-        if (!rentalId) {
-          deleteFile(req.file.filename);
-          return res.status(400).json({ error: "rentalId é obrigatório" });
-        }
-
-        // Verify user owns the rental
         const ownsRental = await verifyRentalOwnership(parseInt(rentalId), userId);
-        if (!ownsRental) {
-          deleteFile(req.file.filename);
-          return res.status(403).json({ error: "Access denied" });
-        }
+        if (!ownsRental) return res.status(403).json({ error: "Access denied" });
 
-        // Salvar no banco de dados
+        // Fazer upload para S3
+        const s3Url = await uploadFile(req.file, "rental-attachments");
+
         const db = await getDb();
         if (!db) {
-          deleteFile(req.file.filename);
+          await deleteFile(s3Url);
           return res.status(500).json({ error: "Database not available" });
         }
 
@@ -371,105 +344,102 @@ export function registerUploadRoutes(app: Express) {
           .insert(rentalAttachments)
           .values({
             rentalId: parseInt(rentalId),
-            filename: req.file.filename,
-            blobUrl: `/api/rental-attachments/${req.file.filename}/download`,
+            filename: req.file.originalname,
+            blobUrl: s3Url,
             fileSize: req.file.size,
             mimeType: req.file.mimetype,
             type: type || "DOCUMENTOS",
           })
           .returning();
 
-        return res.json({
-          success: true,
-          attachment: result[0],
-        });
+        return res.json({ success: true, attachment: result[0] });
       } catch (error) {
         console.error("[Upload] Rental upload error:", error);
-        if (req.file) {
-          deleteFile(req.file.filename);
-        }
         return res.status(500).json({ error: "Erro ao fazer upload" });
       }
     }
   );
 
-  // GET /api/rental-attachments/:filename/download - Download de arquivo da reserva
-  app.get("/api/rental-attachments/:filename/download", async (req: Request, res: Response) => {
+  // GET /api/rental-attachments/:id/download - Download de arquivo da reserva
+  app.get("/api/rental-attachments/:id/download", async (req: Request, res: Response) => {
     try {
-      const { filename } = req.params;
-      const userId = (req as any).user?.id;
+      const attachmentId = parseInt(req.params.id);
+      const userId = (req as any)?.user?.id as number;
 
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (isNaN(attachmentId)) return res.status(400).json({ error: "ID inválido" });
 
-      // Validate filename to prevent path traversal
-      if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-        return res.status(400).json({ error: "Invalid filename" });
-      }
-
-      const filePath = getFilePath(filename);
-
-      if (!fileExists(filename)) {
-        return res.status(404).json({ error: "Arquivo não encontrado" });
-      }
-
-      // Verify user has access to this attachment
       const db = await getDb();
-      if (!db) {
-        return res.status(500).json({ error: "Database not available" });
-      }
+      if (!db) return res.status(500).json({ error: "Database not available" });
 
       const { rentalAttachments } = await import("../../drizzle/schema");
       const [attachment] = await db
         .select()
         .from(rentalAttachments)
-        .where(eq(rentalAttachments.filename, filename));
+        .where(eq(rentalAttachments.id, attachmentId));
 
-      if (!attachment) {
-        return res.status(404).json({ error: "Arquivo não encontrado" });
-      }
+      if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
 
-      // Verify user owns the rental
       const ownsRental = await verifyRentalOwnership(attachment.rentalId, userId);
-      if (!ownsRental) {
-        return res.status(403).json({ error: "Access denied" });
+      if (!ownsRental) return res.status(403).json({ error: "Access denied" });
+
+      if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
+        const presignedUrl = await getPresignedUrl(attachment.blobUrl, 3600);
+        return res.redirect(presignedUrl);
       }
 
-      // Enviar arquivo para download
-      res.download(filePath);
+      return res.redirect(attachment.blobUrl);
     } catch (error) {
       console.error("[Upload] Rental download error:", error);
       return res.status(500).json({ error: "Erro ao baixar arquivo" });
     }
   });
 
-  // GET /api/rental-attachments/:filename/preview - Preview de arquivo da reserva
-  app.get("/api/rental-attachments/:filename/preview", async (req: Request, res: Response) => {
+  // GET /api/rental-attachments/:id/preview - Preview de arquivo da reserva
+  app.get("/api/rental-attachments/:id/preview", async (req: Request, res: Response) => {
+    try {
+      const attachmentId = parseInt(req.params.id);
+      const userId = (req as any)?.user?.id as number;
+
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (isNaN(attachmentId)) return res.status(400).json({ error: "ID inválido" });
+
+      const db = await getDb();
+      if (!db) return res.status(500).json({ error: "Database not available" });
+
+      const { rentalAttachments } = await import("../../drizzle/schema");
+      const [attachment] = await db
+        .select()
+        .from(rentalAttachments)
+        .where(eq(rentalAttachments.id, attachmentId));
+
+      if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
+
+      const ownsRental = await verifyRentalOwnership(attachment.rentalId, userId);
+      if (!ownsRental) return res.status(403).json({ error: "Access denied" });
+
+      if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
+        const presignedUrl = await getPresignedUrl(attachment.blobUrl, 3600);
+        return res.redirect(presignedUrl);
+      }
+
+      return res.redirect(attachment.blobUrl);
+    } catch (error) {
+      console.error("[Upload] Rental preview error:", error);
+      return res.status(500).json({ error: "Erro ao visualizar arquivo" });
+    }
+  });
+
+  // Rota legada por filename para rental attachments
+  app.get("/api/rental-attachments/:filename/download-legacy", async (req: Request, res: Response) => {
     try {
       const { filename } = req.params;
-      const userId = (req as any).user?.id;
+      const userId = (req as any)?.user?.id as number;
 
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      // Validate filename
-      if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-        return res.status(400).json({ error: "Invalid filename" });
-      }
-
-      const filePath = getFilePath(filename);
-
-      if (!fileExists(filename)) {
-        return res.status(404).json({ error: "Arquivo não encontrado" });
-      }
-
-      // Verify user has access
       const db = await getDb();
-      if (!db) {
-        return res.status(500).json({ error: "Database not available" });
-      }
+      if (!db) return res.status(500).json({ error: "Database not available" });
 
       const { rentalAttachments } = await import("../../drizzle/schema");
       const [attachment] = await db
@@ -477,20 +447,20 @@ export function registerUploadRoutes(app: Express) {
         .from(rentalAttachments)
         .where(eq(rentalAttachments.filename, filename));
 
-      if (!attachment) {
-        return res.status(404).json({ error: "Arquivo não encontrado" });
-      }
+      if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
 
-      // Verify user owns the rental
       const ownsRental = await verifyRentalOwnership(attachment.rentalId, userId);
-      if (!ownsRental) {
-        return res.status(403).json({ error: "Access denied" });
+      if (!ownsRental) return res.status(403).json({ error: "Access denied" });
+
+      if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
+        const presignedUrl = await getPresignedUrl(attachment.blobUrl, 3600);
+        return res.redirect(presignedUrl);
       }
 
-      res.sendFile(filePath);
+      return res.redirect(attachment.blobUrl);
     } catch (error) {
-      console.error("[Upload] Rental preview error:", error);
-      return res.status(500).json({ error: "Erro ao visualizar arquivo" });
+      console.error("[Upload] Rental legacy download error:", error);
+      return res.status(500).json({ error: "Erro ao baixar arquivo" });
     }
   });
 
@@ -498,39 +468,29 @@ export function registerUploadRoutes(app: Express) {
   app.delete("/api/rental-attachments/:id", async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
-      const userId = (req as any).user?.id;
+      const userId = (req as any)?.user?.id as number;
 
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const db = await getDb();
-      if (!db) {
-        return res.status(500).json({ error: "Database not available" });
-      }
+      if (!db) return res.status(500).json({ error: "Database not available" });
 
-      // Buscar anexo no banco
       const { rentalAttachments } = await import("../../drizzle/schema");
       const [attachment] = await db
         .select()
         .from(rentalAttachments)
         .where(eq(rentalAttachments.id, attachmentId));
 
-      if (!attachment) {
-        return res.status(404).json({ error: "Anexo não encontrado" });
-      }
+      if (!attachment) return res.status(404).json({ error: "Anexo não encontrado" });
 
-      // Verify user owns the rental
       const ownsRental = await verifyRentalOwnership(attachment.rentalId, userId);
-      if (!ownsRental) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+      if (!ownsRental) return res.status(403).json({ error: "Access denied" });
 
-      // Deletar do filesystem
-      deleteFile(attachment.filename);
-
-      // Deletar do banco de dados
+      // Deletar do banco primeiro
       await db.delete(rentalAttachments).where(eq(rentalAttachments.id, attachmentId));
+
+      // Deletar do S3
+      await deleteFile(attachment.blobUrl);
 
       return res.json({ success: true });
     } catch (error) {
@@ -544,37 +504,24 @@ export function registerUploadRoutes(app: Express) {
     try {
       const attachmentId = parseInt(req.params.id);
       const { type } = req.body;
-      const userId = (req as any).user?.id;
+      const userId = (req as any)?.user?.id as number;
 
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
-      if (!type) {
-        return res.status(400).json({ error: "type é obrigatório" });
-      }
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!type) return res.status(400).json({ error: "type é obrigatório" });
 
       const db = await getDb();
-      if (!db) {
-        return res.status(500).json({ error: "Database not available" });
-      }
+      if (!db) return res.status(500).json({ error: "Database not available" });
 
-      // Buscar anexo
       const { rentalAttachments } = await import("../../drizzle/schema");
       const [attachment] = await db
         .select()
         .from(rentalAttachments)
         .where(eq(rentalAttachments.id, attachmentId));
 
-      if (!attachment) {
-        return res.status(404).json({ error: "Anexo não encontrado" });
-      }
+      if (!attachment) return res.status(404).json({ error: "Anexo não encontrado" });
 
-      // Verify user owns the rental
       const ownsRental = await verifyRentalOwnership(attachment.rentalId, userId);
-      if (!ownsRental) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+      if (!ownsRental) return res.status(403).json({ error: "Access denied" });
 
       const result = await db
         .update(rentalAttachments)

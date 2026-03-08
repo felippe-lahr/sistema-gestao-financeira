@@ -21,7 +21,7 @@ import { ptBR } from "date-fns/locale";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { RentalAttachmentUploader } from "@/components/RentalAttachmentUploader";
-import { uploadFile, deleteFile } from "@/lib/supabase";
+import { uploadFile, deleteFile } from "@/lib/storage";
 import { CurrencyInput, parseCurrency, formatCurrency } from "@/components/CurrencyInput";
 import { getHolidayByDate, getHolidaysByMonth } from "@/lib/holidays";
 
