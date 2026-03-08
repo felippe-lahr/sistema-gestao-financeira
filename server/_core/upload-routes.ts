@@ -1,9 +1,24 @@
-import { Express, Request, Response } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import { upload, uploadFile, deleteFile } from "./upload";
 import { getPresignedUrl } from "./s3";
 import { getDb, getEntityById } from "../db";
 import { attachments, transactions } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { sdk } from "./sdk";
+
+/**
+ * Middleware de autenticação para rotas de upload
+ * Popula req.user com o usuário autenticado
+ */
+async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = await sdk.authenticateRequest(req);
+    (req as any).user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+}
 
 /**
  * Verify that user owns the transaction
@@ -32,6 +47,7 @@ export function registerUploadRoutes(app: Express) {
   // POST /api/attachments/upload - Upload de arquivo para S3
   app.post(
     "/api/attachments/upload",
+    requireAuth,
     upload.single("file"),
     async (req: Request, res: Response) => {
       try {
@@ -85,7 +101,7 @@ export function registerUploadRoutes(app: Express) {
   );
 
   // GET /api/attachments/:id/download - Redireciona para URL pré-assinada do S3
-  app.get("/api/attachments/:id/download", async (req: Request, res: Response) => {
+  app.get("/api/attachments/:id/download", requireAuth, async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
       const userId = (req as any)?.user?.id as number;
@@ -120,7 +136,7 @@ export function registerUploadRoutes(app: Express) {
   });
 
   // GET /api/attachments/:id/preview - Preview via URL pré-assinada
-  app.get("/api/attachments/:id/preview", async (req: Request, res: Response) => {
+  app.get("/api/attachments/:id/preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
       const userId = (req as any)?.user?.id as number;
@@ -154,7 +170,7 @@ export function registerUploadRoutes(app: Express) {
   });
 
   // Rota legada por filename (compatibilidade com arquivos migrados do Supabase)
-  app.get("/api/attachments/:filename/download-legacy", async (req: Request, res: Response) => {
+  app.get("/api/attachments/:filename/download-legacy", requireAuth, async (req: Request, res: Response) => {
     try {
       const { filename } = req.params;
       const userId = (req as any)?.user?.id as number;
@@ -187,7 +203,7 @@ export function registerUploadRoutes(app: Express) {
   });
 
   // DELETE /api/attachments/:id - Deletar anexo
-  app.delete("/api/attachments/:id", async (req: Request, res: Response) => {
+  app.delete("/api/attachments/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
       const userId = (req as any)?.user?.id as number;
@@ -260,6 +276,7 @@ export function registerUploadRoutes(app: Express) {
   // Usado para uploads antes de criar/editar uma transação
   app.post(
     "/api/attachments/upload-temp",
+    requireAuth,
     upload.single("file"),
     async (req: Request, res: Response) => {
       try {
@@ -314,6 +331,7 @@ export function registerUploadRoutes(app: Express) {
   // POST /api/rental-attachments/upload - Upload de arquivo para reserva
   app.post(
     "/api/rental-attachments/upload",
+    requireAuth,
     upload.single("file"),
     async (req: Request, res: Response) => {
       try {
@@ -361,7 +379,7 @@ export function registerUploadRoutes(app: Express) {
   );
 
   // GET /api/rental-attachments/:id/download - Download de arquivo da reserva
-  app.get("/api/rental-attachments/:id/download", async (req: Request, res: Response) => {
+  app.get("/api/rental-attachments/:id/download", requireAuth, async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
       const userId = (req as any)?.user?.id as number;
@@ -396,7 +414,7 @@ export function registerUploadRoutes(app: Express) {
   });
 
   // GET /api/rental-attachments/:id/preview - Preview de arquivo da reserva
-  app.get("/api/rental-attachments/:id/preview", async (req: Request, res: Response) => {
+  app.get("/api/rental-attachments/:id/preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
       const userId = (req as any)?.user?.id as number;
@@ -431,7 +449,7 @@ export function registerUploadRoutes(app: Express) {
   });
 
   // Rota legada por filename para rental attachments
-  app.get("/api/rental-attachments/:filename/download-legacy", async (req: Request, res: Response) => {
+  app.get("/api/rental-attachments/:filename/download-legacy", requireAuth, async (req: Request, res: Response) => {
     try {
       const { filename } = req.params;
       const userId = (req as any)?.user?.id as number;
@@ -465,7 +483,7 @@ export function registerUploadRoutes(app: Express) {
   });
 
   // DELETE /api/rental-attachments/:id - Deletar anexo da reserva
-  app.delete("/api/rental-attachments/:id", async (req: Request, res: Response) => {
+  app.delete("/api/rental-attachments/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
       const userId = (req as any)?.user?.id as number;
