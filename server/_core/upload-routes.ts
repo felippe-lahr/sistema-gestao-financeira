@@ -72,7 +72,8 @@ export function registerUploadRoutes(app: Express) {
         }
 
         // Fazer upload para S3
-        const s3Url = await uploadFile(req.file, "attachments");
+        // Organizar por userId para isolamento multi-tenant
+        const s3Url = await uploadFile(req.file, `users/${userId}/attachments`);
 
         const db = await getDb();
         if (!db) {
@@ -290,8 +291,8 @@ export function registerUploadRoutes(app: Express) {
           return res.status(401).json({ error: "Unauthorized" });
         }
 
-        // Fazer upload para S3 na pasta temp
-        const s3Url = await uploadFile(req.file, "attachments/temp");
+        // Organizar por userId para isolamento multi-tenant
+        const s3Url = await uploadFile(req.file, `users/${userId}/attachments/temp`);
 
         return res.json({ success: true, s3Url });
       } catch (error) {
@@ -349,7 +350,8 @@ export function registerUploadRoutes(app: Express) {
         if (!ownsRental) return res.status(403).json({ error: "Access denied" });
 
         // Fazer upload para S3
-        const s3Url = await uploadFile(req.file, "rental-attachments");
+        // Organizar por userId para isolamento multi-tenant
+        const s3Url = await uploadFile(req.file, `users/${userId}/rental-attachments`);
 
         const db = await getDb();
         if (!db) {

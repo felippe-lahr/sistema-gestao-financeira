@@ -1423,7 +1423,12 @@ export default function Transactions() {
                 <p className="text-lg font-medium text-gray-900 dark:text-gray-100">{previewAttachment.filename}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Tamanho: {(previewAttachment.fileSize / 1024).toFixed(1)} KB</p>
                 <button
-                  onClick={() => window.open(previewAttachment.blobUrl, 'PDFViewer', 'width=900,height=700,scrollbars=yes,resizable=yes')}
+                  onClick={() => window.open(
+                    previewAttachment.id && previewAttachment.id < 1_000_000_000_000
+                      ? `/api/attachments/${previewAttachment.id}/preview`
+                      : previewAttachment.blobUrl,
+                    'PDFViewer', 'width=900,height=700,scrollbars=yes,resizable=yes'
+                  )}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Abrir PDF em nova janela
@@ -1431,7 +1436,11 @@ export default function Transactions() {
               </div>
             ) : previewAttachment?.mimeType?.startsWith('image/') ? (
               <img
-                src={previewAttachment.blobUrl}
+                src={
+                  previewAttachment.id && previewAttachment.id < 1_000_000_000_000
+                    ? `/api/attachments/${previewAttachment.id}/preview`
+                    : previewAttachment.blobUrl
+                }
                 alt={previewAttachment.filename}
                 className="max-w-full max-h-[600px] object-contain"
               />
@@ -1443,21 +1452,11 @@ export default function Transactions() {
             <Button variant="outline" onClick={() => setPreviewAttachment(null)}>
               Fechar
             </Button>
-            <Button onClick={async () => {
+            <Button onClick={() => {
               if (!previewAttachment) return;
-              try {
-                const response = await fetch(previewAttachment.blobUrl);
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = previewAttachment.filename;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-              } catch (error) {
-                console.error('Erro ao baixar arquivo:', error);
+              if (previewAttachment.id && previewAttachment.id < 1_000_000_000_000) {
+                window.open(`/api/attachments/${previewAttachment.id}/download`, '_blank');
+              } else {
                 window.open(previewAttachment.blobUrl, '_blank');
               }
             }}>
