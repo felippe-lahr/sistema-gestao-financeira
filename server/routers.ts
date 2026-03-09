@@ -2,7 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import * as exportUtils from "./export";
 import { getMonthlyCategoryExpenses } from "./db-monthly-category";
@@ -2156,6 +2156,70 @@ export const appRouter = router({
     listSharedEntities: protectedProcedure.query(async ({ ctx }) => {
       return await db.getSharedEntitiesForUser(ctx.user.id);
     }),
+  }),
+
+  // ========== ADMIN ==========
+  admin: router({
+    /**
+     * Estatísticas gerais do sistema.
+     */
+    getStats: adminProcedure.query(async () => {
+      return await db.adminGetStats();
+    }),
+
+    /**
+     * Lista todos os usuários cadastrados.
+     */
+    listUsers: adminProcedure.query(async () => {
+      return await db.adminListUsers();
+    }),
+
+    /**
+     * Lista todas as organizações.
+     */
+    listOrganizations: adminProcedure.query(async () => {
+      return await db.adminListOrganizations();
+    }),
+
+    /**
+     * Altera o plano de uma organização.
+     */
+    setOrganizationPlan: adminProcedure
+      .input(z.object({
+        orgId: z.number(),
+        plan: z.enum(['free', 'pro', 'enterprise']),
+      }))
+      .mutation(async ({ input }) => {
+        await db.adminSetOrganizationPlan(input.orgId, input.plan);
+        return { success: true };
+      }),
+
+    /**
+     * Força a verificação de e-mail de um usuário.
+     */
+    forceVerifyUser: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.adminForceVerifyUser(input.userId);
+        return { success: true };
+      }),
+
+    /**
+     * Altera o role de um usuário (user / admin).
+     */
+    setUserRole: adminProcedure
+      .input(z.object({
+        userId: z.number(),
+        role: z.enum(['user', 'admin']),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // Não permitir que o admin remova seu próprio role
+        if (input.userId === ctx.user.id && input.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Você não pode remover seu próprio acesso de admin.' });
+        }
+        await db.adminSetUserRole(input.userId, input.role);
+        return { success: true };
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;

@@ -452,19 +452,21 @@ export function registerPasswordAuthRoutes(app: Express) {
       const passwordHash = await bcrypt.hash(password, 10);
       await db.setUserPassword(newUser.id, passwordHash);
 
-      // Criar organização
-      const slug = organizationName
+      // Criar organização com slug único (userId + sufixo aleatório para evitar conflitos)
+      const slugBase = organizationName
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "")
-        .substring(0, 100);
+        .substring(0, 60);
+      const slugSuffix = randomUUID().replace(/-/g, "").substring(0, 8);
+      const uniqueSlug = `${slugBase}-${newUser.id}-${slugSuffix}`;
 
       await db.createOrganization({
         name: organizationName.trim(),
         ownerId: newUser.id,
-        slug: `${slug}-${newUser.id}`,
+        slug: uniqueSlug,
       });
 
       // Gerar token de verificação de e-mail
@@ -494,7 +496,15 @@ export function registerPasswordAuthRoutes(app: Express) {
       });
     } catch (error) {
       console.error("[Password Auth] Register failed", error);
-      res.status(500).json({ error: "Erro ao criar conta" });
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      // Detectar erros comuns de banco e retornar mensagem amigável
+      if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('already exists')) {
+        res.status(409).json({ error: "Este e-mail já está cadastrado. Faça login ou use outro e-mail." });
+      } else if (msg.includes('slug')) {
+        res.status(409).json({ error: "Já existe uma organização com esse nome. Tente outro nome." });
+      } else {
+        res.status(500).json({ error: "Erro ao criar conta. Tente novamente." });
+      }
     }
   });
 

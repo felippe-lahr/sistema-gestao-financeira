@@ -2069,3 +2069,191 @@ export async function getUserById(userId: number) {
   const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   return result.length > 0 ? result[0] : null;
 }
+
+// ============================================================
+// ADMIN FUNCTIONS
+// ============================================================
+
+/**
+ * Lista todos os usuários do sistema com informações de verificação e organização.
+ */
+export async function adminListUsers(): Promise<{
+  id: number;
+  name: string | null;
+  email: string | null;
+  role: string;
+  loginMethod: string | null;
+  createdAt: Date;
+  lastSignedIn: Date;
+  emailVerified: boolean;
+  organizationName: string | null;
+  organizationPlan: string | null;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db.execute(
+    sql`SELECT
+          u.id,
+          u.name,
+          u.email,
+          u.role,
+          u."loginMethod",
+          u."createdAt",
+          u."lastSignedIn",
+          CASE WHEN ev.id IS NOT NULL THEN true ELSE false END AS "emailVerified",
+          o.name AS "organizationName",
+          o.plan AS "organizationPlan"
+        FROM users u
+        LEFT JOIN (
+          SELECT DISTINCT ON ("userId") id, "userId"
+          FROM email_verifications
+          WHERE "verifiedAt" IS NOT NULL
+          ORDER BY "userId", id DESC
+        ) ev ON ev."userId" = u.id
+        LEFT JOIN organizations o ON o."ownerId" = u.id
+        ORDER BY u."createdAt" DESC`
+  ) as unknown as any[];
+
+  return rows.map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    role: r.role,
+    loginMethod: r.loginMethod,
+    createdAt: new Date(r.createdAt),
+    lastSignedIn: new Date(r.lastSignedIn),
+    emailVerified: r.emailVerified === true || r.emailVerified === 't',
+    organizationName: r.organizationName ?? null,
+    organizationPlan: r.organizationPlan ?? null,
+  }));
+}
+
+/**
+ * Lista todas as organizações com dados do owner.
+ */
+export async function adminListOrganizations(): Promise<{
+  id: number;
+  name: string;
+  slug: string | null;
+  plan: string;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  createdAt: Date;
+  memberCount: number;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db.execute(
+    sql`SELECT
+          o.id,
+          o.name,
+          o.slug,
+          o.plan,
+          o."createdAt",
+          u.name AS "ownerName",
+          u.email AS "ownerEmail",
+          (SELECT COUNT(*) FROM organization_members om WHERE om."organizationId" = o.id) AS "memberCount"
+        FROM organizations o
+        LEFT JOIN users u ON u.id = o."ownerId"
+        ORDER BY o."createdAt" DESC`
+  ) as unknown as any[];
+
+  return rows.map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug ?? null,
+    plan: r.plan,
+    ownerName: r.ownerName ?? null,
+    ownerEmail: r.ownerEmail ?? null,
+    createdAt: new Date(r.createdAt),
+    memberCount: Number(r.memberCount ?? 0),
+  }));
+}
+
+/**
+ * Estatísticas gerais para o painel de admin.
+ */
+export async function adminGetStats(): Promise<{
+  totalUsers: number;
+  verifiedUsers: number;
+  newUsersThisWeek: number;
+  totalOrganizations: number;
+  planCounts: { free: number; pro: number; enterprise: number };
+}> {
+  const db = await getDb();
+  if (!db) return {
+    totalUsers: 0, verifiedUsers: 0, newUsersThisWeek: 0,
+    totalOrganizations: 0, planCounts: { free: 0, pro: 0, enterprise: 0 },
+  };
+
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const [statsRows, planRows] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        COUNT(*)::int AS "totalUsers",
+        COUNT(ev.id)::int AS "verifiedUsers",
+        COUNT(CASE WHEN u."createdAt" >= ${oneWeekAgo} THEN 1 END)::int AS "newUsersThisWeek",
+        (SELECT COUNT(*)::int FROM organizations) AS "totalOrganizations"
+      FROM users u
+      LEFT JOIN (
+        SELECT DISTINCT ON ("userId") id, "userId"
+        FROM email_verifications WHERE "verifiedAt" IS NOT NULL
+        ORDER BY "userId", id DESC
+      ) ev ON ev."userId" = u.id
+    `) as unknown as any[],
+    db.execute(sql`
+      SELECT plan, COUNT(*)::int AS cnt FROM organizations GROUP BY plan
+    `) as unknown as any[],
+  ]);
+
+  const s = statsRows[0] ?? {};
+  const planCounts = { free: 0, pro: 0, enterprise: 0 };
+  for (const row of planRows) {
+    if (row.plan === 'free') planCounts.free = Number(row.cnt);
+    else if (row.plan === 'pro') planCounts.pro = Number(row.cnt);
+    else if (row.plan === 'enterprise') planCounts.enterprise = Number(row.cnt);
+  }
+
+  return {
+    totalUsers: Number(s.totalUsers ?? 0),
+    verifiedUsers: Number(s.verifiedUsers ?? 0),
+    newUsersThisWeek: Number(s.newUsersThisWeek ?? 0),
+    totalOrganizations: Number(s.totalOrganizations ?? 0),
+    planCounts,
+  };
+}
+
+/**
+ * Altera o plano de uma organização.
+ */
+export async function adminSetOrganizationPlan(orgId: number, plan: 'free' | 'pro' | 'enterprise'): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.execute(sql`UPDATE organizations SET plan = ${plan}, "updatedAt" = NOW() WHERE id = ${orgId}`);
+}
+
+/**
+ * Força a verificação de e-mail de um usuário (ação administrativa).
+ */
+export async function adminForceVerifyUser(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  // Inserir um registro de verificação já confirmado
+  await db.execute(sql`
+    INSERT INTO email_verifications ("userId", token, "expiresAt", "verifiedAt")
+    VALUES (${userId}, ${'admin_forced_' + userId + '_' + Date.now()}, NOW(), NOW())
+    ON CONFLICT DO NOTHING
+  `);
+}
+
+/**
+ * Altera o role de um usuário (user / admin).
+ */
+export async function adminSetUserRole(userId: number, role: 'user' | 'admin'): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.execute(sql`UPDATE users SET role = ${role}, "updatedAt" = NOW() WHERE id = ${userId}`);
+}
