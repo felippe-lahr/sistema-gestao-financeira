@@ -30,24 +30,15 @@ export const appRouter = router({
   // ========== ENTITIES ==========
   entities: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      // Retorna entidades próprias + entidades compartilhadas com o usuário
-      const ownedEntities = await db.getEntitiesByUserId(ctx.user.id);
-      const sharedEntities = await db.getSharedEntitiesForUser(ctx.user.id);
-      
-      // Buscar dados completos das entidades compartilhadas
-      const sharedFull = await Promise.all(
-        sharedEntities.map(async (se) => {
-          const entity = await db.getEntityById(se.id);
-          return entity ? { ...entity, sharedRole: se.role } : null;
-        })
-      );
-      
-      const validShared = sharedFull.filter(Boolean) as any[];
-      
+      // Retorna entidades próprias + entidades compartilhadas em paralelo (sem N+1)
+      const [ownedEntities, sharedEntities] = await Promise.all([
+        db.getEntitiesByUserId(ctx.user.id),
+        db.getSharedEntitiesForUser(ctx.user.id),
+      ]);
       // Combinar: entidades próprias primeiro, depois compartilhadas
       return [
         ...ownedEntities.map(e => ({ ...e, sharedRole: null })),
-        ...validShared,
+        ...sharedEntities,
       ];
     }),
 
@@ -89,10 +80,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.id);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.id, ctx.user.id, "OWNER");
         await db.updateEntity(input.id, {
           name: input.name,
           description: input.description,
@@ -103,10 +91,7 @@ export const appRouter = router({
       }),
 
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
-      const entity = await db.getEntityById(input.id);
-      if (!entity || entity.userId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
+      await requireEntityAccess(input.id, ctx.user.id, "OWNER");
       await db.deleteEntity(input.id);
       return { success: true };
     }),
@@ -123,10 +108,7 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         // Verify all entities belong to user
         for (const item of input) {
-          const entity = await db.getEntityById(item.id);
-          if (!entity || entity.userId !== ctx.user.id) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-          }
+          await requireEntityAccess(item.id, ctx.user.id, "OWNER");
         }
         // Update display order for all entities
         await db.updateEntitiesOrder(input);
@@ -137,10 +119,7 @@ export const appRouter = router({
   // ========== CATEGORIES ==========
   categories: router({
     listByEntity: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
-      const entity = await db.getEntityById(input.entityId);
-      if (!entity || entity.userId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
+      await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
       return await db.getCategoriesByEntityId(input.entityId, ctx.user.id);
     }),
 
@@ -155,10 +134,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         const categoryId = await db.createCategory({
           userId: ctx.user.id,
           entityId: input.entityId,
@@ -183,10 +159,7 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         // Verify all entities belong to user
         for (const entityId of input.entityIds) {
-          const entity = await db.getEntityById(entityId);
-          if (!entity || entity.userId !== ctx.user.id) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-          }
+          await requireEntityAccess(entityId, ctx.user.id, "VIEWER");
         }
         
         // Get transactions from all entities
@@ -238,10 +211,7 @@ export const appRouter = router({
   // ========== BANK ACCOUNTS ==========
   bankAccounts: router({
     listByEntity: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
-      const entity = await db.getEntityById(input.entityId);
-      if (!entity || entity.userId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
+      await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
       return await db.getBankAccountsByEntityId(input.entityId, ctx.user.id);
     }),
 
@@ -257,10 +227,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         const balanceInCents = input.balance ? Math.round(input.balance * 100) : 0;
 
@@ -322,10 +289,7 @@ export const appRouter = router({
   // ========== PAYMENT METHODS ==========
   paymentMethods: router({
     listByEntity: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
-      const entity = await db.getEntityById(input.entityId);
-      if (!entity || entity.userId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
+      await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
       return await db.getPaymentMethodsByEntityId(input.entityId, ctx.user.id);
     }),
 
@@ -340,10 +304,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         const methodId = await db.createPaymentMethod({
           userId: ctx.user.id,
@@ -405,10 +366,7 @@ export const appRouter = router({
         })
       )
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         return await getTransactionSummary(input.entityId, {
           startDate: input.startDate,
           endDate: input.endDate,
@@ -429,10 +387,7 @@ export const appRouter = router({
         })
       )
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         return await db.getTransactionsByEntityId(input.entityId, {
           startDate: input.startDate,
           endDate: input.endDate,
@@ -447,10 +402,7 @@ export const appRouter = router({
       if (!transaction) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
       }
-      const entity = await db.getEntityById(transaction.entityId);
-      if (!entity || entity.userId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
+      await requireEntityAccess(transaction.entityId, ctx.user.id, "VIEWER");
       return transaction;
     }),
 
@@ -474,10 +426,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         // Convert amount to cents
         const amountInCents = Math.round(input.amount * 100);
@@ -583,10 +532,7 @@ export const appRouter = router({
         if (!transaction) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
         }
-        const entity = await db.getEntityById(transaction.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(transaction.entityId, ctx.user.id, "EDITOR");
 
         const updateData: any = {
           type: input.type,
@@ -624,10 +570,7 @@ export const appRouter = router({
       if (!transaction) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
       }
-      const entity = await db.getEntityById(transaction.entityId);
-      if (!entity || entity.userId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
+      await requireEntityAccess(transaction.entityId, ctx.user.id, "EDITOR");
       await db.deleteTransaction(input.id);
       return { success: true };
     }),
@@ -644,10 +587,7 @@ export const appRouter = router({
         if (!transaction) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
         }
-        const entity = await db.getEntityById(transaction.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(transaction.entityId, ctx.user.id, "ADMIN");
         await db.deleteRecurringTransaction(input.id, input.deleteMode);
         return { success: true };
       }),
@@ -657,10 +597,7 @@ export const appRouter = router({
   dashboard: router({
     // Endpoint de diagnóstico para investigar cálculo do Saldo Atual
     balanceDiagnostic: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
-      const entity = await db.getEntityById(input.entityId);
-      if (!entity || entity.userId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
+      await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
       try {
         const diagnostic = await db.getBalanceDiagnostic(input.entityId);
@@ -690,10 +627,7 @@ export const appRouter = router({
       startDate: z.date().optional(),
       endDate: z.date().optional(),
     })).query(async ({ input, ctx }) => {
-      const entity = await db.getEntityById(input.entityId);
-      if (!entity || entity.userId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
+      await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
       const metrics = await db.getDashboardMetrics(input.entityId, {
         startDate: input.startDate,
@@ -729,10 +663,7 @@ export const appRouter = router({
         endDate: z.date().optional()
       }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         const months = input.months || 6;
         const cashFlowData = await db.getCashFlowData(input.entityId, months, input.startDate, input.endDate);
@@ -752,10 +683,7 @@ export const appRouter = router({
         endDate: z.date().optional(),
       }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         const distribution = await db.getCategoryDistribution(input.entityId, input.startDate, input.endDate);
         
@@ -774,10 +702,7 @@ export const appRouter = router({
         categoryId: z.number().optional(),
       }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         const data = await getMonthlyCategoryExpenses(
           input.entityId, 
@@ -801,10 +726,7 @@ export const appRouter = router({
         endDate: z.date().optional(),
       }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         const transactions = await db.getTransactionsByEntityId(input.entityId, {
           limit: input.limit || 10,
@@ -825,10 +747,7 @@ export const appRouter = router({
         daysAhead: z.number().optional(),
       }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         const transactions = await db.getUpcomingTransactions(
           input.entityId,
@@ -847,10 +766,7 @@ export const appRouter = router({
         daysAhead: z.number().optional(),
       }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         const transactions = await db.getUpcomingIncomeTransactions(
           input.entityId,
@@ -870,10 +786,7 @@ export const appRouter = router({
         endDate: z.date().optional(),
       }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         const data = await db.getCategoryExpensesByStatus(input.entityId, input.startDate, input.endDate);
         
@@ -900,11 +813,8 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+         await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
-
         // Processar datas corretamente (formato YYYY-MM-DD vem do frontend)
         let startDate: Date | undefined;
         let endDate: Date | undefined;
@@ -923,7 +833,6 @@ export const appRouter = router({
           startDate,
           endDate,
         });
-
         const summary = {
           totalIncome: transactions
             .filter((t) => t.type === "INCOME" && t.status === "PAID")
@@ -932,9 +841,8 @@ export const appRouter = router({
             .filter((t) => t.type === "EXPENSE" && t.status === "PAID")
             .reduce((sum, t) => sum + t.amount, 0),
         };
-
         const buffer = await exportUtils.generateTransactionsExcel({
-          entityName: entity.name,
+          entityName: entity?.name ?? "",
           transactions,
           summary,
           period: input.period,
@@ -942,7 +850,7 @@ export const appRouter = router({
 
         return {
           data: buffer.toString("base64"),
-          filename: `relatorio_${entity.name.replace(/\s+/g, "_")}_${Date.now()}.xlsx`,
+          filename: `relatorio_${(entity?.name ?? "entidade").replace(/\s+/g, "_")}_${Date.now()}.xlsx`,
         };
       }),
 
@@ -959,11 +867,9 @@ export const appRouter = router({
         try {
           console.log("[PDF Export] Iniciando exportação para entityId:", input.entityId);
           
+          await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
           const entity = await db.getEntityById(input.entityId);
-          if (!entity || entity.userId !== ctx.user.id) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-          }
-          console.log("[PDF Export] Entidade encontrada:", entity.name);
+          console.log("[PDF Export] Entidade encontrada:", entity?.name);
 
           // Processar datas corretamente (formato YYYY-MM-DD vem do frontend)
           let startDate: Date | undefined;
@@ -1037,7 +943,7 @@ export const appRouter = router({
 
           console.log("[PDF Export] Gerando PDF...");
           const buffer = await exportUtils.generateTransactionsPDF({
-            entityName: entity.name,
+            entityName: entity?.name ?? "",
             transactions,
             summary,
             period: input.period,
@@ -1052,7 +958,7 @@ export const appRouter = router({
 
           return {
             data: buffer.toString("base64"),
-            filename: `relatorio_${entity.name.replace(/\s+/g, "_")}_${Date.now()}.pdf`,
+            filename: `relatorio_${(entity?.name ?? "entidade").replace(/\s+/g, "_")}_${Date.now()}.pdf`,
           };
         } catch (error) {
           console.error("[PDF Export] Erro ao exportar PDF:", error);
@@ -1076,11 +982,9 @@ export const appRouter = router({
         try {
           console.log("[ZIP Export] Iniciando exportação de anexos para entityId:", input.entityId);
           
+          await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
           const entity = await db.getEntityById(input.entityId);
-          if (!entity || entity.userId !== ctx.user.id) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-          }
-          console.log("[ZIP Export] Entidade encontrada:", entity.name);
+          console.log("[ZIP Export] Entidade encontrada:", entity?.name);
 
           // Converter datas corretamente (formato YYYY-MM-DD)
           // Usar UTC para consistência com como as transações são salvas
@@ -1124,14 +1028,14 @@ export const appRouter = router({
 
           console.log("[ZIP Export] Gerando ZIP...");
           const buffer = await exportUtils.generateAttachmentsZip({
-            entityName: entity.name,
+            entityName: entity?.name ?? "",
             attachments,
           });
           console.log("[ZIP Export] ZIP gerado com sucesso. Tamanho:", buffer.length, "bytes");
 
           return {
             data: buffer.toString("base64"),
-            filename: `anexos_${entity.name.replace(/\s+/g, "_")}_${Date.now()}.zip`,
+            filename: `anexos_${(entity?.name ?? "entidade").replace(/\s+/g, "_")}_${Date.now()}.zip`,
           };
         } catch (error) {
           console.error("[ZIP Export] Erro ao exportar anexos:", error);
@@ -1153,10 +1057,7 @@ export const appRouter = router({
         if (!transaction) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
         }
-        const entity = await db.getEntityById(transaction.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(transaction.entityId, ctx.user.id, "VIEWER");
         return await db.getAttachmentsByTransactionId(input.transactionId);
       }),
 
@@ -1177,10 +1078,7 @@ export const appRouter = router({
         if (!transaction) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
         }
-        const entity = await db.getEntityById(transaction.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(transaction.entityId, ctx.user.id, "EDITOR");
         const attachmentId = await db.createAttachment(input);
         return { id: attachmentId };
       }),
@@ -1197,10 +1095,7 @@ export const appRouter = router({
         if (!transaction) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
         }
-        const entity = await db.getEntityById(transaction.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(transaction.entityId, ctx.user.id, "ADMIN");
         await db.deleteAttachment(input.id);
         return { success: true };
       }),
@@ -1222,10 +1117,7 @@ export const appRouter = router({
         if (!transaction) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Transaction not found" });
         }
-        const entity = await db.getEntityById(transaction.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(transaction.entityId, ctx.user.id, "EDITOR");
         await db.updateAttachmentType(input.id, input.type);
         return { success: true };
       }),
@@ -1237,10 +1129,7 @@ export const appRouter = router({
       .input(z.object({ entityId: z.number() }))
       .query(async ({ input, ctx }) => {
         // Verify entity belongs to user
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         return await db.getInvestmentsByEntity(input.entityId);
       }),
 
@@ -1252,10 +1141,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
         }
         // Verify investment belongs to user
-        const entity = await db.getEntityById(investment.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(investment.entityId, ctx.user.id, "VIEWER");
         return investment;
       }),
 
@@ -1280,14 +1166,8 @@ export const appRouter = router({
         
         try {
           console.log('[investments.create] Verificando entidade...');
-          // Verify entity belongs to user
-          const entity = await db.getEntityById(input.entityId);
-          console.log('[investments.create] Entidade:', entity);
-          
-          if (!entity || entity.userId !== ctx.user.id) {
-            console.log('[investments.create] ERRO: Acesso negado');
-            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-          }
+          // Verify entity access (RBAC)
+          await requireEntityAccess(input.entityId, ctx.user.id, "EDITOR");
 
           console.log('[investments.create] Criando investimento...');
           const investment = await db.createInvestment({
@@ -1325,10 +1205,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
         }
         // Verify investment belongs to user
-        const entity = await db.getEntityById(investment.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(investment.entityId, ctx.user.id, "EDITOR");
         return await db.updateInvestment(id, data);
       }),
 
@@ -1340,10 +1217,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
         }
         // Verify investment belongs to user
-        const entity = await db.getEntityById(investment.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(investment.entityId, ctx.user.id, "ADMIN");
         await db.deleteInvestment(input.id);
         return { success: true };
       }),
@@ -1352,10 +1226,7 @@ export const appRouter = router({
       .input(z.object({ entityId: z.number() }))
       .query(async ({ input, ctx }) => {
         // Verify entity belongs to user
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         return await db.getInvestmentsSummary(input.entityId);
       }),
 
@@ -1363,10 +1234,7 @@ export const appRouter = router({
       .input(z.object({ entityId: z.number() }))
       .query(async ({ input, ctx }) => {
         // Verify entity belongs to user
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         return await db.getPortfolioDistribution(input.entityId);
       }),
 
@@ -1378,10 +1246,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
         }
         // Verify investment belongs to user
-        const entity = await db.getEntityById(investment.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(investment.entityId, ctx.user.id, "VIEWER");
         return await db.getInvestmentHistory(input.investmentId, input.days);
       }),
 
@@ -1393,10 +1258,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
         }
         // Verify investment belongs to user
-        const entity = await db.getEntityById(investment.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(investment.entityId, ctx.user.id, "VIEWER");
         return await db.getInvestmentTransactions(input.investmentId);
       }),
 
@@ -1419,10 +1281,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
         }
         // Verify investment belongs to user
-        const entity = await db.getEntityById(investment.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(investment.entityId, ctx.user.id, "EDITOR");
         return await db.addInvestmentTransaction({
           ...input,
           date: new Date(input.date),
@@ -1437,10 +1296,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Investment not found" });
         }
         // Verify investment belongs to user
-        const entity = await db.getEntityById(investment.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(investment.entityId, ctx.user.id, "ADMIN");
 
         // Import scraper dynamically to avoid circular dependencies
         const scraper = await import("./services/investment-scraper");
@@ -1460,10 +1316,7 @@ export const appRouter = router({
       .input(z.object({ entityId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         // Verify entity belongs to user
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
         // Import scraper dynamically
         const scraper = await import("./services/investment-scraper");
@@ -1481,10 +1334,7 @@ export const appRouter = router({
     getByEntity: protectedProcedure
       .input(z.object({ entityId: z.number() }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         const result = await db.getTreasurySelicByEntity(input.entityId);
         return result && result.length > 0 ? result[0] : null;
       }),
@@ -1498,10 +1348,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         const result = await db.createOrUpdateTreasurySelic(input.entityId, {
           quantity: input.quantity,
           initialPrice: input.initialPrice,
@@ -1512,20 +1359,14 @@ export const appRouter = router({
     updatePrice: protectedProcedure
       .input(z.object({ entityId: z.number(), currentPrice: z.number() }))
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         const result = await db.updateTreasurySelicPrice(input.entityId, input.currentPrice);
         return result && result.length > 0 ? result[0] : null;
       }),
     fetchLatestPrice: protectedProcedure
       .input(z.object({ entityId: z.number() }))
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         
         try {
           const { fetchTreasurySelicPrice } = await import("../services/treasury-selic-scraper");
@@ -1547,10 +1388,7 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ entityId: z.number() }))
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         return database.delete(treasurySelic).where(eq(treasurySelic.entityId, input.entityId)).returning();
@@ -1622,10 +1460,7 @@ export const appRouter = router({
     list: protectedProcedure
       .input(z.object({ entityId: z.number() }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         const { getRentalsByEntityId } = await import("./db-rentals");
         return await getRentalsByEntityId(input.entityId);
       }),
@@ -1633,10 +1468,7 @@ export const appRouter = router({
     getConfig: protectedProcedure
       .input(z.object({ entityId: z.number() }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         const { getRentalConfigByEntityId } = await import("./db-rentals");
         return await getRentalConfigByEntityId(input.entityId);
       }),
@@ -1664,10 +1496,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         const { createRental } = await import("./db-rentals");
         return await createRental({
           ...input,
@@ -1834,10 +1663,7 @@ export const appRouter = router({
     listByEntity: protectedProcedure
       .input(z.object({ entityId: z.number() }))
       .query(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         return await db.getTasksByEntityId(input.entityId);
       }),
 
@@ -1877,10 +1703,7 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         if (input.entityId) {
-          const entity = await db.getEntityById(input.entityId);
-          if (!entity || entity.userId !== ctx.user.id) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-          }
+          await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         }
         // Se for recorrente, criar múltiplas tarefas
         if (input.isRecurring && input.recurrenceCount && input.recurrenceFrequency) {
@@ -2007,10 +1830,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         if (input.entityId) {
-          const entity = await db.getEntityById(input.entityId);
-          if (!entity || entity.userId !== ctx.user.id) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-          }
+          await requireEntityAccess(input.entityId, ctx.user.id, "EDITOR");
         }
         
         const { id, updateAll, ...updateData } = input;
@@ -2160,10 +1980,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o dono da entidade pode criar convites" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "OWNER");
 
         // Gera token único
         const { randomUUID } = await import("crypto");
@@ -2295,10 +2112,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o dono pode alterar roles" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "OWNER");
         await db.updateEntityMemberRole(input.entityId, input.userId, input.role);
         return { success: true };
       }),
@@ -2337,10 +2151,7 @@ export const appRouter = router({
     revokeInvite: protectedProcedure
       .input(z.object({ inviteId: z.number(), entityId: z.number() }))
       .mutation(async ({ input, ctx }) => {
-        const entity = await db.getEntityById(input.entityId);
-        if (!entity || entity.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o dono pode revogar convites" });
-        }
+        await requireEntityAccess(input.entityId, ctx.user.id, "OWNER");
         await db.revokeEntityInvite(input.inviteId);
         return { success: true };
       }),

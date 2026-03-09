@@ -1741,12 +1741,20 @@ export async function getSharedEntitiesForUser(userId: number) {
   const db = await getDb();
   if (!db) return [];
 
+  // Retorna todos os campos da entidade + role do membro em uma única query (sem N+1)
   return await db
     .select({
       id: entities.id,
-      name: entities.name,
+      organizationId: entities.organizationId,
       userId: entities.userId,
-      role: entityMembers.role,
+      name: entities.name,
+      description: entities.description,
+      color: entities.color,
+      displayOrder: entities.displayOrder,
+      temporaryRentalEnabled: entities.temporaryRentalEnabled,
+      createdAt: entities.createdAt,
+      updatedAt: entities.updatedAt,
+      sharedRole: entityMembers.role,
     })
     .from(entityMembers)
     .innerJoin(entities, eq(entityMembers.entityId, entities.id))

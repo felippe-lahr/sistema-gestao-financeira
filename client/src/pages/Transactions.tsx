@@ -93,6 +93,12 @@ export default function Transactions() {
     setSelectedEntityId(entities[0].id);
   }
 
+  // Calcular role do usuário na entidade selecionada
+  const selectedEntity = entities?.find((e) => e.id === selectedEntityId);
+  const myRole = (selectedEntity as any)?.sharedRole ?? "OWNER"; // null sharedRole = é dono
+  const canWrite = myRole === "OWNER" || myRole === "ADMIN" || myRole === "EDITOR";
+  const canDelete = myRole === "OWNER" || myRole === "ADMIN";
+
   // Fetch transactions with filters
   const { data: transactions, isLoading: transactionsLoading } = trpc.transactions.listByEntity.useQuery(
     {
@@ -709,10 +715,12 @@ export default function Transactions() {
             </SheetContent>
           </Sheet>
           
+          {canWrite && (
           <Button className="w-full md:w-auto" onClick={() => setIsCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nova Transação
           </Button>
+          )}
 
           <Sheet open={isCreateOpen} onOpenChange={(open) => {
             setIsCreateOpen(open);
@@ -1281,12 +1289,16 @@ export default function Transactions() {
                             {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
                           </p>
                         </div>
+                        {canWrite && (
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(transaction)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
+                        )}
+                        {canDelete && (
                         <Button variant="ghost" size="icon" onClick={() => handleDelete(transaction.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
+                        )}
                       </div>
                     </div>
 
@@ -1311,9 +1323,11 @@ export default function Transactions() {
                             </div>
                           </div>
                         </div>
+                        {canWrite && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleEdit(transaction)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
+                        )}
                       </div>
 
                       {/* Row 2: Category Badge */}
@@ -1335,9 +1349,11 @@ export default function Transactions() {
                         <p className={`text-base font-bold ${transaction.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
                           {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
                         </p>
+                        {canDelete && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleDelete(transaction.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>

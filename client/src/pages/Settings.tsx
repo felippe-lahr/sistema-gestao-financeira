@@ -23,6 +23,12 @@ export default function Settings() {
     setSelectedEntityId(entities[0].id);
   }
 
+  // Calcular role do usuário na entidade selecionada
+  const selectedEntity = entities?.find((e) => e.id === selectedEntityId);
+  const myRole = (selectedEntity as any)?.sharedRole ?? "OWNER";
+  const canWrite = myRole === "OWNER" || myRole === "ADMIN" || myRole === "EDITOR";
+  const canDeleteSettings = myRole === "OWNER" || myRole === "ADMIN";
+
   if (entitiesLoading) {
     return (
       <div className="container py-8">
@@ -93,15 +99,13 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="accounts" className="mt-6">
-          {selectedEntityId && <BankAccountsTab entityId={selectedEntityId} />}
+           {selectedEntityId && <BankAccountsTab entityId={selectedEntityId} canWrite={canWrite} canDelete={canDeleteSettings} />}
         </TabsContent>
-
         <TabsContent value="payments" className="mt-6">
-          {selectedEntityId && <PaymentMethodsTab entityId={selectedEntityId} />}
+          {selectedEntityId && <PaymentMethodsTab entityId={selectedEntityId} canWrite={canWrite} canDelete={canDeleteSettings} />}
         </TabsContent>
-
         <TabsContent value="categories" className="mt-6">
-          {selectedEntityId && <CategoriesTab entityId={selectedEntityId} />}
+          {selectedEntityId && <CategoriesTab entityId={selectedEntityId} canWrite={canWrite} canDelete={canDeleteSettings} />}
         </TabsContent>
       </Tabs>
     </div>
@@ -109,7 +113,7 @@ export default function Settings() {
 }
 
 // ========== BANK ACCOUNTS TAB ==========
-function BankAccountsTab({ entityId }: { entityId: number }) {
+function BankAccountsTab({ entityId, canWrite = true, canDelete = true }: { entityId: number; canWrite?: boolean; canDelete?: boolean }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
@@ -236,10 +240,12 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
         <p className="text-sm text-muted-foreground">
           {accounts?.length || 0} conta(s) cadastrada(s)
         </p>
+        {canWrite && (
         <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
           <Plus className="mr-2 h-4 w-4" />
           Nova Conta
         </Button>
+        )}
 
         <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
@@ -348,6 +354,7 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
                       <p className="text-sm text-muted-foreground">Saldo</p>
                       <p className="text-lg font-bold">{formatCurrency(account.balance)}</p>
                     </div>
+                    {canWrite && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -355,6 +362,8 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
+                    )}
+                    {canDelete && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -363,6 +372,7 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -450,7 +460,7 @@ function BankAccountsTab({ entityId }: { entityId: number }) {
 }
 
 // ========== PAYMENT METHODS TAB ==========
-function PaymentMethodsTab({ entityId }: { entityId: number }) {
+function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { entityId: number; canWrite?: boolean; canDelete?: boolean }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState<any>(null);
@@ -577,10 +587,12 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
         <p className="text-sm text-muted-foreground">
           {methods?.length || 0} meio(s) de pagamento cadastrado(s)
         </p>
+        {canWrite && (
         <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
           <Plus className="mr-2 h-4 w-4" />
           Novo Meio de Pagamento
         </Button>
+        )}
 
         <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
@@ -679,6 +691,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {canWrite && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -686,6 +699,8 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
+                    )}
+                    {canDelete && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -694,6 +709,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -778,7 +794,7 @@ function PaymentMethodsTab({ entityId }: { entityId: number }) {
 }
 
 // ========== CATEGORIES TAB ==========
-function CategoriesTab({ entityId }: { entityId: number }) {
+function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entityId: number; canWrite?: boolean; canDelete?: boolean }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
@@ -890,10 +906,12 @@ function CategoriesTab({ entityId }: { entityId: number }) {
         <p className="text-sm text-muted-foreground">
           {categories?.length || 0} categoria(s) cadastrada(s)
         </p>
+        {canWrite && (
         <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
           <Plus className="mr-2 h-4 w-4" />
           Nova Categoria
         </Button>
+        )}
 
         <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
@@ -973,7 +991,8 @@ function CategoriesTab({ entityId }: { entityId: number }) {
                       />
                       <span className="font-medium">{category.name}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2">
+                      {canWrite && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -981,6 +1000,8 @@ function CategoriesTab({ entityId }: { entityId: number }) {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
+                      )}
+                      {canDelete && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -989,6 +1010,7 @@ function CategoriesTab({ entityId }: { entityId: number }) {
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -996,7 +1018,6 @@ function CategoriesTab({ entityId }: { entityId: number }) {
             ))
           )}
         </div>
-
         {/* Despesas */}
         <div className="space-y-3">
           <h3 className="font-semibold text-lg">Despesas</h3>
@@ -1019,6 +1040,7 @@ function CategoriesTab({ entityId }: { entityId: number }) {
                       <span className="font-medium">{category.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
+                      {canWrite && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1026,6 +1048,8 @@ function CategoriesTab({ entityId }: { entityId: number }) {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
+                      )}
+                      {canDelete && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1034,6 +1058,7 @@ function CategoriesTab({ entityId }: { entityId: number }) {
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
