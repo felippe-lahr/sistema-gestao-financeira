@@ -194,9 +194,9 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
 
   return (
     <Drawer open={open} onOpenChange={handleClose} direction="right">
-      <DrawerContent className="w-full sm:max-w-lg flex flex-col h-full">
+      <DrawerContent className="w-full sm:w-[600px] flex flex-col h-full">
         {/* Header fixo */}
-        <DrawerHeader className="border-b px-6 py-4 flex-shrink-0">
+        <DrawerHeader className="border-b px-8 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-muted-foreground" />
@@ -217,7 +217,7 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
 
         {/* Conteúdo com scroll */}
         <ScrollArea className="flex-1 overflow-y-auto">
-          <div className="px-6 py-5 space-y-6">
+          <div className="px-8 py-6 space-y-6">
 
             {/* Seção: Gerar Convite */}
             <div className="space-y-4">
@@ -479,7 +479,7 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
         </ScrollArea>
 
         {/* Footer fixo */}
-        <DrawerFooter className="border-t px-6 py-4 flex-shrink-0">
+        <DrawerFooter className="border-t px-8 py-4 flex-shrink-0">
           <DrawerClose asChild>
             <Button variant="outline" className="w-full">
               Fechar
