@@ -115,26 +115,22 @@ export function RentalAttachmentUploader({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDownload = async (attachment: RentalAttachment) => {
-    try {
-      const response = await fetch(attachment.blobUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = attachment.filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Erro ao baixar arquivo:', error);
+  const handleDownload = (attachment: RentalAttachment) => {
+    // Usar rota do servidor que gera URL pré-assinada do S3
+    if (attachment.id && attachment.id < 1_000_000_000_000) {
+      window.open(`/api/rental-attachments/${attachment.id}/download`, '_blank');
+    } else {
       window.open(attachment.blobUrl, '_blank');
     }
   };
 
   const handlePreview = (attachment: RentalAttachment) => {
-    window.open(attachment.blobUrl, '_blank', 'noopener,noreferrer');
+    // Usar rota do servidor que gera URL pré-assinada do S3
+    if (attachment.id && attachment.id < 1_000_000_000_000) {
+      window.open(`/api/rental-attachments/${attachment.id}/preview`, '_blank', 'noopener,noreferrer');
+    } else {
+      window.open(attachment.blobUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   return (

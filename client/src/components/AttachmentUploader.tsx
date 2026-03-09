@@ -115,27 +115,24 @@ export function AttachmentUploader({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDownload = async (attachment: Attachment) => {
-    try {
-      const response = await fetch(attachment.blobUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = attachment.filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Erro ao baixar arquivo:', error);
-      // Fallback: abrir em nova aba
+  const handleDownload = (attachment: Attachment) => {
+    // Usar rota do servidor que gera URL pré-assinada do S3
+    // IDs temporários (criados com Date.now()) são maiores que 1 trilhão
+    if (attachment.id && attachment.id < 1_000_000_000_000) {
+      window.open(`/api/attachments/${attachment.id}/download`, '_blank');
+    } else {
+      // Fallback para attachments ainda não salvos no banco
       window.open(attachment.blobUrl, '_blank');
     }
   };
 
   const handlePreview = (attachment: Attachment) => {
-    window.open(attachment.blobUrl, '_blank', 'noopener,noreferrer');
+    // Usar rota do servidor que gera URL pré-assinada do S3
+    if (attachment.id && attachment.id < 1_000_000_000_000) {
+      window.open(`/api/attachments/${attachment.id}/preview`, '_blank', 'noopener,noreferrer');
+    } else {
+      window.open(attachment.blobUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   return (

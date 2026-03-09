@@ -1005,7 +1005,11 @@ export default function Rentals() {
                   }
                 }}
                 onPreview={(attachment) => {
-                  window.open(attachment.blobUrl, "_blank");
+                  if (attachment.id && attachment.id < 1_000_000_000_000) {
+                    window.open(`/api/rental-attachments/${attachment.id}/preview`, "_blank");
+                  } else {
+                    window.open(attachment.blobUrl, "_blank");
+                  }
                 }}
               />
             </div>
@@ -1352,7 +1356,11 @@ export default function Rentals() {
                   }
                 }}
                 onPreview={(attachment) => {
-                  window.open(attachment.blobUrl, "_blank");
+                  if (attachment.id && attachment.id < 1_000_000_000_000) {
+                    window.open(`/api/rental-attachments/${attachment.id}/preview`, "_blank");
+                  } else {
+                    window.open(attachment.blobUrl, "_blank");
+                  }
                 }}
               />
             </div>
