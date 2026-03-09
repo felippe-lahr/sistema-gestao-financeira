@@ -618,7 +618,7 @@ export async function generateAttachmentsZip(data: {
 }): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     const archive = archiver("zip", {
-      zlib: { level: 9 }, // Máxima compressão
+      zlib: { level: 6 }, // Compressão padrão (compatível com macOS Archive Utility)
     });
 
     const chunks: Buffer[] = [];
@@ -639,25 +639,33 @@ export async function generateAttachmentsZip(data: {
     }
 
     // Adicionar arquivos ao ZIP organizados por tipo
+    let filesAdded = 0;
     for (const [type, typeAttachments] of Object.entries(attachmentsByType)) {
       const folderName = type.replace(/_/g, " ");
+      console.log(`[ZIP] Processando tipo: ${type} (${typeAttachments.length} anexos)`);
       
       for (const attachment of typeAttachments) {
         try {
+          console.log(`[ZIP] Baixando anexo ${attachment.id}: ${attachment.blobUrl}`);
           // Gerar URL de acesso: pré-assinada para S3 (bucket privado) ou URL direta para Supabase
           let downloadUrl = attachment.blobUrl;
           if (isS3Configured() && attachment.blobUrl.includes("amazonaws.com")) {
             downloadUrl = await getPresignedUrl(attachment.blobUrl, 300); // 5 minutos
+            console.log(`[ZIP] URL pré-assinada gerada para anexo ${attachment.id}`);
+          } else {
+            console.log(`[ZIP] Usando URL direta para anexo ${attachment.id} (não é S3)`);
           }
 
           const response = await fetch(downloadUrl);
+          console.log(`[ZIP] Resposta para anexo ${attachment.id}: ${response.status} ${response.statusText}`);
           if (!response.ok) {
-            console.error(`Erro ao baixar anexo ${attachment.id}: ${response.status} ${response.statusText}`);
+            console.error(`[ZIP] Erro ao baixar anexo ${attachment.id}: ${response.status} ${response.statusText}`);
             continue;
           }
 
           const arrayBuffer = await response.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
+          console.log(`[ZIP] Anexo ${attachment.id} baixado: ${buffer.length} bytes`);
 
           // Criar nome de arquivo seguro com ID do anexo para garantir unicidade
           const transactionDesc = attachment.transactionDescription
@@ -671,13 +679,16 @@ export async function generateAttachmentsZip(data: {
           archive.append(buffer, { 
             name: `${folderName}/${safeFilename}` 
           });
+          filesAdded++;
+          console.log(`[ZIP] Arquivo adicionado: ${folderName}/${safeFilename}`);
         } catch (error) {
-          console.error(`Erro ao processar anexo ${attachment.id}:`, error);
+          console.error(`[ZIP] Erro ao processar anexo ${attachment.id}:`, error);
         }
       }
     }
 
     // Finalizar o ZIP
+    console.log(`[ZIP] Finalizando arquivo com ${filesAdded} arquivos adicionados`);
     archive.finalize();
   });
 }
