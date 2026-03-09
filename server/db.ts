@@ -1741,24 +1741,34 @@ export async function getSharedEntitiesForUser(userId: number) {
   const db = await getDb();
   if (!db) return [];
 
-  // Retorna todos os campos da entidade + role do membro em uma única query (sem N+1)
-  return await db
-    .select({
-      id: entities.id,
-      organizationId: entities.organizationId,
-      userId: entities.userId,
-      name: entities.name,
-      description: entities.description,
-      color: entities.color,
-      displayOrder: entities.displayOrder,
-      temporaryRentalEnabled: entities.temporaryRentalEnabled,
-      createdAt: entities.createdAt,
-      updatedAt: entities.updatedAt,
-      sharedRole: entityMembers.role,
-    })
-    .from(entityMembers)
-    .innerJoin(entities, eq(entityMembers.entityId, entities.id))
-    .where(eq(entityMembers.userId, userId));
+  try {
+    // Retorna todos os campos da entidade + role do membro em uma única query (sem N+1)
+    return await db
+      .select({
+        id: entities.id,
+        organizationId: entities.organizationId,
+        userId: entities.userId,
+        name: entities.name,
+        description: entities.description,
+        color: entities.color,
+        displayOrder: entities.displayOrder,
+        temporaryRentalEnabled: entities.temporaryRentalEnabled,
+        createdAt: entities.createdAt,
+        updatedAt: entities.updatedAt,
+        sharedRole: entityMembers.role,
+      })
+      .from(entityMembers)
+      .innerJoin(entities, eq(entityMembers.entityId, entities.id))
+      .where(eq(entityMembers.userId, userId));
+  } catch (err: any) {
+    // Se a tabela ainda não existe (migração pendente), retorna lista vazia
+    const msg: string = err?.message ?? '';
+    if (msg.includes('entity_members') || err?.code === '42P01') {
+      console.warn('[db] entity_members table not found, returning empty shared entities');
+      return [];
+    }
+    throw err;
+  }
 }
 
 // ========== ENTITY INVITE OPERATIONS ==========
@@ -1865,4 +1875,62 @@ export async function isEntityMember(entityId: number, userId: number): Promise<
     .where(and(eq(entityMembers.entityId, entityId), eq(entityMembers.userId, userId)))
     .limit(1);
   return result.length > 0;
+}
+
+// ========== SCHEMA INITIALIZATION ==========
+/**
+ * Garante que as tabelas de compartilhamento de entidades existam no banco.
+ * Executado no startup do servidor para garantir compatibilidade com bancos
+ * que ainda não passaram pela migração do drizzle-kit push.
+ */
+export async function ensureEntitySharingTables(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  try {
+    // Verificar se as tabelas já existem
+    const client = postgres(process.env.DATABASE_URL!);
+    
+    await client`
+      CREATE TYPE IF NOT EXISTS "entity_member_role" AS ENUM ('VIEWER', 'EDITOR', 'ADMIN', 'OWNER');
+    `;
+
+    await client`
+      CREATE TYPE IF NOT EXISTS "invite_status" AS ENUM ('PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED');
+    `;
+
+    await client`
+      CREATE TABLE IF NOT EXISTS "entity_members" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "entityId" integer NOT NULL REFERENCES "entities"("id") ON DELETE CASCADE,
+        "userId" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "role" "entity_member_role" NOT NULL DEFAULT 'VIEWER',
+        "invitedBy" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "joinedAt" timestamp DEFAULT now() NOT NULL,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        UNIQUE("entityId", "userId")
+      );
+    `;
+
+    await client`
+      CREATE TABLE IF NOT EXISTS "entity_invites" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "entityId" integer NOT NULL REFERENCES "entities"("id") ON DELETE CASCADE,
+        "invitedBy" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "email" varchar(320),
+        "role" "entity_member_role" NOT NULL DEFAULT 'VIEWER',
+        "token" varchar(128) NOT NULL UNIQUE,
+        "status" "invite_status" NOT NULL DEFAULT 'PENDING',
+        "expiresAt" timestamp NOT NULL,
+        "acceptedAt" timestamp,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+    `;
+
+    await client.end();
+    console.log('[db] Entity sharing tables ensured');
+  } catch (err: any) {
+    // Não bloquear o startup se falhar
+    console.warn('[db] Could not ensure entity sharing tables:', err?.message);
+  }
 }

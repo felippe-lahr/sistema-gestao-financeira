@@ -14,6 +14,7 @@ import { registerUploadRoutes } from "./upload-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
+import { ensureEntitySharingTables } from "../db";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -147,6 +148,9 @@ async function startServer() {
     console.log('[Security] CORS protection enabled');
     console.log('[Security] Rate limiting enabled');
   });
+
+  // Garantir que as tabelas de compartilhamento existam (migração segura)
+  await ensureEntitySharingTables();
 
   // Start cron jobs
   startCronJobs();
