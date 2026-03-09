@@ -116,9 +116,14 @@ export function RentalAttachmentUploader({
   };
 
   const handleDownload = (attachment: RentalAttachment) => {
-    // Usar rota do servidor que gera URL pré-assinada do S3
     if (attachment.id && attachment.id < 1_000_000_000_000) {
-      window.open(`/api/rental-attachments/${attachment.id}/download`, '_blank');
+      // Rota do servidor faz streaming com Content-Disposition: attachment
+      const a = document.createElement('a');
+      a.href = `/api/rental-attachments/${attachment.id}/download`;
+      a.download = attachment.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } else {
       window.open(attachment.blobUrl, '_blank');
     }

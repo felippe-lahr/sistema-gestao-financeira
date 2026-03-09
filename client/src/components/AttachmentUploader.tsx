@@ -116,10 +116,14 @@ export function AttachmentUploader({
   };
 
   const handleDownload = (attachment: Attachment) => {
-    // Usar rota do servidor que gera URL pré-assinada do S3
-    // IDs temporários (criados com Date.now()) são maiores que 1 trilhão
     if (attachment.id && attachment.id < 1_000_000_000_000) {
-      window.open(`/api/attachments/${attachment.id}/download`, '_blank');
+      // Rota do servidor faz streaming com Content-Disposition: attachment
+      const a = document.createElement('a');
+      a.href = `/api/attachments/${attachment.id}/download`;
+      a.download = attachment.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } else {
       // Fallback para attachments ainda não salvos no banco
       window.open(attachment.blobUrl, '_blank');
