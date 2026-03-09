@@ -1843,3 +1843,18 @@ export async function revokeEntityInvite(inviteId: number) {
     .delete(entityInvites)
     .where(eq(entityInvites.id, inviteId));
 }
+
+// ========== ENTITY MEMBER CHECK ==========
+/**
+ * Verifica se um usuário já é membro de uma entidade (como membro compartilhado, não dono).
+ */
+export async function isEntityMember(entityId: number, userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db
+    .select({ id: entityMembers.id })
+    .from(entityMembers)
+    .where(and(eq(entityMembers.entityId, entityId), eq(entityMembers.userId, userId)))
+    .limit(1);
+  return result.length > 0;
+}

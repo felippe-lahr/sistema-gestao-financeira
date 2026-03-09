@@ -1,10 +1,17 @@
 /**
  * Modal de compartilhamento de entidade com RBAC.
  * Permite ao dono da entidade:
- * - Criar links de convite com roles específicos
+ * - Criar links de convite com email OBRIGATÓRIO e role específico
  * - Ver e gerenciar membros atuais
  * - Revogar convites pendentes
  * - Remover membros
+ *
+ * Fluxo do convidado:
+ * 1. Recebe o link por email/WhatsApp
+ * 2. Acessa o link /convite/:token
+ * 3. Se não tem conta: cria conta com nome + senha (email já vem do convite)
+ * 4. Se já tem conta: faz login
+ * 5. Convite é aceito automaticamente após autenticação
  */
 
 import { useState } from "react";
@@ -40,6 +47,8 @@ import {
   Eye,
   Edit,
   Crown,
+  Mail,
+  Info,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -83,6 +92,7 @@ interface EntitySharingModalProps {
 export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharingModalProps) {
   const [selectedRole, setSelectedRole] = useState<Role>("VIEWER");
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [linkExpiry, setLinkExpiry] = useState<Date | null>(null);
 
@@ -100,7 +110,7 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
       setGeneratedLink(link);
       setLinkExpiry(new Date(data.expiresAt));
       utils.entitySharing.listMembers.invalidate({ entityId: entity.id });
-      toast.success("Link de convite gerado com sucesso!");
+      toast.success("Link de convite gerado! Compartilhe com o convidado.");
     },
     onError: (error) => {
       toast.error("Erro ao gerar convite: " + error.message);
@@ -137,12 +147,27 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
     },
   });
 
+  const validateEmail = (value: string) => {
+    if (!value.trim()) {
+      setEmailError("O e-mail do convidado é obrigatório");
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value.trim())) {
+      setEmailError("Informe um e-mail válido");
+      return false;
+    }
+    setEmailError("");
+    return true;
+  };
+
   const handleGenerateLink = () => {
+    if (!validateEmail(email)) return;
     setGeneratedLink(null);
     createInviteMutation.mutate({
       entityId: entity.id,
       role: selectedRole,
-      email: email.trim() || undefined,
+      email: email.trim(),
     });
   };
 
@@ -156,6 +181,7 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
   const handleClose = () => {
     setGeneratedLink(null);
     setEmail("");
+    setEmailError("");
     setSelectedRole("VIEWER");
     onOpenChange(false);
   };
@@ -169,7 +195,8 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
             Compartilhar: {entity.name}
           </DialogTitle>
           <DialogDescription>
-            Convide pessoas para acessar esta entidade com diferentes níveis de permissão.
+            Convide pessoas para acessar esta entidade. O convidado receberá um link para criar
+            sua conta ou fazer login.
           </DialogDescription>
         </DialogHeader>
 
@@ -180,16 +207,36 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
             Gerar Link de Convite
           </h3>
 
+          {/* Aviso informativo */}
+          <div className="flex gap-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-800 dark:text-blue-200">
+            <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <p>
+              O e-mail é obrigatório para identificar o convidado. Ao acessar o link, ele poderá
+              <strong> criar uma conta com senha própria</strong> ou fazer login se já tiver cadastro.
+            </p>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="invite-email">E-mail do convidado (opcional)</Label>
+              <Label htmlFor="invite-email" className="flex items-center gap-1">
+                <Mail className="h-3 w-3" />
+                E-mail do convidado <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="invite-email"
                 type="email"
                 placeholder="contador@exemplo.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) validateEmail(e.target.value);
+                }}
+                onBlur={() => email && validateEmail(email)}
+                className={emailError ? "border-destructive focus-visible:ring-destructive" : ""}
               />
+              {emailError && (
+                <p className="text-xs text-destructive">{emailError}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -248,7 +295,7 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
                   readOnly
                   className="font-mono text-xs bg-white dark:bg-gray-900"
                 />
-                <Button size="sm" variant="outline" onClick={handleCopyLink}>
+                <Button size="sm" variant="outline" onClick={handleCopyLink} title="Copiar link">
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
@@ -259,7 +306,8 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
-                Compartilhe este link com a pessoa que você quer convidar. O link é válido por 7 dias.
+                Envie este link para <strong>{email}</strong>. Ao acessar, o convidado poderá
+                criar sua conta ou fazer login para aceitar o convite.
               </p>
             </div>
           )}
@@ -305,7 +353,7 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{member.userName || "Usuário"}</p>
+                        <p className="font-medium text-sm">{member.userName || "Sem nome"}</p>
                         <p className="text-xs text-muted-foreground">{member.userEmail}</p>
                       </div>
                     </div>
@@ -342,6 +390,7 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
                           })
                         }
                         disabled={removeMemberMutation.isPending}
+                        title="Remover membro"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -369,7 +418,8 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
               {sharingData.invites.map((invite) => (
                 <div key={invite.id} className="flex items-center justify-between p-3 border rounded-lg border-dashed">
                   <div>
-                    <p className="text-sm font-medium">
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <Mail className="h-3 w-3 text-muted-foreground" />
                       {invite.email || "Link sem e-mail específico"}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -392,6 +442,7 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
                         })
                       }
                       disabled={revokeInviteMutation.isPending}
+                      title="Revogar convite"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

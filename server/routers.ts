@@ -2206,6 +2206,7 @@ export const appRouter = router({
           entityName: invite.entityName,
           inviterName: invite.inviterName,
           inviterEmail: invite.inviterEmail,
+          inviteEmail: invite.email,
           role: invite.role,
           expiresAt: invite.expiresAt,
         };

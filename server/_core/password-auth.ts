@@ -4,6 +4,7 @@ import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 
 export function registerPasswordAuthRoutes(app: Express) {
   // Login com email e senha
@@ -111,6 +112,199 @@ export function registerPasswordAuthRoutes(app: Express) {
     } catch (error) {
       console.error("[Password Auth] Setup password failed", error);
       res.status(500).json({ error: "Erro ao configurar senha" });
+    }
+  });
+
+  // Registro de novo usuário via convite
+  // Fluxo: token de convite válido + email + nome + senha => cria conta + aceita convite + faz login
+  app.post("/api/auth/register-invite", async (req: Request, res: Response) => {
+    try {
+      const { token, name, password } = req.body;
+
+      if (!token || !name || !password) {
+        res.status(400).json({ error: "Token, nome e senha são obrigatórios" });
+        return;
+      }
+
+      if (password.length < 6) {
+        res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
+        return;
+      }
+
+      // Validar o convite pelo token
+      const invite = await db.getEntityInviteByToken(token);
+      if (!invite) {
+        res.status(404).json({ error: "Convite não encontrado ou inválido" });
+        return;
+      }
+      if (invite.status !== "PENDING") {
+        res.status(400).json({ error: "Este convite já foi utilizado" });
+        return;
+      }
+      if (new Date() > new Date(invite.expiresAt)) {
+        res.status(400).json({ error: "Este convite expirou" });
+        return;
+      }
+
+      // O email vem do convite (obrigatório)
+      const email = invite.email;
+      if (!email) {
+        res.status(400).json({ error: "Este convite não possui email associado" });
+        return;
+      }
+
+      // Verificar se o email já está cadastrado
+      const existingUser = await db.getUserByEmail(email);
+      if (existingUser) {
+        res.status(409).json({ error: "Este email já possui uma conta. Faça login para aceitar o convite.", emailExists: true });
+        return;
+      }
+
+      // Criar novo usuário com openId único
+      const openId = `local_${randomUUID().replace(/-/g, "")}`;
+      await db.upsertUser({
+        openId,
+        name,
+        email,
+        loginMethod: "password",
+        lastSignedIn: new Date(),
+      });
+
+      const newUser = await db.getUserByEmail(email);
+      if (!newUser) {
+        res.status(500).json({ error: "Erro ao criar usuário" });
+        return;
+      }
+
+      // Definir senha
+      const passwordHash = await bcrypt.hash(password, 10);
+      await db.setUserPassword(newUser.id, passwordHash);
+
+      // Aceitar o convite: adicionar como membro da entidade
+      await db.addEntityMember({
+        entityId: invite.entityId,
+        userId: newUser.id,
+        role: invite.role,
+        invitedBy: invite.invitedBy,
+      });
+      await db.acceptEntityInvite(token);
+
+      // Criar sessão (24h)
+      const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+      const sessionToken = await sdk.createSessionToken(openId, {
+        name,
+        expiresInMs: TWENTY_FOUR_HOURS_MS,
+        rememberMe: false,
+      });
+
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: TWENTY_FOUR_HOURS_MS });
+
+      res.json({
+        success: true,
+        user: { id: newUser.id, name: newUser.name, email: newUser.email },
+        entityId: invite.entityId,
+      });
+    } catch (error) {
+      console.error("[Password Auth] Register invite failed", error);
+      res.status(500).json({ error: "Erro ao criar conta" });
+    }
+  });
+
+  // Aceitar convite com login (usuário já tem conta)
+  // Fluxo: token de convite válido + email + senha => faz login + aceita convite
+  app.post("/api/auth/login-accept-invite", async (req: Request, res: Response) => {
+    try {
+      const { token, email, password, rememberMe } = req.body;
+
+      if (!token || !email || !password) {
+        res.status(400).json({ error: "Token, email e senha são obrigatórios" });
+        return;
+      }
+
+      // Validar o convite
+      const invite = await db.getEntityInviteByToken(token);
+      if (!invite) {
+        res.status(404).json({ error: "Convite não encontrado ou inválido" });
+        return;
+      }
+      if (invite.status !== "PENDING") {
+        res.status(400).json({ error: "Este convite já foi utilizado" });
+        return;
+      }
+      if (new Date() > new Date(invite.expiresAt)) {
+        res.status(400).json({ error: "Este convite expirou" });
+        return;
+      }
+
+      // Verificar se o email bate com o do convite
+      if (invite.email && invite.email.toLowerCase() !== email.toLowerCase()) {
+        res.status(403).json({ error: "Este convite foi enviado para outro email" });
+        return;
+      }
+
+      // Login normal
+      const user = await db.getUserByEmail(email);
+      if (!user) {
+        res.status(401).json({ error: "Email ou senha incorretos" });
+        return;
+      }
+
+      const passwordHash = await db.getUserPassword(user.id);
+      if (!passwordHash) {
+        res.status(401).json({ error: "Usuário não possui senha configurada" });
+        return;
+      }
+
+      const isValid = await bcrypt.compare(password, passwordHash);
+      if (!isValid) {
+        res.status(401).json({ error: "Email ou senha incorretos" });
+        return;
+      }
+
+      // Verificar se já é membro
+      const isMember = await db.isEntityMember(invite.entityId, user.id);
+      if (!isMember) {
+        // Adicionar como membro
+        await db.addEntityMember({
+          entityId: invite.entityId,
+          userId: user.id,
+          role: invite.role,
+          invitedBy: invite.invitedBy,
+        });
+        await db.acceptEntityInvite(token);
+      }
+
+      // Atualizar último login
+      await db.upsertUser({
+        openId: user.openId,
+        name: user.name,
+        email: user.email,
+        loginMethod: "password",
+        lastSignedIn: new Date(),
+      });
+
+      const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+      const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+      const sessionDuration = rememberMe ? TWENTY_FOUR_HOURS_MS : THIRTY_MINUTES_MS;
+
+      const sessionToken = await sdk.createSessionToken(user.openId, {
+        name: user.name || "",
+        expiresInMs: sessionDuration,
+        rememberMe,
+      });
+
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: sessionDuration });
+
+      res.json({
+        success: true,
+        user: { id: user.id, name: user.name, email: user.email },
+        entityId: invite.entityId,
+      });
+    } catch (error) {
+      console.error("[Password Auth] Login accept invite failed", error);
+      res.status(500).json({ error: "Erro ao fazer login" });
     }
   });
 
