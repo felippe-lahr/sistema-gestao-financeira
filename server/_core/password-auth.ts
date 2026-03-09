@@ -94,14 +94,7 @@ export function registerPasswordAuthRoutes(app: Express) {
         return;
       }
 
-      // Verificar se ja tem senha
-      const existingPassword = await db.getUserPassword(user.id);
-      if (existingPassword) {
-        res.status(400).json({ error: "Usuario ja possui senha configurada" });
-        return;
-      }
-
-      // Configurar senha
+      // Configurar ou resetar senha (sobrescreve se já existir)
       const passwordHash = await bcrypt.hash(password, 10);
       await db.setUserPassword(user.id, passwordHash);
 
