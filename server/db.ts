@@ -1934,3 +1934,138 @@ export async function ensureEntitySharingTables(): Promise<void> {
     console.warn('[db] Could not ensure entity sharing tables:', err?.message);
   }
 }
+
+// ========== EMAIL VERIFICATION OPERATIONS ==========
+
+/**
+ * Garante que a tabela email_verifications existe no banco.
+ * Chamado no startup do servidor.
+ */
+export async function ensureEmailVerificationsTable(): Promise<void> {
+  try {
+    const { ENV } = await import("./_core/env");
+    const { default: postgres } = await import("postgres");
+    const client = postgres(ENV.databaseUrl, { max: 1 });
+    await client`
+      CREATE TABLE IF NOT EXISTS "email_verifications" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "userId" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "token" varchar(128) NOT NULL UNIQUE,
+        "expiresAt" timestamp NOT NULL,
+        "verifiedAt" timestamp,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+    `;
+    await client.end();
+    console.log('[db] email_verifications table ensured');
+  } catch (err: any) {
+    console.warn('[db] Could not ensure email_verifications table:', err?.message);
+  }
+}
+
+/**
+ * Cria um token de verificação de e-mail para um usuário.
+ */
+export async function createEmailVerificationToken(userId: number, token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+
+  // Usar SQL raw pois a tabela não está no schema drizzle
+  await db.execute(
+    sql`INSERT INTO email_verifications ("userId", "token", "expiresAt")
+        VALUES (${userId}, ${token}, ${expiresAt})
+        ON CONFLICT ("token") DO NOTHING`
+  );
+}
+
+/**
+ * Busca um token de verificação de e-mail.
+ */
+export async function getEmailVerificationToken(token: string): Promise<{
+  id: number;
+  userId: number;
+  token: string;
+  expiresAt: Date;
+  verifiedAt: Date | null;
+} | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = await db.execute<{
+    id: number;
+    userId: number;
+    token: string;
+    expiresAt: Date;
+    verifiedAt: Date | null;
+  }>(
+    sql`SELECT id, "userId", token, "expiresAt", "verifiedAt"
+        FROM email_verifications
+        WHERE token = ${token}
+        LIMIT 1`
+  ) as unknown as Array<{
+    id: number;
+    userId: number;
+    token: string;
+    expiresAt: Date;
+    verifiedAt: Date | null;
+  }>;
+
+  return rows.length > 0 ? rows[0] : null;
+}
+
+/**
+ * Marca um token de verificação como usado.
+ */
+export async function markEmailVerified(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.execute(
+    sql`UPDATE email_verifications SET "verifiedAt" = now() WHERE token = ${token}`
+  );
+}
+
+/**
+ * Verifica se um usuário já confirmou o e-mail.
+ */
+export async function isUserEmailVerified(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const rows = await db.execute(
+    sql`SELECT id FROM email_verifications
+        WHERE "userId" = ${userId} AND "verifiedAt" IS NOT NULL
+        LIMIT 1`
+  ) as unknown as unknown[];
+
+  return rows.length > 0;
+}
+
+/**
+ * Verifica se o usuário tem algum registro na tabela email_verifications (pendente ou verificado).
+ * Usuários legados (criados antes do sistema de verificação) não terão nenhum registro.
+ */
+export async function hasEmailVerificationRecord(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const rows = await db.execute(
+    sql`SELECT id FROM email_verifications
+        WHERE "userId" = ${userId}
+        LIMIT 1`
+  ) as unknown as unknown[];
+
+  return rows.length > 0;
+}
+
+/**
+ * Busca um usuário pelo ID.
+ */
+export async function getUserById(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}

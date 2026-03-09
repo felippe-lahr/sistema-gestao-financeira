@@ -14,7 +14,7 @@ import { registerUploadRoutes } from "./upload-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
-import { ensureEntitySharingTables } from "../db";
+import { ensureEntitySharingTables, ensureEmailVerificationsTable } from "../db";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -151,6 +151,8 @@ async function startServer() {
 
   // Garantir que as tabelas de compartilhamento existam (migração segura)
   await ensureEntitySharingTables();
+  // Garantir que a tabela de verificação de e-mail existe
+  await ensureEmailVerificationsTable();
 
   // Start cron jobs
   startCronJobs();

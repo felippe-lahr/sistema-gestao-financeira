@@ -37,6 +37,21 @@ export function registerPasswordAuthRoutes(app: Express) {
         return;
       }
 
+      // Verificar se o e-mail foi confirmado (apenas para contas criadas via registro self-service)
+      // Usuários legados (sem registro em email_verifications) são considerados verificados
+      const hasVerificationRecord = await db.hasEmailVerificationRecord(user.id);
+      if (hasVerificationRecord) {
+        const emailVerified = await db.isUserEmailVerified(user.id);
+        if (!emailVerified) {
+          res.status(403).json({
+            error: "E-mail não verificado. Verifique sua caixa de entrada e clique no link de ativação.",
+            code: "EMAIL_NOT_VERIFIED",
+            email: user.email,
+          });
+          return;
+        }
+      }
+
       // Atualizar ultimo login
       await db.upsertUser({
         openId: user.openId,
@@ -388,6 +403,218 @@ export function registerPasswordAuthRoutes(app: Express) {
       console.error("[Password Auth] Change password failed", error);
       const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
       res.status(500).json({ error: "Erro ao alterar senha: " + errorMessage });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // REGISTRO SELF-SERVICE — Cadastro de novo usuário com organização
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // POST /api/auth/register — Cria conta + organização + envia e-mail de verificação
+  app.post("/api/auth/register", async (req: Request, res: Response) => {
+    try {
+      const { name, email, password, organizationName } = req.body;
+
+      if (!name || !email || !password || !organizationName) {
+        res.status(400).json({ error: "Todos os campos são obrigatórios" });
+        return;
+      }
+
+      if (password.length < 8) {
+        res.status(400).json({ error: "A senha deve ter pelo menos 8 caracteres" });
+        return;
+      }
+
+      // Verificar se o e-mail já está cadastrado
+      const existingUser = await db.getUserByEmail(email.toLowerCase().trim());
+      if (existingUser) {
+        res.status(409).json({ error: "Este e-mail já está cadastrado. Faça login ou use outro e-mail." });
+        return;
+      }
+
+      // Criar o usuário
+      const openId = `local_${randomUUID().replace(/-/g, "")}`;
+      await db.upsertUser({
+        openId,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        loginMethod: "password",
+        lastSignedIn: new Date(),
+      });
+
+      const newUser = await db.getUserByEmail(email.toLowerCase().trim());
+      if (!newUser) {
+        res.status(500).json({ error: "Erro ao criar usuário" });
+        return;
+      }
+
+      // Definir senha
+      const passwordHash = await bcrypt.hash(password, 10);
+      await db.setUserPassword(newUser.id, passwordHash);
+
+      // Criar organização
+      const slug = organizationName
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .substring(0, 100);
+
+      await db.createOrganization({
+        name: organizationName.trim(),
+        ownerId: newUser.id,
+        slug: `${slug}-${newUser.id}`,
+      });
+
+      // Gerar token de verificação de e-mail
+      const verificationToken = randomUUID().replace(/-/g, "");
+      await db.createEmailVerificationToken(newUser.id, verificationToken);
+
+      // Enviar e-mail de verificação
+      const { ENV } = await import("./env");
+      const { sendVerificationEmail } = await import("./email");
+      const verificationUrl = `${ENV.appUrl}/verificar-email?token=${verificationToken}`;
+
+      try {
+        await sendVerificationEmail({
+          to: email.toLowerCase().trim(),
+          name: name.trim(),
+          verificationUrl,
+        });
+      } catch (emailError) {
+        console.error("[Register] Failed to send verification email:", emailError);
+        // Não bloquear o cadastro se o e-mail falhar — apenas logar
+      }
+
+      res.status(201).json({
+        success: true,
+        message: "Conta criada com sucesso. Verifique seu e-mail para ativar o acesso.",
+        email: email.toLowerCase().trim(),
+      });
+    } catch (error) {
+      console.error("[Password Auth] Register failed", error);
+      res.status(500).json({ error: "Erro ao criar conta" });
+    }
+  });
+
+  // POST /api/auth/verify-email — Verifica o token de e-mail e ativa a conta
+  app.post("/api/auth/verify-email", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        res.status(400).json({ error: "Token de verificação é obrigatório" });
+        return;
+      }
+
+      // Buscar o token
+      const verification = await db.getEmailVerificationToken(token);
+      if (!verification) {
+        res.status(404).json({ error: "Token inválido ou expirado" });
+        return;
+      }
+
+      if (verification.verifiedAt) {
+        res.status(400).json({ error: "Este e-mail já foi verificado. Faça login para continuar." });
+        return;
+      }
+
+      if (new Date() > new Date(verification.expiresAt)) {
+        res.status(400).json({ error: "Este link de verificação expirou. Solicite um novo." });
+        return;
+      }
+
+      // Marcar como verificado
+      await db.markEmailVerified(token);
+
+      // Buscar o usuário para criar sessão automática
+      const user = await db.getUserById(verification.userId);
+
+      if (!user) {
+        res.status(404).json({ error: "Usuário não encontrado" });
+        return;
+      }
+
+      // Enviar e-mail de boas-vindas
+      try {
+        const { sendWelcomeEmail } = await import("./email");
+        const orgs = await db.getOrganizationsByUserId(user.id);
+        const orgName = orgs.length > 0 ? orgs[0].name : "sua organização";
+        await sendWelcomeEmail({
+          to: user.email ?? "",
+          name: user.name ?? "Usuário",
+          organizationName: orgName,
+        });
+      } catch (emailError) {
+        console.error("[Verify Email] Failed to send welcome email:", emailError);
+      }
+
+      // Criar sessão automática (24h)
+      const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+      const { COOKIE_NAME } = await import("@shared/const");
+      const sessionToken = await sdk.createSessionToken(user.openId, {
+        name: user.name || "",
+        expiresInMs: TWENTY_FOUR_HOURS_MS,
+        rememberMe: false,
+      });
+
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: TWENTY_FOUR_HOURS_MS });
+
+      res.json({
+        success: true,
+        message: "E-mail verificado com sucesso! Bem-vindo ao sistema.",
+        user: { id: user.id, name: user.name, email: user.email },
+      });
+    } catch (error) {
+      console.error("[Password Auth] Verify email failed", error);
+      res.status(500).json({ error: "Erro ao verificar e-mail" });
+    }
+  });
+
+  // POST /api/auth/resend-verification — Reenvia o e-mail de verificação
+  app.post("/api/auth/resend-verification", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        res.status(400).json({ error: "E-mail é obrigatório" });
+        return;
+      }
+
+      const user = await db.getUserByEmail(email.toLowerCase().trim());
+      if (!user) {
+        // Não revelar se o e-mail existe ou não (segurança)
+        res.json({ success: true, message: "Se o e-mail estiver cadastrado, você receberá um novo link." });
+        return;
+      }
+
+      // Verificar se já foi verificado
+      const alreadyVerified = await db.isUserEmailVerified(user.id);
+      if (alreadyVerified) {
+        res.status(400).json({ error: "Este e-mail já foi verificado. Faça login para continuar." });
+        return;
+      }
+
+      // Gerar novo token
+      const verificationToken = randomUUID().replace(/-/g, "");
+      await db.createEmailVerificationToken(user.id, verificationToken);
+
+      const { ENV } = await import("./env");
+      const { sendVerificationEmail } = await import("./email");
+      const verificationUrl = `${ENV.appUrl}/verificar-email?token=${verificationToken}`;
+
+      await sendVerificationEmail({
+        to: user.email ?? "",
+        name: user.name ?? "Usuário",
+        verificationUrl,
+      });
+
+      res.json({ success: true, message: "Novo link de verificação enviado para seu e-mail." });
+    } catch (error) {
+      console.error("[Password Auth] Resend verification failed", error);
+      res.status(500).json({ error: "Erro ao reenviar e-mail" });
     }
   });
 }
