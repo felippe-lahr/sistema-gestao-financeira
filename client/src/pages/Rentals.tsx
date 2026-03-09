@@ -76,6 +76,14 @@ export default function Rentals() {
     rentalId: null as number | null,
   });
 
+  // Controle de permissões por role
+  const { data: entities = [] } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60000 });
+  const currentEntity = entities.find((e: any) => e.id === parseInt(entityId));
+  const sharedRole = currentEntity?.sharedRole ?? null;
+  const isOwner = sharedRole === null; // null = dono (não é membro compartilhado)
+  const canWrite = isOwner || sharedRole === 'ADMIN' || sharedRole === 'EDITOR';
+  const canDelete = isOwner || sharedRole === 'ADMIN';
+
   const { data: rentals = [], isLoading: rentalsLoading, refetch } = trpc.rentals.list.useQuery({
     entityId: parseInt(entityId),
     month: currentMonth.getMonth() + 1,
@@ -349,10 +357,12 @@ export default function Rentals() {
             <BarChart3 className="w-4 h-4" />
             <span>Relatórios</span>
           </Button>
-          <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700 gap-2 flex-1 sm:flex-none">
-            <Plus className="h-4 w-4" />
-            <span>Nova Reserva</span>
-          </Button>
+          {canWrite && (
+            <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700 gap-2 flex-1 sm:flex-none">
+              <Plus className="h-4 w-4" />
+              <span>Nova Reserva</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -583,7 +593,7 @@ export default function Rentals() {
                             <Popover key={`${rental.id}-bar-${weekIndex}-${rentalIndex}`} open={openPopoverId === popoverId} onOpenChange={(open) => setOpenPopoverId(open ? popoverId : null)}>
                               <PopoverTrigger asChild>
                                 <button
-                                  onClick={() => handleEdit(rental)}
+                                  onClick={() => canWrite ? handleEdit(rental) : setOpenPopoverId(popoverId)}
                                   onMouseEnter={() => setOpenPopoverId(popoverId)}
                                   onMouseLeave={() => setOpenPopoverId(null)}
                                   className={`absolute text-sm md:text-base font-semibold text-white px-2 py-1 truncate cursor-pointer transition-all pointer-events-auto top-1/2 transform -translate-y-1/2 hover:opacity-80 ${getSourceColor(rental.source)}`}
@@ -1369,14 +1379,18 @@ export default function Rentals() {
           {/* Footer Fixo */}
           <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-              Cancelar
+              {canWrite ? 'Cancelar' : 'Fechar'}
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Deletar
-            </Button>
-            <Button onClick={handleUpdate} className="bg-blue-600 hover:bg-blue-700">
-              Salvar Alterações
-            </Button>
+            {canDelete && (
+              <Button variant="destructive" onClick={handleDelete}>
+                Deletar
+              </Button>
+            )}
+            {canWrite && (
+              <Button onClick={handleUpdate} className="bg-blue-600 hover:bg-blue-700">
+                Salvar Alterações
+              </Button>
+            )}
           </div>
         </SheetContent>
       </Sheet>

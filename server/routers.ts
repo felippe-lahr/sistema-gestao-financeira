@@ -1496,7 +1496,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        await requireEntityAccess(input.entityId, ctx.user.id, "EDITOR");
         const { createRental } = await import("./db-rentals");
         return await createRental({
           ...input,
@@ -1529,9 +1529,8 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { getRentalById, updateRental } = await import("./db-rentals");
         const rental = await getRentalById(input.id);
-        if (!rental || rental.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        if (!rental) throw new TRPCError({ code: "NOT_FOUND", message: "Rental not found" });
+        await requireEntityAccess(rental.entityId, ctx.user.id, "EDITOR");
         return await updateRental(input.id, input);
       }),
 
@@ -1540,9 +1539,8 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { getRentalById, deleteRental } = await import("./db-rentals");
         const rental = await getRentalById(input.id);
-        if (!rental || rental.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        if (!rental) throw new TRPCError({ code: "NOT_FOUND", message: "Rental not found" });
+        await requireEntityAccess(rental.entityId, ctx.user.id, "ADMIN");
         return await deleteRental(input.id);
       }),
   }),
@@ -1562,9 +1560,8 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { getRentalById } = await import("./db-rentals");
         const rental = await getRentalById(input.rentalId);
-        if (!rental || rental.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        if (!rental) throw new TRPCError({ code: "NOT_FOUND", message: "Rental not found" });
+        await requireEntityAccess(rental.entityId, ctx.user.id, "ADMIN");
         const dbInstance = await getDb();
         if (!dbInstance) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
@@ -1582,9 +1579,8 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         const { getRentalById } = await import("./db-rentals");
         const rental = await getRentalById(input.rentalId);
-        if (!rental || rental.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        if (!rental) throw new TRPCError({ code: "NOT_FOUND", message: "Rental not found" });
+        await requireEntityAccess(rental.entityId, ctx.user.id, "EDITOR");
         const dbInstance = await getDb();
         if (!dbInstance) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
@@ -1613,9 +1609,8 @@ export const appRouter = router({
         }
         const { getRentalById } = await import("./db-rentals");
         const rental = await getRentalById(attachment.rentalId);
-        if (!rental || rental.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        if (!rental) throw new TRPCError({ code: "NOT_FOUND", message: "Rental not found" });
+        await requireEntityAccess(rental.entityId, ctx.user.id, "ADMIN");
         await dbInstance.delete(rentalAttachments).where(eq(rentalAttachments.id, input.id));
         return { success: true };
       }),
@@ -1642,9 +1637,8 @@ export const appRouter = router({
         }
         const { getRentalById } = await import("./db-rentals");
         const rental = await getRentalById(attachment.rentalId);
-        if (!rental || rental.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        if (!rental) throw new TRPCError({ code: "NOT_FOUND", message: "Rental not found" });
+        await requireEntityAccess(rental.entityId, ctx.user.id, "EDITOR");
         const result = await dbInstance
           .update(rentalAttachments)
           .set({ type: input.type })
