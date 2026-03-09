@@ -1,6 +1,6 @@
 import { Express, Request, Response, NextFunction } from "express";
 import { upload, uploadFile, deleteFile } from "./upload";
-import { getPresignedUrl } from "./s3";
+import { getPresignedUrl, getS3Stream } from "./s3";
 import { getDb, getEntityById } from "../db";
 import { attachments, transactions } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -101,37 +101,40 @@ export function registerUploadRoutes(app: Express) {
     }
   );
 
-  // GET /api/attachments/:id/download - Retorna URL pré-assinada para o frontend fazer o download via fetch+Blob
+    // GET /api/attachments/:id/download - Streaming do arquivo S3 com Content-Disposition: attachment
   app.get("/api/attachments/:id/download", requireAuth, async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
       const userId = (req as any)?.user?.id as number;
-
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
       if (isNaN(attachmentId)) return res.status(400).json({ error: "ID inválido" });
-
       const db = await getDb();
       if (!db) return res.status(500).json({ error: "Database not available" });
-
       const [attachment] = await db
         .select()
         .from(attachments)
         .where(eq(attachments.id, attachmentId));
-
       if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
-
       const ownsTransaction = await verifyTransactionOwnership(attachment.transactionId, userId);
       if (!ownsTransaction) return res.status(403).json({ error: "Access denied" });
-
-      // Retornar URL pré-assinada + filename para o frontend fazer download via fetch+Blob
-      let downloadUrl = attachment.blobUrl;
+      // Streaming do arquivo do S3 para o cliente
+      const encodedFilename = encodeURIComponent(attachment.filename);
+      res.setHeader("Content-Disposition", `attachment; filename="${attachment.filename}"; filename*=UTF-8''${encodedFilename}`);
+      res.setHeader("Content-Type", attachment.mimeType || "application/octet-stream");
       if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
-        downloadUrl = await getPresignedUrl(attachment.blobUrl, 300);
+        const { stream, contentLength } = await getS3Stream(attachment.blobUrl);
+        if (contentLength) res.setHeader("Content-Length", contentLength);
+        (stream as any).pipe(res);
+      } else {
+        // Fallback para URLs antigas (Supabase)
+        const fileRes = await fetch(attachment.blobUrl);
+        if (!fileRes.ok) return res.status(502).json({ error: "Erro ao buscar arquivo" });
+        const buffer = await fileRes.arrayBuffer();
+        res.send(Buffer.from(buffer));
       }
-      return res.json({ url: downloadUrl, filename: attachment.filename, mimeType: attachment.mimeType });
     } catch (error) {
       console.error("[Upload] Download error:", error);
-      return res.status(500).json({ error: "Erro ao baixar arquivo" });
+      if (!res.headersSent) return res.status(500).json({ error: "Erro ao baixar arquivo" });
     }
   });
 
@@ -379,38 +382,41 @@ export function registerUploadRoutes(app: Express) {
     }
   );
 
-  // GET /api/rental-attachments/:id/download - Download de arquivo da reserva
+  // GET /api/rental-attachments/:id/download - Streaming do arquivo S3 com Content-Disposition: attachment
   app.get("/api/rental-attachments/:id/download", requireAuth, async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
       const userId = (req as any)?.user?.id as number;
-
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
       if (isNaN(attachmentId)) return res.status(400).json({ error: "ID inválido" });
-
       const db = await getDb();
       if (!db) return res.status(500).json({ error: "Database not available" });
-
       const { rentalAttachments } = await import("../../drizzle/schema");
       const [attachment] = await db
         .select()
         .from(rentalAttachments)
         .where(eq(rentalAttachments.id, attachmentId));
-
       if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
-
       const ownsRental = await verifyRentalOwnership(attachment.rentalId, userId);
       if (!ownsRental) return res.status(403).json({ error: "Access denied" });
-
-      // Retornar URL pré-assinada + filename para o frontend fazer download via fetch+Blob
-      let downloadUrl = attachment.blobUrl;
+      // Streaming do arquivo do S3 para o cliente
+      const encodedFilename = encodeURIComponent(attachment.filename);
+      res.setHeader("Content-Disposition", `attachment; filename="${attachment.filename}"; filename*=UTF-8''${encodedFilename}`);
+      res.setHeader("Content-Type", attachment.mimeType || "application/octet-stream");
       if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
-        downloadUrl = await getPresignedUrl(attachment.blobUrl, 300);
+        const { stream, contentLength } = await getS3Stream(attachment.blobUrl);
+        if (contentLength) res.setHeader("Content-Length", contentLength);
+        (stream as any).pipe(res);
+      } else {
+        // Fallback para URLs antigas (Supabase)
+        const fileRes = await fetch(attachment.blobUrl);
+        if (!fileRes.ok) return res.status(502).json({ error: "Erro ao buscar arquivo" });
+        const buffer = await fileRes.arrayBuffer();
+        res.send(Buffer.from(buffer));
       }
-      return res.json({ url: downloadUrl, filename: attachment.filename, mimeType: attachment.mimeType });
     } catch (error) {
       console.error("[Upload] Rental download error:", error);
-      return res.status(500).json({ error: "Erro ao baixar arquivo" });
+      if (!res.headersSent) return res.status(500).json({ error: "Erro ao baixar arquivo" });
     }
   });
 

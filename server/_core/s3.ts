@@ -96,6 +96,26 @@ export async function getPresignedUrl(
 }
 
 /**
+ * Retorna um stream do arquivo no S3 para streaming de download
+ */
+export async function getS3Stream(fileUrl: string): Promise<{ stream: NodeJS.ReadableStream; contentType?: string; contentLength?: number }> {
+  const url = new URL(fileUrl);
+  const key = url.pathname.substring(1);
+
+  const command = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+  });
+
+  const response = await s3Client.send(command);
+  return {
+    stream: response.Body as NodeJS.ReadableStream,
+    contentType: response.ContentType,
+    contentLength: response.ContentLength,
+  };
+}
+
+/**
  * Extrai o nome do arquivo de uma URL do S3
  */
 export function getFilenameFromS3Url(url: string): string {

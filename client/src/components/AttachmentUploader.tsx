@@ -115,30 +115,18 @@ export function AttachmentUploader({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDownload = async (attachment: Attachment) => {
-    try {
-      if (attachment.id && attachment.id < 1_000_000_000_000) {
-        // Buscar URL pré-assinada do servidor
-        const res = await fetch(`/api/attachments/${attachment.id}/download`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Erro ao obter URL de download');
-        const { url, filename } = await res.json();
-        // Usar fetch+Blob para forçar download sem abrir nova aba
-        const fileRes = await fetch(url);
-        const blob = await fileRes.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.download = filename || attachment.filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(objectUrl);
-      } else {
-        // Fallback para attachments ainda não salvos no banco
-        window.open(attachment.blobUrl, '_blank');
-      }
-    } catch (error) {
-      console.error('Erro ao baixar arquivo:', error);
+  const handleDownload = (attachment: Attachment) => {
+    if (attachment.id && attachment.id < 1_000_000_000_000) {
+      // Rota do servidor faz streaming com Content-Disposition: attachment
+      const a = document.createElement('a');
+      a.href = `/api/attachments/${attachment.id}/download`;
+      a.download = attachment.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      // Fallback para attachments ainda não salvos no banco
+      window.open(attachment.blobUrl, '_blank');
     }
   };
 
