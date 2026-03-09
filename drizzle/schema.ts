@@ -577,3 +577,55 @@ export const tasks = pgTable("tasks", {
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = typeof tasks.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENTITY SHARING — Compartilhamento de entidades com roles
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Roles para membros de uma entidade compartilhada.
+ * - VIEWER: apenas visualiza dados e baixa arquivos
+ * - EDITOR: visualiza + cria/edita transações e categorias
+ * - ADMIN:  tudo do EDITOR + deleta registros
+ */
+export const entityMemberRoleEnum = pgEnum("entity_member_role", ["VIEWER", "EDITOR", "ADMIN"]);
+
+/**
+ * Status de um convite para uma entidade.
+ */
+export const inviteStatusEnum = pgEnum("invite_status", ["PENDING", "ACCEPTED", "REJECTED", "EXPIRED"]);
+
+/**
+ * Membros de uma entidade — usuários que receberam acesso compartilhado.
+ * O dono da entidade (userId na tabela entities) não aparece aqui.
+ */
+export const entityMembers = pgTable("entity_members", {
+  id: serial("id").primaryKey(),
+  entityId: integer("entityId").notNull().references(() => entities.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: entityMemberRoleEnum("role").notNull().default("VIEWER"),
+  invitedBy: integer("invitedBy").notNull().references(() => users.id, { onDelete: "cascade" }),
+  joinedAt: timestamp("joinedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EntityMember = typeof entityMembers.$inferSelect;
+export type InsertEntityMember = typeof entityMembers.$inferInsert;
+
+/**
+ * Convites para acesso a uma entidade.
+ * O token é um UUID gerado no servidor e enviado via link de convite.
+ */
+export const entityInvites = pgTable("entity_invites", {
+  id: serial("id").primaryKey(),
+  entityId: integer("entityId").notNull().references(() => entities.id, { onDelete: "cascade" }),
+  invitedBy: integer("invitedBy").notNull().references(() => users.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 320 }), // Email do convidado (opcional, para referência)
+  role: entityMemberRoleEnum("role").notNull().default("VIEWER"),
+  token: varchar("token", { length: 128 }).notNull().unique(), // Token único para o link de convite
+  status: inviteStatusEnum("status").notNull().default("PENDING"),
+  expiresAt: timestamp("expiresAt").notNull(), // Convite expira em 7 dias
+  acceptedAt: timestamp("acceptedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EntityInvite = typeof entityInvites.$inferSelect;
+export type InsertEntityInvite = typeof entityInvites.$inferInsert;

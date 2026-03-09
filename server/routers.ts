@@ -8,6 +8,7 @@ import * as exportUtils from "./export";
 import { getMonthlyCategoryExpenses } from "./db-monthly-category";
 import { getTransactionSummary } from "./db-transaction-summary";
 import { TRPCError } from "@trpc/server";
+import { requireEntityAccess } from "./_core/entity-auth";
 import { eq } from "drizzle-orm";
 import { treasurySelic } from "../drizzle/schema";
 import { getDb } from "./db";
@@ -29,7 +30,25 @@ export const appRouter = router({
   // ========== ENTITIES ==========
   entities: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      return await db.getEntitiesByUserId(ctx.user.id);
+      // Retorna entidades próprias + entidades compartilhadas com o usuário
+      const ownedEntities = await db.getEntitiesByUserId(ctx.user.id);
+      const sharedEntities = await db.getSharedEntitiesForUser(ctx.user.id);
+      
+      // Buscar dados completos das entidades compartilhadas
+      const sharedFull = await Promise.all(
+        sharedEntities.map(async (se) => {
+          const entity = await db.getEntityById(se.id);
+          return entity ? { ...entity, sharedRole: se.role } : null;
+        })
+      );
+      
+      const validShared = sharedFull.filter(Boolean) as any[];
+      
+      // Combinar: entidades próprias primeiro, depois compartilhadas
+      return [
+        ...ownedEntities.map(e => ({ ...e, sharedRole: null })),
+        ...validShared,
+      ];
     }),
 
     getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input, ctx }) => {
@@ -37,10 +56,8 @@ export const appRouter = router({
       if (!entity) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Entity not found" });
       }
-      if (entity.userId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
-      return entity;
+      const role = await requireEntityAccess(input.id, ctx.user.id, "VIEWER");
+      return { ...entity, myRole: role };
     }),
 
     create: protectedProcedure
@@ -2125,6 +2142,213 @@ export const appRouter = router({
         email: ctx.user.email,
       });
       return org;
+    }),
+  }),
+
+  // ========== ENTITY SHARING (RBAC) ==========
+  entitySharing: router({
+    /**
+     * Cria um link de convite para uma entidade.
+     * Apenas o dono da entidade pode convidar.
+     */
+    createInvite: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          role: z.enum(["VIEWER", "EDITOR", "ADMIN"]),
+          email: z.string().email().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o dono da entidade pode criar convites" });
+        }
+
+        // Gera token único
+        const { randomUUID } = await import("crypto");
+        const token = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
+
+        // Convite expira em 7 dias
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        const invite = await db.createEntityInvite({
+          entityId: input.entityId,
+          invitedBy: ctx.user.id,
+          email: input.email,
+          role: input.role,
+          token,
+          expiresAt,
+        });
+
+        return { token: invite.token, expiresAt: invite.expiresAt };
+      }),
+
+    /**
+     * Retorna informações de um convite pelo token (rota pública para a página de aceite).
+     */
+    getInviteInfo: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const invite = await db.getEntityInviteByToken(input.token);
+        if (!invite) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Convite não encontrado" });
+        }
+        if (invite.status !== "PENDING") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Este convite já foi utilizado ou expirou" });
+        }
+        if (new Date() > invite.expiresAt) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Este convite expirou" });
+        }
+        return {
+          entityId: invite.entityId,
+          entityName: invite.entityName,
+          inviterName: invite.inviterName,
+          inviterEmail: invite.inviterEmail,
+          role: invite.role,
+          expiresAt: invite.expiresAt,
+        };
+      }),
+
+    /**
+     * Aceita um convite. O usuário autenticado se torna membro da entidade.
+     */
+    acceptInvite: protectedProcedure
+      .input(z.object({ token: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const invite = await db.getEntityInviteByToken(input.token);
+        if (!invite) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Convite não encontrado" });
+        }
+        if (invite.status !== "PENDING") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Este convite já foi utilizado ou expirou" });
+        }
+        if (new Date() > invite.expiresAt) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Este convite expirou" });
+        }
+
+        // Verifica se o usuário já é dono da entidade
+        const entity = await db.getEntityById(invite.entityId);
+        if (entity?.userId === ctx.user.id) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Você já é o dono desta entidade" });
+        }
+
+        // Verifica se já é membro
+        const existingMember = await db.getEntityMember(invite.entityId, ctx.user.id);
+        if (existingMember) {
+          // Atualiza o role se o convite tem um role diferente
+          if (existingMember.role !== invite.role) {
+            await db.updateEntityMemberRole(invite.entityId, ctx.user.id, invite.role);
+          }
+        } else {
+          // Adiciona como novo membro
+          await db.addEntityMember({
+            entityId: invite.entityId,
+            userId: ctx.user.id,
+            role: invite.role,
+            invitedBy: invite.invitedBy,
+          });
+        }
+
+        // Marca o convite como aceito
+        await db.acceptEntityInvite(input.token);
+
+        return { success: true, entityId: invite.entityId, role: invite.role };
+      }),
+
+    /**
+     * Lista os membros de uma entidade.
+     * Dono e membros podem ver a lista.
+     */
+    listMembers: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Entidade não encontrada" });
+        }
+
+        const isOwner = entity.userId === ctx.user.id;
+        const member = await db.getEntityMember(input.entityId, ctx.user.id);
+
+        if (!isOwner && !member) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+        }
+
+        const members = await db.getEntityMembers(input.entityId);
+        const invites = await db.getEntityInvites(input.entityId);
+
+        return { members, invites, isOwner, myRole: isOwner ? "OWNER" : member?.role };
+      }),
+
+    /**
+     * Atualiza o role de um membro. Apenas o dono pode fazer isso.
+     */
+    updateMemberRole: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          userId: z.number(),
+          role: z.enum(["VIEWER", "EDITOR", "ADMIN"]),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o dono pode alterar roles" });
+        }
+        await db.updateEntityMemberRole(input.entityId, input.userId, input.role);
+        return { success: true };
+      }),
+
+    /**
+     * Remove um membro de uma entidade.
+     * O dono pode remover qualquer membro. O próprio membro pode sair.
+     */
+    removeMember: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          userId: z.number(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Entidade não encontrada" });
+        }
+
+        const isOwner = entity.userId === ctx.user.id;
+        const isSelf = input.userId === ctx.user.id;
+
+        if (!isOwner && !isSelf) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o dono pode remover membros" });
+        }
+
+        await db.removeEntityMember(input.entityId, input.userId);
+        return { success: true };
+      }),
+
+    /**
+     * Revoga um convite pendente. Apenas o dono pode revogar.
+     */
+    revokeInvite: protectedProcedure
+      .input(z.object({ inviteId: z.number(), entityId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const entity = await db.getEntityById(input.entityId);
+        if (!entity || entity.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o dono pode revogar convites" });
+        }
+        await db.revokeEntityInvite(input.inviteId);
+        return { success: true };
+      }),
+
+    /**
+     * Lista todas as entidades às quais o usuário tem acesso compartilhado.
+     */
+    listSharedEntities: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getSharedEntitiesForUser(ctx.user.id);
     }),
   }),
 });

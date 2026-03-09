@@ -30,6 +30,8 @@ import {
   InsertTask,
   organizations,
   organizationMembers,
+  entityMembers,
+  entityInvites,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1642,4 +1644,202 @@ export async function ensureOrganizationForUser(user: { id: number; name: string
   });
 
   return org;
+}
+
+// ========== ENTITY SHARING OPERATIONS ==========
+
+/**
+ * Retorna todos os membros de uma entidade (exceto o dono).
+ * Inclui dados básicos do usuário para exibição.
+ */
+export async function getEntityMembers(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select({
+      id: entityMembers.id,
+      entityId: entityMembers.entityId,
+      userId: entityMembers.userId,
+      role: entityMembers.role,
+      invitedBy: entityMembers.invitedBy,
+      joinedAt: entityMembers.joinedAt,
+      userName: users.name,
+      userEmail: users.email,
+    })
+    .from(entityMembers)
+    .leftJoin(users, eq(entityMembers.userId, users.id))
+    .where(eq(entityMembers.entityId, entityId));
+}
+
+/**
+ * Verifica se um usuário é membro de uma entidade e retorna seu role.
+ * Retorna undefined se não for membro.
+ */
+export async function getEntityMember(entityId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(entityMembers)
+    .where(and(eq(entityMembers.entityId, entityId), eq(entityMembers.userId, userId)))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Adiciona um usuário como membro de uma entidade.
+ */
+export async function addEntityMember(data: {
+  entityId: number;
+  userId: number;
+  role: "VIEWER" | "EDITOR" | "ADMIN";
+  invitedBy: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(entityMembers).values(data).returning();
+  return result[0];
+}
+
+/**
+ * Atualiza o role de um membro de uma entidade.
+ */
+export async function updateEntityMemberRole(
+  entityId: number,
+  userId: number,
+  role: "VIEWER" | "EDITOR" | "ADMIN"
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(entityMembers)
+    .set({ role })
+    .where(and(eq(entityMembers.entityId, entityId), eq(entityMembers.userId, userId)));
+}
+
+/**
+ * Remove um membro de uma entidade.
+ */
+export async function removeEntityMember(entityId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .delete(entityMembers)
+    .where(and(eq(entityMembers.entityId, entityId), eq(entityMembers.userId, userId)));
+}
+
+/**
+ * Retorna todas as entidades que um usuário tem acesso (como membro, não dono).
+ */
+export async function getSharedEntitiesForUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select({
+      id: entities.id,
+      name: entities.name,
+      userId: entities.userId,
+      role: entityMembers.role,
+    })
+    .from(entityMembers)
+    .innerJoin(entities, eq(entityMembers.entityId, entities.id))
+    .where(eq(entityMembers.userId, userId));
+}
+
+// ========== ENTITY INVITE OPERATIONS ==========
+
+/**
+ * Cria um convite para uma entidade.
+ */
+export async function createEntityInvite(data: {
+  entityId: number;
+  invitedBy: number;
+  email?: string;
+  role: "VIEWER" | "EDITOR" | "ADMIN";
+  token: string;
+  expiresAt: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(entityInvites).values(data).returning();
+  return result[0];
+}
+
+/**
+ * Busca um convite pelo token.
+ */
+export async function getEntityInviteByToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select({
+      id: entityInvites.id,
+      entityId: entityInvites.entityId,
+      invitedBy: entityInvites.invitedBy,
+      email: entityInvites.email,
+      role: entityInvites.role,
+      token: entityInvites.token,
+      status: entityInvites.status,
+      expiresAt: entityInvites.expiresAt,
+      acceptedAt: entityInvites.acceptedAt,
+      createdAt: entityInvites.createdAt,
+      entityName: entities.name,
+      inviterName: users.name,
+      inviterEmail: users.email,
+    })
+    .from(entityInvites)
+    .innerJoin(entities, eq(entityInvites.entityId, entities.id))
+    .innerJoin(users, eq(entityInvites.invitedBy, users.id))
+    .where(eq(entityInvites.token, token))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Retorna todos os convites pendentes de uma entidade.
+ */
+export async function getEntityInvites(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(entityInvites)
+    .where(and(eq(entityInvites.entityId, entityId), eq(entityInvites.status, "PENDING")))
+    .orderBy(desc(entityInvites.createdAt));
+}
+
+/**
+ * Marca um convite como aceito.
+ */
+export async function acceptEntityInvite(token: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(entityInvites)
+    .set({ status: "ACCEPTED", acceptedAt: new Date() })
+    .where(eq(entityInvites.token, token));
+}
+
+/**
+ * Cancela (revoga) um convite.
+ */
+export async function revokeEntityInvite(inviteId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .delete(entityInvites)
+    .where(eq(entityInvites.id, inviteId));
 }

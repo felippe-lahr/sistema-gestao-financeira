@@ -7,19 +7,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2, Building2, GripVertical, Calendar } from "lucide-react";
+import { Plus, Edit, Trash2, Building2, GripVertical, Calendar, Share2, Eye, Shield, Crown } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { EntitySharingModal } from "@/components/EntitySharingModal";
+
+const ROLE_LABELS: Record<string, string> = {
+  VIEWER: "Visualizador",
+  EDITOR: "Editor",
+  ADMIN: "Administrador",
+  OWNER: "Proprietário",
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  VIEWER: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  EDITOR: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  ADMIN: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  OWNER: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+};
 
 export default function Entities() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isSharingOpen, setIsSharingOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -142,6 +159,11 @@ export default function Entities() {
     setIsDeleteOpen(true);
   };
 
+  const handleShare = (entity: any) => {
+    setSelectedEntity(entity);
+    setIsSharingOpen(true);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -190,6 +212,10 @@ export default function Entities() {
       </div>
     );
   }
+
+  // Separar entidades próprias das compartilhadas
+  const ownedEntities = localEntities.filter((e) => !e.sharedRole);
+  const sharedEntities = localEntities.filter((e) => e.sharedRole);
 
   return (
     <div className="container py-8 space-y-8">
@@ -265,8 +291,8 @@ export default function Entities() {
         </Dialog>
       </div>
 
-      {/* Entities Grid */}
-      {!localEntities || localEntities.length === 0 ? (
+      {/* Entidades Próprias */}
+      {ownedEntities.length === 0 && sharedEntities.length === 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>Nenhuma entidade cadastrada</CardTitle>
@@ -276,18 +302,50 @@ export default function Entities() {
           </CardHeader>
         </Card>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={localEntities.map(e => e.id)}>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {localEntities.map((entity) => (
-                <SortableEntityCard key={entity.id} entity={entity} onEdit={handleEdit} onDelete={handleDelete} />
-              ))}
+        <>
+          {ownedEntities.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-muted-foreground">Minhas Entidades</h2>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={ownedEntities.map(e => e.id)}>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {ownedEntities.map((entity) => (
+                      <SortableEntityCard
+                        key={entity.id}
+                        entity={entity}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onShare={handleShare}
+                        isOwner={true}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             </div>
-          </SortableContext>
-        </DndContext>
-      )}
+          )}
 
-      {/* Edit Dialog */}
+          {/* Entidades Compartilhadas */}
+          {sharedEntities.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-muted-foreground">Compartilhadas Comigo</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {sharedEntities.map((entity) => (
+                  <SortableEntityCard
+                    key={entity.id}
+                    entity={entity}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onShare={handleShare}
+                    isOwner={false}
+                    sharedRole={entity.sharedRole}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
@@ -393,12 +451,35 @@ export default function Entities() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Sharing Modal */}
+      {selectedEntity && isSharingOpen && (
+        <EntitySharingModal
+          entity={selectedEntity}
+          open={isSharingOpen}
+          onOpenChange={setIsSharingOpen}
+        />
+      )}
     </div>
   );
 }
 
 // Sortable Entity Card Component
-function SortableEntityCard({ entity, onEdit, onDelete }: { entity: any; onEdit: (entity: any) => void; onDelete: (entity: any) => void }) {
+function SortableEntityCard({
+  entity,
+  onEdit,
+  onDelete,
+  onShare,
+  isOwner,
+  sharedRole,
+}: {
+  entity: any;
+  onEdit: (entity: any) => void;
+  onDelete: (entity: any) => void;
+  onShare: (entity: any) => void;
+  isOwner: boolean;
+  sharedRole?: string;
+}) {
   const {
     attributes,
     listeners,
@@ -406,7 +487,7 @@ function SortableEntityCard({ entity, onEdit, onDelete }: { entity: any; onEdit:
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: entity.id });
+  } = useSortable({ id: entity.id, disabled: !isOwner });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -414,9 +495,26 @@ function SortableEntityCard({ entity, onEdit, onDelete }: { entity: any; onEdit:
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const ROLE_COLORS: Record<string, string> = {
+    VIEWER: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    EDITOR: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    ADMIN: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+    OWNER: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  };
+
+  const ROLE_LABELS: Record<string, string> = {
+    VIEWER: "Visualizador",
+    EDITOR: "Editor",
+    ADMIN: "Administrador",
+    OWNER: "Proprietário",
+  };
+
+  const canEdit = isOwner || sharedRole === "EDITOR" || sharedRole === "ADMIN";
+  const canDelete = isOwner;
+
   return (
     <div ref={setNodeRef} style={style}>
-      <Card className="hover:shadow-lg transition-shadow">
+      <Card className={`hover:shadow-lg transition-shadow ${sharedRole ? "border-dashed" : ""}`}>
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3 flex-1">
@@ -426,41 +524,64 @@ function SortableEntityCard({ entity, onEdit, onDelete }: { entity: any; onEdit:
               >
                 <Building2 className="h-6 w-6 text-white" />
               </div>
-              <div className="flex-1">
-                <CardTitle className="text-lg">{entity.name}</CardTitle>
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-lg truncate">{entity.name}</CardTitle>
                 <CardDescription className="text-xs">
                   Criado em {format(new Date(entity.createdAt), "dd/MM/yyyy", { locale: ptBR })}
                 </CardDescription>
               </div>
             </div>
-            <button
-              {...attributes}
-              {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 dark:bg-gray-800 rounded"
-              title="Arrastar para reordenar"
-            >
-              <GripVertical className="h-5 w-5 text-muted-foreground" />
-            </button>
+            {isOwner ? (
+              <button
+                {...attributes}
+                {...listeners}
+                className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 dark:bg-gray-800 rounded"
+                title="Arrastar para reordenar"
+              >
+                <GripVertical className="h-5 w-5 text-muted-foreground" />
+              </button>
+            ) : (
+              sharedRole && (
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${ROLE_COLORS[sharedRole] || ""}`}>
+                  {ROLE_LABELS[sharedRole] || sharedRole}
+                </span>
+              )
+            )}
           </div>
         </CardHeader>
         <CardContent>
           {entity.description && (
-            <p className="text-sm text-muted-foreground mb-4">{entity.description}</p>
+            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{entity.description}</p>
           )}
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit(entity)}>
-              <Edit className="mr-2 h-3 w-3" />
-              Editar
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 text-destructive hover:text-destructive"
-              onClick={() => onDelete(entity)}
-            >
-              <Trash2 className="mr-2 h-3 w-3" />
-              Excluir
-            </Button>
+          <div className="flex gap-2 flex-wrap">
+            {isOwner && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => onShare(entity)}
+                title="Compartilhar entidade"
+              >
+                <Share2 className="mr-1 h-3 w-3" />
+                Compartilhar
+              </Button>
+            )}
+            {canEdit && (
+              <Button variant="outline" size="sm" className={isOwner ? "flex-1" : "flex-1"} onClick={() => onEdit(entity)}>
+                <Edit className="mr-1 h-3 w-3" />
+                Editar
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive px-3"
+                onClick={() => onDelete(entity)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
