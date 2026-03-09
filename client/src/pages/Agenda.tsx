@@ -65,7 +65,7 @@ export default function Agenda() {
     recurrenceFrequency: "MONTH" as "DAY" | "WEEK" | "MONTH" | "YEAR",
   });
 
-  const { data: entities = [] } = trpc.entities.list.useQuery();
+  const { data: entities = [] } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
   const { data: tasks = [], refetch: refetchTasks } = trpc.tasks.list.useQuery();
 
   const createTask = trpc.tasks.create.useMutation({

@@ -21,7 +21,7 @@ export default function Dashboard() {
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
 
   // Fetch entities
-  const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery();
+  const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
 
   // Set first entity as default
   if (!selectedEntityId && entities && entities.length > 0) {

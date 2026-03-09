@@ -86,7 +86,7 @@ export default function Transactions() {
   const [exportingAttachments, setExportingAttachments] = useState(false);
 
   const utils = trpc.useUtils();
-  const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery();
+  const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
 
   // Set first entity as default
   if (!selectedEntityId && entities && entities.length > 0) {

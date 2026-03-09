@@ -24,7 +24,7 @@ export default function OverallDashboard() {
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
 
-  const { data: entities = [] } = trpc.entities.list.useQuery();
+  const { data: entities = [] } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
 
   // Inicializar com todas as entidades selecionadas
   useEffect(() => {

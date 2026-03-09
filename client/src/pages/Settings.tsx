@@ -16,7 +16,7 @@ export default function Settings() {
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("accounts");
 
-  const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery();
+  const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
 
   // Set first entity as default
   if (!selectedEntityId && entities && entities.length > 0) {

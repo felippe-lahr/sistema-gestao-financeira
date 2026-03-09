@@ -47,7 +47,7 @@ export default function Entities() {
   const [localEntities, setLocalEntities] = useState<any[]>([]);
 
   const utils = trpc.useUtils();
-  const { data: entities, isLoading } = trpc.entities.list.useQuery();
+  const { data: entities, isLoading } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
 
   // Sensors for drag and drop
   const sensors = useSensors(
