@@ -101,7 +101,7 @@ export function registerUploadRoutes(app: Express) {
     }
   );
 
-  // GET /api/attachments/:id/download - Força download do arquivo com Content-Disposition: attachment
+  // GET /api/attachments/:id/download - Retorna URL pré-assinada para o frontend fazer o download via fetch+Blob
   app.get("/api/attachments/:id/download", requireAuth, async (req: Request, res: Response) => {
     try {
       const attachmentId = parseInt(req.params.id);
@@ -123,21 +123,12 @@ export function registerUploadRoutes(app: Express) {
       const ownsTransaction = await verifyTransactionOwnership(attachment.transactionId, userId);
       if (!ownsTransaction) return res.status(403).json({ error: "Access denied" });
 
-      // Baixar o arquivo e enviar com Content-Disposition: attachment para forçar download
+      // Retornar URL pré-assinada + filename para o frontend fazer download via fetch+Blob
       let downloadUrl = attachment.blobUrl;
       if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
         downloadUrl = await getPresignedUrl(attachment.blobUrl, 300);
       }
-      const fileResponse = await fetch(downloadUrl);
-      if (!fileResponse.ok) {
-        return res.status(502).json({ error: "Erro ao acessar arquivo" });
-      }
-      const contentType = attachment.mimeType || "application/octet-stream";
-      const safeFilename = encodeURIComponent(attachment.filename);
-      res.setHeader("Content-Disposition", `attachment; filename="${attachment.filename}"; filename*=UTF-8''${safeFilename}`);
-      res.setHeader("Content-Type", contentType);
-      const arrayBuffer = await fileResponse.arrayBuffer();
-      return res.send(Buffer.from(arrayBuffer));
+      return res.json({ url: downloadUrl, filename: attachment.filename, mimeType: attachment.mimeType });
     } catch (error) {
       console.error("[Upload] Download error:", error);
       return res.status(500).json({ error: "Erro ao baixar arquivo" });
@@ -411,21 +402,12 @@ export function registerUploadRoutes(app: Express) {
       const ownsRental = await verifyRentalOwnership(attachment.rentalId, userId);
       if (!ownsRental) return res.status(403).json({ error: "Access denied" });
 
-      // Baixar o arquivo e enviar com Content-Disposition: attachment para forçar download
+      // Retornar URL pré-assinada + filename para o frontend fazer download via fetch+Blob
       let downloadUrl = attachment.blobUrl;
       if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
         downloadUrl = await getPresignedUrl(attachment.blobUrl, 300);
       }
-      const fileResponse = await fetch(downloadUrl);
-      if (!fileResponse.ok) {
-        return res.status(502).json({ error: "Erro ao acessar arquivo" });
-      }
-      const contentType = attachment.mimeType || "application/octet-stream";
-      const safeFilename = encodeURIComponent(attachment.filename);
-      res.setHeader("Content-Disposition", `attachment; filename="${attachment.filename}"; filename*=UTF-8''${safeFilename}`);
-      res.setHeader("Content-Type", contentType);
-      const arrayBuffer = await fileResponse.arrayBuffer();
-      return res.send(Buffer.from(arrayBuffer));
+      return res.json({ url: downloadUrl, filename: attachment.filename, mimeType: attachment.mimeType });
     } catch (error) {
       console.error("[Upload] Rental download error:", error);
       return res.status(500).json({ error: "Erro ao baixar arquivo" });
