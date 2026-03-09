@@ -618,7 +618,7 @@ export async function generateAttachmentsZip(data: {
 }): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     const archive = archiver("zip", {
-      zlib: { level: 9 }, // Máxima compressão
+      zlib: { level: 6 }, // Compressão padrão (compatível com macOS Archive Utility)
     });
 
     const chunks: Buffer[] = [];
