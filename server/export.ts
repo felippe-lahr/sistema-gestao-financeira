@@ -610,6 +610,7 @@ export function generateTransactionsPDF(data: {
 
 import archiver from "archiver";
 import { Readable } from "stream";
+import { getPresignedUrl, isS3Configured } from "./_core/s3";
 
 export async function generateAttachmentsZip(data: {
   entityName: string;
@@ -643,10 +644,15 @@ export async function generateAttachmentsZip(data: {
       
       for (const attachment of typeAttachments) {
         try {
-          // Baixar arquivo do Vercel Blob
-          const response = await fetch(attachment.blobUrl);
+          // Gerar URL de acesso: pré-assinada para S3 (bucket privado) ou URL direta para Supabase
+          let downloadUrl = attachment.blobUrl;
+          if (isS3Configured() && attachment.blobUrl.includes("amazonaws.com")) {
+            downloadUrl = await getPresignedUrl(attachment.blobUrl, 300); // 5 minutos
+          }
+
+          const response = await fetch(downloadUrl);
           if (!response.ok) {
-            console.error(`Erro ao baixar anexo ${attachment.id}: ${response.statusText}`);
+            console.error(`Erro ao baixar anexo ${attachment.id}: ${response.status} ${response.statusText}`);
             continue;
           }
 
