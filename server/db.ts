@@ -1991,57 +1991,52 @@ export async function getEmailVerificationToken(token: string): Promise<{
   expiresAt: Date;
   verifiedAt: Date | null;
 } | null> {
-  const db = await getDb();
-  if (!db) return null;
-
-  const rows = await db.execute<{
-    id: number;
-    userId: number;
-    token: string;
-    expiresAt: Date;
-    verifiedAt: Date | null;
-  }>(
-    sql`SELECT id, "userId", token, "expiresAt", "verifiedAt"
+  // Usar postgres direto pois a tabela não está no schema drizzle
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const rows = await client<Array<{
+      id: number;
+      userId: number;
+      token: string;
+      expiresAt: Date;
+      verifiedAt: Date | null;
+    }>>`SELECT id, "userId", token, "expiresAt", "verifiedAt"
         FROM email_verifications
         WHERE token = ${token}
-        LIMIT 1`
-  ) as unknown as Array<{
-    id: number;
-    userId: number;
-    token: string;
-    expiresAt: Date;
-    verifiedAt: Date | null;
-  }>;
-
-  return rows.length > 0 ? rows[0] : null;
+        LIMIT 1`;
+    return rows.length > 0 ? rows[0] : null;
+  } finally {
+    await client.end();
+  }
 }
 
 /**
  * Marca um token de verificação como usado.
  */
 export async function markEmailVerified(token: string): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db.execute(
-    sql`UPDATE email_verifications SET "verifiedAt" = now() WHERE token = ${token}`
-  );
+  // Usar postgres direto pois a tabela não está no schema drizzle
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    await client`UPDATE email_verifications SET "verifiedAt" = now() WHERE token = ${token}`;
+  } finally {
+    await client.end();
+  }
 }
 
 /**
  * Verifica se um usuário já confirmou o e-mail.
  */
 export async function isUserEmailVerified(userId: number): Promise<boolean> {
-  const db = await getDb();
-  if (!db) return false;
-
-  const rows = await db.execute(
-    sql`SELECT id FROM email_verifications
+  // Usar postgres direto pois a tabela não está no schema drizzle
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const rows = await client`SELECT id FROM email_verifications
         WHERE "userId" = ${userId} AND "verifiedAt" IS NOT NULL
-        LIMIT 1`
-  ) as unknown as unknown[];
-
-  return rows.length > 0;
+        LIMIT 1`;
+    return rows.length > 0;
+  } finally {
+    await client.end();
+  }
 }
 
 /**
@@ -2049,16 +2044,16 @@ export async function isUserEmailVerified(userId: number): Promise<boolean> {
  * Usuários legados (criados antes do sistema de verificação) não terão nenhum registro.
  */
 export async function hasEmailVerificationRecord(userId: number): Promise<boolean> {
-  const db = await getDb();
-  if (!db) return false;
-
-  const rows = await db.execute(
-    sql`SELECT id FROM email_verifications
+  // Usar postgres direto pois a tabela não está no schema drizzle
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const rows = await client`SELECT id FROM email_verifications
         WHERE "userId" = ${userId}
-        LIMIT 1`
-  ) as unknown as unknown[];
-
-  return rows.length > 0;
+        LIMIT 1`;
+    return rows.length > 0;
+  } finally {
+    await client.end();
+  }
 }
 
 /**
@@ -2090,11 +2085,9 @@ export async function adminListUsers(): Promise<{
   organizationName: string | null;
   organizationPlan: string | null;
 }[]> {
-  const db = await getDb();
-  if (!db) return [];
-
-  const rows = await db.execute(
-    sql`SELECT
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const rows = await client<any[]>`SELECT
           u.id,
           u.name,
           u.email,
@@ -2113,21 +2106,22 @@ export async function adminListUsers(): Promise<{
           ORDER BY "userId", id DESC
         ) ev ON ev."userId" = u.id
         LEFT JOIN organizations o ON o."ownerId" = u.id
-        ORDER BY u."createdAt" DESC`
-  ) as unknown as any[];
-
-  return rows.map((r: any) => ({
-    id: r.id,
-    name: r.name,
-    email: r.email,
-    role: r.role,
-    loginMethod: r.loginMethod,
-    createdAt: new Date(r.createdAt),
-    lastSignedIn: new Date(r.lastSignedIn),
-    emailVerified: r.emailVerified === true || r.emailVerified === 't',
-    organizationName: r.organizationName ?? null,
-    organizationPlan: r.organizationPlan ?? null,
-  }));
+        ORDER BY u."createdAt" DESC`;
+    return rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      role: r.role,
+      loginMethod: r.loginMethod,
+      createdAt: new Date(r.createdAt),
+      lastSignedIn: new Date(r.lastSignedIn),
+      emailVerified: r.emailVerified === true || r.emailVerified === 't',
+      organizationName: r.organizationName ?? null,
+      organizationPlan: r.organizationPlan ?? null,
+    }));
+  } finally {
+    await client.end();
+  }
 }
 
 /**
@@ -2143,11 +2137,9 @@ export async function adminListOrganizations(): Promise<{
   createdAt: Date;
   memberCount: number;
 }[]> {
-  const db = await getDb();
-  if (!db) return [];
-
-  const rows = await db.execute(
-    sql`SELECT
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const rows = await client<any[]>`SELECT
           o.id,
           o.name,
           o.slug,
@@ -2158,19 +2150,20 @@ export async function adminListOrganizations(): Promise<{
           (SELECT COUNT(*) FROM organization_members om WHERE om."organizationId" = o.id) AS "memberCount"
         FROM organizations o
         LEFT JOIN users u ON u.id = o."ownerId"
-        ORDER BY o."createdAt" DESC`
-  ) as unknown as any[];
-
-  return rows.map((r: any) => ({
-    id: r.id,
-    name: r.name,
-    slug: r.slug ?? null,
-    plan: r.plan,
-    ownerName: r.ownerName ?? null,
-    ownerEmail: r.ownerEmail ?? null,
-    createdAt: new Date(r.createdAt),
-    memberCount: Number(r.memberCount ?? 0),
-  }));
+        ORDER BY o."createdAt" DESC`;
+    return rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug ?? null,
+      plan: r.plan,
+      ownerName: r.ownerName ?? null,
+      ownerEmail: r.ownerEmail ?? null,
+      createdAt: new Date(r.createdAt),
+      memberCount: Number(r.memberCount ?? 0),
+    }));
+  } finally {
+    await client.end();
+  }
 }
 
 /**
@@ -2183,48 +2176,42 @@ export async function adminGetStats(): Promise<{
   totalOrganizations: number;
   planCounts: { free: number; pro: number; enterprise: number };
 }> {
-  const db = await getDb();
-  if (!db) return {
-    totalUsers: 0, verifiedUsers: 0, newUsersThisWeek: 0,
-    totalOrganizations: 0, planCounts: { free: 0, pro: 0, enterprise: 0 },
-  };
-
-  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-  const [statsRows, planRows] = await Promise.all([
-    db.execute(sql`
-      SELECT
-        COUNT(*)::int AS "totalUsers",
-        COUNT(ev.id)::int AS "verifiedUsers",
-        COUNT(CASE WHEN u."createdAt" >= ${oneWeekAgo} THEN 1 END)::int AS "newUsersThisWeek",
-        (SELECT COUNT(*)::int FROM organizations) AS "totalOrganizations"
-      FROM users u
-      LEFT JOIN (
-        SELECT DISTINCT ON ("userId") id, "userId"
-        FROM email_verifications WHERE "verifiedAt" IS NOT NULL
-        ORDER BY "userId", id DESC
-      ) ev ON ev."userId" = u.id
-    `) as unknown as any[],
-    db.execute(sql`
-      SELECT plan, COUNT(*)::int AS cnt FROM organizations GROUP BY plan
-    `) as unknown as any[],
-  ]);
-
-  const s = statsRows[0] ?? {};
-  const planCounts = { free: 0, pro: 0, enterprise: 0 };
-  for (const row of planRows) {
-    if (row.plan === 'free') planCounts.free = Number(row.cnt);
-    else if (row.plan === 'pro') planCounts.pro = Number(row.cnt);
-    else if (row.plan === 'enterprise') planCounts.enterprise = Number(row.cnt);
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [statsRows, planRows] = await Promise.all([
+      client<any[]>`
+        SELECT
+          COUNT(*)::int AS "totalUsers",
+          COUNT(ev.id)::int AS "verifiedUsers",
+          COUNT(CASE WHEN u."createdAt" >= ${oneWeekAgo} THEN 1 END)::int AS "newUsersThisWeek",
+          (SELECT COUNT(*)::int FROM organizations) AS "totalOrganizations"
+        FROM users u
+        LEFT JOIN (
+          SELECT DISTINCT ON ("userId") id, "userId"
+          FROM email_verifications WHERE "verifiedAt" IS NOT NULL
+          ORDER BY "userId", id DESC
+        ) ev ON ev."userId" = u.id
+      `,
+      client<any[]>`SELECT plan, COUNT(*)::int AS cnt FROM organizations GROUP BY plan`,
+    ]);
+    const s = statsRows[0] ?? {};
+    const planCounts = { free: 0, pro: 0, enterprise: 0 };
+    for (const row of planRows) {
+      if (row.plan === 'free') planCounts.free = Number(row.cnt);
+      else if (row.plan === 'pro') planCounts.pro = Number(row.cnt);
+      else if (row.plan === 'enterprise') planCounts.enterprise = Number(row.cnt);
+    }
+    return {
+      totalUsers: Number(s.totalUsers ?? 0),
+      verifiedUsers: Number(s.verifiedUsers ?? 0),
+      newUsersThisWeek: Number(s.newUsersThisWeek ?? 0),
+      totalOrganizations: Number(s.totalOrganizations ?? 0),
+      planCounts,
+    };
+  } finally {
+    await client.end();
   }
-
-  return {
-    totalUsers: Number(s.totalUsers ?? 0),
-    verifiedUsers: Number(s.verifiedUsers ?? 0),
-    newUsersThisWeek: Number(s.newUsersThisWeek ?? 0),
-    totalOrganizations: Number(s.totalOrganizations ?? 0),
-    planCounts,
-  };
 }
 
 /**
@@ -2240,14 +2227,17 @@ export async function adminSetOrganizationPlan(orgId: number, plan: 'free' | 'pr
  * Força a verificação de e-mail de um usuário (ação administrativa).
  */
 export async function adminForceVerifyUser(userId: number): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
-  // Inserir um registro de verificação já confirmado
-  await db.execute(sql`
-    INSERT INTO email_verifications ("userId", token, "expiresAt", "verifiedAt")
-    VALUES (${userId}, ${'admin_forced_' + userId + '_' + Date.now()}, NOW(), NOW())
-    ON CONFLICT DO NOTHING
-  `);
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const token = `admin_forced_${userId}_${Date.now()}`;
+    await client`
+      INSERT INTO email_verifications ("userId", token, "expiresAt", "verifiedAt")
+      VALUES (${userId}, ${token}, NOW(), NOW())
+      ON CONFLICT DO NOTHING
+    `;
+  } finally {
+    await client.end();
+  }
 }
 
 /**
@@ -2272,35 +2262,18 @@ export async function adminSetUserStatus(userId: number, status: 'active' | 'sus
  * Admin: Deleta um usuário e todos os seus dados associados.
  */
 export async function adminDeleteUser(userId: number): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
-
-  // IMPORTANTE: A constraint organizations.ownerId tem DELETE RULE = RESTRICT,
-  // portanto as organizações do usuário DEVEM ser deletadas ANTES do usuário.
-
-  // Remove verificações de e-mail (CASCADE, mas deletamos explicitamente)
-  await db.execute(sql`DELETE FROM email_verifications WHERE "userId" = ${userId}`);
-
-  // Remove senhas
-  await db.execute(sql`DELETE FROM user_passwords WHERE "userId" = ${userId}`);
-
-  // Remove memberships de organizações
-  await db.execute(sql`DELETE FROM organization_members WHERE "userId" = ${userId}`);
-
-  // Remove entity_members (CASCADE, mas deletamos explicitamente)
-  await db.execute(sql`DELETE FROM entity_members WHERE "userId" = ${userId}`);
-
-  // Remove entity_invites feitos pelo usuário
-  await db.execute(sql`DELETE FROM entity_invites WHERE "invitedBy" = ${userId}`);
-
-  // Remove organizações onde o usuário é owner (DEVE ser antes de deletar o usuário
-  // por causa da constraint RESTRICT em organizations.ownerId)
-  // Transfere ownership para outro membro ou deleta a organização inteira
-  await db.execute(sql`
-    DELETE FROM organizations
-    WHERE "ownerId" = ${userId}
-  `);
-
-  // Remove o usuário (agora seguro pois não há mais organizações com ownerId = userId)
-  await db.execute(sql`DELETE FROM users WHERE id = ${userId}`);
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    // IMPORTANTE: A constraint organizations.ownerId tem DELETE RULE = RESTRICT,
+    // portanto as organizações do usuário DEVEM ser deletadas ANTES do usuário.
+    await client`DELETE FROM email_verifications WHERE "userId" = ${userId}`;
+    await client`DELETE FROM user_passwords WHERE "userId" = ${userId}`;
+    await client`DELETE FROM organization_members WHERE "userId" = ${userId}`;
+    await client`DELETE FROM entity_members WHERE "userId" = ${userId}`;
+    await client`DELETE FROM entity_invites WHERE "invitedBy" = ${userId}`;
+    await client`DELETE FROM organizations WHERE "ownerId" = ${userId}`;
+    await client`DELETE FROM users WHERE id = ${userId}`;
+  } finally {
+    await client.end();
+  }
 }

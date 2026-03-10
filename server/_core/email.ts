@@ -17,7 +17,7 @@ export async function sendVerificationEmail(params: {
 
   const firstName = name.split(" ")[0];
 
-  await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
     to,
     subject: "Confirme seu e-mail — Gestão Financeira",
@@ -90,6 +90,11 @@ export async function sendVerificationEmail(params: {
 </html>
     `.trim(),
   });
+  if (error) {
+    console.error("[Resend] Erro ao enviar e-mail de verificação:", JSON.stringify(error));
+    throw new Error(`Falha ao enviar e-mail: ${error.message ?? JSON.stringify(error)}`);
+  }
+  console.log("[Resend] E-mail de verificação enviado:", data?.id, "para", to);
 }
 
 /**
@@ -104,7 +109,7 @@ export async function sendWelcomeEmail(params: {
   const firstName = name.split(" ")[0];
   const loginUrl = `${ENV.appUrl}/`;
 
-  await resend.emails.send({
+  const { data: welcomeData, error: welcomeError } = await resend.emails.send({
     from: FROM_EMAIL,
     to,
     subject: `Bem-vindo ao Gestão Financeira, ${firstName}!`,
@@ -174,4 +179,9 @@ export async function sendWelcomeEmail(params: {
 </html>
     `.trim(),
   });
+  if (welcomeError) {
+    console.error("[Resend] Erro ao enviar e-mail de boas-vindas:", JSON.stringify(welcomeError));
+    throw new Error(`Falha ao enviar e-mail de boas-vindas: ${welcomeError.message ?? JSON.stringify(welcomeError)}`);
+  }
+  console.log("[Resend] E-mail de boas-vindas enviado:", welcomeData?.id, "para", to);
 }
