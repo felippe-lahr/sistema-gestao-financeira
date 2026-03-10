@@ -394,6 +394,21 @@ export type UserPassword = typeof userPasswords.$inferSelect;
 export type InsertUserPassword = typeof userPasswords.$inferInsert;
 
 /**
+ * Email Verifications table — tokens de verificação de e-mail enviados no cadastro.
+ * Cada usuário pode ter no máximo um token ativo (UNIQUE em userId).
+ */
+export const emailVerifications = pgTable("email_verifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+});
+
+export type EmailVerification = typeof emailVerifications.$inferSelect;
+export type InsertEmailVerification = typeof emailVerifications.$inferInsert;
+
+/**
  * Rental Status enum
  */
 export const rentalStatusEnum = pgEnum("rental_status", ["BLOCKED", "RESERVED_AIRBNB", "RESERVED_DIRECT", "AVAILABLE"]);
