@@ -1967,17 +1967,18 @@ export async function ensureEmailVerificationsTable(): Promise<void> {
  * Cria um token de verificação de e-mail para um usuário.
  */
 export async function createEmailVerificationToken(userId: number, token: string): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
-
-  // Usar SQL raw pois a tabela não está no schema drizzle
-  await db.execute(
-    sql`INSERT INTO email_verifications ("userId", "token", "expiresAt")
-        VALUES (${userId}, ${token}, ${expiresAt})
-        ON CONFLICT ("token") DO NOTHING`
-  );
+  // Usar postgres direto pois a tabela não está no schema drizzle
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    await client`
+      INSERT INTO email_verifications ("userId", token, "expiresAt")
+      VALUES (${userId}, ${token}, ${expiresAt})
+      ON CONFLICT (token) DO NOTHING
+    `;
+  } finally {
+     await client.end();
+  }
 }
 
 /**
