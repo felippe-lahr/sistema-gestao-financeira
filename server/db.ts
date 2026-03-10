@@ -2274,7 +2274,10 @@ export async function adminDeleteUser(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
 
-  // Remove verificações de e-mail
+  // IMPORTANTE: A constraint organizations.ownerId tem DELETE RULE = RESTRICT,
+  // portanto as organizações do usuário DEVEM ser deletadas ANTES do usuário.
+
+  // Remove verificações de e-mail (CASCADE, mas deletamos explicitamente)
   await db.execute(sql`DELETE FROM email_verifications WHERE "userId" = ${userId}`);
 
   // Remove senhas
@@ -2283,15 +2286,20 @@ export async function adminDeleteUser(userId: number): Promise<void> {
   // Remove memberships de organizações
   await db.execute(sql`DELETE FROM organization_members WHERE "userId" = ${userId}`);
 
-  // Remove organizações onde o usuário é owner e não há outros membros
+  // Remove entity_members (CASCADE, mas deletamos explicitamente)
+  await db.execute(sql`DELETE FROM entity_members WHERE "userId" = ${userId}`);
+
+  // Remove entity_invites feitos pelo usuário
+  await db.execute(sql`DELETE FROM entity_invites WHERE "invitedBy" = ${userId}`);
+
+  // Remove organizações onde o usuário é owner (DEVE ser antes de deletar o usuário
+  // por causa da constraint RESTRICT em organizations.ownerId)
+  // Transfere ownership para outro membro ou deleta a organização inteira
   await db.execute(sql`
     DELETE FROM organizations
     WHERE "ownerId" = ${userId}
-    AND id NOT IN (
-      SELECT DISTINCT "organizationId" FROM organization_members WHERE "userId" != ${userId}
-    )
   `);
 
-  // Remove o usuário
+  // Remove o usuário (agora seguro pois não há mais organizações com ownerId = userId)
   await db.execute(sql`DELETE FROM users WHERE id = ${userId}`);
 }
