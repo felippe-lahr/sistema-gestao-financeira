@@ -364,10 +364,11 @@ function Step3({
         </div>
       </div>
 
-      <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 p-3">
-        <p className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
-          <Mail className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-          Após criar sua conta, você receberá um e-mail de verificação em <strong>{data.email}</strong>. Clique no link para ativar o acesso.
+      <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 p-3 flex items-start gap-2">
+        <Mail className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+        <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+          Após criar sua conta, você receberá um e-mail de verificação em{" "}
+          <strong className="font-semibold break-all">{data.email}</strong>. Clique no link para ativar o acesso ao sistema.
         </p>
       </div>
 
@@ -418,27 +419,46 @@ export default function Signup() {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          email: formData.email.toLowerCase().trim(),
-          password: formData.password,
-          organizationName: formData.organizationName.trim(),
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+      let response: Response;
+      try {
+        response = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name.trim(),
+            email: formData.email.toLowerCase().trim(),
+            password: formData.password,
+            organizationName: formData.organizationName.trim(),
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       const data = await response.json();
 
       if (response.ok) {
         setSubmittedEmail(formData.email.toLowerCase().trim());
         setSubmitted(true);
+      } else if (response.status === 409) {
+        toast.error("Este e-mail já está cadastrado. Faça login ou use outro e-mail.");
+      } else if (response.status === 429) {
+        toast.error("Muitas tentativas. Aguarde alguns minutos e tente novamente.");
       } else {
         toast.error(data.error || "Erro ao criar conta. Tente novamente.");
       }
-    } catch {
-      toast.error("Erro de conexão. Verifique sua internet e tente novamente.");
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        toast.error(
+          "A requisição demorou muito. Verifique seu e-mail — sua conta pode ter sido criada. Se não receber o e-mail, tente novamente."
+        );
+      } else {
+        toast.error("Erro de conexão. Verifique sua internet e tente novamente.");
+      }
     } finally {
       setIsLoading(false);
     }
