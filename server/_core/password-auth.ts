@@ -623,8 +623,10 @@ export function registerPasswordAuthRoutes(app: Express) {
 
       res.json({ success: true, message: "Novo link de verificação enviado para seu e-mail." });
     } catch (error) {
-      console.error("[Password Auth] Resend verification failed", error);
-      res.status(500).json({ error: "Erro ao reenviar e-mail" });
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error("[Password Auth] Resend verification failed", msg);
+      // Retornar mensagem de erro mais detalhada para diagnóstico
+      res.status(500).json({ error: "Erro ao reenviar e-mail", detail: msg });
     }
   });
 }
