@@ -1434,7 +1434,7 @@ export async function getUserByEmail(email: string) {
   const db = await getDb();
   if (!db) return null;
 
-  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const result = await db.select().from(users).where(eq(users.email, email)).orderBy(asc(users.id)).limit(1);
   return result.length > 0 ? result[0] : null;
 }
 
