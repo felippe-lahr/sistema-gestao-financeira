@@ -3,7 +3,18 @@ import { ENV } from "./env";
 
 const resend = new Resend(ENV.resendApiKey);
 
-const FROM_EMAIL = "Gestão Financeira <noreply@unifiquepro.com.br>";
+const FROM_EMAIL = "UnifiquePro <noreply@unifiquepro.com.br>";
+
+const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310419663029179004/bOlVubVBUCKquGqG.png";
+
+const emailHeader = `
+  <tr>
+    <td style="background-color:#1e293b;padding:28px 40px;text-align:center;">
+      <img src="${LOGO_URL}" alt="UnifiquePro" width="160" style="display:block;margin:0 auto;height:auto;max-width:160px;" />
+      <p style="margin:6px 0 0;color:#94a3b8;font-size:12px;letter-spacing:0.3px;">simplificando suas finanças</p>
+    </td>
+  </tr>
+`;
 
 /**
  * Envia e-mail de verificação de conta para um novo usuário.
@@ -20,7 +31,7 @@ export async function sendVerificationEmail(params: {
   const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: "Confirme seu e-mail — Gestão Financeira",
+    subject: "Confirme seu e-mail — UnifiquePro",
     html: `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -34,14 +45,7 @@ export async function sendVerificationEmail(params: {
     <tr>
       <td align="center">
         <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="background-color:#1e293b;padding:32px 40px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">
-                💰 Gestão Financeira
-              </h1>
-            </td>
-          </tr>
+          ${emailHeader}
           <!-- Body -->
           <tr>
             <td style="padding:40px 40px 32px;">
@@ -112,7 +116,7 @@ export async function sendWelcomeEmail(params: {
   const { data: welcomeData, error: welcomeError } = await resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: `Bem-vindo ao Gestão Financeira, ${firstName}!`,
+    subject: `Bem-vindo ao UnifiquePro, ${firstName}!`,
     html: `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -126,14 +130,7 @@ export async function sendWelcomeEmail(params: {
     <tr>
       <td align="center">
         <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="background-color:#1e293b;padding:32px 40px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">
-                💰 Gestão Financeira
-              </h1>
-            </td>
-          </tr>
+          ${emailHeader}
           <!-- Body -->
           <tr>
             <td style="padding:40px 40px 32px;">
@@ -167,7 +164,7 @@ export async function sendWelcomeEmail(params: {
           <tr>
             <td style="padding:24px 40px;text-align:center;">
               <p style="margin:0;color:#94a3b8;font-size:12px;">
-                Você recebeu este e-mail porque criou uma conta no Gestão Financeira.
+                Você recebeu este e-mail porque criou uma conta no UnifiquePro.
               </p>
             </td>
           </tr>

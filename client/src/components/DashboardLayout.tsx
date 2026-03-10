@@ -113,8 +113,14 @@ function LoginForm() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <Card className="w-full max-w-md mx-4 shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Sistema de Gestao Financeira</CardTitle>
-          <CardDescription>Entre com suas credenciais para acessar</CardDescription>
+          <div className="flex justify-center mb-3">
+            <img
+              src="/logo-unifique-pro.png"
+              alt="UnifiquePro"
+              className="h-10 w-auto object-contain"
+            />
+          </div>
+          <CardDescription className="text-sm text-muted-foreground">simplificando suas finanças</CardDescription>
         </CardHeader>
         <CardContent>
           {emailNotVerified && (
@@ -408,10 +414,12 @@ function DashboardLayoutContent({
                 <Menu className="h-5 w-5 text-muted-foreground" />
               </button>
               {!isCollapsed ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold tracking-tight truncate">
-                    Gestão Financeira
-                  </span>
+                <div className="flex items-center min-w-0 flex-1">
+                  <img
+                    src="/logo-unifique-pro.png"
+                    alt="UnifiquePro"
+                    className="h-7 w-auto object-contain max-w-[140px]"
+                  />
                 </div>
               ) : null}
             </div>

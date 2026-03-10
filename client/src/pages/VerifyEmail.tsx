@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, XCircle, Loader2, Mail, Building2 } from "lucide-react";
+import { Check, XCircle, Loader2, Mail } from "lucide-react";
 
 type Status = "loading" | "success" | "error" | "expired";
 
@@ -62,11 +62,9 @@ export default function VerifyEmail() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardContent className="pt-10 pb-10 text-center space-y-6">
-          {/* Ícone do sistema */}
+          {/* Logo UnifiquePro */}
           <div className="flex justify-center">
-            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
-              <Building2 className="h-6 w-6 text-white" />
-            </div>
+            <img src="/logo-unifique-pro.png" alt="UnifiquePro" className="h-9 w-auto object-contain" />
           </div>
 
           {/* Loading */}

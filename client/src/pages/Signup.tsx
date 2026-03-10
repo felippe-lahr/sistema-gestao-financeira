@@ -470,6 +470,9 @@ export default function Signup() {
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
         <Card className="w-full max-w-md shadow-xl">
           <CardContent className="pt-8 pb-8 text-center space-y-6">
+            <div className="flex justify-center mb-2">
+              <img src="/logo-unifique-pro.png" alt="UnifiquePro" className="h-9 w-auto object-contain" />
+            </div>
             <div className="flex justify-center">
               <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                 <Mail className="h-10 w-10 text-blue-600 dark:text-blue-400" />
@@ -517,9 +520,7 @@ export default function Signup() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-3">
-            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
-              <Building2 className="h-6 w-6 text-white" />
-            </div>
+            <img src="/logo-unifique-pro.png" alt="UnifiquePro" className="h-9 w-auto object-contain" />
           </div>
           <CardTitle className="text-2xl font-bold">{stepTitles[step - 1].title}</CardTitle>
           <CardDescription>{stepTitles[step - 1].description}</CardDescription>

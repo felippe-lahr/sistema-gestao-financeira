@@ -251,7 +251,9 @@ export default function AcceptInvite() {
 
         {/* Header da plataforma */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sistema de Gestão Financeira</h1>
+          <div className="flex justify-center mb-2">
+            <img src="/logo-unifique-pro.png" alt="UnifiquePro" className="h-9 w-auto object-contain" />
+          </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">Convite de acesso compartilhado</p>
         </div>
 
