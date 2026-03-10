@@ -3,7 +3,7 @@ import { ENV } from "./env";
 
 const resend = new Resend(ENV.resendApiKey);
 
-const FROM_EMAIL = "Gestão Financeira <onboarding@resend.dev>";
+const FROM_EMAIL = "Gestão Financeira <noreply@unifiquepro.com.br>";
 
 /**
  * Envia e-mail de verificação de conta para um novo usuário.
