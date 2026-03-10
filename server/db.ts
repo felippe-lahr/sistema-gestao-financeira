@@ -2257,3 +2257,41 @@ export async function adminSetUserRole(userId: number, role: 'user' | 'admin'): 
   if (!db) throw new Error('Database not available');
   await db.execute(sql`UPDATE users SET role = ${role}, "updatedAt" = NOW() WHERE id = ${userId}`);
 }
+
+/**
+ * Altera o status de um usuário (active / suspended / banned).
+ */
+export async function adminSetUserStatus(userId: number, status: 'active' | 'suspended' | 'banned'): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.execute(sql`UPDATE users SET status = ${status}::text, "updatedAt" = NOW() WHERE id = ${userId}`);
+}
+
+/**
+ * Admin: Deleta um usuário e todos os seus dados associados.
+ */
+export async function adminDeleteUser(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+
+  // Remove verificações de e-mail
+  await db.execute(sql`DELETE FROM email_verifications WHERE "userId" = ${userId}`);
+
+  // Remove senhas
+  await db.execute(sql`DELETE FROM user_passwords WHERE "userId" = ${userId}`);
+
+  // Remove memberships de organizações
+  await db.execute(sql`DELETE FROM organization_members WHERE "userId" = ${userId}`);
+
+  // Remove organizações onde o usuário é owner e não há outros membros
+  await db.execute(sql`
+    DELETE FROM organizations
+    WHERE "ownerId" = ${userId}
+    AND id NOT IN (
+      SELECT DISTINCT "organizationId" FROM organization_members WHERE "userId" != ${userId}
+    )
+  `);
+
+  // Remove o usuário
+  await db.execute(sql`DELETE FROM users WHERE id = ${userId}`);
+}

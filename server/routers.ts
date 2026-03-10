@@ -2220,6 +2220,35 @@ export const appRouter = router({
         await db.adminSetUserRole(input.userId, input.role);
         return { success: true };
       }),
+
+    /**
+     * Altera o status de um usuário (active / suspended / banned).
+     */
+    setUserStatus: adminProcedure
+      .input(z.object({
+        userId: z.number(),
+        status: z.enum(['active', 'suspended', 'banned']),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (input.userId === ctx.user.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Você não pode alterar seu próprio status.' });
+        }
+        await db.adminSetUserStatus(input.userId, input.status);
+        return { success: true };
+      }),
+
+    /**
+     * Deleta um usuário e todos os seus dados.
+     */
+    deleteUser: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (input.userId === ctx.user.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Você não pode deletar sua própria conta por aqui.' });
+        }
+        await db.adminDeleteUser(input.userId);
+        return { success: true };
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;

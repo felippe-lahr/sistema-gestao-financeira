@@ -11,6 +11,9 @@ export const attachmentTypeEnum = pgEnum("attachment_type", ["NOTA_FISCAL", "DOC
 // Organization plan enum
 export const orgPlanEnum = pgEnum("org_plan", ["free", "pro", "enterprise"]);
 
+// User status enum
+export const userStatusEnum = pgEnum("user_status", ["active", "suspended", "banned"]);
+
 /**
  * Core user table backing auth flow.
  */
@@ -21,6 +24,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: roleEnum("role").default("user").notNull(),
+  status: userStatusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
