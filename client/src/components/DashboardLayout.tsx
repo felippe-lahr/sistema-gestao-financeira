@@ -117,7 +117,7 @@ function LoginForm() {
             <img
               src="/logo-unifique-pro.png"
               alt="UnifiquePro"
-              className="h-10 w-auto object-contain"
+              style={{ width: '280px' }} className="h-auto object-contain"
             />
           </div>
           <CardDescription className="text-sm text-muted-foreground">simplificando suas finanças</CardDescription>
@@ -418,7 +418,7 @@ function DashboardLayoutContent({
                   <img
                     src="/logo-unifique-pro.png"
                     alt="UnifiquePro"
-                    className="h-7 w-auto object-contain max-w-[140px]"
+                    style={{ width: '180px' }} className="h-auto object-contain"
                   />
                 </div>
               ) : null}
