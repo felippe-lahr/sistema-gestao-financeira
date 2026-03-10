@@ -471,28 +471,44 @@ export function registerPasswordAuthRoutes(app: Express) {
 
       // Gerar token de verificação de e-mail
       const verificationToken = randomUUID().replace(/-/g, "");
-      await db.createEmailVerificationToken(newUser.id, verificationToken);
+      console.log("[Register] Criando token de verificação para userId:", newUser.id);
+      try {
+        await db.createEmailVerificationToken(newUser.id, verificationToken);
+        console.log("[Register] Token de verificação criado com sucesso");
+      } catch (tokenError) {
+        console.error("[Register] Falha ao criar token de verificação:", tokenError);
+        // Conta já foi criada — não bloquear, mas logar o erro
+      }
 
       // Enviar e-mail de verificação
-      const { ENV } = await import("./env");
-      const { sendVerificationEmail } = await import("./email");
-      const verificationUrl = `${ENV.appUrl}/verificar-email?token=${verificationToken}`;
-
+      let emailSent = false;
       try {
+        const { ENV } = await import("./env");
+        const { sendVerificationEmail } = await import("./email");
+        const verificationUrl = `${ENV.appUrl}/verificar-email?token=${verificationToken}`;
+        console.log("[Register] APP_URL:", ENV.appUrl);
+        console.log("[Register] Verification URL:", verificationUrl);
+
         await sendVerificationEmail({
           to: email.toLowerCase().trim(),
           name: name.trim(),
           verificationUrl,
         });
+        emailSent = true;
+        console.log("[Register] E-mail de verificação enviado com sucesso");
       } catch (emailError) {
-        console.error("[Register] Failed to send verification email:", emailError);
-        // Não bloquear o cadastro se o e-mail falhar — apenas logar
+        const emailMsg = emailError instanceof Error ? emailError.message : String(emailError);
+        console.error("[Register] Falha ao enviar e-mail de verificação:", emailMsg);
+        // Não bloquear o cadastro se o e-mail falhar — conta já foi criada
       }
 
       res.status(201).json({
         success: true,
-        message: "Conta criada com sucesso. Verifique seu e-mail para ativar o acesso.",
+        message: emailSent
+          ? "Conta criada com sucesso. Verifique seu e-mail para ativar o acesso."
+          : "Conta criada com sucesso. Houve um problema ao enviar o e-mail de verificação — tente reenviar.",
         email: email.toLowerCase().trim(),
+        emailSent,
       });
     } catch (error) {
       console.error("[Password Auth] Register failed", error);
@@ -606,22 +622,25 @@ export function registerPasswordAuthRoutes(app: Express) {
         res.status(400).json({ error: "Este e-mail já foi verificado. Faça login para continuar." });
         return;
       }
-
       // Gerar novo token
       const verificationToken = randomUUID().replace(/-/g, "");
+      console.log("[Resend Verification] Criando novo token para userId:", user.id);
       await db.createEmailVerificationToken(user.id, verificationToken);
 
       const { ENV } = await import("./env");
       const { sendVerificationEmail } = await import("./email");
       const verificationUrl = `${ENV.appUrl}/verificar-email?token=${verificationToken}`;
+      console.log("[Resend Verification] APP_URL:", ENV.appUrl);
+      console.log("[Resend Verification] Verification URL:", verificationUrl);
 
       await sendVerificationEmail({
         to: user.email ?? "",
-        name: user.name ?? "Usuário",
+        name: user.name ?? "Usu\u00e1rio",
         verificationUrl,
       });
 
-      res.json({ success: true, message: "Novo link de verificação enviado para seu e-mail." });
+      console.log("[Resend Verification] E-mail reenviado com sucesso");
+      res.json({ success: true, message: "Novo link de verifica\u00e7\u00e3o enviado para seu e-mail." });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error("[Password Auth] Resend verification failed", msg);

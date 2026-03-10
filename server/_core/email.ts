@@ -1,7 +1,21 @@
 import { Resend } from "resend";
 import { ENV } from "./env";
 
-const resend = new Resend(ENV.resendApiKey);
+// Lazy initialization — só cria a instância quando realmente precisar enviar
+let _resend: Resend | null = null;
+
+function getResend(): Resend {
+  if (!_resend) {
+    const apiKey = ENV.resendApiKey || process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "RESEND_API_KEY não está configurada. Configure a variável de ambiente no Railway."
+      );
+    }
+    _resend = new Resend(apiKey);
+  }
+  return _resend;
+}
 
 const FROM_EMAIL = "UnifiquePro <noreply@unifiquepro.com.br>";
 
@@ -27,6 +41,12 @@ export async function sendVerificationEmail(params: {
   const { to, name, verificationUrl } = params;
 
   const firstName = name.split(" ")[0];
+
+  console.log("[Resend] Tentando enviar e-mail de verificação para:", to);
+  console.log("[Resend] API Key presente:", !!(ENV.resendApiKey || process.env.RESEND_API_KEY));
+  console.log("[Resend] Verification URL:", verificationUrl);
+
+  const resend = getResend();
 
   const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
@@ -112,6 +132,10 @@ export async function sendWelcomeEmail(params: {
   const { to, name, organizationName } = params;
   const firstName = name.split(" ")[0];
   const loginUrl = `${ENV.appUrl}/`;
+
+  console.log("[Resend] Tentando enviar e-mail de boas-vindas para:", to);
+
+  const resend = getResend();
 
   const { data: welcomeData, error: welcomeError } = await resend.emails.send({
     from: FROM_EMAIL,

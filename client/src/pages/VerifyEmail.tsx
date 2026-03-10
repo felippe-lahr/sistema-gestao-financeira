@@ -64,7 +64,7 @@ export default function VerifyEmail() {
         <CardContent className="pt-10 pb-10 text-center space-y-6">
           {/* Logo UnifiquePro */}
           <div className="flex justify-center">
-            <img src="/logo-unifique-pro.png" alt="UnifiquePro" className="h-9 w-auto object-contain" />
+            <img src="/logo-unifique-pro.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain" />
           </div>
 
           {/* Loading */}
