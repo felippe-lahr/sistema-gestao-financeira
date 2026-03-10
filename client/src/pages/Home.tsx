@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 export default function Home() {
   const [, setLocation] = useLocation();
   const [showValues, setShowValues] = useState(true);
-  const { data: entities, isLoading } = trpc.entities.list.useQuery();
+  const { data: entities, isLoading } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
 
   // Carregar preferência do localStorage
   useEffect(() => {

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -39,6 +39,10 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +50,7 @@ function LoginForm() {
       toast.error("Preencha email e senha");
       return;
     }
+    setEmailNotVerified(false);
     setIsLoading(true);
     try {
       const response = await fetch("/api/auth/login", {
@@ -62,6 +67,9 @@ function LoginForm() {
         localStorage.setItem('rememberMe', JSON.stringify(rememberMe));
         // Redirecionar para página de entidades
         window.location.href = '/';
+      } else if (data.code === "EMAIL_NOT_VERIFIED") {
+        setEmailNotVerified(true);
+        setUnverifiedEmail(data.email || email);
       } else {
         toast.error(data.error || "Email ou senha incorretos");
       }
@@ -69,6 +77,35 @@ function LoginForm() {
       toast.error("Erro ao fazer login");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (resendCooldown > 0) return;
+    setResendLoading(true);
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: unverifiedEmail }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("Novo link de verificação enviado! Verifique sua caixa de entrada.");
+        setResendCooldown(60);
+        const interval = setInterval(() => {
+          setResendCooldown((prev) => {
+            if (prev <= 1) { clearInterval(interval); return 0; }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        toast.error(data.error || "Erro ao reenviar e-mail");
+      }
+    } catch {
+      toast.error("Erro de conexão");
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -80,6 +117,26 @@ function LoginForm() {
           <CardDescription>Entre com suas credenciais para acessar</CardDescription>
         </CardHeader>
         <CardContent>
+          {emailNotVerified && (
+            <div className="mb-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <span className="text-amber-600 dark:text-amber-400 text-sm font-medium">⚠️ E-mail não verificado</span>
+              </div>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Verifique sua caixa de entrada e clique no link de ativação enviado para <strong>{unverifiedEmail}</strong>.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
+                onClick={handleResendVerification}
+                disabled={resendLoading || resendCooldown > 0}
+              >
+                {resendLoading ? "Enviando..." : resendCooldown > 0 ? `Reenviar em ${resendCooldown}s` : "Reenviar e-mail de verificação"}
+              </Button>
+            </div>
+          )}
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -129,6 +186,17 @@ function LoginForm() {
               {isLoading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Não tem uma conta?{" "}
+              <a
+                href="/signup"
+                className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
+              >
+                Cadastre-se gratuitamente
+              </a>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -369,6 +437,19 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                 );
               })}
+              {user?.role === "admin" && (
+                <SidebarMenuItem key="/admin">
+                  <SidebarMenuButton
+                    isActive={location === "/admin"}
+                    onClick={() => setLocation("/admin")}
+                    tooltip="Painel Admin"
+                    className={`h-10 transition-all font-normal text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300`}
+                  >
+                    <ShieldCheck className={`h-5 w-5 ${location === "/admin" ? "text-purple-600 dark:text-purple-400" : ""}`} />
+                    <span>Painel Admin</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarContent>
 

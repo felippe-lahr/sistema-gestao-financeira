@@ -14,6 +14,7 @@ import { registerUploadRoutes } from "./upload-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
+import { ensureEntitySharingTables, ensureEmailVerificationsTable } from "../db";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -88,15 +89,27 @@ async function startServer() {
   });
   app.use(limiter);
 
-  // Stricter rate limit for authentication endpoints
-  const authLimiter = rateLimit({
+  // Rate limit estrito para login (proteção contra brute force)
+  const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 5,
-    message: 'Too many login attempts, please try again later.',
+    max: 10,
+    message: 'Muitas tentativas de login. Tente novamente em 15 minutos.',
     skipSuccessfulRequests: true,
   });
-  app.use('/api/oauth', authLimiter);
-  app.use('/api/auth', authLimiter);
+  app.use('/api/oauth', loginLimiter);
+  app.use('/api/auth/login', loginLimiter);
+  app.use('/api/auth/demo-login', loginLimiter);
+
+  // Rate limit mais permissivo para registro e verificação de e-mail
+  const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hora
+    max: 20,
+    message: 'Muitas tentativas de cadastro. Tente novamente em 1 hora.',
+    skipSuccessfulRequests: true,
+  });
+  app.use('/api/auth/register', registerLimiter);
+  app.use('/api/auth/verify-email', registerLimiter);
+  app.use('/api/auth/resend-verification', registerLimiter);
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
@@ -147,6 +160,11 @@ async function startServer() {
     console.log('[Security] CORS protection enabled');
     console.log('[Security] Rate limiting enabled');
   });
+
+  // Garantir que as tabelas de compartilhamento existam (migração segura)
+  await ensureEntitySharingTables();
+  // Garantir que a tabela de verificação de e-mail existe
+  await ensureEmailVerificationsTable();
 
   // Start cron jobs
   startCronJobs();

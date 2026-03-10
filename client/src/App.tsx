@@ -17,6 +17,10 @@ import UserProfile from "@/pages/UserProfile";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import AcceptInvite from "@/pages/AcceptInvite";
+import Signup from "@/pages/Signup";
+import VerifyEmail from "@/pages/VerifyEmail";
+import Admin from "@/pages/Admin";
 
 function Router() {
   return (
@@ -33,6 +37,10 @@ function Router() {
       <Route path="/agenda" component={() => <DashboardLayout><Agenda /></DashboardLayout>} />
       <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
       <Route path="/profile" component={() => <DashboardLayout><UserProfile /></DashboardLayout>} />
+      <Route path="/convite/:token" component={AcceptInvite} />
+      <Route path="/signup" component={Signup} />
+      <Route path="/verificar-email" component={VerifyEmail} />
+      <Route path="/admin" component={() => <DashboardLayout><Admin /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

@@ -30,6 +30,8 @@ import {
   InsertTask,
   organizations,
   organizationMembers,
+  entityMembers,
+  entityInvites,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1432,7 +1434,7 @@ export async function getUserByEmail(email: string) {
   const db = await getDb();
   if (!db) return null;
 
-  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const result = await db.select().from(users).where(eq(users.email, email)).orderBy(asc(users.id)).limit(1);
   return result.length > 0 ? result[0] : null;
 }
 
@@ -1642,4 +1644,663 @@ export async function ensureOrganizationForUser(user: { id: number; name: string
   });
 
   return org;
+}
+
+// ========== ENTITY SHARING OPERATIONS ==========
+
+/**
+ * Retorna todos os membros de uma entidade (exceto o dono).
+ * Inclui dados básicos do usuário para exibição.
+ */
+export async function getEntityMembers(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select({
+      id: entityMembers.id,
+      entityId: entityMembers.entityId,
+      userId: entityMembers.userId,
+      role: entityMembers.role,
+      invitedBy: entityMembers.invitedBy,
+      joinedAt: entityMembers.joinedAt,
+      userName: users.name,
+      userEmail: users.email,
+    })
+    .from(entityMembers)
+    .leftJoin(users, eq(entityMembers.userId, users.id))
+    .where(eq(entityMembers.entityId, entityId));
+}
+
+/**
+ * Verifica se um usuário é membro de uma entidade e retorna seu role.
+ * Retorna undefined se não for membro.
+ */
+export async function getEntityMember(entityId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(entityMembers)
+    .where(and(eq(entityMembers.entityId, entityId), eq(entityMembers.userId, userId)))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Adiciona um usuário como membro de uma entidade.
+ */
+export async function addEntityMember(data: {
+  entityId: number;
+  userId: number;
+  role: "VIEWER" | "EDITOR" | "ADMIN";
+  invitedBy: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(entityMembers).values(data).returning();
+  return result[0];
+}
+
+/**
+ * Atualiza o role de um membro de uma entidade.
+ */
+export async function updateEntityMemberRole(
+  entityId: number,
+  userId: number,
+  role: "VIEWER" | "EDITOR" | "ADMIN"
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(entityMembers)
+    .set({ role })
+    .where(and(eq(entityMembers.entityId, entityId), eq(entityMembers.userId, userId)));
+}
+
+/**
+ * Remove um membro de uma entidade.
+ */
+export async function removeEntityMember(entityId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .delete(entityMembers)
+    .where(and(eq(entityMembers.entityId, entityId), eq(entityMembers.userId, userId)));
+}
+
+/**
+ * Retorna todas as entidades que um usuário tem acesso (como membro, não dono).
+ */
+export async function getSharedEntitiesForUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    // Retorna todos os campos da entidade + role do membro em uma única query (sem N+1)
+    return await db
+      .select({
+        id: entities.id,
+        organizationId: entities.organizationId,
+        userId: entities.userId,
+        name: entities.name,
+        description: entities.description,
+        color: entities.color,
+        displayOrder: entities.displayOrder,
+        temporaryRentalEnabled: entities.temporaryRentalEnabled,
+        createdAt: entities.createdAt,
+        updatedAt: entities.updatedAt,
+        sharedRole: entityMembers.role,
+      })
+      .from(entityMembers)
+      .innerJoin(entities, eq(entityMembers.entityId, entities.id))
+      .where(eq(entityMembers.userId, userId));
+  } catch (err: any) {
+    // Se a tabela ainda não existe (migração pendente), retorna lista vazia
+    const msg: string = err?.message ?? '';
+    if (msg.includes('entity_members') || err?.code === '42P01') {
+      console.warn('[db] entity_members table not found, returning empty shared entities');
+      return [];
+    }
+    throw err;
+  }
+}
+
+// ========== ENTITY INVITE OPERATIONS ==========
+
+/**
+ * Cria um convite para uma entidade.
+ */
+export async function createEntityInvite(data: {
+  entityId: number;
+  invitedBy: number;
+  email?: string;
+  role: "VIEWER" | "EDITOR" | "ADMIN";
+  token: string;
+  expiresAt: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(entityInvites).values(data).returning();
+  return result[0];
+}
+
+/**
+ * Busca um convite pelo token.
+ */
+export async function getEntityInviteByToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select({
+      id: entityInvites.id,
+      entityId: entityInvites.entityId,
+      invitedBy: entityInvites.invitedBy,
+      email: entityInvites.email,
+      role: entityInvites.role,
+      token: entityInvites.token,
+      status: entityInvites.status,
+      expiresAt: entityInvites.expiresAt,
+      acceptedAt: entityInvites.acceptedAt,
+      createdAt: entityInvites.createdAt,
+      entityName: entities.name,
+      inviterName: users.name,
+      inviterEmail: users.email,
+    })
+    .from(entityInvites)
+    .innerJoin(entities, eq(entityInvites.entityId, entities.id))
+    .innerJoin(users, eq(entityInvites.invitedBy, users.id))
+    .where(eq(entityInvites.token, token))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Retorna todos os convites pendentes de uma entidade.
+ */
+export async function getEntityInvites(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(entityInvites)
+    .where(and(eq(entityInvites.entityId, entityId), eq(entityInvites.status, "PENDING")))
+    .orderBy(desc(entityInvites.createdAt));
+}
+
+/**
+ * Marca um convite como aceito.
+ */
+export async function acceptEntityInvite(token: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(entityInvites)
+    .set({ status: "ACCEPTED", acceptedAt: new Date() })
+    .where(eq(entityInvites.token, token));
+}
+
+/**
+ * Cancela (revoga) um convite.
+ */
+export async function revokeEntityInvite(inviteId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .delete(entityInvites)
+    .where(eq(entityInvites.id, inviteId));
+}
+
+// ========== ENTITY MEMBER CHECK ==========
+/**
+ * Verifica se um usuário já é membro de uma entidade (como membro compartilhado, não dono).
+ */
+export async function isEntityMember(entityId: number, userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db
+    .select({ id: entityMembers.id })
+    .from(entityMembers)
+    .where(and(eq(entityMembers.entityId, entityId), eq(entityMembers.userId, userId)))
+    .limit(1);
+  return result.length > 0;
+}
+
+// ========== SCHEMA INITIALIZATION ==========
+/**
+ * Garante que as tabelas de compartilhamento de entidades existam no banco.
+ * Executado no startup do servidor para garantir compatibilidade com bancos
+ * que ainda não passaram pela migração do drizzle-kit push.
+ */
+export async function ensureEntitySharingTables(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  try {
+    // Verificar se as tabelas já existem
+    const client = postgres(process.env.DATABASE_URL!);
+    
+    await client`
+      CREATE TYPE IF NOT EXISTS "entity_member_role" AS ENUM ('VIEWER', 'EDITOR', 'ADMIN', 'OWNER');
+    `;
+
+    await client`
+      CREATE TYPE IF NOT EXISTS "invite_status" AS ENUM ('PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED');
+    `;
+
+    await client`
+      CREATE TABLE IF NOT EXISTS "entity_members" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "entityId" integer NOT NULL REFERENCES "entities"("id") ON DELETE CASCADE,
+        "userId" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "role" "entity_member_role" NOT NULL DEFAULT 'VIEWER',
+        "invitedBy" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "joinedAt" timestamp DEFAULT now() NOT NULL,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        UNIQUE("entityId", "userId")
+      );
+    `;
+
+    await client`
+      CREATE TABLE IF NOT EXISTS "entity_invites" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "entityId" integer NOT NULL REFERENCES "entities"("id") ON DELETE CASCADE,
+        "invitedBy" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "email" varchar(320),
+        "role" "entity_member_role" NOT NULL DEFAULT 'VIEWER',
+        "token" varchar(128) NOT NULL UNIQUE,
+        "status" "invite_status" NOT NULL DEFAULT 'PENDING',
+        "expiresAt" timestamp NOT NULL,
+        "acceptedAt" timestamp,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+    `;
+
+    await client.end();
+    console.log('[db] Entity sharing tables ensured');
+  } catch (err: any) {
+    // Não bloquear o startup se falhar
+    console.warn('[db] Could not ensure entity sharing tables:', err?.message);
+  }
+}
+
+// ========== EMAIL VERIFICATION OPERATIONS ==========
+
+/**
+ * Garante que a tabela email_verifications existe no banco.
+ * Chamado no startup do servidor.
+ */
+export async function ensureEmailVerificationsTable(): Promise<void> {
+  try {
+    const { ENV } = await import("./_core/env");
+    const { default: postgres } = await import("postgres");
+    const client = postgres(ENV.databaseUrl, { max: 1 });
+    await client`
+      CREATE TABLE IF NOT EXISTS "email_verifications" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "userId" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "token" varchar(128) NOT NULL UNIQUE,
+        "expiresAt" timestamp NOT NULL,
+        "verifiedAt" timestamp,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+    `;
+    await client.end();
+    console.log('[db] email_verifications table ensured');
+  } catch (err: any) {
+    console.warn('[db] Could not ensure email_verifications table:', err?.message);
+  }
+}
+
+/**
+ * Cria um token de verificação de e-mail para um usuário.
+ */
+export async function createEmailVerificationToken(userId: number, token: string): Promise<void> {
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+  // Usar postgres direto pois a tabela não está no schema drizzle
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    await client`
+      INSERT INTO email_verifications ("userId", token, "expiresAt")
+      VALUES (${userId}, ${token}, ${expiresAt})
+      ON CONFLICT (token) DO NOTHING
+    `;
+  } finally {
+     await client.end();
+  }
+}
+
+/**
+ * Busca um token de verificação de e-mail.
+ */
+export async function getEmailVerificationToken(token: string): Promise<{
+  id: number;
+  userId: number;
+  token: string;
+  expiresAt: Date;
+  verifiedAt: Date | null;
+} | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = await db.execute<{
+    id: number;
+    userId: number;
+    token: string;
+    expiresAt: Date;
+    verifiedAt: Date | null;
+  }>(
+    sql`SELECT id, "userId", token, "expiresAt", "verifiedAt"
+        FROM email_verifications
+        WHERE token = ${token}
+        LIMIT 1`
+  ) as unknown as Array<{
+    id: number;
+    userId: number;
+    token: string;
+    expiresAt: Date;
+    verifiedAt: Date | null;
+  }>;
+
+  return rows.length > 0 ? rows[0] : null;
+}
+
+/**
+ * Marca um token de verificação como usado.
+ */
+export async function markEmailVerified(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.execute(
+    sql`UPDATE email_verifications SET "verifiedAt" = now() WHERE token = ${token}`
+  );
+}
+
+/**
+ * Verifica se um usuário já confirmou o e-mail.
+ */
+export async function isUserEmailVerified(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const rows = await db.execute(
+    sql`SELECT id FROM email_verifications
+        WHERE "userId" = ${userId} AND "verifiedAt" IS NOT NULL
+        LIMIT 1`
+  ) as unknown as unknown[];
+
+  return rows.length > 0;
+}
+
+/**
+ * Verifica se o usuário tem algum registro na tabela email_verifications (pendente ou verificado).
+ * Usuários legados (criados antes do sistema de verificação) não terão nenhum registro.
+ */
+export async function hasEmailVerificationRecord(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const rows = await db.execute(
+    sql`SELECT id FROM email_verifications
+        WHERE "userId" = ${userId}
+        LIMIT 1`
+  ) as unknown as unknown[];
+
+  return rows.length > 0;
+}
+
+/**
+ * Busca um usuário pelo ID.
+ */
+export async function getUserById(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+// ============================================================
+// ADMIN FUNCTIONS
+// ============================================================
+
+/**
+ * Lista todos os usuários do sistema com informações de verificação e organização.
+ */
+export async function adminListUsers(): Promise<{
+  id: number;
+  name: string | null;
+  email: string | null;
+  role: string;
+  loginMethod: string | null;
+  createdAt: Date;
+  lastSignedIn: Date;
+  emailVerified: boolean;
+  organizationName: string | null;
+  organizationPlan: string | null;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db.execute(
+    sql`SELECT
+          u.id,
+          u.name,
+          u.email,
+          u.role,
+          u."loginMethod",
+          u."createdAt",
+          u."lastSignedIn",
+          CASE WHEN ev.id IS NOT NULL THEN true ELSE false END AS "emailVerified",
+          o.name AS "organizationName",
+          o.plan AS "organizationPlan"
+        FROM users u
+        LEFT JOIN (
+          SELECT DISTINCT ON ("userId") id, "userId"
+          FROM email_verifications
+          WHERE "verifiedAt" IS NOT NULL
+          ORDER BY "userId", id DESC
+        ) ev ON ev."userId" = u.id
+        LEFT JOIN organizations o ON o."ownerId" = u.id
+        ORDER BY u."createdAt" DESC`
+  ) as unknown as any[];
+
+  return rows.map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    role: r.role,
+    loginMethod: r.loginMethod,
+    createdAt: new Date(r.createdAt),
+    lastSignedIn: new Date(r.lastSignedIn),
+    emailVerified: r.emailVerified === true || r.emailVerified === 't',
+    organizationName: r.organizationName ?? null,
+    organizationPlan: r.organizationPlan ?? null,
+  }));
+}
+
+/**
+ * Lista todas as organizações com dados do owner.
+ */
+export async function adminListOrganizations(): Promise<{
+  id: number;
+  name: string;
+  slug: string | null;
+  plan: string;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  createdAt: Date;
+  memberCount: number;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db.execute(
+    sql`SELECT
+          o.id,
+          o.name,
+          o.slug,
+          o.plan,
+          o."createdAt",
+          u.name AS "ownerName",
+          u.email AS "ownerEmail",
+          (SELECT COUNT(*) FROM organization_members om WHERE om."organizationId" = o.id) AS "memberCount"
+        FROM organizations o
+        LEFT JOIN users u ON u.id = o."ownerId"
+        ORDER BY o."createdAt" DESC`
+  ) as unknown as any[];
+
+  return rows.map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug ?? null,
+    plan: r.plan,
+    ownerName: r.ownerName ?? null,
+    ownerEmail: r.ownerEmail ?? null,
+    createdAt: new Date(r.createdAt),
+    memberCount: Number(r.memberCount ?? 0),
+  }));
+}
+
+/**
+ * Estatísticas gerais para o painel de admin.
+ */
+export async function adminGetStats(): Promise<{
+  totalUsers: number;
+  verifiedUsers: number;
+  newUsersThisWeek: number;
+  totalOrganizations: number;
+  planCounts: { free: number; pro: number; enterprise: number };
+}> {
+  const db = await getDb();
+  if (!db) return {
+    totalUsers: 0, verifiedUsers: 0, newUsersThisWeek: 0,
+    totalOrganizations: 0, planCounts: { free: 0, pro: 0, enterprise: 0 },
+  };
+
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const [statsRows, planRows] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        COUNT(*)::int AS "totalUsers",
+        COUNT(ev.id)::int AS "verifiedUsers",
+        COUNT(CASE WHEN u."createdAt" >= ${oneWeekAgo} THEN 1 END)::int AS "newUsersThisWeek",
+        (SELECT COUNT(*)::int FROM organizations) AS "totalOrganizations"
+      FROM users u
+      LEFT JOIN (
+        SELECT DISTINCT ON ("userId") id, "userId"
+        FROM email_verifications WHERE "verifiedAt" IS NOT NULL
+        ORDER BY "userId", id DESC
+      ) ev ON ev."userId" = u.id
+    `) as unknown as any[],
+    db.execute(sql`
+      SELECT plan, COUNT(*)::int AS cnt FROM organizations GROUP BY plan
+    `) as unknown as any[],
+  ]);
+
+  const s = statsRows[0] ?? {};
+  const planCounts = { free: 0, pro: 0, enterprise: 0 };
+  for (const row of planRows) {
+    if (row.plan === 'free') planCounts.free = Number(row.cnt);
+    else if (row.plan === 'pro') planCounts.pro = Number(row.cnt);
+    else if (row.plan === 'enterprise') planCounts.enterprise = Number(row.cnt);
+  }
+
+  return {
+    totalUsers: Number(s.totalUsers ?? 0),
+    verifiedUsers: Number(s.verifiedUsers ?? 0),
+    newUsersThisWeek: Number(s.newUsersThisWeek ?? 0),
+    totalOrganizations: Number(s.totalOrganizations ?? 0),
+    planCounts,
+  };
+}
+
+/**
+ * Altera o plano de uma organização.
+ */
+export async function adminSetOrganizationPlan(orgId: number, plan: 'free' | 'pro' | 'enterprise'): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.execute(sql`UPDATE organizations SET plan = ${plan}, "updatedAt" = NOW() WHERE id = ${orgId}`);
+}
+
+/**
+ * Força a verificação de e-mail de um usuário (ação administrativa).
+ */
+export async function adminForceVerifyUser(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  // Inserir um registro de verificação já confirmado
+  await db.execute(sql`
+    INSERT INTO email_verifications ("userId", token, "expiresAt", "verifiedAt")
+    VALUES (${userId}, ${'admin_forced_' + userId + '_' + Date.now()}, NOW(), NOW())
+    ON CONFLICT DO NOTHING
+  `);
+}
+
+/**
+ * Altera o role de um usuário (user / admin).
+ */
+export async function adminSetUserRole(userId: number, role: 'user' | 'admin'): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.execute(sql`UPDATE users SET role = ${role}, "updatedAt" = NOW() WHERE id = ${userId}`);
+}
+
+/**
+ * Altera o status de um usuário (active / suspended / banned).
+ */
+export async function adminSetUserStatus(userId: number, status: 'active' | 'suspended' | 'banned'): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.execute(sql`UPDATE users SET status = ${status}::text, "updatedAt" = NOW() WHERE id = ${userId}`);
+}
+
+/**
+ * Admin: Deleta um usuário e todos os seus dados associados.
+ */
+export async function adminDeleteUser(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+
+  // IMPORTANTE: A constraint organizations.ownerId tem DELETE RULE = RESTRICT,
+  // portanto as organizações do usuário DEVEM ser deletadas ANTES do usuário.
+
+  // Remove verificações de e-mail (CASCADE, mas deletamos explicitamente)
+  await db.execute(sql`DELETE FROM email_verifications WHERE "userId" = ${userId}`);
+
+  // Remove senhas
+  await db.execute(sql`DELETE FROM user_passwords WHERE "userId" = ${userId}`);
+
+  // Remove memberships de organizações
+  await db.execute(sql`DELETE FROM organization_members WHERE "userId" = ${userId}`);
+
+  // Remove entity_members (CASCADE, mas deletamos explicitamente)
+  await db.execute(sql`DELETE FROM entity_members WHERE "userId" = ${userId}`);
+
+  // Remove entity_invites feitos pelo usuário
+  await db.execute(sql`DELETE FROM entity_invites WHERE "invitedBy" = ${userId}`);
+
+  // Remove organizações onde o usuário é owner (DEVE ser antes de deletar o usuário
+  // por causa da constraint RESTRICT em organizations.ownerId)
+  // Transfere ownership para outro membro ou deleta a organização inteira
+  await db.execute(sql`
+    DELETE FROM organizations
+    WHERE "ownerId" = ${userId}
+  `);
+
+  // Remove o usuário (agora seguro pois não há mais organizações com ownerId = userId)
+  await db.execute(sql`DELETE FROM users WHERE id = ${userId}`);
 }

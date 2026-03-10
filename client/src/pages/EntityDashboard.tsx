@@ -92,7 +92,7 @@ export default function EntityDashboard() {
 
   const { startDate, endDate } = getFilterDates();
 
-  const { data: entities } = trpc.entities.list.useQuery();
+  const { data: entities } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
   const { data: metrics, isLoading: metricsLoading } = trpc.dashboard.metrics.useQuery(
     { entityId: entityId!, startDate, endDate },
     { enabled: !!entityId }
