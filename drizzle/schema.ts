@@ -399,7 +399,7 @@ export type InsertUserPassword = typeof userPasswords.$inferInsert;
  */
 export const emailVerifications = pgTable("email_verifications", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   token: varchar("token", { length: 64 }).notNull().unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   expiresAt: timestamp("expiresAt").notNull(),
