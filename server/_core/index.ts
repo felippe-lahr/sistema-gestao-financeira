@@ -80,20 +80,24 @@ async function startServer() {
   // 2.5. Cookie Parser - Parse cookies from requests
   app.use(cookieParser());
 
+  // 2.6. Trust proxy - necessário para Railway (reverse proxy)
+  // Sem isso, o rate limiter vê o IP do proxy e bloqueia todos os usuários juntos
+  app.set('trust proxy', 1);
+
   // 3. Rate Limiting - Prevent brute force and DDoS
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 500, // 500 req por IP a cada 15 min (suficiente para uso normal)
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
   });
   app.use(limiter);
 
-  // Rate limit estrito para login (proteção contra brute force)
+  // Rate limit para login (proteção contra brute force)
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: 30, // 30 tentativas de login por IP a cada 15 min
     message: 'Muitas tentativas de login. Tente novamente em 15 minutos.',
     skipSuccessfulRequests: true,
   });
@@ -102,10 +106,10 @@ async function startServer() {
   app.use('/api/auth/demo-login', loginLimiter);
   app.use('/api/auth/google', loginLimiter);
 
-  // Rate limit mais permissivo para registro e verificação de e-mail
+  // Rate limit para registro e verificação de e-mail
   const registerLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hora
-    max: 20,
+    max: 30, // 30 tentativas por hora
     message: 'Muitas tentativas de cadastro. Tente novamente em 1 hora.',
     skipSuccessfulRequests: true,
   });
