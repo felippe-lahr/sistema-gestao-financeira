@@ -529,6 +529,11 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           <SidebarFooter className="p-3 space-y-2">
+            <div className="px-1 group-data-[collapsible=icon]:hidden">
+              <p className="text-[10px] text-muted-foreground/50 text-center select-none">
+                v{__APP_VERSION__}
+              </p>
+            </div>
             <LiveClock />
             <div className="flex items-center justify-center group-data-[collapsible=icon]:justify-center">
               <ModeToggle />
