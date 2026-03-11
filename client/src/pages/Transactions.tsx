@@ -22,6 +22,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerC
 import { AttachmentUploader } from "@/components/AttachmentUploader";
 import { uploadFile, deleteFile } from "@/lib/storage";
 import { CurrencyInput, parseCurrency, formatCurrencyValue } from "@/components/CurrencyInput";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export default function Transactions() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -670,20 +671,18 @@ export default function Transactions() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="export_start_date">Data Inicial</Label>
-                      <Input
+                      <DatePicker
                         id="export_start_date"
-                        type="date"
                         value={exportAttachmentsStartDate}
-                        onChange={(e) => setExportAttachmentsStartDate(e.target.value)}
+                        onChange={(v) => setExportAttachmentsStartDate(v)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="export_end_date">Data Final</Label>
-                      <Input
+                      <DatePicker
                         id="export_end_date"
-                        type="date"
                         value={exportAttachmentsEndDate}
-                        onChange={(e) => setExportAttachmentsEndDate(e.target.value)}
+                        onChange={(v) => setExportAttachmentsEndDate(v)}
                       />
                     </div>
                   </div>
@@ -909,11 +908,11 @@ export default function Transactions() {
                 <>
                   <div className="space-y-2">
                     <Label>Data Inicial</Label>
-                    <Input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} />
+                    <DatePicker value={filterStartDate} onChange={(v) => setFilterStartDate(v)} />
                   </div>
                   <div className="space-y-2">
                     <Label>Data Final</Label>
-                    <Input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} />
+                    <DatePicker value={filterEndDate} onChange={(v) => setFilterEndDate(v)} />
                   </div>
                 </>
               )}
@@ -1042,8 +1041,8 @@ export default function Transactions() {
 
         {filterPeriod === "custom" && (
           <>
-            <Input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} className="w-[140px]" />
-            <Input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} className="w-[140px]" />
+            <DatePicker value={filterStartDate} onChange={(v) => setFilterStartDate(v)} className="w-[160px]" />
+            <DatePicker value={filterEndDate} onChange={(v) => setFilterEndDate(v)} className="w-[160px]" />
           </>
         )}
 
@@ -1569,12 +1568,12 @@ function TransactionForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="dueDate">Data de Vencimento</Label>
-          <Input id="dueDate" type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} />
+          <DatePicker id="dueDate" value={formData.dueDate} onChange={(v) => setFormData({ ...formData, dueDate: v })} />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="paymentDate">Data de Pagamento</Label>
-          <Input id="paymentDate" type="date" value={formData.paymentDate} onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })} />
+          <DatePicker id="paymentDate" value={formData.paymentDate} onChange={(v) => setFormData({ ...formData, paymentDate: v })} />
         </div>
       </div>
 

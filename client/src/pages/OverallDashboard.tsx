@@ -14,6 +14,7 @@ import { useLocation } from "wouter";
 import { format, startOfMonth, endOfMonth, addDays, isBefore, isAfter, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { trpc } from "@/lib/trpc";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export default function OverallDashboard() {
   const [, setLocation] = useLocation();
@@ -295,19 +296,9 @@ export default function OverallDashboard() {
 
         {filterPeriod === "custom" && (
           <>
-            <Input
-              type="date"
-              value={filterStartDate}
-              onChange={(e) => setFilterStartDate(e.target.value)}
-              className="w-[150px]"
-            />
+            <DatePicker value={filterStartDate} onChange={(v) => setFilterStartDate(v)} className="w-[160px]" />
             <span className="text-gray-500 dark:text-gray-400">até</span>
-            <Input
-              type="date"
-              value={filterEndDate}
-              onChange={(e) => setFilterEndDate(e.target.value)}
-              className="w-[150px]"
-            />
+            <DatePicker value={filterEndDate} onChange={(v) => setFilterEndDate(v)} className="w-[160px]" />
           </>
         )}
       </div>

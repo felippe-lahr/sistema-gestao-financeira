@@ -13,6 +13,7 @@ import { ptBR } from "date-fns/locale";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export function Reports() {
   const { entityId } = useParams();
@@ -405,21 +406,11 @@ export function Reports() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start-date">Data Inicial</Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+              <DatePicker id="start-date" value={startDate} onChange={(v) => setStartDate(v)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="end-date">Data Final</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
+              <DatePicker id="end-date" value={endDate} onChange={(v) => setEndDate(v)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="period-type">Período</Label>

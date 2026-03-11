@@ -24,6 +24,7 @@ import { RentalAttachmentUploader } from "@/components/RentalAttachmentUploader"
 import { uploadFile, deleteFile } from "@/lib/storage";
 import { CurrencyInput, parseCurrency, formatCurrency } from "@/components/CurrencyInput";
 import { getHolidayByDate, getHolidaysByMonth } from "@/lib/holidays";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type RentalAttachment = {
   id: number;
@@ -700,20 +701,11 @@ export default function Rentals() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-3">
                 <Label className="font-semibold">Data de Início *</Label>
-                <Input
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                />
+                <DatePicker value={formData.startDate} onChange={(v) => setFormData({ ...formData, startDate: v })} />
               </div>
               <div className="space-y-3">
                 <Label className="font-semibold">Data de Fim *</Label>
-                <Input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  min={formData.startDate || undefined}
-                />
+                <DatePicker value={formData.endDate} onChange={(v) => setFormData({ ...formData, endDate: v })} />
               </div>
             </div>
 
@@ -1053,20 +1045,11 @@ export default function Rentals() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-3">
                 <Label className="font-semibold">Data de Início *</Label>
-                <Input
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                />
+                <DatePicker value={formData.startDate} onChange={(v) => setFormData({ ...formData, startDate: v })} />
               </div>
               <div className="space-y-3">
                 <Label className="font-semibold">Data de Fim *</Label>
-                <Input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  min={formData.startDate || undefined}
-                />
+                <DatePicker value={formData.endDate} onChange={(v) => setFormData({ ...formData, endDate: v })} />
               </div>
             </div>
 

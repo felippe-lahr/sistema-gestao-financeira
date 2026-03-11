@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Pie, PieChart, Cell, Legend, BarChart, Bar } from "recharts";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export default function EntityDashboard() {
   const [, params] = useRoute("/dashboard/:id");
@@ -429,21 +430,11 @@ export default function EntityDashboard() {
                 <>
                   <div className="space-y-2">
                     <Label>Data Inicial</Label>
-                    <input
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="w-full px-3 py-2 border dark:border-gray-700 rounded-md text-sm"
-                    />
+                    <DatePicker value={customStartDate} onChange={(v) => setCustomStartDate(v)} />
                   </div>
                   <div className="space-y-2">
                     <Label>Data Final</Label>
-                    <input
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="w-full px-3 py-2 border dark:border-gray-700 rounded-md text-sm"
-                    />
+                    <DatePicker value={customEndDate} onChange={(v) => setCustomEndDate(v)} />
                   </div>
                 </>
               )}
@@ -519,18 +510,8 @@ export default function EntityDashboard() {
 
           {filterPeriod === "custom" && (
             <>
-              <input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-                className="px-3 py-2 border dark:border-gray-700 rounded-md text-sm w-[140px]"
-              />
-              <input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-                className="px-3 py-2 border dark:border-gray-700 rounded-md text-sm w-[140px]"
-              />
+              <DatePicker value={customStartDate} onChange={(v) => setCustomStartDate(v)} className="w-[160px]" />
+              <DatePicker value={customEndDate} onChange={(v) => setCustomEndDate(v)} className="w-[160px]" />
             </>
           )}
 
@@ -822,23 +803,11 @@ export default function EntityDashboard() {
             <div className="flex flex-col sm:flex-row gap-2 mt-4">
               <div className="flex-1">
                 <Label htmlFor="monthly-start-date" className="text-xs">Data Início</Label>
-                <input
-                  id="monthly-start-date"
-                  type="date"
-                  value={monthlyChartStartDate}
-                  onChange={(e) => setMonthlyChartStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border dark:border-gray-700 rounded-md text-sm"
-                />
+                <DatePicker id="monthly-start-date" value={monthlyChartStartDate} onChange={(v) => setMonthlyChartStartDate(v)} />
               </div>
               <div className="flex-1">
                 <Label htmlFor="monthly-end-date" className="text-xs">Data Fim</Label>
-                <input
-                  id="monthly-end-date"
-                  type="date"
-                  value={monthlyChartEndDate}
-                  onChange={(e) => setMonthlyChartEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border dark:border-gray-700 rounded-md text-sm"
-                />
+                <DatePicker id="monthly-end-date" value={monthlyChartEndDate} onChange={(v) => setMonthlyChartEndDate(v)} />
               </div>
             </div>
           )}

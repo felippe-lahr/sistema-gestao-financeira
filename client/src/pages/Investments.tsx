@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CurrencyInput, parseCurrency, formatCurrency as formatCurrencyValue } from "@/components/CurrencyInput";
 import { TreasuryDirectSelector } from "@/components/TreasuryDirectSelector";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const investmentTypes = [
   { value: "ACAO", label: "Ação" },
@@ -511,22 +512,12 @@ export default function Investments() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="purchaseDate">Data de Compra *</Label>
-                <Input
-                  id="purchaseDate"
-                  type="date"
-                  value={formData.purchaseDate}
-                  onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-                />
+                <DatePicker id="purchaseDate" value={formData.purchaseDate} onChange={(v) => setFormData({ ...formData, purchaseDate: v })} />
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="maturityDate">Data de Vencimento</Label>
-                <Input
-                  id="maturityDate"
-                  type="date"
-                  value={formData.maturityDate}
-                  onChange={(e) => setFormData({ ...formData, maturityDate: e.target.value })}
-                />
+                <DatePicker id="maturityDate" value={formData.maturityDate} onChange={(v) => setFormData({ ...formData, maturityDate: v })} />
               </div>
             </div>
 
