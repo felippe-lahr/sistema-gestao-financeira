@@ -1726,6 +1726,16 @@ export const appRouter = router({
             parentTaskId: null,
           });
           tasks.push(parentTaskId);
+
+          // Sync com Google Calendar (tarefa pai)
+          try {
+            const user = await db.getUserById(ctx.user.id);
+            if (user?.googleCalendarRefreshToken) {
+              const { syncTaskToGoogleCalendar } = await import("./services/google-calendar");
+              const parentTask = await db.getTaskById(parentTaskId);
+              if (parentTask) await syncTaskToGoogleCalendar(parentTask, user.googleCalendarRefreshToken);
+            }
+          } catch (e) { console.error("[Google Calendar] Erro sync tarefa pai:", e); }
           
           // Criar tarefas filhas
           for (let i = 1; i < count; i++) {
@@ -1771,6 +1781,16 @@ export const appRouter = router({
               parentTaskId: parentTaskId,
             });
             tasks.push(childTaskId);
+
+            // Sync com Google Calendar (tarefa filha)
+            try {
+              const user = await db.getUserById(ctx.user.id);
+              if (user?.googleCalendarRefreshToken) {
+                const { syncTaskToGoogleCalendar } = await import("./services/google-calendar");
+                const childTask = await db.getTaskById(childTaskId);
+                if (childTask) await syncTaskToGoogleCalendar(childTask, user.googleCalendarRefreshToken);
+              }
+            } catch (e) { console.error("[Google Calendar] Erro sync tarefa filha:", e); }
           }
           
           return { id: parentTaskId, tasks };
@@ -1795,6 +1815,17 @@ export const appRouter = router({
             recurrencePattern: null,
             parentTaskId: null,
           });
+
+          // Sync com Google Calendar (tarefa única)
+          try {
+            const user = await db.getUserById(ctx.user.id);
+            if (user?.googleCalendarRefreshToken) {
+              const { syncTaskToGoogleCalendar } = await import("./services/google-calendar");
+              const createdTask = await db.getTaskById(taskId);
+              if (createdTask) await syncTaskToGoogleCalendar(createdTask, user.googleCalendarRefreshToken);
+            }
+          } catch (e) { console.error("[Google Calendar] Erro sync tarefa:", e); }
+
           return { id: taskId };
         }
       }),
@@ -1846,6 +1877,26 @@ export const appRouter = router({
           // Atualizar apenas a tarefa atual
           await db.updateTask(id, updateData);
         }
+
+        // Sync com Google Calendar após atualização
+        try {
+          const user = await db.getUserById(ctx.user.id);
+          if (user?.googleCalendarRefreshToken) {
+            const { syncTaskToGoogleCalendar } = await import("./services/google-calendar");
+            if (updateAll && (task.parentTaskId || task.isRecurring)) {
+              const parentId = task.parentTaskId || task.id;
+              const parentTask = await db.getTaskById(parentId);
+              if (parentTask) await syncTaskToGoogleCalendar(parentTask, user.googleCalendarRefreshToken);
+              const relatedTasks = await db.getTasksByParentId(parentId);
+              for (const rt of relatedTasks) {
+                await syncTaskToGoogleCalendar(rt, user.googleCalendarRefreshToken);
+              }
+            } else {
+              const updatedTask = await db.getTaskById(id);
+              if (updatedTask) await syncTaskToGoogleCalendar(updatedTask, user.googleCalendarRefreshToken);
+            }
+          }
+        } catch (e) { console.error("[Google Calendar] Erro sync após update:", e); }
         
         return { success: true };
       }),
