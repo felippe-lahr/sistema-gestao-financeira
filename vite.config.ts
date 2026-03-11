@@ -5,10 +5,6 @@ import fs from "node:fs";
 import path from "path";
 import { defineConfig } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const pkg = require("./package.json");
 
 const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime()];
 
@@ -25,7 +21,7 @@ export default defineConfig({
   root: path.resolve(process.cwd(), "client"),
   publicDir: path.resolve(process.cwd(), "client", "public"),
   define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_VERSION__: JSON.stringify(process.env.VITE_APP_VERSION ?? "0.5.0-beta"),
   },
   build: {
     outDir: path.resolve(process.cwd(), "dist/public"),
