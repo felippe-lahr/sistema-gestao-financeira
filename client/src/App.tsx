@@ -20,6 +20,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import AcceptInvite from "@/pages/AcceptInvite";
 import Signup from "@/pages/Signup";
 import VerifyEmail from "@/pages/VerifyEmail";
+import GoogleAuthSuccess from "@/pages/GoogleAuthSuccess";
 import Admin from "@/pages/Admin";
 
 function Router() {
@@ -40,6 +41,7 @@ function Router() {
       <Route path="/convite/:token" component={AcceptInvite} />
       <Route path="/signup" component={Signup} />
       <Route path="/verificar-email" component={VerifyEmail} />
+      <Route path="/auth/google/success" component={GoogleAuthSuccess} />
       <Route path="/admin" component={() => <DashboardLayout><Admin /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

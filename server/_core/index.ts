@@ -10,6 +10,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerDemoAuthRoutes } from "./demo-auth";
 import { registerPasswordAuthRoutes } from "./password-auth";
+import { registerGoogleAuthRoutes } from "./google-auth";
 import { registerUploadRoutes } from "./upload-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -99,6 +100,7 @@ async function startServer() {
   app.use('/api/oauth', loginLimiter);
   app.use('/api/auth/login', loginLimiter);
   app.use('/api/auth/demo-login', loginLimiter);
+  app.use('/api/auth/google', loginLimiter);
 
   // Rate limit mais permissivo para registro e verificação de e-mail
   const registerLimiter = rateLimit({
@@ -123,6 +125,8 @@ async function startServer() {
   registerDemoAuthRoutes(app);
   // Password auth routes for email/password login
   registerPasswordAuthRoutes(app);
+  // Google OAuth routes
+  registerGoogleAuthRoutes(app);
   // Upload routes for attachments
   registerUploadRoutes(app);
 

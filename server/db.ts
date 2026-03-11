@@ -1,4 +1,5 @@
 import { eq, or, and, isNull, desc, asc, gte, lte, sql } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
@@ -2256,6 +2257,35 @@ export async function adminSetUserStatus(userId: number, status: 'active' | 'sus
   const db = await getDb();
   if (!db) throw new Error('Database not available');
   await db.execute(sql`UPDATE users SET status = ${status}::text, "updatedAt" = NOW() WHERE id = ${userId}`);
+}
+
+/**
+ * Garante que o e-mail de um usuário Google está marcado como verificado.
+ * Se não houver registro em email_verifications, insere um já verificado.
+ * Se houver registro pendente, marca como verificado.
+ * Usado no fluxo de login via Google (o Google já verificou o e-mail).
+ */
+export async function ensureEmailVerifiedForGoogleUser(userId: number): Promise<void> {
+  await ensureEmailVerificationsTable();
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const rows = await client`SELECT id, "verifiedAt" FROM email_verifications WHERE "userId" = ${userId} LIMIT 1`;
+    if (rows.length === 0) {
+      // Inserir registro já verificado
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      await client`
+        INSERT INTO email_verifications ("userId", token, "expiresAt", "verifiedAt")
+        VALUES (${userId}, ${token}, ${expiresAt}, now())
+        ON CONFLICT (token) DO NOTHING
+      `;
+    } else if (!rows[0].verifiedAt) {
+      // Marcar registro existente como verificado
+      await client`UPDATE email_verifications SET "verifiedAt" = now() WHERE "userId" = ${userId}`;
+    }
+  } finally {
+    await client.end();
+  }
 }
 
 /**
