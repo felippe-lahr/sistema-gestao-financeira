@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Edit2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Edit2, X, Calendar, RefreshCw, CheckCircle2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isBefore, startOfWeek, endOfWeek, parseISO, addDays, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -67,6 +67,39 @@ export default function Agenda() {
 
   const { data: entities = [] } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
   const { data: tasks = [], refetch: refetchTasks } = trpc.tasks.list.useQuery();
+  const { data: currentUser, refetch: refetchUser } = trpc.auth.me.useQuery();
+  const syncGoogleCalendar = trpc.tasks.syncGoogleCalendar.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Google Agenda sincronizado! ${result.synced} tarefa(s) enviada(s).`);
+    },
+    onError: (error) => {
+      toast.error("Erro ao sincronizar: " + error.message);
+    },
+  });
+
+  const calendarConnected = !!(currentUser as any)?.googleCalendarRefreshToken;
+
+  // Detectar retorno do OAuth do Google Calendar via query params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("calendar_connected");
+    const calError = params.get("calendar_error");
+    if (connected === "true") {
+      toast.success("Google Agenda conectado com sucesso!");
+      refetchUser();
+      // Limpar query params da URL
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (calError) {
+      const messages: Record<string, string> = {
+        cancelled: "Conexão cancelada.",
+        no_refresh_token: "Token não recebido. Tente desconectar o app no Google e reconectar.",
+        auth_failed: "Falha na autenticação com o Google.",
+        invalid_state: "Estado inválido. Tente novamente.",
+      };
+      toast.error(messages[calError] || "Erro ao conectar Google Agenda.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const createTask = trpc.tasks.create.useMutation({
     onSuccess: () => {
@@ -377,10 +410,35 @@ export default function Agenda() {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Agenda</h1>
             <p className="text-gray-600 dark:text-gray-400">Gerencie suas tarefas e compromissos</p>
           </div>
-          <Button onClick={() => openCreateSheet()}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Tarefa
-          </Button>
+          <div className="flex gap-2">
+            {calendarConnected ? (
+              <Button
+                variant="outline"
+                onClick={() => syncGoogleCalendar.mutate()}
+                disabled={syncGoogleCalendar.isPending}
+                className="border-green-500 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-400 dark:hover:bg-green-950"
+              >
+                {syncGoogleCalendar.isPending ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                )}
+                Google Agenda
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = "/api/auth/google/calendar"}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Conectar Google Agenda
+              </Button>
+            )}
+            <Button onClick={() => openCreateSheet()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Tarefa
+            </Button>
+          </div>
         </div>
       </div>
 

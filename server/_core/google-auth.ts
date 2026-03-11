@@ -21,6 +21,7 @@ import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
 import { sdk } from "./sdk";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { syncAllTasksToGoogleCalendar } from "../services/google-calendar";
 
 const GOOGLE_STATE_COOKIE = "google_oauth_state";
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
@@ -214,6 +215,135 @@ export function registerGoogleAuthRoutes(app: Express) {
     } catch (error) {
       console.error("[Google Auth] Erro no callback:", error);
       res.redirect("/?error=google_auth_failed");
+    }
+  });
+
+  // ─── Google Calendar OAuth ────────────────────────────────────────────────
+
+  /**
+   * Inicia o fluxo OAuth para conectar o Google Calendar.
+   * Requer que o usuário já esteja autenticado no sistema.
+   */
+  app.get("/api/auth/google/calendar", async (req: Request, res: Response) => {
+    const sessionToken = req.cookies?.[COOKIE_NAME];
+    if (!sessionToken) {
+      res.redirect("/?error=not_authenticated");
+      return;
+    }
+    let openId: string;
+    try {
+      const session = await sdk.verifySessionToken(sessionToken);
+      openId = session.openId;
+    } catch {
+      res.redirect("/?error=not_authenticated");
+      return;
+    }
+
+    const nonce = randomBytes(16).toString("hex");
+    const state = Buffer.from(JSON.stringify({ openId, nonce })).toString("base64url");
+
+    const calendarClient = new OAuth2Client({
+      clientId: ENV.googleClientId,
+      clientSecret: ENV.googleClientSecret,
+      redirectUri: `${ENV.appUrl}/api/auth/google/calendar/callback`,
+    });
+
+    const authUrl = calendarClient.generateAuthUrl({
+      access_type: "offline",
+      scope: ["https://www.googleapis.com/auth/calendar"],
+      state,
+      prompt: "consent",
+    });
+
+    console.log("[Google Calendar] Iniciando OAuth para conectar calendário");
+    res.redirect(302, authUrl);
+  });
+
+  /**
+   * Callback do OAuth do Google Calendar.
+   * Recebe o código, troca por tokens e salva o refresh_token.
+   */
+  app.get("/api/auth/google/calendar/callback", async (req: Request, res: Response) => {
+    const code = typeof req.query.code === "string" ? req.query.code : null;
+    const state = typeof req.query.state === "string" ? req.query.state : null;
+    const error = typeof req.query.error === "string" ? req.query.error : null;
+
+    if (error || !code || !state) {
+      console.warn("[Google Calendar] Erro ou cancelamento no callback:", error);
+      res.redirect("/agenda?calendar_error=cancelled");
+      return;
+    }
+
+    try {
+      const stateData = JSON.parse(Buffer.from(state, "base64url").toString());
+      const { openId } = stateData;
+
+      if (!openId) {
+        res.redirect("/agenda?calendar_error=invalid_state");
+        return;
+      }
+
+      const calendarClient = new OAuth2Client({
+        clientId: ENV.googleClientId,
+        clientSecret: ENV.googleClientSecret,
+        redirectUri: `${ENV.appUrl}/api/auth/google/calendar/callback`,
+      });
+
+      const { tokens } = await calendarClient.getToken(code);
+
+      if (!tokens.refresh_token) {
+        console.error("[Google Calendar] refresh_token não retornado pelo Google");
+        res.redirect("/agenda?calendar_error=no_refresh_token");
+        return;
+      }
+
+      const user = await db.getUserByOpenId(openId);
+      if (!user) {
+        res.redirect("/agenda?calendar_error=user_not_found");
+        return;
+      }
+
+      await db.saveGoogleCalendarToken(user.id, tokens.refresh_token);
+      console.log(`[Google Calendar] Calendário conectado para usuário: ${user.email}`);
+
+      // Sincronizar todas as tarefas existentes em background
+      syncAllTasksToGoogleCalendar(user.id, tokens.refresh_token)
+        .then(({ synced, errors }) => {
+          console.log(`[Google Calendar] Sync inicial: ${synced} tarefas sincronizadas, ${errors} erros`);
+        })
+        .catch((err) => {
+          console.error("[Google Calendar] Erro no sync inicial:", err);
+        });
+
+      res.redirect("/agenda?calendar_connected=true");
+    } catch (err) {
+      console.error("[Google Calendar] Erro no callback:", err);
+      res.redirect("/agenda?calendar_error=auth_failed");
+    }
+  });
+
+  /**
+   * Desconecta o Google Calendar do usuário.
+   */
+  app.post("/api/auth/google/calendar/disconnect", async (req: Request, res: Response) => {
+    const sessionToken = req.cookies?.[COOKIE_NAME];
+    if (!sessionToken) {
+      res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+    try {
+      const session = await sdk.verifySessionToken(sessionToken);
+      const user = await db.getUserByOpenId(session.openId);
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      await db.removeGoogleCalendarToken(user.id);
+      console.log(`[Google Calendar] Calendário desconectado para usuário: ${user.email}`);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Google Calendar] Erro ao desconectar:", err);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 }

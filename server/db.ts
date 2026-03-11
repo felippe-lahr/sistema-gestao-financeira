@@ -2307,3 +2307,51 @@ export async function adminDeleteUser(userId: number): Promise<void> {
     await client.end();
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GOOGLE CALENDAR SYNC
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Salva o refresh_token do Google Calendar para um usuário.
+ */
+export async function saveGoogleCalendarToken(userId: number, refreshToken: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(users)
+    .set({
+      googleCalendarRefreshToken: refreshToken,
+      googleCalendarConnectedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+}
+
+/**
+ * Remove o refresh_token do Google Calendar de um usuário (desconectar).
+ */
+export async function removeGoogleCalendarToken(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(users)
+    .set({
+      googleCalendarRefreshToken: null,
+      googleCalendarConnectedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+}
+
+/**
+ * Salva o ID do evento no Google Calendar para uma tarefa.
+ */
+export async function updateTaskGoogleCalendarEventId(taskId: number, eventId: string | null): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(tasks)
+    .set({ googleCalendarEventId: eventId, updatedAt: new Date() })
+    .where(eq(tasks.id, taskId));
+}

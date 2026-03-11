@@ -1904,6 +1904,19 @@ export const appRouter = router({
         await db.updateTask(input.id, { status: newStatus });
         return { success: true, status: newStatus };
       }),
+    /**
+     * Sincroniza todas as tarefas do usuário com o Google Calendar.
+     */
+    syncGoogleCalendar: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        const { syncAllTasksToGoogleCalendar } = await import("./services/google-calendar");
+        const user = await db.getUserById(ctx.user.id);
+        if (!user?.googleCalendarRefreshToken) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Google Calendar não conectado" });
+        }
+        const result = await syncAllTasksToGoogleCalendar(ctx.user.id, user.googleCalendarRefreshToken);
+        return result;
+      }),
   }),
 
   // ========== ORGANIZATIONS ==========

@@ -28,6 +28,8 @@ export const users = pgTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  googleCalendarRefreshToken: text("googleCalendarRefreshToken"), // Token para sync com Google Calendar
+  googleCalendarConnectedAt: timestamp("googleCalendarConnectedAt"), // Quando conectou
 });
 
 export type User = typeof users.$inferSelect;
@@ -573,6 +575,9 @@ export const tasks = pgTable("tasks", {
   
   // Lembrete
   reminderMinutes: integer("reminderMinutes"), // Minutos antes para lembrar
+  
+  // Google Calendar sync
+  googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }), // ID do evento no Google Calendar
   
   // Metadados
   completedAt: timestamp("completedAt"),
