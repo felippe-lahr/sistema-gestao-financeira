@@ -19,7 +19,7 @@ function getResend(): Resend {
 
 const FROM_EMAIL = "UnifiquePro <noreply@unifiquepro.com.br>";
 
-const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310419663029179004/EjbQBGNzOVktBkdN.png";
+const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310419663029179004/NujcpHuyWRVgvVLk.png";
 
 const emailHeader = `
   <tr>
