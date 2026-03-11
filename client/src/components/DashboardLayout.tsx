@@ -240,11 +240,11 @@ function LoginForm() {
 }
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Inicio", path: "/" },
+  { icon: LayoutDashboard, label: "Início", path: "/" },
   { icon: Building2, label: "Entidades", path: "/entities" },
-  { icon: Receipt, label: "Transacoes", path: "/transactions" },
+  { icon: Receipt, label: "Transações", path: "/transactions" },
   { icon: Calendar, label: "Agenda", path: "/agenda" },
-  { icon: Settings, label: "Configuracoes", path: "/settings" },
+  { icon: Settings, label: "Configurações", path: "/settings" },
 ];
 
 function LiveClock() {
