@@ -117,7 +117,12 @@ function LoginForm() {
             <img
               src="/logo-unifique-pro.png"
               alt="UnifiquePro"
-              style={{ width: '280px' }} className="h-auto object-contain"
+              style={{ width: '280px' }} className="h-auto object-contain dark:hidden"
+            />
+            <img
+              src="/logo-unifique-pro-dark.png"
+              alt="UnifiquePro"
+              style={{ width: '280px' }} className="h-auto object-contain hidden dark:block"
             />
           </div>
           <CardDescription className="text-sm text-muted-foreground">simplificando suas finanças</CardDescription>
@@ -418,7 +423,12 @@ function DashboardLayoutContent({
                   <img
                     src="/logo-unifique-pro.png"
                     alt="UnifiquePro"
-                    style={{ width: '180px' }} className="h-auto object-contain"
+                    style={{ width: '180px' }} className="h-auto object-contain dark:hidden"
+                  />
+                  <img
+                    src="/logo-unifique-pro-dark.png"
+                    alt="UnifiquePro"
+                    style={{ width: '180px' }} className="h-auto object-contain hidden dark:block"
                   />
                 </div>
               ) : null}

@@ -471,7 +471,10 @@ export default function Signup() {
         <Card className="w-full max-w-md shadow-xl">
           <CardContent className="pt-8 pb-8 text-center space-y-6">
             <div className="flex justify-center mb-2">
-              <img src="/logo-unifique-pro.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain" />
+              <>
+            <img src="/logo-unifique-pro.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain dark:hidden" />
+            <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain hidden dark:block" />
+          </>
             </div>
             <div className="flex justify-center">
               <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
@@ -520,7 +523,10 @@ export default function Signup() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-3">
-            <img src="/logo-unifique-pro.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain" />
+            <>
+            <img src="/logo-unifique-pro.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain dark:hidden" />
+            <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain hidden dark:block" />
+          </>
           </div>
           <CardTitle className="text-2xl font-bold">{stepTitles[step - 1].title}</CardTitle>
           <CardDescription>{stepTitles[step - 1].description}</CardDescription>

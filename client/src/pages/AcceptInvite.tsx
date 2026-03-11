@@ -252,7 +252,8 @@ export default function AcceptInvite() {
         {/* Header da plataforma */}
         <div className="text-center">
           <div className="flex justify-center mb-2">
-            <img src="/logo-unifique-pro.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain" />
+            <img src="/logo-unifique-pro.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain dark:hidden" />
+            <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '280px' }} className="h-auto object-contain hidden dark:block" />
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">Convite de acesso compartilhado</p>
         </div>
