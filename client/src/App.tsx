@@ -1,51 +1,65 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import DashboardLayout from "@/components/DashboardLayout";
-import NotFound from "@/pages/NotFound";
-import Home from "@/pages/Home";
-import EntityDashboard from "@/pages/EntityDashboard";
-import Entities from "@/pages/Entities";
-import Transactions from "@/pages/Transactions";
-import Investments from "@/pages/Investments";
-import Rentals from "@/pages/Rentals";
-import { Reports } from "@/pages/Reports";
-import TreasurySelix from "@/pages/TreasurySelix";
-import OverallDashboard from "@/pages/OverallDashboard";
-import Agenda from "@/pages/Agenda";
-import Settings from "@/pages/Settings";
-import UserProfile from "@/pages/UserProfile";
+import { lazy, Suspense } from "react";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import AcceptInvite from "@/pages/AcceptInvite";
-import Signup from "@/pages/Signup";
-import VerifyEmail from "@/pages/VerifyEmail";
-import GoogleAuthSuccess from "@/pages/GoogleAuthSuccess";
-import Admin from "@/pages/Admin";
+
+// Lazy load all pages for code splitting
+const DashboardLayout = lazy(() => import("@/components/DashboardLayout"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const Home = lazy(() => import("@/pages/Home"));
+const EntityDashboard = lazy(() => import("@/pages/EntityDashboard"));
+const Entities = lazy(() => import("@/pages/Entities"));
+const Transactions = lazy(() => import("@/pages/Transactions"));
+const Investments = lazy(() => import("@/pages/Investments"));
+const Rentals = lazy(() => import("@/pages/Rentals"));
+const Reports = lazy(() => import("@/pages/Reports").then(m => ({ default: m.Reports })));
+const TreasurySelix = lazy(() => import("@/pages/TreasurySelix"));
+const OverallDashboard = lazy(() => import("@/pages/OverallDashboard"));
+const Agenda = lazy(() => import("@/pages/Agenda"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const UserProfile = lazy(() => import("@/pages/UserProfile"));
+const AcceptInvite = lazy(() => import("@/pages/AcceptInvite"));
+const Signup = lazy(() => import("@/pages/Signup"));
+const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
+const GoogleAuthSuccess = lazy(() => import("@/pages/GoogleAuthSuccess"));
+const Admin = lazy(() => import("@/pages/Admin"));
+
+// Loading fallback - minimal spinner
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={() => <DashboardLayout><Home /></DashboardLayout>} />
-      <Route path="/dashboard/:id" component={() => <DashboardLayout><EntityDashboard /></DashboardLayout>} />
-      <Route path="/entities" component={() => <DashboardLayout><Entities /></DashboardLayout>} />
-      <Route path="/transactions" component={() => <DashboardLayout><Transactions /></DashboardLayout>} />
-      <Route path="/investments/:entityId" component={() => <DashboardLayout><Investments /></DashboardLayout>} />
-      <Route path="/rentals/:entityId" component={() => <DashboardLayout><Rentals /></DashboardLayout>} />
-      <Route path="/reports/:entityId" component={() => <DashboardLayout><Reports /></DashboardLayout>} />
-      <Route path="/treasury-selic/:entityId" component={() => <DashboardLayout><TreasurySelix /></DashboardLayout>} />
-      <Route path="/overall-dashboard" component={() => <DashboardLayout><OverallDashboard /></DashboardLayout>} />
-      <Route path="/agenda" component={() => <DashboardLayout><Agenda /></DashboardLayout>} />
-      <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
-      <Route path="/profile" component={() => <DashboardLayout><UserProfile /></DashboardLayout>} />
-      <Route path="/convite/:token" component={AcceptInvite} />
-      <Route path="/signup" component={Signup} />
-      <Route path="/verificar-email" component={VerifyEmail} />
-      <Route path="/auth/google/success" component={GoogleAuthSuccess} />
-      <Route path="/admin" component={() => <DashboardLayout><Admin /></DashboardLayout>} />
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={() => <DashboardLayout><Home /></DashboardLayout>} />
+        <Route path="/dashboard/:id" component={() => <DashboardLayout><EntityDashboard /></DashboardLayout>} />
+        <Route path="/entities" component={() => <DashboardLayout><Entities /></DashboardLayout>} />
+        <Route path="/transactions" component={() => <DashboardLayout><Transactions /></DashboardLayout>} />
+        <Route path="/investments/:entityId" component={() => <DashboardLayout><Investments /></DashboardLayout>} />
+        <Route path="/rentals/:entityId" component={() => <DashboardLayout><Rentals /></DashboardLayout>} />
+        <Route path="/reports/:entityId" component={() => <DashboardLayout><Reports /></DashboardLayout>} />
+        <Route path="/treasury-selic/:entityId" component={() => <DashboardLayout><TreasurySelix /></DashboardLayout>} />
+        <Route path="/overall-dashboard" component={() => <DashboardLayout><OverallDashboard /></DashboardLayout>} />
+        <Route path="/agenda" component={() => <DashboardLayout><Agenda /></DashboardLayout>} />
+        <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
+        <Route path="/profile" component={() => <DashboardLayout><UserProfile /></DashboardLayout>} />
+        <Route path="/convite/:token" component={AcceptInvite} />
+        <Route path="/signup" component={Signup} />
+        <Route path="/verificar-email" component={VerifyEmail} />
+        <Route path="/auth/google/success" component={GoogleAuthSuccess} />
+        <Route path="/admin" component={() => <DashboardLayout><Admin /></DashboardLayout>} />
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
