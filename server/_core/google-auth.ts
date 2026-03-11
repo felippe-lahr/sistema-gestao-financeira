@@ -227,17 +227,15 @@ export function registerGoogleAuthRoutes(app: Express) {
   app.get("/api/auth/google/calendar", async (req: Request, res: Response) => {
     const sessionToken = req.cookies?.[COOKIE_NAME];
     if (!sessionToken) {
-      res.redirect("/?error=not_authenticated");
+      res.redirect("/agenda?calendar_error=not_authenticated");
       return;
     }
-    let openId: string;
-    try {
-      const session = await sdk.verifySessionToken(sessionToken);
-      openId = session.openId;
-    } catch {
-      res.redirect("/?error=not_authenticated");
+    const session = await sdk.verifySession(sessionToken);
+    if (!session?.openId) {
+      res.redirect("/agenda?calendar_error=not_authenticated");
       return;
     }
+    const openId = session.openId;
 
     const nonce = randomBytes(16).toString("hex");
     const state = Buffer.from(JSON.stringify({ openId, nonce })).toString("base64url");
@@ -332,7 +330,11 @@ export function registerGoogleAuthRoutes(app: Express) {
       return;
     }
     try {
-      const session = await sdk.verifySessionToken(sessionToken);
+      const session = await sdk.verifySession(sessionToken);
+      if (!session?.openId) {
+        res.status(401).json({ error: "Not authenticated" });
+        return;
+      }
       const user = await db.getUserByOpenId(session.openId);
       if (!user) {
         res.status(404).json({ error: "User not found" });
