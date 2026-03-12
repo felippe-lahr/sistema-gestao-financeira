@@ -639,3 +639,25 @@ export const entityInvites = pgTable("entity_invites", {
 });
 export type EntityInvite = typeof entityInvites.$inferSelect;
 export type InsertEntityInvite = typeof entityInvites.$inferInsert;
+
+/**
+ * Tokens de verificação de e-mail para o fluxo de registro self-service.
+ * Cada registro representa um token enviado ao usuário para confirmar o e-mail.
+ * Um usuário pode ter múltiplos tokens (ex: reenvio), mas basta um com verifiedAt preenchido.
+ * IMPORTANTE: Esta tabela é gerenciada pelo schema drizzle para evitar que o
+ * `drizzle-kit push` a drope a cada deploy (tabelas fora do schema são removidas).
+ */
+export const emailVerifications = pgTable("email_verifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Nota: a constraint UNIQUE no banco foi criada com nome 'email_verifications_token_key'
+  // (padrão PostgreSQL). Não usar .unique() aqui para evitar que o drizzle tente
+  // recriar com nome 'email_verifications_token_unique', o que causaria truncate da tabela.
+  token: varchar("token", { length: 128 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  verifiedAt: timestamp("verifiedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EmailVerification = typeof emailVerifications.$inferSelect;
+export type InsertEmailVerification = typeof emailVerifications.$inferInsert;
+
