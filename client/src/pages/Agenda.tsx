@@ -16,6 +16,7 @@ import { useLocation } from "wouter";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isBefore, startOfWeek, endOfWeek, parseISO, addDays, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const PRIORITY_COLORS = {
   LOW: "bg-blue-500",
@@ -698,19 +699,16 @@ export default function Agenda() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="mb-2 block">Data de Início *</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                    onChange={(v) => setFormData({ ...formData, dueDate: v })}
                   />
                 </div>
                 <div>
                   <Label className="mb-2 block">Data de Término</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    min={formData.dueDate}
+                    onChange={(v) => setFormData({ ...formData, endDate: v })}
                   />
                 </div>
               </div>
@@ -869,19 +867,16 @@ export default function Agenda() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="mb-2 block">Data de Início *</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                    onChange={(v) => setFormData({ ...formData, dueDate: v })}
                   />
                 </div>
                 <div>
                   <Label className="mb-2 block">Data de Término</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    min={formData.dueDate}
+                    onChange={(v) => setFormData({ ...formData, endDate: v })}
                   />
                 </div>
               </div>
