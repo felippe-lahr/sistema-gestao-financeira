@@ -650,7 +650,10 @@ export type InsertEntityInvite = typeof entityInvites.$inferInsert;
 export const emailVerifications = pgTable("email_verifications", {
   id: serial("id").primaryKey(),
   userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
-  token: varchar("token", { length: 128 }).notNull().unique(),
+  // Nota: a constraint UNIQUE no banco foi criada com nome 'email_verifications_token_key'
+  // (padrão PostgreSQL). Não usar .unique() aqui para evitar que o drizzle tente
+  // recriar com nome 'email_verifications_token_unique', o que causaria truncate da tabela.
+  token: varchar("token", { length: 128 }).notNull(),
   expiresAt: timestamp("expiresAt").notNull(),
   verifiedAt: timestamp("verifiedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
