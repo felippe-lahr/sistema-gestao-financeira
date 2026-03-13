@@ -12,6 +12,7 @@ import { registerDemoAuthRoutes } from "./demo-auth";
 import { registerPasswordAuthRoutes } from "./password-auth";
 import { registerGoogleAuthRoutes } from "./google-auth";
 import { registerUploadRoutes } from "./upload-routes";
+import { registerStripeRoutes } from "./stripe-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
@@ -133,6 +134,8 @@ async function startServer() {
   registerGoogleAuthRoutes(app);
   // Upload routes for attachments
   registerUploadRoutes(app);
+  // Stripe billing routes (webhook must come before json body parser)
+  registerStripeRoutes(app);
 
   // tRPC API with rate limiting
   app.use(
