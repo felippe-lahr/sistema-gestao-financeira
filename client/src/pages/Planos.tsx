@@ -15,7 +15,7 @@ export default function Planos() {
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<"month" | "year" | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [interval, setInterval] = useState<"month" | "year">("month");
+  const [interval, setInterval] = useState<"month" | "year">("year");
 
   useEffect(() => {
     fetchBillingStatus();
@@ -109,30 +109,30 @@ export default function Planos() {
         </p>
 
         {/* Toggle mensal/anual */}
-        <div className="flex flex-col items-center gap-2 mt-6">
-          <div className="flex items-center gap-4">
-            <span
-              className={`text-sm font-medium cursor-pointer transition-colors ${interval === "month" ? "text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
+        <div className="flex flex-col items-center gap-3 mt-6">
+          <div className="inline-flex rounded-full border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 p-1">
+            <button
               onClick={() => setInterval("month")}
+              className={`px-5 py-1.5 rounded-full text-sm font-medium transition-all ${
+                interval === "month"
+                  ? "bg-white dark:bg-gray-900 text-blue-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              }`}
             >
               Mensal
-            </span>
-            <button
-              onClick={() => setInterval(interval === "month" ? "year" : "month")}
-              className={`relative w-12 h-6 rounded-full transition-colors focus:outline-none ${interval === "year" ? "bg-blue-600" : "bg-gray-300"}`}
-            >
-              <span
-                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${interval === "year" ? "translate-x-7" : "translate-x-1"}`}
-              />
             </button>
-            <span
-              className={`text-sm font-medium cursor-pointer transition-colors ${interval === "year" ? "text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
+            <button
               onClick={() => setInterval("year")}
+              className={`px-5 py-1.5 rounded-full text-sm font-medium transition-all ${
+                interval === "year"
+                  ? "bg-white dark:bg-gray-900 text-blue-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              }`}
             >
               Anual
-            </span>
+            </button>
           </div>
-          <Badge className="bg-green-100 text-green-700 text-xs border-0">
+          <Badge className="bg-green-100 text-green-700 text-xs border-0 px-3 py-1">
             Economize 20% no plano anual
           </Badge>
         </div>
