@@ -109,28 +109,32 @@ export default function Planos() {
         </p>
 
         {/* Toggle mensal/anual */}
-        <div className="flex items-center justify-center gap-3 mt-6">
-          <span
-            className={`text-sm font-medium cursor-pointer ${interval === "month" ? "text-blue-600" : "text-gray-400"}`}
-            onClick={() => setInterval("month")}
-          >
-            Mensal
-          </span>
-          <button
-            onClick={() => setInterval(interval === "month" ? "year" : "month")}
-            className={`relative w-12 h-6 rounded-full transition-colors ${interval === "year" ? "bg-blue-600" : "bg-gray-300"}`}
-          >
+        <div className="flex flex-col items-center gap-2 mt-6">
+          <div className="flex items-center gap-4">
             <span
-              className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${interval === "year" ? "translate-x-7" : "translate-x-1"}`}
-            />
-          </button>
-          <span
-            className={`text-sm font-medium cursor-pointer ${interval === "year" ? "text-blue-600" : "text-gray-400"}`}
-            onClick={() => setInterval("year")}
-          >
-            Anual
-            <Badge className="ml-2 bg-green-100 text-green-700 text-xs">20% off</Badge>
-          </span>
+              className={`text-sm font-medium cursor-pointer transition-colors ${interval === "month" ? "text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
+              onClick={() => setInterval("month")}
+            >
+              Mensal
+            </span>
+            <button
+              onClick={() => setInterval(interval === "month" ? "year" : "month")}
+              className={`relative w-12 h-6 rounded-full transition-colors focus:outline-none ${interval === "year" ? "bg-blue-600" : "bg-gray-300"}`}
+            >
+              <span
+                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${interval === "year" ? "translate-x-7" : "translate-x-1"}`}
+              />
+            </button>
+            <span
+              className={`text-sm font-medium cursor-pointer transition-colors ${interval === "year" ? "text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
+              onClick={() => setInterval("year")}
+            >
+              Anual
+            </span>
+          </div>
+          <Badge className="bg-green-100 text-green-700 text-xs border-0">
+            Economize 20% no plano anual
+          </Badge>
         </div>
       </div>
 
