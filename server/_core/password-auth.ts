@@ -406,6 +406,35 @@ export function registerPasswordAuthRoutes(app: Express) {
     }
   });
 
+  // Verificar se usuário tem senha cadastrada
+  app.get("/api/auth/has-password", async (req: Request, res: Response) => {
+    try {
+      let sessionToken = req.cookies?.[COOKIE_NAME];
+      if (!sessionToken) {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          sessionToken = authHeader.substring(7);
+        }
+      }
+      if (!sessionToken) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+      const sessionInfo = await sdk.verifySession(sessionToken);
+      if (!sessionInfo || !sessionInfo.openId) {
+        return res.status(401).json({ error: "Sessão inválida" });
+      }
+      const user = await db.getUserByOpenId(sessionInfo.openId);
+      if (!user) {
+        return res.status(401).json({ error: "Usuário não encontrado" });
+      }
+      const passwordHash = await db.getUserPassword(user.id);
+      res.json({ hasPassword: !!passwordHash });
+    } catch (error) {
+      console.error("[Password Auth] has-password check failed", error);
+      res.status(500).json({ error: "Erro ao verificar senha" });
+    }
+  });
+
   // ─────────────────────────────────────────────────────────────────────────────
   // REGISTRO SELF-SERVICE — Cadastro de novo usuário com organização
   // ─────────────────────────────────────────────────────────────────────────────
