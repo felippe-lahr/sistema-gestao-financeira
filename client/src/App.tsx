@@ -25,8 +25,6 @@ const Signup = lazy(() => import("@/pages/Signup"));
 const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
 const GoogleAuthSuccess = lazy(() => import("@/pages/GoogleAuthSuccess"));
 const Admin = lazy(() => import("@/pages/Admin"));
-const Planos = lazy(() => import("@/pages/Planos"));
-const BillingSuccess = lazy(() => import("@/pages/BillingSuccess"));
 
 // Loading fallback - minimal spinner
 function PageLoader() {
@@ -58,8 +56,6 @@ function Router() {
         <Route path="/verificar-email" component={VerifyEmail} />
         <Route path="/auth/google/success" component={GoogleAuthSuccess} />
         <Route path="/admin" component={() => <DashboardLayout><Admin /></DashboardLayout>} />
-        <Route path="/planos" component={() => <DashboardLayout><Planos /></DashboardLayout>} />
-        <Route path="/billing/success" component={BillingSuccess} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

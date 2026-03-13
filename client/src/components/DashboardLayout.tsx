@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -512,17 +512,6 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                 );
               })}
-              <SidebarMenuItem key="/planos">
-                <SidebarMenuButton
-                  isActive={location === "/planos"}
-                  onClick={() => setLocation("/planos")}
-                  tooltip="Planos"
-                  className={`h-10 transition-all font-normal text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300`}
-                >
-                  <Crown className={`h-5 w-5 ${location === "/planos" ? "text-blue-600 dark:text-blue-400" : ""}`} />
-                  <span>Planos</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
               {user?.role === "admin" && (
                 <SidebarMenuItem key="/admin">
                   <SidebarMenuButton
