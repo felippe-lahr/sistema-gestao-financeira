@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Check, Zap, Building2, Loader2, ExternalLink, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface BillingStatus {
   plan: "free" | "pro" | "enterprise";
@@ -11,7 +11,6 @@ interface BillingStatus {
 }
 
 export default function Planos() {
-  const { toast } = useToast();
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<"month" | "year" | null>(null);
@@ -53,11 +52,7 @@ export default function Planos() {
       const { url } = await res.json();
       window.location.href = url;
     } catch (err: any) {
-      toast({
-        title: "Erro ao iniciar pagamento",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erro ao iniciar pagamento", { description: err.message });
     } finally {
       setCheckoutLoading(null);
     }
@@ -74,11 +69,7 @@ export default function Planos() {
       const { url } = await res.json();
       window.location.href = url;
     } catch (err: any) {
-      toast({
-        title: "Erro ao abrir portal",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erro ao abrir portal", { description: err.message });
     } finally {
       setPortalLoading(false);
     }
