@@ -20,8 +20,8 @@ export function registerStripeRoutes(app: Express) {
   // ========== CHECKOUT — Iniciar assinatura ==========
   app.post("/api/billing/checkout", async (req, res) => {
     try {
-      const session = await sdk.verifySession(req);
-      if (!session?.userId) {
+      const user = await sdk.authenticateRequest(req).catch(() => null);
+      if (!user) {
         return res.status(401).json({ error: "Não autenticado" });
       }
 
@@ -37,7 +37,7 @@ export function registerStripeRoutes(app: Express) {
       }
 
       // Buscar organização do usuário
-      const org = await getOrFirstOrganizationForUser(session.userId);
+      const org = await getOrFirstOrganizationForUser(user.id);
       if (!org) {
         return res.status(400).json({ error: "Organização não encontrada" });
       }
@@ -46,7 +46,7 @@ export function registerStripeRoutes(app: Express) {
       const customerId = await getOrCreateStripeCustomer({
         organizationId: org.id,
         organizationName: org.name,
-        userEmail: session.email ?? "",
+        userEmail: user.email ?? "",
         existingCustomerId: org.stripeCustomerId,
       });
 
@@ -75,12 +75,12 @@ export function registerStripeRoutes(app: Express) {
   // ========== PORTAL — Gerenciar assinatura ==========
   app.post("/api/billing/portal", async (req, res) => {
     try {
-      const session = await sdk.verifySession(req);
-      if (!session?.userId) {
+      const user = await sdk.authenticateRequest(req).catch(() => null);
+      if (!user) {
         return res.status(401).json({ error: "Não autenticado" });
       }
 
-      const org = await getOrFirstOrganizationForUser(session.userId);
+      const org = await getOrFirstOrganizationForUser(user.id);
       if (!org?.stripeCustomerId) {
         return res.status(400).json({ error: "Nenhuma assinatura ativa encontrada" });
       }
@@ -135,12 +135,12 @@ export function registerStripeRoutes(app: Express) {
   // ========== STATUS — Retornar plano atual ==========
   app.get("/api/billing/status", async (req, res) => {
     try {
-      const session = await sdk.verifySession(req);
-      if (!session?.userId) {
+      const user = await sdk.authenticateRequest(req).catch(() => null);
+      if (!user) {
         return res.status(401).json({ error: "Não autenticado" });
       }
 
-      const org = await getOrFirstOrganizationForUser(session.userId);
+      const org = await getOrFirstOrganizationForUser(user.id);
       if (!org) {
         return res.json({ plan: "free", hasSubscription: false });
       }
