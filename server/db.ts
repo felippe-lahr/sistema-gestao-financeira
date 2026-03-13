@@ -2355,3 +2355,69 @@ export async function updateTaskGoogleCalendarEventId(taskId: number, eventId: s
     .set({ googleCalendarEventId: eventId, updatedAt: new Date() })
     .where(eq(tasks.id, taskId));
 }
+
+// ========== BILLING / STRIPE OPERATIONS ==========
+
+/**
+ * Atualiza o plano e dados de billing de uma organização após evento do Stripe.
+ */
+export async function updateOrganizationBilling(data: {
+  organizationId: number;
+  plan: "free" | "pro" | "enterprise";
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, unknown> = {
+    plan: data.plan,
+    updatedAt: new Date(),
+  };
+
+  if (data.stripeCustomerId) {
+    updateData.stripeCustomerId = data.stripeCustomerId;
+  }
+  if (data.stripeSubscriptionId) {
+    updateData.stripeSubscriptionId = data.stripeSubscriptionId;
+  }
+
+  await db
+    .update(organizations)
+    .set(updateData as any)
+    .where(eq(organizations.id, data.organizationId));
+}
+
+/**
+ * Atualiza apenas o stripeCustomerId de uma organização.
+ */
+export async function updateOrganizationStripeCustomer(
+  organizationId: number,
+  stripeCustomerId: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(organizations)
+    .set({ stripeCustomerId, updatedAt: new Date() } as any)
+    .where(eq(organizations.id, organizationId));
+}
+
+/**
+ * Busca organização pelo stripeCustomerId.
+ */
+export async function getOrganizationByStripeCustomer(
+  stripeCustomerId: string
+): Promise<typeof organizations.$inferSelect | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.stripeCustomerId, stripeCustomerId))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : null;
+}
