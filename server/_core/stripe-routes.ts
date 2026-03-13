@@ -10,6 +10,7 @@ import {
 } from "../services/stripe";
 import {
   getOrFirstOrganizationForUser,
+  ensureOrganizationForUser,
   updateOrganizationBilling,
   updateOrganizationStripeCustomer,
   getOrganizationByStripeCustomer,
@@ -36,11 +37,8 @@ export function registerStripeRoutes(app: Express) {
         return res.status(400).json({ error: "Plano não configurado" });
       }
 
-      // Buscar organização do usuário
-      const org = await getOrFirstOrganizationForUser(user.id);
-      if (!org) {
-        return res.status(400).json({ error: "Organização não encontrada" });
-      }
+      // Buscar ou criar organização do usuário
+      const org = await ensureOrganizationForUser(user);
 
       // Criar ou recuperar customer no Stripe
       const customerId = await getOrCreateStripeCustomer({
@@ -80,7 +78,7 @@ export function registerStripeRoutes(app: Express) {
         return res.status(401).json({ error: "Não autenticado" });
       }
 
-      const org = await getOrFirstOrganizationForUser(user.id);
+      const org = await ensureOrganizationForUser(user);
       if (!org?.stripeCustomerId) {
         return res.status(400).json({ error: "Nenhuma assinatura ativa encontrada" });
       }
@@ -140,7 +138,7 @@ export function registerStripeRoutes(app: Express) {
         return res.status(401).json({ error: "Não autenticado" });
       }
 
-      const org = await getOrFirstOrganizationForUser(user.id);
+      const org = await ensureOrganizationForUser(user);
       if (!org) {
         return res.json({ plan: "free", hasSubscription: false });
       }
