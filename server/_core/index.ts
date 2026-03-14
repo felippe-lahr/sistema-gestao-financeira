@@ -13,6 +13,7 @@ import { registerPasswordAuthRoutes } from "./password-auth";
 import { registerGoogleAuthRoutes } from "./google-auth";
 import { registerUploadRoutes } from "./upload-routes";
 import { registerStripeRoutes } from "./stripe-routes";
+import { registerOfxRoutes } from "./ofx-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
@@ -134,6 +135,8 @@ async function startServer() {
   registerGoogleAuthRoutes(app);
   // Upload routes for attachments
   registerUploadRoutes(app);
+  // OFX import routes
+  registerOfxRoutes(app);
   // Stripe billing routes (webhook must come before json body parser)
   registerStripeRoutes(app);
 

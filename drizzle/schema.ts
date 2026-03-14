@@ -131,11 +131,14 @@ export const transactions = pgTable("transactions", {
   isRecurring: boolean("isRecurring").default(false).notNull(),
   recurrencePattern: text("recurrencePattern"), // JSON: { frequency: 'daily'|'weekly'|'monthly'|'yearly', interval: number, endDate?: string }
   parentTransactionId: integer("parentTransactionId"), // For recurring transactions
-  notes: text("notes"),
+   notes: text("notes"),
+  // Origem da transação: MANUAL (cadastrada pelo usuário) ou OFX (importada do extrato bancário)
+  importOrigin: varchar("importOrigin", { length: 10 }).default("MANUAL").notNull(),
+  // Referência ao registro OFX original (quando importOrigin = 'OFX')
+  ofxTransactionId: integer("ofxTransactionId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
-
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = typeof transactions.$inferInsert;
 
@@ -660,3 +663,76 @@ export const emailVerifications = pgTable("email_verifications", {
 });
 export type EmailVerification = typeof emailVerifications.$inferSelect;
 export type InsertEmailVerification = typeof emailVerifications.$inferInsert;
+
+// =============================================================================
+// OFX IMPORT TABLES - Importação de extratos bancários
+// =============================================================================
+
+/**
+ * Status de uma importação OFX.
+ */
+export const ofxImportStatusEnum = pgEnum("ofx_import_status", ["PENDING", "PROCESSING", "COMPLETED", "FAILED"]);
+
+/**
+ * Status de conciliação de uma transação importada do OFX.
+ */
+export const ofxTransactionStatusEnum = pgEnum("ofx_transaction_status", [
+  "PENDING_REVIEW",   // Aguardando revisão do usuário
+  "MATCHED",          // Conciliada com transação existente
+  "IMPORTED",         // Importada como nova transação
+  "IGNORED",          // Ignorada pelo usuário (duplicata confirmada)
+]);
+
+/**
+ * Importações de extrato OFX — cada upload gera um registro aqui.
+ */
+export const ofxImports = pgTable("ofx_imports", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").references(() => organizations.id, { onDelete: "cascade" }),
+  entityId: integer("entityId").notNull(),
+  bankAccountId: integer("bankAccountId").notNull().references(() => bankAccounts.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  status: ofxImportStatusEnum("status").default("PENDING").notNull(),
+  totalTransactions: integer("totalTransactions").default(0).notNull(),
+  importedCount: integer("importedCount").default(0).notNull(),
+  matchedCount: integer("matchedCount").default(0).notNull(),
+  ignoredCount: integer("ignoredCount").default(0).notNull(),
+  // Período do extrato
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  // Saldo do extrato (informado pelo banco no OFX)
+  ledgerBalance: integer("ledgerBalance"),   // em centavos
+  availableBalance: integer("availableBalance"), // em centavos
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type OfxImport = typeof ofxImports.$inferSelect;
+export type InsertOfxImport = typeof ofxImports.$inferInsert;
+
+/**
+ * Transações individuais extraídas de um arquivo OFX.
+ * Cada linha do extrato bancário vira um registro aqui antes de ser conciliada.
+ */
+export const ofxTransactions = pgTable("ofx_transactions", {
+  id: serial("id").primaryKey(),
+  importId: integer("importId").notNull().references(() => ofxImports.id, { onDelete: "cascade" }),
+  bankAccountId: integer("bankAccountId").notNull().references(() => bankAccounts.id, { onDelete: "cascade" }),
+  // Dados originais do OFX
+  ofxId: varchar("ofxId", { length: 255 }).notNull(), // FITID do OFX — identificador único do banco
+  type: transactionTypeEnum("type").notNull(),         // INCOME ou EXPENSE
+  amount: integer("amount").notNull(),                 // em centavos (sempre positivo)
+  date: timestamp("date").notNull(),
+  description: text("description").notNull(),          // MEMO ou NAME do OFX
+  memo: text("memo"),                                  // campo MEMO original
+  // Conciliação
+  status: ofxTransactionStatusEnum("status").default("PENDING_REVIEW").notNull(),
+  matchedTransactionId: integer("matchedTransactionId"),   // ID da transação existente conciliada
+  importedTransactionId: integer("importedTransactionId"), // ID da transação criada pela importação
+  suggestedCategoryId: integer("suggestedCategoryId"),     // Sugestão de categoria (futura IA)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type OfxTransaction = typeof ofxTransactions.$inferSelect;
+export type InsertOfxTransaction = typeof ofxTransactions.$inferInsert;
+

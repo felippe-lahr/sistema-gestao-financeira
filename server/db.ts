@@ -229,6 +229,7 @@ export async function getTransactionsByEntityId(
     status?: "PENDING" | "PAID" | "OVERDUE";
     type?: "INCOME" | "EXPENSE";
     limit?: number;
+    bankAccountId?: number;
   }
 ) {
   const db = await getDb();
@@ -257,6 +258,9 @@ export async function getTransactionsByEntityId(
   if (options?.type) {
     conditions.push(eq(transactions.type, options.type));
   }
+  if (options?.bankAccountId) {
+    conditions.push(eq(transactions.bankAccountId, options.bankAccountId));
+  }
   
   let query = db
     .select({
@@ -278,10 +282,13 @@ export async function getTransactionsByEntityId(
       updatedAt: transactions.updatedAt,
       categoryName: categories.name,
       categoryColor: categories.color,
+      importOrigin: transactions.importOrigin,
+      bankAccountName: bankAccounts.name,
       attachmentCount: sql<number>`(SELECT COUNT(*) FROM ${attachments} WHERE ${attachments.transactionId} = ${transactions.id})`,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .leftJoin(bankAccounts, eq(transactions.bankAccountId, bankAccounts.id))
     .where(and(...conditions))
     .$dynamic();
 
@@ -381,7 +388,7 @@ export async function deleteRecurringTransaction(
 
 // ========== DASHBOARD METRICS ==========
 
-export async function getDashboardMetrics(entityId: number, options?: { startDate?: Date; endDate?: Date }) {
+export async function getDashboardMetrics(entityId: number, options?: { startDate?: Date; endDate?: Date; bankAccountId?: number }) {
   const db = await getDb();
   if (!db) return null;
 
@@ -389,15 +396,41 @@ export async function getDashboardMetrics(entityId: number, options?: { startDat
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  // Get current balance (all paid transactions - TODO PERÍODO)
+  // Saldo inicial das contas bancárias da entidade (suporte multi-contas)
+  // Se bankAccountId for fornecido, soma apenas o saldo inicial daquela conta
+  const bankBalanceConditions: any[] = [eq(bankAccounts.entityId, entityId), eq(bankAccounts.isActive, true)];
+  if (options?.bankAccountId) {
+    bankBalanceConditions.push(eq(bankAccounts.id, options.bankAccountId));
+  }
+  const bankBalanceResult = await db
+    .select({
+      total: sql<number>`COALESCE(SUM(balance), 0)`,
+    })
+    .from(bankAccounts)
+    .where(and(...bankBalanceConditions));
+  const initialBankBalance = Number(bankBalanceResult[0]?.total) || 0;
+
+  // Saldo das transações pagas (receitas - despesas)
+  const txConditions: any[] = [eq(transactions.entityId, entityId), eq(transactions.status, "PAID")];
+  if (options?.bankAccountId) {
+    txConditions.push(eq(transactions.bankAccountId, options.bankAccountId));
+  }
   const balanceResult = await db
     .select({
       total: sql<number>`COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END), 0)`,
     })
     .from(transactions)
-    .where(and(eq(transactions.entityId, entityId), eq(transactions.status, "PAID")));
+    .where(and(...txConditions));
 
-  const currentBalance = Number(balanceResult[0]?.total) || 0;
+  // Saldo atual = saldo inicial das contas + movimentações pagas
+  const currentBalance = initialBankBalance + (Number(balanceResult[0]?.total) || 0);
+
+  // Helper: condições base para transações (com filtro opcional por conta)
+  const baseTxCond = () => {
+    const c: any[] = [eq(transactions.entityId, entityId)];
+    if (options?.bankAccountId) c.push(eq(transactions.bankAccountId, options.bankAccountId));
+    return c;
+  };
 
   // Get period balance (filtered by date range if provided)
   let periodBalance = 0;
@@ -409,7 +442,7 @@ export async function getDashboardMetrics(entityId: number, options?: { startDat
       .from(transactions)
       .where(
         and(
-          eq(transactions.entityId, entityId),
+          ...baseTxCond(),
           eq(transactions.status, "PAID"),
           gte(transactions.dueDate, options.startDate),
           lte(transactions.dueDate, options.endDate)
@@ -426,7 +459,7 @@ export async function getDashboardMetrics(entityId: number, options?: { startDat
     .from(transactions)
     .where(
       and(
-        eq(transactions.entityId, entityId),
+        ...baseTxCond(),
         eq(transactions.type, "INCOME"),
         eq(transactions.status, "PAID"),
         gte(transactions.dueDate, startOfMonth),
@@ -444,7 +477,7 @@ export async function getDashboardMetrics(entityId: number, options?: { startDat
     .from(transactions)
     .where(
       and(
-        eq(transactions.entityId, entityId),
+        ...baseTxCond(),
         eq(transactions.type, "EXPENSE"),
         eq(transactions.status, "PAID"),
         gte(transactions.dueDate, startOfMonth),
@@ -461,7 +494,7 @@ export async function getDashboardMetrics(entityId: number, options?: { startDat
     })
     .from(transactions)
     .where(
-      and(eq(transactions.entityId, entityId), eq(transactions.type, "EXPENSE"), eq(transactions.status, "PENDING"))
+      and(...baseTxCond(), eq(transactions.type, "EXPENSE"), eq(transactions.status, "PENDING"))
     );
 
   const pendingExpenses = Number(pendingResult[0]?.total) || 0;
@@ -476,7 +509,7 @@ export async function getDashboardMetrics(entityId: number, options?: { startDat
       .from(transactions)
       .where(
         and(
-          eq(transactions.entityId, entityId),
+          ...baseTxCond(),
           eq(transactions.type, "EXPENSE"),
           eq(transactions.status, "PENDING"),
           gte(transactions.dueDate, options.startDate),

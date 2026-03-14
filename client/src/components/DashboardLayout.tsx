@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -275,6 +275,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Início", path: "/" },
   { icon: Building2, label: "Entidades", path: "/entities" },
   { icon: Receipt, label: "Transações", path: "/transactions" },
+  { icon: Landmark, label: "Contas Bancárias", path: "/bank-accounts" },
   { icon: Calendar, label: "Agenda", path: "/agenda" },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];

@@ -18,7 +18,7 @@ export async function generateTransactionsExcel(data: {
   transactions: any[];
   summary: any;
   period: string;
-}) {
+}): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Sistema de Gestão Financeira";
   workbook.created = new Date();
@@ -34,6 +34,8 @@ export async function generateTransactionsExcel(data: {
     { header: "Descrição", key: "description", width: 35 },
     { header: "Tipo", key: "type", width: 10 },
     { header: "Categoria", key: "category", width: 20 },
+    { header: "Conta Bancária", key: "bankAccount", width: 22 },
+    { header: "Origem", key: "origin", width: 12 },
     { header: "Valor", key: "amount", width: 15 },
     { header: "Status", key: "status", width: 12 },
     { header: "Vencimento", key: "dueDate", width: 12 },
@@ -57,6 +59,8 @@ export async function generateTransactionsExcel(data: {
       description: transaction.description,
       type: transaction.type === "INCOME" ? "Receita" : "Despesa",
       category: transaction.categoryName || "",
+      bankAccount: transaction.bankAccountName || "",
+      origin: transaction.importOrigin === "OFX" ? "OFX" : "Manual",
       amount: transaction.amount / 100,
       status:
         transaction.status === "PAID"
@@ -144,7 +148,7 @@ export async function generateTransactionsExcel(data: {
 
   // Retornar buffer
   const buffer = await workbook.xlsx.writeBuffer();
-  return buffer;
+  return Buffer.from(buffer);
 }
 
 // ========== PDF EXPORT ==========

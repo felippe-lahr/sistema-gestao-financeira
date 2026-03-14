@@ -1152,6 +1152,12 @@ export default function EntityDashboard() {
                         {transaction.categoryName}
                       </span>
                     )}
+                    {/* Badge OFX */}
+                    {(transaction as any).importOrigin === "OFX" && (
+                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 w-fit">
+                        OFX
+                      </span>
+                    )}
                   </div>
 
                   {/* Valor + Status */}

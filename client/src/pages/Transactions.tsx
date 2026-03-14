@@ -1274,6 +1274,11 @@ export default function Transactions() {
                               <Paperclip className="h-4 w-4 text-muted-foreground" />
                             )}
                             {getCategoryBadge(transaction.categoryId)}
+                            {(transaction as any).importOrigin === "OFX" && (
+                              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                                OFX
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             Vencimento: {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
@@ -1329,9 +1334,14 @@ export default function Transactions() {
                         )}
                       </div>
 
-                      {/* Row 2: Category Badge */}
-                      <div>
+                      {/* Row 2: Category Badge + OFX Badge */}
+                      <div className="flex items-center gap-2 flex-wrap">
                         {getCategoryBadge(transaction.categoryId)}
+                        {(transaction as any).importOrigin === "OFX" && (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                            OFX
+                          </span>
+                        )}
                       </div>
 
                       {/* Row 3: Dates */}
