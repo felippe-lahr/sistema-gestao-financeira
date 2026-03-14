@@ -284,6 +284,28 @@ export const appRouter = router({
       await db.deleteBankAccount(input.id);
       return { success: true };
     }),
+    // Retorna saldo atual por conta (saldo inicial + movimentações pagas)
+    getBalanceSummary: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        const accounts = await db.getBankAccountsByEntityId(input.entityId, ctx.user.id);
+        const summaries = await Promise.all(
+          accounts.map(async (acc) => {
+            const metrics = await db.getDashboardMetrics(input.entityId, { bankAccountId: acc.id });
+            return {
+              id: acc.id,
+              name: acc.name,
+              bank: acc.bank,
+              color: acc.color,
+              isActive: acc.isActive,
+              initialBalance: acc.balance / 100,
+              currentBalance: metrics ? metrics.currentBalance / 100 : acc.balance / 100,
+            };
+          })
+        );
+        return summaries;
+      }),
   }),
 
   // ========== PAYMENT METHODS ==========
@@ -384,6 +406,7 @@ export const appRouter = router({
           status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
           type: z.enum(["INCOME", "EXPENSE"]).optional(),
           limit: z.number().optional(),
+          bankAccountId: z.number().optional(),
         })
       )
       .query(async ({ input, ctx }) => {
@@ -394,6 +417,7 @@ export const appRouter = router({
           status: input.status,
           type: input.type,
           limit: input.limit,
+          bankAccountId: input.bankAccountId,
         });
       }),
 
@@ -626,12 +650,14 @@ export const appRouter = router({
       entityId: z.number(),
       startDate: z.date().optional(),
       endDate: z.date().optional(),
+      bankAccountId: z.number().optional(),
     })).query(async ({ input, ctx }) => {
       await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
 
       const metrics = await db.getDashboardMetrics(input.entityId, {
         startDate: input.startDate,
         endDate: input.endDate,
+        bankAccountId: input.bankAccountId,
       });
       if (!metrics) {
         return {

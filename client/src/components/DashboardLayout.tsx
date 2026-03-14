@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -275,6 +275,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Início", path: "/" },
   { icon: Building2, label: "Entidades", path: "/entities" },
   { icon: Receipt, label: "Transações", path: "/transactions" },
+  { icon: Landmark, label: "Contas Bancárias", path: "/bank-accounts" },
   { icon: Calendar, label: "Agenda", path: "/agenda" },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];
@@ -512,6 +513,17 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                 );
               })}
+              <SidebarMenuItem key="/planos">
+                <SidebarMenuButton
+                  isActive={location === "/planos"}
+                  onClick={() => setLocation("/planos")}
+                  tooltip="Planos"
+                  className={`h-10 transition-all font-normal text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300`}
+                >
+                  <Crown className={`h-5 w-5 ${location === "/planos" ? "text-blue-600 dark:text-blue-400" : ""}`} />
+                  <span>Planos</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               {user?.role === "admin" && (
                 <SidebarMenuItem key="/admin">
                   <SidebarMenuButton
@@ -569,7 +581,7 @@ function DashboardLayoutContent({
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span>Sair</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

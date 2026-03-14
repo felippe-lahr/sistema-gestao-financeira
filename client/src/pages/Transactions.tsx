@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -41,6 +41,17 @@ export default function Transactions() {
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  
+  // Estados para categorização rápida inline
+  const [quickCategoryTx, setQuickCategoryTx] = useState<any>(null);
+  const [quickCategoryDrawerOpen, setQuickCategoryDrawerOpen] = useState(false);
+  const [quickCategoryValue, setQuickCategoryValue] = useState<string>("");
+  const [quickCategorySaving, setQuickCategorySaving] = useState(false);
+  
+  // Estados para categorização em lote
+  const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
+  const [bulkCategoryAssignments, setBulkCategoryAssignments] = useState<Record<number, string>>({});
+  const [bulkCategorySaving, setBulkCategorySaving] = useState(false);
   
   // Resetar mês e ano para o atual ao abrir a página
   useEffect(() => {
@@ -527,6 +538,80 @@ export default function Transactions() {
     });
   };
 
+  // Categorização rápida inline via Popover — recebe transação e categoryId diretamente
+  const handleSaveQuickCategory = async (transaction: any, categoryId: number) => {
+    try {
+      await utils.client.transactions.update.mutate({
+        id: transaction.id,
+        type: transaction.type,
+        description: transaction.description,
+        amount: transaction.amount,
+        dueDate: new Date(transaction.dueDate),
+        paymentDate: transaction.paymentDate ? new Date(transaction.paymentDate) : undefined,
+        status: transaction.status,
+        categoryId: categoryId,
+        bankAccountId: transaction.bankAccountId || undefined,
+        paymentMethodId: transaction.paymentMethodId || undefined,
+        notes: transaction.notes || undefined,
+      });
+      utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
+      utils.dashboard.metrics.invalidate();
+      toast.success("Categoria atualizada!");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao atualizar categoria");
+    }
+  };
+
+  // handleOpenBulkCategory e handleSaveBulkCategory usam uncategorizedTransactions
+  // que é definido após filteredTransactions — ver abaixo
+  const handleOpenBulkCategory = () => {
+    const initial: Record<number, string> = {};
+    uncategorizedTransactions.forEach((t) => { initial[t.id] = ""; });
+    setBulkCategoryAssignments(initial);
+    setIsBulkCategoryOpen(true);
+  };
+
+  const handleSaveBulkCategory = async () => {
+    const toUpdate = Object.entries(bulkCategoryAssignments).filter(([, v]) => v !== "");
+    if (toUpdate.length === 0) {
+      toast.info("Nenhuma categoria selecionada.");
+      return;
+    }
+    setBulkCategorySaving(true);
+    let successCount = 0;
+    try {
+      for (const [idStr, categoryIdStr] of toUpdate) {
+        const tx = uncategorizedTransactions.find((t) => t.id === parseInt(idStr));
+        if (!tx) continue;
+        await utils.client.transactions.update.mutate({
+          id: tx.id,
+          type: tx.type,
+          description: tx.description,
+          amount: tx.amount,
+          dueDate: new Date(tx.dueDate),
+          paymentDate: tx.paymentDate ? new Date(tx.paymentDate) : undefined,
+          status: tx.status,
+          categoryId: parseInt(categoryIdStr),
+          bankAccountId: tx.bankAccountId || undefined,
+          paymentMethodId: tx.paymentMethodId || undefined,
+          notes: tx.notes || undefined,
+        });
+        successCount++;
+      }
+      utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
+      utils.dashboard.metrics.invalidate();
+      setIsBulkCategoryOpen(false);
+      setBulkCategoryAssignments({});
+      toast.success(`${successCount} transações categorizadas com sucesso!`);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao categorizar transações");
+    } finally {
+      setBulkCategorySaving(false);
+    }
+  };
+
   // Apply filters to transactions
   const filteredTransactions = transactions?.filter((t) => {
     // Search filter
@@ -568,6 +653,9 @@ export default function Transactions() {
 
     return true;
   });
+
+  // Transações sem categoria (calculado após filtro)
+  const uncategorizedTransactions = filteredTransactions?.filter((t) => !t.categoryId) || [];
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive"> = {
@@ -1238,6 +1326,30 @@ export default function Transactions() {
         </div>
       )}
 
+      {/* Banner de categorização em lote */}
+      {!transactionsLoading && uncategorizedTransactions.length > 0 && (
+        <div className="flex items-center justify-between gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Tag className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              <span className="font-semibold">{uncategorizedTransactions.length}</span> transação{uncategorizedTransactions.length > 1 ? "ões" : ""} sem categoria
+            </p>
+          </div>
+          {canWrite && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-400 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-900/40 flex-shrink-0"
+              onClick={handleOpenBulkCategory}
+            >
+              <Tags className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Categorizar todas</span>
+              <span className="sm:hidden">Categorizar</span>
+            </Button>
+          )}
+        </div>
+      )}
+
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
         <TabsList>
           <TabsTrigger value="all">Todas</TabsTrigger>
@@ -1274,6 +1386,39 @@ export default function Transactions() {
                               <Paperclip className="h-4 w-4 text-muted-foreground" />
                             )}
                             {getCategoryBadge(transaction.categoryId)}
+                            {!transaction.categoryId && canWrite && (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 transition-colors">
+                                    <Tag className="h-3 w-3" />
+                                    Sem categoria
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-56 p-1" align="start">
+                                  <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
+                                  <div className="max-h-48 overflow-y-auto">
+                                    {categories?.filter(c => c.type === transaction.type || c.type === 'BOTH').map((cat) => (
+                                      <button
+                                        key={cat.id}
+                                        onClick={() => handleSaveQuickCategory(transaction, cat.id)}
+                                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors text-left"
+                                      >
+                                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
+                                        {cat.name}
+                                      </button>
+                                    ))}
+                                    {(!categories || categories.filter(c => c.type === transaction.type || c.type === 'BOTH').length === 0) && (
+                                      <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma categoria cadastrada</p>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                            {(transaction as any).importOrigin === "OFX" && (
+                              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                                OFX
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             Vencimento: {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
@@ -1329,9 +1474,42 @@ export default function Transactions() {
                         )}
                       </div>
 
-                      {/* Row 2: Category Badge */}
-                      <div>
+                      {/* Row 2: Category Badge + OFX Badge */}
+                      <div className="flex items-center gap-2 flex-wrap">
                         {getCategoryBadge(transaction.categoryId)}
+                        {!transaction.categoryId && canWrite && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 active:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 transition-colors">
+                                <Tag className="h-3 w-3" />
+                                Sem categoria
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56 p-1" align="start" side="top">
+                              <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
+                              <div className="max-h-48 overflow-y-auto">
+                                {categories?.filter(c => c.type === transaction.type || c.type === 'BOTH').map((cat) => (
+                                  <button
+                                    key={cat.id}
+                                    onClick={() => handleSaveQuickCategory(transaction, cat.id)}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors text-left"
+                                  >
+                                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
+                                    {cat.name}
+                                  </button>
+                                ))}
+                                {(!categories || categories.filter(c => c.type === transaction.type || c.type === 'BOTH').length === 0) && (
+                                  <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma categoria cadastrada</p>
+                                )}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                        {(transaction as any).importOrigin === "OFX" && (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                            OFX
+                          </span>
+                        )}
                       </div>
 
                       {/* Row 3: Dates */}
@@ -1368,6 +1546,89 @@ export default function Transactions() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Drawer de Categorização Rápida Inline - removido, substituído por Popover inline nos cards */}
+
+      {/* Drawer de Categorização em Lote */}
+      <Drawer open={isBulkCategoryOpen} onOpenChange={(open) => { if (!open) setIsBulkCategoryOpen(false); }}>
+        <DrawerContent className="max-h-[90vh]">
+          <DrawerHeader>
+            <div className="flex items-center justify-between">
+              <DrawerTitle className="flex items-center gap-2">
+                <Tags className="h-5 w-5 text-amber-600" />
+                Categorizar em Lote
+              </DrawerTitle>
+              <DrawerClose asChild>
+                <Button variant="ghost" size="icon"><X className="h-4 w-4" /></Button>
+              </DrawerClose>
+            </div>
+            <p className="text-sm text-muted-foreground text-left">
+              {uncategorizedTransactions.length} transação{uncategorizedTransactions.length > 1 ? "ões" : ""} sem categoria. Atribua categorias e clique em Salvar.
+            </p>
+          </DrawerHeader>
+          <div className="overflow-y-auto px-4 pb-2 space-y-3" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+            {uncategorizedTransactions.map((tx) => (
+              <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className={`p-1.5 rounded-full flex-shrink-0 ${tx.type === 'INCOME' ? 'bg-green-100' : 'bg-red-100'}`}>
+                    {tx.type === 'INCOME'
+                      ? <ArrowUpRight className="h-3.5 w-3.5 text-green-600" />
+                      : <ArrowDownRight className="h-3.5 w-3.5 text-red-600" />
+                    }
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{tx.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tx.amount / 100)}
+                      {' • '}{format(new Date(tx.dueDate), 'dd/MM/yyyy', { locale: ptBR })}
+                    </p>
+                  </div>
+                </div>
+                <div className="w-full sm:w-48 flex-shrink-0">
+                  <Select
+                    value={bulkCategoryAssignments[tx.id] || ""}
+                    onValueChange={(v) => setBulkCategoryAssignments(prev => ({ ...prev, [tx.id]: v }))}
+                  >
+                    <SelectTrigger className="w-full h-9 text-sm">
+                      <SelectValue placeholder="Selecionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories?.filter(c => c.type === tx.type || c.type === 'BOTH').map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
+                            {cat.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ))}
+          </div>
+          <DrawerFooter>
+            <Button
+              onClick={handleSaveBulkCategory}
+              disabled={bulkCategorySaving || Object.values(bulkCategoryAssignments).every(v => v === '')}
+              className="bg-blue-600 hover:bg-blue-700 w-full"
+            >
+              {bulkCategorySaving ? "Salvando..." : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Salvar {Object.values(bulkCategoryAssignments).filter(v => v !== '').length > 0
+                    ? `(${Object.values(bulkCategoryAssignments).filter(v => v !== '').length} selecionadas)`
+                    : 'Categorias'
+                  }
+                </>
+              )}
+            </Button>
+            <DrawerClose asChild>
+              <Button variant="outline" className="w-full">Cancelar</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

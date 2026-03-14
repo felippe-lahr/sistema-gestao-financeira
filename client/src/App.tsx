@@ -25,6 +25,9 @@ const Signup = lazy(() => import("@/pages/Signup"));
 const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
 const GoogleAuthSuccess = lazy(() => import("@/pages/GoogleAuthSuccess"));
 const Admin = lazy(() => import("@/pages/Admin"));
+const Planos = lazy(() => import("@/pages/Planos"));
+const BillingSuccess = lazy(() => import("@/pages/BillingSuccess"));
+const BankAccounts = lazy(() => import("@/pages/BankAccounts"));
 
 // Loading fallback - minimal spinner
 function PageLoader() {
@@ -49,6 +52,7 @@ function Router() {
         <Route path="/treasury-selic/:entityId" component={() => <DashboardLayout><TreasurySelix /></DashboardLayout>} />
         <Route path="/overall-dashboard" component={() => <DashboardLayout><OverallDashboard /></DashboardLayout>} />
         <Route path="/agenda" component={() => <DashboardLayout><Agenda /></DashboardLayout>} />
+        <Route path="/bank-accounts" component={() => <DashboardLayout><BankAccounts /></DashboardLayout>} />
         <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
         <Route path="/profile" component={() => <DashboardLayout><UserProfile /></DashboardLayout>} />
         <Route path="/convite/:token" component={AcceptInvite} />
@@ -56,6 +60,8 @@ function Router() {
         <Route path="/verificar-email" component={VerifyEmail} />
         <Route path="/auth/google/success" component={GoogleAuthSuccess} />
         <Route path="/admin" component={() => <DashboardLayout><Admin /></DashboardLayout>} />
+        <Route path="/planos" component={() => <DashboardLayout><Planos /></DashboardLayout>} />
+        <Route path="/billing/success" component={BillingSuccess} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
