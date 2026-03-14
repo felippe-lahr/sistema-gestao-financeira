@@ -1594,25 +1594,27 @@ export default function Transactions() {
       {/* Drawer de Categorização Rápida Inline - removido, substituído por Popover inline nos cards */}
 
       {/* Drawer de Categorização em Lote */}
-      <Drawer open={isBulkCategoryOpen} onOpenChange={(open) => { if (!open) setIsBulkCategoryOpen(false); }}>
-        <DrawerContent className="max-h-[90vh]">
-          <DrawerHeader>
+      <Sheet open={isBulkCategoryOpen} onOpenChange={(open) => { if (!open) { setIsBulkCategoryOpen(false); setBulkCategoryAssignments({}); } }}>
+        <SheetContent side="right" className="w-full sm:w-[520px] flex flex-col p-0">
+          {/* Header */}
+          <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b dark:border-gray-700 px-6 py-4">
             <div className="flex items-center justify-between">
-              <DrawerTitle className="flex items-center gap-2">
+              <SheetTitle className="flex items-center gap-2 text-lg font-bold">
                 <Tags className="h-5 w-5 text-amber-600" />
                 Categorizar em Lote
-              </DrawerTitle>
-              <DrawerClose asChild>
-                <Button variant="ghost" size="icon"><X className="h-4 w-4" /></Button>
-              </DrawerClose>
+              </SheetTitle>
+              <Button variant="ghost" size="icon" onClick={() => { setIsBulkCategoryOpen(false); setBulkCategoryAssignments({}); }}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <p className="text-sm text-muted-foreground text-left">
+            <p className="text-sm text-muted-foreground mt-1">
               {uncategorizedTransactions.length} transação{uncategorizedTransactions.length > 1 ? "ões" : ""} sem categoria. Atribua categorias e clique em Salvar.
             </p>
-          </DrawerHeader>
-          <div className="overflow-y-auto px-4 pb-2 space-y-3" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+          </div>
+          {/* Lista de transações */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
             {uncategorizedTransactions.map((tx) => (
-              <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div className={`p-1.5 rounded-full flex-shrink-0 ${tx.type === 'INCOME' ? 'bg-green-100' : 'bg-red-100'}`}>
                     {tx.type === 'INCOME'
@@ -1628,13 +1630,13 @@ export default function Transactions() {
                     </p>
                   </div>
                 </div>
-                <div className="w-full sm:w-48 flex-shrink-0">
+                <div className="w-full sm:w-52 flex-shrink-0">
                   <Select
                     value={bulkCategoryAssignments[tx.id] || ""}
                     onValueChange={(v) => setBulkCategoryAssignments(prev => ({ ...prev, [tx.id]: v }))}
                   >
                     <SelectTrigger className="w-full h-9 text-sm">
-                      <SelectValue placeholder="Selecionar..." />
+                      <SelectValue placeholder="Selecionar categoria..." />
                     </SelectTrigger>
                     <SelectContent>
                       {categories?.filter(c => c.type === tx.type || c.type === 'BOTH').map((cat) => (
@@ -1651,7 +1653,8 @@ export default function Transactions() {
               </div>
             ))}
           </div>
-          <DrawerFooter>
+          {/* Footer fixo */}
+          <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t dark:border-gray-700 px-6 py-4 space-y-2">
             <Button
               onClick={handleSaveBulkCategory}
               disabled={bulkCategorySaving || Object.values(bulkCategoryAssignments).every(v => v === '')}
@@ -1667,12 +1670,12 @@ export default function Transactions() {
                 </>
               )}
             </Button>
-            <DrawerClose asChild>
-              <Button variant="outline" className="w-full">Cancelar</Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+            <Button variant="outline" className="w-full" onClick={() => { setIsBulkCategoryOpen(false); setBulkCategoryAssignments({}); }}>
+              Cancelar
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
