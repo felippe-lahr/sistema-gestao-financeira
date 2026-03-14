@@ -538,40 +538,28 @@ export default function Transactions() {
     });
   };
 
-  // Categorização rápida inline
-  const handleQuickCategory = (transaction: any) => {
-    setQuickCategoryTx(transaction);
-    setQuickCategoryValue(transaction.categoryId?.toString() || "");
-    setQuickCategoryDrawerOpen(true);
-  };
-
-  const handleSaveQuickCategory = async () => {
-    if (!quickCategoryTx) return;
-    setQuickCategorySaving(true);
+  // Categorização rápida inline via Popover — recebe transação e categoryId diretamente
+  const handleSaveQuickCategory = async (transaction: any, categoryId: number) => {
     try {
       await utils.client.transactions.update.mutate({
-        id: quickCategoryTx.id,
-        type: quickCategoryTx.type,
-        description: quickCategoryTx.description,
-        amount: quickCategoryTx.amount,
-        dueDate: new Date(quickCategoryTx.dueDate),
-        paymentDate: quickCategoryTx.paymentDate ? new Date(quickCategoryTx.paymentDate) : undefined,
-        status: quickCategoryTx.status,
-        categoryId: quickCategoryValue ? parseInt(quickCategoryValue) : undefined,
-        bankAccountId: quickCategoryTx.bankAccountId || undefined,
-        paymentMethodId: quickCategoryTx.paymentMethodId || undefined,
-        notes: quickCategoryTx.notes || undefined,
+        id: transaction.id,
+        type: transaction.type,
+        description: transaction.description,
+        amount: transaction.amount,
+        dueDate: new Date(transaction.dueDate),
+        paymentDate: transaction.paymentDate ? new Date(transaction.paymentDate) : undefined,
+        status: transaction.status,
+        categoryId: categoryId,
+        bankAccountId: transaction.bankAccountId || undefined,
+        paymentMethodId: transaction.paymentMethodId || undefined,
+        notes: transaction.notes || undefined,
       });
       utils.transactions.listByEntity.invalidate();
       utils.transactions.summary.invalidate();
       utils.dashboard.metrics.invalidate();
-      setQuickCategoryDrawerOpen(false);
-      setQuickCategoryTx(null);
       toast.success("Categoria atualizada!");
     } catch (error: any) {
       toast.error(error.message || "Erro ao atualizar categoria");
-    } finally {
-      setQuickCategorySaving(false);
     }
   };
 
@@ -1399,13 +1387,32 @@ export default function Transactions() {
                             )}
                             {getCategoryBadge(transaction.categoryId)}
                             {!transaction.categoryId && canWrite && (
-                              <button
-                                onClick={() => handleQuickCategory(transaction)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 transition-colors"
-                              >
-                                <Tag className="h-3 w-3" />
-                                Sem categoria
-                              </button>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 transition-colors">
+                                    <Tag className="h-3 w-3" />
+                                    Sem categoria
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-56 p-1" align="start">
+                                  <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
+                                  <div className="max-h-48 overflow-y-auto">
+                                    {categories?.filter(c => c.type === transaction.type || c.type === 'BOTH').map((cat) => (
+                                      <button
+                                        key={cat.id}
+                                        onClick={() => handleSaveQuickCategory(transaction, cat.id)}
+                                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors text-left"
+                                      >
+                                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
+                                        {cat.name}
+                                      </button>
+                                    ))}
+                                    {(!categories || categories.filter(c => c.type === transaction.type || c.type === 'BOTH').length === 0) && (
+                                      <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma categoria cadastrada</p>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             )}
                             {(transaction as any).importOrigin === "OFX" && (
                               <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
@@ -1471,13 +1478,32 @@ export default function Transactions() {
                       <div className="flex items-center gap-2 flex-wrap">
                         {getCategoryBadge(transaction.categoryId)}
                         {!transaction.categoryId && canWrite && (
-                          <button
-                            onClick={() => handleQuickCategory(transaction)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 active:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 transition-colors"
-                          >
-                            <Tag className="h-3 w-3" />
-                            Sem categoria
-                          </button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 active:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 transition-colors">
+                                <Tag className="h-3 w-3" />
+                                Sem categoria
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56 p-1" align="start" side="top">
+                              <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
+                              <div className="max-h-48 overflow-y-auto">
+                                {categories?.filter(c => c.type === transaction.type || c.type === 'BOTH').map((cat) => (
+                                  <button
+                                    key={cat.id}
+                                    onClick={() => handleSaveQuickCategory(transaction, cat.id)}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors text-left"
+                                  >
+                                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
+                                    {cat.name}
+                                  </button>
+                                ))}
+                                {(!categories || categories.filter(c => c.type === transaction.type || c.type === 'BOTH').length === 0) && (
+                                  <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma categoria cadastrada</p>
+                                )}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         )}
                         {(transaction as any).importOrigin === "OFX" && (
                           <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
@@ -1521,57 +1547,7 @@ export default function Transactions() {
         </TabsContent>
       </Tabs>
 
-      {/* Drawer de Categorização Rápida Inline */}
-      <Drawer open={quickCategoryDrawerOpen} onOpenChange={(open) => { if (!open) { setQuickCategoryDrawerOpen(false); setQuickCategoryTx(null); } }}>
-        <DrawerContent>
-          <DrawerHeader>
-            <div className="flex items-center justify-between">
-              <DrawerTitle className="flex items-center gap-2">
-                <Tag className="h-5 w-5 text-amber-600" />
-                Categorizar Transação
-              </DrawerTitle>
-              <DrawerClose asChild>
-                <Button variant="ghost" size="icon"><X className="h-4 w-4" /></Button>
-              </DrawerClose>
-            </div>
-            {quickCategoryTx && (
-              <p className="text-sm text-muted-foreground mt-1 text-left">{quickCategoryTx.description}</p>
-            )}
-          </DrawerHeader>
-          <div className="px-4 pb-4 space-y-4">
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select value={quickCategoryValue} onValueChange={setQuickCategoryValue}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories?.filter(c => !quickCategoryTx || c.type === quickCategoryTx.type || c.type === 'BOTH').map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
-                        {cat.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DrawerFooter>
-            <Button
-              onClick={handleSaveQuickCategory}
-              disabled={!quickCategoryValue || quickCategorySaving}
-              className="bg-blue-600 hover:bg-blue-700 w-full"
-            >
-              {quickCategorySaving ? "Salvando..." : "Salvar Categoria"}
-            </Button>
-            <DrawerClose asChild>
-              <Button variant="outline" className="w-full">Cancelar</Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+      {/* Drawer de Categorização Rápida Inline - removido, substituído por Popover inline nos cards */}
 
       {/* Drawer de Categorização em Lote */}
       <Drawer open={isBulkCategoryOpen} onOpenChange={(open) => { if (!open) setIsBulkCategoryOpen(false); }}>
