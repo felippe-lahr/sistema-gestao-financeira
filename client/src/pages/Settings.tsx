@@ -9,14 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("payments");
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
 
   const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
 
