@@ -672,13 +672,15 @@ export default function Transactions() {
     return <Badge variant={variants[status] || "default"}>{status === "PENDING" ? "Pendente" : status === "PAID" ? "Pago" : "Vencido"}</Badge>;
   };
 
-  const getCategoryBadge = (categoryId: number | null) => {
-    if (!categoryId || !categories) return null;
-    const category = categories.find((c) => c.id === categoryId);
-    if (!category) return null;
+  const getCategoryBadge = (categoryId: number | null, categoryName?: string | null, categoryColor?: string | null) => {
+    if (!categoryId) return null;
+    // Prioriza os dados que já vêm na transação via JOIN (categoryName, categoryColor)
+    const name = categoryName || categories?.find((c) => c.id === categoryId)?.name;
+    const color = categoryColor || categories?.find((c) => c.id === categoryId)?.color;
+    if (!name) return null;
     return (
-      <Badge style={{ backgroundColor: category.color || "#6B7280", color: "#fff" }} className="font-normal">
-        {category.name}
+      <Badge style={{ backgroundColor: color || "#6B7280", color: "#fff" }} className="font-normal">
+        {name}
       </Badge>
     );
   };
@@ -1431,7 +1433,7 @@ export default function Transactions() {
                             {transaction.attachmentCount > 0 && (
                               <Paperclip className="h-4 w-4 text-muted-foreground" />
                             )}
-                            {getCategoryBadge(transaction.categoryId)}
+                            {getCategoryBadge(transaction.categoryId, (transaction as any).categoryName, (transaction as any).categoryColor)}
                             {!transaction.categoryId && canWrite && (
                               <Popover>
                                 <PopoverTrigger asChild>
@@ -1528,7 +1530,7 @@ export default function Transactions() {
 
                       {/* Row 2: Category Badge + OFX Badge */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        {getCategoryBadge(transaction.categoryId)}
+                        {getCategoryBadge(transaction.categoryId, (transaction as any).categoryName, (transaction as any).categoryColor)}
                         {!transaction.categoryId && canWrite && (
                           <Popover>
                             <PopoverTrigger asChild>
