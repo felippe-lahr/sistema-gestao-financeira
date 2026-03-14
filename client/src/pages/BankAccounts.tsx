@@ -144,7 +144,7 @@ export default function BankAccounts() {
 
       {/* Seletor de entidade (se mais de uma) */}
       {entities.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        <div className="flex flex-wrap gap-2 pb-1">
           {entities.map((e) => (
             <button
               key={e.id}
