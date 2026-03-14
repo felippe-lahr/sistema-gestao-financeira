@@ -11,10 +11,4 @@ export const ENV = {
   appUrl: process.env.APP_URL ?? "http://localhost:5173",
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-  // Stripe
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
-  stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
-  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
-  stripePriceProMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY ?? "",
-  stripePriceProYearly: process.env.STRIPE_PRICE_PRO_YEARLY ?? "",
 };

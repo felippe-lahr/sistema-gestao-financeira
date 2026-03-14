@@ -2388,12 +2388,6 @@ export async function updateTaskGoogleCalendarEventId(taskId: number, eventId: s
     .set({ googleCalendarEventId: eventId, updatedAt: new Date() })
     .where(eq(tasks.id, taskId));
 }
-
-// ========== BILLING / STRIPE OPERATIONS ==========
-
-/**
- * Atualiza o plano e dados de billing de uma organização após evento do Stripe.
- */
 export async function updateOrganizationBilling(data: {
   organizationId: number;
   plan: "free" | "pro" | "enterprise";
