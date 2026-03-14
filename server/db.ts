@@ -284,6 +284,7 @@ export async function getTransactionsByEntityId(
       categoryColor: categories.color,
       importOrigin: transactions.importOrigin,
       bankAccountName: bankAccounts.name,
+      bankInstitution: bankAccounts.bank,
       attachmentCount: sql<number>`(SELECT COUNT(*) FROM ${attachments} WHERE ${attachments.transactionId} = ${transactions.id})`,
     })
     .from(transactions)

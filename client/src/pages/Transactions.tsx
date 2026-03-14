@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2 } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -38,6 +38,7 @@ export default function Transactions() {
   const [filterEndDate, setFilterEndDate] = useState("");
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterBankAccountId, setFilterBankAccountId] = useState<string>("");
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -65,6 +66,7 @@ export default function Transactions() {
     filterPeriod !== "all",
     filterCategoryId !== "" && filterCategoryId !== "all",
     filterStatus !== "" && filterStatus !== "all",
+    filterBankAccountId !== "" && filterBankAccountId !== "all",
     filterStartDate !== "" || filterEndDate !== ""
   ].filter(Boolean).length;
 
@@ -628,6 +630,10 @@ export default function Transactions() {
     if (filterStatus && filterStatus !== "all" && t.status !== filterStatus) {
       return false;
     }
+    // Bank account filter
+    if (filterBankAccountId && filterBankAccountId !== "all" && t.bankAccountId?.toString() !== filterBankAccountId) {
+      return false;
+    }
 
     // Period filter
     const transactionDate = new Date(t.dueDate);
@@ -1038,6 +1044,26 @@ export default function Transactions() {
                   </SelectContent>
                 </Select>
               </div>
+              {/* Conta Bancária */}
+              <div className="space-y-2">
+                <Label>Conta Bancária</Label>
+                <Select value={filterBankAccountId} onValueChange={setFilterBankAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as contas</SelectItem>
+                    {bankAccounts?.map((account) => (
+                      <SelectItem key={account.id} value={account.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <Landmark className="h-3.5 w-3.5" />
+                          {account.name}{account.bank ? ` (${account.bank})` : ""}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <DrawerFooter>
@@ -1047,6 +1073,7 @@ export default function Transactions() {
                   setFilterPeriod("all");
                   setFilterCategoryId("");
                   setFilterStatus("");
+                  setFilterBankAccountId("");
                   setFilterStartDate("");
                   setFilterEndDate("");
                   setSearchTerm("");
@@ -1168,6 +1195,24 @@ export default function Transactions() {
           </Select>
         </div>
 
+        {/* Conta Bancária */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Conta:</span>
+          <Select value={filterBankAccountId} onValueChange={setFilterBankAccountId}>
+            <SelectTrigger className="w-[160px] bg-white dark:bg-gray-800">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as contas</SelectItem>
+              {bankAccounts?.map((account) => (
+                <SelectItem key={account.id} value={account.id.toString()}>
+                  {account.name}{account.bank ? ` (${account.bank})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Buscar */}
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
@@ -1189,6 +1234,7 @@ export default function Transactions() {
             setFilterEndDate("");
             setFilterCategoryId("all");
             setFilterStatus("all");
+            setFilterBankAccountId("all");
             setSearchTerm("");
           }}
         >
@@ -1419,6 +1465,12 @@ export default function Transactions() {
                                 OFX
                               </span>
                             )}
+                            {(transaction as any).bankAccountName && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                <Landmark className="h-3 w-3" />
+                                {(transaction as any).bankInstitution || (transaction as any).bankAccountName}
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             Vencimento: {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
@@ -1508,6 +1560,12 @@ export default function Transactions() {
                         {(transaction as any).importOrigin === "OFX" && (
                           <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
                             OFX
+                          </span>
+                        )}
+                        {(transaction as any).bankAccountName && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            <Landmark className="h-3 w-3" />
+                            {(transaction as any).bankInstitution || (transaction as any).bankAccountName}
                           </span>
                         )}
                       </div>
