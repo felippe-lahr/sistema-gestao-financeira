@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -165,6 +166,9 @@ export default function BankAccounts() {
           entityId={selectedEntityId}
           canWrite={canWrite}
           canDelete={canDelete}
+          entities={entities}
+          selectedEntityId={selectedEntityId}
+          onEntityChange={(id) => setSelectedEntityId(id)}
         />
       )}
     </div>
@@ -177,10 +181,16 @@ function BankAccountsList({
   entityId,
   canWrite,
   canDelete,
+  entities,
+  selectedEntityId,
+  onEntityChange,
 }: {
   entityId: number;
   canWrite: boolean;
   canDelete: boolean;
+  entities: any[];
+  selectedEntityId: number;
+  onEntityChange: (id: number) => void;
 }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -193,6 +203,7 @@ function BankAccountsList({
     accountNumber: "",
     balance: "",
     color: "#2563EB",
+    entityId: entityId,
   });
 
    const utils = trpc.useUtils();
@@ -229,16 +240,17 @@ function BankAccountsList({
   });
 
   const resetForm = () =>
-    setFormData({ name: "", bank: "", accountNumber: "", balance: "", color: "#2563EB" });
+    setFormData({ name: "", bank: "", accountNumber: "", balance: "", color: "#2563EB", entityId });
 
   const handleCreate = () => {
     if (!formData.name.trim()) return toast.error("O nome da conta é obrigatório");
+    if (!formData.entityId) return toast.error("Selecione uma entidade para vincular a conta");
     createMutation.mutate({
-      entityId,
+      entityId: formData.entityId,
       name: formData.name,
       bank: formData.bank || undefined,
       accountNumber: formData.accountNumber || undefined,
-       balance: formData.balance ? parseCurrency(formData.balance) : undefined,
+      balance: formData.balance ? parseCurrency(formData.balance) : undefined,
       color: formData.color,
     });
   };
@@ -251,6 +263,7 @@ function BankAccountsList({
       accountNumber: account.accountNumber || "",
       balance: (account.balance / 100).toFixed(2).replace(".", ","),
       color: account.color || "#2563EB",
+      entityId: account.entityId || entityId,
     });
     setIsEditOpen(true);
   };
@@ -432,6 +445,8 @@ function BankAccountsList({
         onSubmit={handleCreate}
         submitLabel={createMutation.isPending ? "Criando..." : "Criar Conta"}
         isPending={createMutation.isPending}
+        entities={entities}
+        isEditing={false}
       />
 
       {/* ── Sheet: Editar conta ── */}
@@ -444,6 +459,8 @@ function BankAccountsList({
         onSubmit={handleUpdate}
         submitLabel={updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
         isPending={updateMutation.isPending}
+        entities={entities}
+        isEditing={true}
       />
 
       {/* ── Alert: Confirmar exclusão ── */}
@@ -494,6 +511,8 @@ function AccountSheet({
   onSubmit,
   submitLabel,
   isPending,
+  entities,
+  isEditing,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -503,6 +522,8 @@ function AccountSheet({
   onSubmit: () => void;
   submitLabel: string;
   isPending: boolean;
+  entities: any[];
+  isEditing: boolean;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -520,6 +541,53 @@ function AccountSheet({
 
         {/* Corpo */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+
+          {/* Seletor de entidade - sempre visível e obrigatório */}
+          <div className="space-y-2">
+            <Label htmlFor="acc-entity">
+              Entidade *
+              <span className="ml-1 text-xs text-muted-foreground font-normal">(conta será vinculada a esta entidade)</span>
+            </Label>
+            {entities.length === 1 ? (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <div
+                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: entities[0].color || "#2563EB" }}
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{entities[0].name}</span>
+                <span className="ml-auto text-xs text-muted-foreground">Selecionada automaticamente</span>
+              </div>
+            ) : (
+              <Select
+                value={formData.entityId?.toString()}
+                onValueChange={(v) => setFormData({ ...formData, entityId: Number(v) })}
+                disabled={isEditing}
+              >
+                <SelectTrigger id="acc-entity" className="rounded-xl">
+                  <SelectValue placeholder="Selecione a entidade..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {entities.map((e: any) => (
+                    <SelectItem key={e.id} value={e.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: e.color || "#2563EB" }}
+                        />
+                        {e.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {isEditing && entities.length > 1 && (
+              <p className="text-xs text-muted-foreground">
+                A entidade não pode ser alterada após a criação da conta.
+              </p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="acc-name">Nome da Conta *</Label>
             <Input

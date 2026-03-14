@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, Trash2, CreditCard, Building2, Tag, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState("accounts");
+  const [activeTab, setActiveTab] = useState("payments");
+  const navigate = useNavigate();
 
   const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
 
@@ -59,7 +61,7 @@ export default function Settings() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
-          <p className="text-muted-foreground">Gerencie contas, meios de pagamento e categorias</p>
+          <p className="text-muted-foreground">Gerencie meios de pagamento e categorias</p>
         </div>
         <Select value={selectedEntityId?.toString()} onValueChange={(value) => setSelectedEntityId(Number(value))}>
           <SelectTrigger className="w-full sm:w-[200px]">
@@ -81,13 +83,24 @@ export default function Settings() {
         </Select>
       </div>
 
+      {/* Card de acesso rápido a Contas Bancárias */}
+      <button
+        onClick={() => navigate("/bank-accounts")}
+        className="w-full flex items-center gap-4 p-4 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors text-left"
+      >
+        <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+          <Landmark className="h-5 w-5 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-blue-900 dark:text-blue-100">Contas Bancárias</p>
+          <p className="text-sm text-blue-600 dark:text-blue-400">Gerencie contas e importe extratos OFX</p>
+        </div>
+        <ArrowRight className="h-5 w-5 text-blue-400 flex-shrink-0" />
+      </button>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="accounts">
-            <Building2 className="mr-2 h-4 w-4" />
-            Contas Correntes
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="payments">
             <CreditCard className="mr-2 h-4 w-4" />
             Meios de Pagamento
@@ -98,9 +111,6 @@ export default function Settings() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="accounts" className="mt-6">
-           {selectedEntityId && <BankAccountsTab entityId={selectedEntityId} canWrite={canWrite} canDelete={canDeleteSettings} />}
-        </TabsContent>
         <TabsContent value="payments" className="mt-6">
           {selectedEntityId && <PaymentMethodsTab entityId={selectedEntityId} canWrite={canWrite} canDelete={canDeleteSettings} />}
         </TabsContent>
@@ -108,353 +118,6 @@ export default function Settings() {
           {selectedEntityId && <CategoriesTab entityId={selectedEntityId} canWrite={canWrite} canDelete={canDeleteSettings} />}
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-// ========== BANK ACCOUNTS TAB ==========
-function BankAccountsTab({ entityId, canWrite = true, canDelete = true }: { entityId: number; canWrite?: boolean; canDelete?: boolean }) {
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<any>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    bank: "",
-    accountNumber: "",
-    balance: "",
-    color: "#2563EB",
-  });
-
-  const utils = trpc.useUtils();
-  const { data: accounts, isLoading } = trpc.bankAccounts.listByEntity.useQuery({ entityId });
-
-  const createMutation = trpc.bankAccounts.create.useMutation({
-    onSuccess: () => {
-      utils.bankAccounts.listByEntity.invalidate();
-      setIsCreateOpen(false);
-      resetForm();
-      toast.success("Conta criada com sucesso!");
-    },
-    onError: (error) => {
-      toast.error("Erro ao criar conta: " + error.message);
-    },
-  });
-
-  const updateMutation = trpc.bankAccounts.update.useMutation({
-    onSuccess: () => {
-      utils.bankAccounts.listByEntity.invalidate();
-      setIsEditOpen(false);
-      setEditingAccount(null);
-      resetForm();
-      toast.success("Conta atualizada com sucesso!");
-    },
-    onError: (error) => {
-      toast.error("Erro ao atualizar conta: " + error.message);
-    },
-  });
-
-  const deleteMutation = trpc.bankAccounts.delete.useMutation({
-    onSuccess: () => {
-      utils.bankAccounts.listByEntity.invalidate();
-      toast.success("Conta excluída com sucesso!");
-    },
-    onError: (error) => {
-      toast.error("Erro ao excluir conta: " + error.message);
-    },
-  });
-
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      bank: "",
-      accountNumber: "",
-      balance: "",
-      color: "#2563EB",
-    });
-  };
-
-  const handleCreate = () => {
-    if (!formData.name.trim()) {
-      toast.error("O nome da conta é obrigatório");
-      return;
-    }
-
-    createMutation.mutate({
-      entityId,
-      name: formData.name,
-      bank: formData.bank || undefined,
-      accountNumber: formData.accountNumber || undefined,
-      balance: formData.balance ? parseFloat(formData.balance) : undefined,
-      color: formData.color,
-    });
-  };
-
-  const handleEdit = (account: any) => {
-    setEditingAccount(account);
-    setFormData({
-      name: account.name,
-      bank: account.bank || "",
-      accountNumber: account.accountNumber || "",
-      balance: (account.balance / 100).toString(),
-      color: account.color || "#2563EB",
-    });
-    setIsEditOpen(true);
-  };
-
-  const handleUpdate = () => {
-    if (!formData.name.trim()) {
-      toast.error("O nome da conta é obrigatório");
-      return;
-    }
-
-    updateMutation.mutate({
-      id: editingAccount.id,
-      name: formData.name,
-      bank: formData.bank || undefined,
-      accountNumber: formData.accountNumber || undefined,
-      balance: formData.balance ? parseFloat(formData.balance) : undefined,
-      color: formData.color,
-    });
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value / 100);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-20 w-full" />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">
-          {accounts?.length || 0} conta(s) cadastrada(s)
-        </p>
-        {canWrite && (
-        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Conta
-        </Button>
-        )}
-
-        <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-            <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
-              <SheetTitle className="text-2xl font-bold">Nova Conta Corrente</SheetTitle>
-              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-8 py-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome da Conta *</Label>
-                  <Input
-                    id="name"
-                    placeholder="Ex: Conta Corrente Principal"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="bank">Banco</Label>
-                    <Input
-                      id="bank"
-                      placeholder="Ex: Banco do Brasil"
-                      value={formData.bank}
-                      onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="accountNumber">Número da Conta</Label>
-                    <Input
-                      id="accountNumber"
-                      placeholder="Ex: 12345-6"
-                      value={formData.accountNumber}
-                      onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="balance">Saldo Inicial</Label>
-                    <Input
-                      id="balance"
-                      type="number"
-                      step="0.01"
-                      placeholder="0,00"
-                      value={formData.balance}
-                      onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="color">Cor</Label>
-                    <Input
-                      id="color"
-                      type="color"
-                      value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
-                {createMutation.isPending ? "Criando..." : "Criar Conta"}
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {!accounts || accounts.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Nenhuma conta cadastrada
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {accounts.map((account) => (
-            <Card key={account.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: account.color || "#2563EB" }}
-                    >
-                      <Building2 className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">{account.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {account.bank && `${account.bank} • `}
-                        {account.accountNumber || "Sem número"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Saldo</p>
-                      <p className="text-lg font-bold">{formatCurrency(account.balance)}</p>
-                    </div>
-                    {canWrite && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(account)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    )}
-                    {canDelete && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteMutation.mutate({ id: account.id })}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Edit Sheet */}
-      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
-            <SheetTitle className="text-2xl font-bold">Editar Conta Corrente</SheetTitle>
-            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-8 py-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-name">Nome da Conta *</Label>
-                <Input
-                  id="edit-name"
-                  placeholder="Ex: Conta Corrente Principal"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-bank">Banco</Label>
-                  <Input
-                    id="edit-bank"
-                    placeholder="Ex: Banco do Brasil"
-                    value={formData.bank}
-                    onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-accountNumber">Número da Conta</Label>
-                  <Input
-                    id="edit-accountNumber"
-                    placeholder="Ex: 12345-6"
-                    value={formData.accountNumber}
-                    onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-balance">Saldo</Label>
-                  <Input
-                    id="edit-balance"
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={formData.balance}
-                    onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-color">Cor</Label>
-                  <Input
-                    id="edit-color"
-                    type="color"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
-              {updateMutation.isPending ? "Atualizando..." : "Atualizar"}
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
