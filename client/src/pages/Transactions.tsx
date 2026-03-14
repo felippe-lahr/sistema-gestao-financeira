@@ -543,18 +543,10 @@ export default function Transactions() {
   // Categorização rápida inline via Popover — recebe transação e categoryId diretamente
   const handleSaveQuickCategory = async (transaction: any, categoryId: number) => {
     try {
+      // Não enviar amount: o banco já armazena em centavos e o servidor multiplicaria por 100 novamente
       await utils.client.transactions.update.mutate({
         id: transaction.id,
-        type: transaction.type,
-        description: transaction.description,
-        amount: transaction.amount,
-        dueDate: new Date(transaction.dueDate),
-        paymentDate: transaction.paymentDate ? new Date(transaction.paymentDate) : undefined,
-        status: transaction.status,
         categoryId: categoryId,
-        bankAccountId: transaction.bankAccountId || undefined,
-        paymentMethodId: transaction.paymentMethodId || undefined,
-        notes: transaction.notes || undefined,
       });
       utils.transactions.listByEntity.invalidate();
       utils.transactions.summary.invalidate();
@@ -586,18 +578,10 @@ export default function Transactions() {
       for (const [idStr, categoryIdStr] of toUpdate) {
         const tx = uncategorizedTransactions.find((t) => t.id === parseInt(idStr));
         if (!tx) continue;
+        // Não enviar amount: o banco já armazena em centavos e o servidor multiplicaria por 100 novamente
         await utils.client.transactions.update.mutate({
           id: tx.id,
-          type: tx.type,
-          description: tx.description,
-          amount: tx.amount,
-          dueDate: new Date(tx.dueDate),
-          paymentDate: tx.paymentDate ? new Date(tx.paymentDate) : undefined,
-          status: tx.status,
           categoryId: parseInt(categoryIdStr),
-          bankAccountId: tx.bankAccountId || undefined,
-          paymentMethodId: tx.paymentMethodId || undefined,
-          notes: tx.notes || undefined,
         });
         successCount++;
       }
