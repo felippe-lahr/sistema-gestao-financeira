@@ -82,7 +82,16 @@ export function registerOfxRoutes(app: Express) {
         }
 
         // Fazer parse do OFX
-        const content = req.file.buffer.toString("utf-8");
+        // Detectar codificação: arquivos OFX brasileiros frequentemente usam ISO-8859-1 (Latin-1)
+        let content = req.file.buffer.toString("utf-8");
+        // Se o conteúdo parece corrompido (caracteres inválidos), tentar latin1
+        if (content.includes("\uFFFD") || content.includes("\x00")) {
+          content = req.file.buffer.toString("latin1");
+        }
+        // Normalizar quebras de linha e remover BOM se houver
+        content = content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        console.log("[OFX Parse] Arquivo:", req.file.originalname, "Tamanho:", req.file.size, "bytes");
+        console.log("[OFX Parse] Primeiros 300 chars:", content.substring(0, 300));
         const parsed = await parseOfxFile(content);
 
         if (parsed.transactions.length === 0) {

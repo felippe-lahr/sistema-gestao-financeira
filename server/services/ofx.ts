@@ -79,26 +79,36 @@ export async function parseOfxFile(content: string): Promise<ParsedOfxFile> {
     // Navegar pela estrutura do OFX
     const ofxData = parsed?.OFX;
     if (!ofxData) {
-      throw new Error("Arquivo OFX inválido: estrutura OFX não encontrada");
+      // Tentar parsear como XML puro (alguns bancos exportam sem wrapper OFX)
+      throw new Error("Arquivo OFX inválido: estrutura OFX não encontrada. Verifique se o arquivo é um extrato OFX válido.");
     }
 
-    // Tentar encontrar o statement (BANKMSGSRSV1 ou CREDITCARDMSGSRSV1)
+    // Tentar encontrar o statement em todas as variações conhecidas
+    // Alguns bancos brasileiros usam estruturas não-padrão
     const bankMsg =
       ofxData.BANKMSGSRSV1 ||
       ofxData.CREDITCARDMSGSRSV1 ||
-      ofxData.INVSTMTMSGSRSV1;
+      ofxData.INVSTMTMSGSRSV1 ||
+      // Variações com V1 no final
+      (ofxData as any).BANKMSGSRSV2 ||
+      (ofxData as any).CREDITCARDMSGSRSV2;
 
     if (!bankMsg) {
-      throw new Error("Arquivo OFX inválido: nenhum extrato bancário encontrado");
+      const keys = Object.keys(ofxData).join(", ");
+      throw new Error(`Arquivo OFX inválido: nenhum extrato bancário encontrado. Chaves encontradas: ${keys}`);
     }
 
     const stmtrs =
       bankMsg.STMTRS ||
       bankMsg.CCSTMTRS ||
-      bankMsg.INVSTMTRS;
+      bankMsg.INVSTMTRS ||
+      // Alguns bancos colocam direto no nível do bankMsg
+      (bankMsg.STMTTRNRS?.STMTRS) ||
+      (bankMsg.STMTTRNRS?.CCSTMTRS);
 
     if (!stmtrs) {
-      throw new Error("Arquivo OFX inválido: STMTRS não encontrado");
+      const keys = Object.keys(bankMsg).join(", ");
+      throw new Error(`Arquivo OFX inválido: STMTRS não encontrado. Chaves encontradas: ${keys}`);
     }
 
     // Dados da conta
