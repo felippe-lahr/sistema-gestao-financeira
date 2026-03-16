@@ -1985,11 +1985,23 @@ export async function ensureEmailVerificationsTable(): Promise<void> {
       CREATE TABLE IF NOT EXISTS "email_verifications" (
         "id" serial PRIMARY KEY NOT NULL,
         "userId" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
-        "token" varchar(128) NOT NULL UNIQUE,
+        "token" varchar(128) NOT NULL,
         "expiresAt" timestamp NOT NULL,
         "verifiedAt" timestamp,
         "createdAt" timestamp DEFAULT now() NOT NULL
       );
+    `;
+    // Adicionar constraint UNIQUE no token caso não exista (para bancos criados antes desta versão)
+    await client`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'email_verifications_token_unique'
+          AND conrelid = 'email_verifications'::regclass
+        ) THEN
+          ALTER TABLE email_verifications ADD CONSTRAINT email_verifications_token_unique UNIQUE (token);
+        END IF;
+      END $$;
     `;
     await client.end();
     console.log('[db] email_verifications table ensured');
@@ -2006,10 +2018,11 @@ export async function createEmailVerificationToken(userId: number, token: string
   // Usar postgres direto pois a tabela não está no schema drizzle
   const client = postgres(process.env.DATABASE_URL!);
   try {
+    // Remover tokens anteriores não verificados do mesmo usuário para evitar conflitos
+    await client`DELETE FROM email_verifications WHERE "userId" = ${userId} AND "verifiedAt" IS NULL`;
     await client`
       INSERT INTO email_verifications ("userId", token, "expiresAt")
       VALUES (${userId}, ${token}, ${expiresAt})
-      ON CONFLICT (token) DO NOTHING
     `;
   } finally {
      await client.end();
