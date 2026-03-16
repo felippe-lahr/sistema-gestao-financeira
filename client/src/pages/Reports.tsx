@@ -231,75 +231,386 @@ export function Reports() {
   };
 
   const exportToPDF = () => {
-    // Criar conteúdo HTML para o PDF
+    const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtDate = (d: string | Date | null | undefined) => {
+      if (!d) return '—';
+      const dt = typeof d === 'string' ? new Date(d + (d.includes('T') ? '' : 'T00:00:00')) : d;
+      return dt.toLocaleDateString('pt-BR');
+    };
+    const statusLabel = (s: string) => ({ PAID: 'Pago', PENDING: 'Pendente', OVERDUE: 'Atrasado' }[s] || s);
+    const statusColor = (s: string) => ({ PAID: '#16a34a', PENDING: '#d97706', OVERDUE: '#dc2626' }[s] || '#6b7280');
+
+    // Filtrar transações pelo período selecionado
+    const [sy, sm, sd] = startDate.split('-').map(Number);
+    const [ey, em, ed] = endDate.split('-').map(Number);
+    const periodStart = new Date(sy, sm - 1, sd);
+    const periodEnd = new Date(ey, em - 1, ed, 23, 59, 59);
+
+    const txAll = (transactions || []).filter(t => {
+      const d = new Date(t.dueDate);
+      return d >= periodStart && d <= periodEnd;
+    });
+
+    const incomes = txAll.filter(t => t.type === 'INCOME');
+    const expenses = txAll.filter(t => t.type === 'EXPENSE');
+
+    const totalIncome = incomes.reduce((s, t) => s + t.amount / 100, 0);
+    const totalExpense = expenses.reduce((s, t) => s + t.amount / 100, 0);
+    const saldoLiquido = totalIncome - totalExpense;
+    const totalPaid = txAll.filter(t => t.status === 'PAID').reduce((s, t) => s + t.amount / 100, 0);
+    const totalPending = txAll.filter(t => t.status === 'PENDING').reduce((s, t) => s + t.amount / 100, 0);
+    const totalOverdue = txAll.filter(t => t.status === 'OVERDUE').reduce((s, t) => s + t.amount / 100, 0);
+
+    // Receitas por categoria
+    const incomeByCat: Record<string, { total: number; count: number; color: string }> = {};
+    incomes.forEach(t => {
+      const cat = t.categoryName || 'Sem categoria';
+      if (!incomeByCat[cat]) incomeByCat[cat] = { total: 0, count: 0, color: t.categoryColor || '#6b7280' };
+      incomeByCat[cat].total += t.amount / 100;
+      incomeByCat[cat].count++;
+    });
+
+    // Despesas por categoria
+    const expenseByCat: Record<string, { total: number; count: number; color: string }> = {};
+    expenses.forEach(t => {
+      const cat = t.categoryName || 'Sem categoria';
+      if (!expenseByCat[cat]) expenseByCat[cat] = { total: 0, count: 0, color: t.categoryColor || '#6b7280' };
+      expenseByCat[cat].total += t.amount / 100;
+      expenseByCat[cat].count++;
+    });
+
+    // Receitas por status
+    const incomeByStatus: Record<string, number> = {};
+    incomes.forEach(t => { incomeByStatus[t.status] = (incomeByStatus[t.status] || 0) + t.amount / 100; });
+
+    // Despesas por status
+    const expenseByStatus: Record<string, number> = {};
+    expenses.forEach(t => { expenseByStatus[t.status] = (expenseByStatus[t.status] || 0) + t.amount / 100; });
+
+    // Evolução mensal
+    const monthlyMap: Record<string, { income: number; expense: number }> = {};
+    txAll.forEach(t => {
+      const d = new Date(t.dueDate);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthlyMap[key]) monthlyMap[key] = { income: 0, expense: 0 };
+      if (t.type === 'INCOME') monthlyMap[key].income += t.amount / 100;
+      else monthlyMap[key].expense += t.amount / 100;
+    });
+    const monthlyData = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b)).map(([key, v]) => {
+      const [yr, mo] = key.split('-').map(Number);
+      const label = new Date(yr, mo - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      return { label, ...v, saldo: v.income - v.expense };
+    });
+
+    const tableRowStyle = `style="border-bottom: 1px solid #e5e7eb; padding: 7px 10px;"`;
+    const thStyle = `style="background: #f8fafc; padding: 8px 10px; text-align: left; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0;"`;
+
+    const renderTransactionRows = (list: typeof txAll) =>
+      list.map((t, i) => `
+        <tr style="background: ${i % 2 === 0 ? '#fff' : '#f9fafb'}">
+          <td ${tableRowStyle}>${fmtDate(t.dueDate)}</td>
+          <td ${tableRowStyle}>${t.description}</td>
+          <td ${tableRowStyle}>${t.categoryName || '<span style="color:#9ca3af">Sem categoria</span>'}</td>
+          <td ${tableRowStyle} style="text-align:right; font-weight:600; color:${t.type === 'INCOME' ? '#16a34a' : '#dc2626'}">
+            ${t.type === 'INCOME' ? '+' : '-'}R$ ${fmt(t.amount / 100)}
+          </td>
+          <td ${tableRowStyle} style="text-align:center">
+            <span style="background:${statusColor(t.status)}22; color:${statusColor(t.status)}; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600">${statusLabel(t.status)}</span>
+          </td>
+          <td ${tableRowStyle} style="color:#6b7280; font-size:12px">${t.bankAccountName || '—'}</td>
+        </tr>
+      `).join('');
+
     const htmlContent = `
       <!DOCTYPE html>
-      <html>
+      <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
-        <title>Relatório de Ocupação</title>
+        <title>Relatório Financeiro — UnifiquePro</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { color: #333; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f2f2f2; }
-          .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 20px; }
-          .card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
-          .card h3 { margin: 0 0 10px 0; color: #666; }
-          .card .value { font-size: 24px; font-weight: bold; color: #333; }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; background: #fff; font-size: 13px; }
+          .page { max-width: 900px; margin: 0 auto; padding: 32px 28px; }
+          /* Header */
+          .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 3px solid #3b82f6; margin-bottom: 28px; }
+          .header-left h1 { font-size: 22px; font-weight: 700; color: #1e293b; }
+          .header-left p { color: #64748b; font-size: 12px; margin-top: 4px; }
+          .header-right { text-align: right; }
+          .header-right .badge { background: #3b82f6; color: #fff; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+          .header-right p { color: #94a3b8; font-size: 11px; margin-top: 6px; }
+          /* Resumo executivo */
+          .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 28px; }
+          .summary-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 12px; }
+          .summary-card .label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+          .summary-card .value { font-size: 16px; font-weight: 700; }
+          .summary-card.income { border-top: 3px solid #16a34a; }
+          .summary-card.expense { border-top: 3px solid #dc2626; }
+          .summary-card.saldo-pos { border-top: 3px solid #3b82f6; }
+          .summary-card.saldo-neg { border-top: 3px solid #f59e0b; }
+          .summary-card.pending { border-top: 3px solid #d97706; }
+          .summary-card.overdue { border-top: 3px solid #dc2626; }
+          /* Seções */
+          .section { margin-bottom: 32px; }
+          .section-title { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
+          .section-title .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+          /* Tabelas */
+          table { width: 100%; border-collapse: collapse; }
+          th { ${thStyle.replace('style="', '').replace('"', '')} }
+          /* Análise por categoria */
+          .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+          .cat-table { width: 100%; border-collapse: collapse; }
+          .cat-table th { background: #f8fafc; padding: 7px 10px; text-align: left; font-size: 11px; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+          .cat-table td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+          /* Evolução mensal */
+          .monthly-table th { background: #f8fafc; padding: 8px 10px; text-align: center; font-size: 11px; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+          .monthly-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+          /* Footer */
+          .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 11px; }
+          @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         </style>
       </head>
       <body>
-        <h1>Relatório de Ocupação</h1>
-        <p>Período: ${startDate} a ${endDate}</p>
-        
-        <div class="summary">
-          <div class="card">
-            <h3>Ocupação Média</h3>
-            <div class="value">${occupancyData.length > 0 ? Math.round(occupancyData.reduce((sum, m) => sum + m.occupancy, 0) / occupancyData.length) : 0}%</div>
+        <div class="page">
+
+          <!-- CABEÇALHO -->
+          <div class="header">
+            <div class="header-left">
+              <h1>📊 Relatório Financeiro</h1>
+              <p>Período: ${fmtDate(startDate)} a ${fmtDate(endDate)} &nbsp;|&nbsp; ${txAll.length} transações</p>
+            </div>
+            <div class="header-right">
+              <span class="badge">UnifiquePro</span>
+              <p>Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+            </div>
           </div>
-          <div class="card">
-            <h3>Dias Ocupados</h3>
-            <div class="value">${occupancyData.reduce((sum, m) => sum + m.occupied, 0)}</div>
+
+          <!-- RESUMO EXECUTIVO -->
+          <div class="section">
+            <div class="section-title"><span class="dot" style="background:#3b82f6"></span>Resumo Executivo</div>
+            <div class="summary-grid">
+              <div class="summary-card income">
+                <div class="label">Total Receitas</div>
+                <div class="value" style="color:#16a34a">R$ ${fmt(totalIncome)}</div>
+                <div style="font-size:11px;color:#64748b;margin-top:4px">${incomes.length} lançamentos</div>
+              </div>
+              <div class="summary-card expense">
+                <div class="label">Total Despesas</div>
+                <div class="value" style="color:#dc2626">R$ ${fmt(totalExpense)}</div>
+                <div style="font-size:11px;color:#64748b;margin-top:4px">${expenses.length} lançamentos</div>
+              </div>
+              <div class="summary-card ${saldoLiquido >= 0 ? 'saldo-pos' : 'saldo-neg'}">
+                <div class="label">Saldo Líquido</div>
+                <div class="value" style="color:${saldoLiquido >= 0 ? '#3b82f6' : '#f59e0b'}">${saldoLiquido >= 0 ? '+' : ''}R$ ${fmt(saldoLiquido)}</div>
+              </div>
+              <div class="summary-card pending">
+                <div class="label">Pendente</div>
+                <div class="value" style="color:#d97706">R$ ${fmt(totalPending)}</div>
+                <div style="font-size:11px;color:#64748b;margin-top:4px">${txAll.filter(t => t.status === 'PENDING').length} lançamentos</div>
+              </div>
+              <div class="summary-card overdue">
+                <div class="label">Atrasado</div>
+                <div class="value" style="color:#dc2626">R$ ${fmt(totalOverdue)}</div>
+                <div style="font-size:11px;color:#64748b;margin-top:4px">${txAll.filter(t => t.status === 'OVERDUE').length} lançamentos</div>
+              </div>
+            </div>
           </div>
-          <div class="card">
-            <h3>Total de Reservas</h3>
-            <div class="value">${rentals?.length || 0}</div>
+
+          <!-- ANÁLISE POR CATEGORIA E STATUS -->
+          <div class="section">
+            <div class="section-title"><span class="dot" style="background:#8b5cf6"></span>Análise por Categoria e Status</div>
+            <div class="cat-grid">
+              <!-- Receitas por categoria -->
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:10px">✅ Receitas por Categoria</div>
+                <table class="cat-table">
+                  <thead><tr><th>Categoria</th><th style="text-align:right">Total</th><th style="text-align:center">Qtd</th><th style="text-align:right">%</th></tr></thead>
+                  <tbody>
+                    ${Object.entries(incomeByCat).sort(([,a],[,b]) => b.total - a.total).map(([cat, v], i) => `
+                      <tr style="background:${i%2===0?'#fff':'#f9fafb'}">
+                        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${v.color};margin-right:6px"></span>${cat}</td>
+                        <td style="text-align:right;font-weight:600;color:#16a34a">R$ ${fmt(v.total)}</td>
+                        <td style="text-align:center;color:#64748b">${v.count}</td>
+                        <td style="text-align:right;color:#64748b">${totalIncome > 0 ? Math.round(v.total/totalIncome*100) : 0}%</td>
+                      </tr>
+                    `).join('')}
+                    ${incomes.length === 0 ? '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">Nenhuma receita no período</td></tr>' : ''}
+                  </tbody>
+                </table>
+                <!-- Receitas por status -->
+                <div style="margin-top:14px;font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px">Por Status</div>
+                <table class="cat-table">
+                  <thead><tr><th>Status</th><th style="text-align:right">Total</th><th style="text-align:right">%</th></tr></thead>
+                  <tbody>
+                    ${Object.entries(incomeByStatus).map(([st, val]) => `
+                      <tr>
+                        <td><span style="background:${statusColor(st)}22;color:${statusColor(st)};padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600">${statusLabel(st)}</span></td>
+                        <td style="text-align:right;font-weight:600">R$ ${fmt(val)}</td>
+                        <td style="text-align:right;color:#64748b">${totalIncome > 0 ? Math.round(val/totalIncome*100) : 0}%</td>
+                      </tr>
+                    `).join('')}
+                    ${incomes.length === 0 ? '<tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:8px">—</td></tr>' : ''}
+                  </tbody>
+                </table>
+              </div>
+              <!-- Despesas por categoria -->
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">❌ Despesas por Categoria</div>
+                <table class="cat-table">
+                  <thead><tr><th>Categoria</th><th style="text-align:right">Total</th><th style="text-align:center">Qtd</th><th style="text-align:right">%</th></tr></thead>
+                  <tbody>
+                    ${Object.entries(expenseByCat).sort(([,a],[,b]) => b.total - a.total).map(([cat, v], i) => `
+                      <tr style="background:${i%2===0?'#fff':'#f9fafb'}">
+                        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${v.color};margin-right:6px"></span>${cat}</td>
+                        <td style="text-align:right;font-weight:600;color:#dc2626">R$ ${fmt(v.total)}</td>
+                        <td style="text-align:center;color:#64748b">${v.count}</td>
+                        <td style="text-align:right;color:#64748b">${totalExpense > 0 ? Math.round(v.total/totalExpense*100) : 0}%</td>
+                      </tr>
+                    `).join('')}
+                    ${expenses.length === 0 ? '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">Nenhuma despesa no período</td></tr>' : ''}
+                  </tbody>
+                </table>
+                <!-- Despesas por status -->
+                <div style="margin-top:14px;font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px">Por Status</div>
+                <table class="cat-table">
+                  <thead><tr><th>Status</th><th style="text-align:right">Total</th><th style="text-align:right">%</th></tr></thead>
+                  <tbody>
+                    ${Object.entries(expenseByStatus).map(([st, val]) => `
+                      <tr>
+                        <td><span style="background:${statusColor(st)}22;color:${statusColor(st)};padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600">${statusLabel(st)}</span></td>
+                        <td style="text-align:right;font-weight:600">R$ ${fmt(val)}</td>
+                        <td style="text-align:right;color:#64748b">${totalExpense > 0 ? Math.round(val/totalExpense*100) : 0}%</td>
+                      </tr>
+                    `).join('')}
+                    ${expenses.length === 0 ? '<tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:8px">—</td></tr>' : ''}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
+
+          <!-- EVOLUÇÃO MENSAL -->
+          ${monthlyData.length > 0 ? `
+          <div class="section">
+            <div class="section-title"><span class="dot" style="background:#f59e0b"></span>Evolução Mensal</div>
+            <table class="monthly-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left">Mês</th>
+                  <th style="color:#16a34a">Receitas</th>
+                  <th style="color:#dc2626">Despesas</th>
+                  <th>Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${monthlyData.map((m, i) => `
+                  <tr style="background:${i%2===0?'#fff':'#f9fafb'}">
+                    <td style="text-align:left;font-weight:600">${m.label}</td>
+                    <td style="color:#16a34a;font-weight:600">R$ ${fmt(m.income)}</td>
+                    <td style="color:#dc2626;font-weight:600">R$ ${fmt(m.expense)}</td>
+                    <td style="font-weight:700;color:${m.saldo >= 0 ? '#3b82f6' : '#f59e0b'}">${m.saldo >= 0 ? '+' : ''}R$ ${fmt(m.saldo)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+              <tfoot>
+                <tr style="background:#f8fafc;font-weight:700;border-top:2px solid #e2e8f0">
+                  <td style="text-align:left;padding:8px 10px">TOTAL</td>
+                  <td style="text-align:center;color:#16a34a;padding:8px 10px">R$ ${fmt(totalIncome)}</td>
+                  <td style="text-align:center;color:#dc2626;padding:8px 10px">R$ ${fmt(totalExpense)}</td>
+                  <td style="text-align:center;color:${saldoLiquido>=0?'#3b82f6':'#f59e0b'};padding:8px 10px">${saldoLiquido>=0?'+':''}R$ ${fmt(saldoLiquido)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>` : ''}
+
+          <!-- TABELA DE RECEITAS -->
+          ${incomes.length > 0 ? `
+          <div class="section">
+            <div class="section-title"><span class="dot" style="background:#16a34a"></span>Receitas (${incomes.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Vencimento</th>
+                  <th>Descrição</th>
+                  <th>Categoria</th>
+                  <th style="text-align:right">Valor</th>
+                  <th style="text-align:center">Status</th>
+                  <th>Conta Bancária</th>
+                </tr>
+              </thead>
+              <tbody>${renderTransactionRows(incomes)}</tbody>
+              <tfoot>
+                <tr style="background:#f0fdf4;font-weight:700;border-top:2px solid #bbf7d0">
+                  <td colspan="3" style="padding:8px 10px">TOTAL RECEITAS</td>
+                  <td style="text-align:right;color:#16a34a;padding:8px 10px">R$ ${fmt(totalIncome)}</td>
+                  <td colspan="2"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>` : ''}
+
+          <!-- TABELA DE DESPESAS -->
+          ${expenses.length > 0 ? `
+          <div class="section">
+            <div class="section-title"><span class="dot" style="background:#dc2626"></span>Despesas (${expenses.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Vencimento</th>
+                  <th>Descrição</th>
+                  <th>Categoria</th>
+                  <th style="text-align:right">Valor</th>
+                  <th style="text-align:center">Status</th>
+                  <th>Conta Bancária</th>
+                </tr>
+              </thead>
+              <tbody>${renderTransactionRows(expenses)}</tbody>
+              <tfoot>
+                <tr style="background:#fef2f2;font-weight:700;border-top:2px solid #fecaca">
+                  <td colspan="3" style="padding:8px 10px">TOTAL DESPESAS</td>
+                  <td style="text-align:right;color:#dc2626;padding:8px 10px">R$ ${fmt(totalExpense)}</td>
+                  <td colspan="2"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>` : ''}
+
+          <!-- TABELA GERAL DE TRANSAÇÕES -->
+          ${txAll.length > 0 ? `
+          <div class="section">
+            <div class="section-title"><span class="dot" style="background:#6b7280"></span>Todas as Transações (${txAll.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Vencimento</th>
+                  <th>Descrição</th>
+                  <th>Categoria</th>
+                  <th style="text-align:right">Valor</th>
+                  <th style="text-align:center">Status</th>
+                  <th>Conta Bancária</th>
+                </tr>
+              </thead>
+              <tbody>${renderTransactionRows(txAll)}</tbody>
+            </table>
+          </div>` : `
+          <div class="section">
+            <p style="text-align:center;color:#94a3b8;padding:32px">Nenhuma transação encontrada no período selecionado.</p>
+          </div>`}
+
+          <!-- FOOTER -->
+          <div class="footer">
+            UnifiquePro &nbsp;·&nbsp; Relatório gerado em ${new Date().toLocaleString('pt-BR')} &nbsp;·&nbsp; Período: ${fmtDate(startDate)} a ${fmtDate(endDate)}
+          </div>
+
         </div>
-        
-        <h2>Ocupação por Mês</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Mês</th>
-              <th>Ocupação (%)</th>
-              <th>Dias Ocupados</th>
-              <th>Total de Dias</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${occupancyData.map(m => `
-              <tr>
-                <td>${m.month}</td>
-                <td>${m.occupancy}%</td>
-                <td>${m.occupied}</td>
-                <td>${m.total}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
       </body>
       </html>
     `;
 
-    // Usar html2pdf se disponível, senão usar print
-    const printWindow = window.open('', '', 'height=400,width=800');
+    const printWindow = window.open('', '_blank', 'height=900,width=1100');
     if (printWindow) {
       printWindow.document.write(htmlContent);
       printWindow.document.close();
-      printWindow.print();
+      setTimeout(() => printWindow.print(), 500);
     }
   };
 
