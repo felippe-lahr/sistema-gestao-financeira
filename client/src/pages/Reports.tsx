@@ -606,11 +606,23 @@ export function Reports() {
       </html>
     `;
 
-    const printWindow = window.open('', '_blank', 'height=900,width=1100');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      setTimeout(() => printWindow.print(), 500);
+    // Usar iframe oculto para evitar bloqueio de popup
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.top = '-10000px';
+    iframe.style.left = '-10000px';
+    iframe.style.width = '1100px';
+    iframe.style.height = '900px';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(htmlContent);
+      iframeDoc.close();
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+        setTimeout(() => document.body.removeChild(iframe), 1000);
+      }, 600);
     }
   };
 
