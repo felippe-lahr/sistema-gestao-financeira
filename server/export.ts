@@ -167,444 +167,439 @@ export function generateTransactionsPDF(data: {
   upcomingIncomeTransactions?: any[];
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
     const chunks: Buffer[] = [];
+    const PAGE_WIDTH = 595.28;
+    const PAGE_HEIGHT = 841.89;
+    const MARGIN = 40;
+    const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    // Cabeçalho
-    doc
-      .fontSize(20)
-      .font("Helvetica-Bold")
-      .fillColor("#2563EB")
-      .text("Relatório Financeiro", { align: "center" });
+    // ===== HELPER: desenhar linha separadora =====
+    const drawSeparator = (y: number, color = "#E2E8F0") => {
+      doc.strokeColor(color).lineWidth(1).moveTo(MARGIN, y).lineTo(PAGE_WIDTH - MARGIN, y).stroke();
+    };
 
-    doc
-      .fontSize(14)
-      .font("Helvetica")
-      .fillColor("#000000")
+    // ===== HELPER: desenhar cabeçalho de tabela =====
+    const drawTableHeader = (headers: string[], colWidths: number[], y: number, color = "#2563EB") => {
+      let x = MARGIN;
+      headers.forEach((header, i) => {
+        doc.rect(x, y, colWidths[i], 22).fillAndStroke(color, color);
+        doc.fontSize(8).font("Helvetica-Bold").fillColor("#FFFFFF")
+          .text(header, x + 4, y + 7, { width: colWidths[i] - 8, align: "left" });
+        x += colWidths[i];
+      });
+      return y + 22;
+    };
+
+    // ===== HELPER: verificar se precisa nova página =====
+    const ensureSpace = (needed: number) => {
+      if (doc.y > PAGE_HEIGHT - MARGIN - needed) {
+        addFooter();
+        doc.addPage();
+        doc.y = MARGIN;
+      }
+    };
+
+    // ===== HELPER: rodapé =====
+    const addFooter = () => {
+      doc.fontSize(7).font("Helvetica").fillColor("#94A3B8")
+        .text("UnifiquePro · Relatório gerado automaticamente", MARGIN, PAGE_HEIGHT - 30, { align: "center", width: CONTENT_WIDTH });
+    };
+
+    // ===== DADOS CALCULADOS =====
+    const incomes = data.transactions.filter(t => t.type === "INCOME");
+    const expenses = data.transactions.filter(t => t.type === "EXPENSE");
+    const totalIncome = incomes.reduce((s, t) => s + t.amount, 0);
+    const totalExpense = expenses.reduce((s, t) => s + t.amount, 0);
+    const saldoLiquido = totalIncome - totalExpense;
+    const totalPaid = data.transactions.filter(t => t.status === "PAID").reduce((s, t) => s + t.amount, 0);
+    const totalPending = data.transactions.filter(t => t.status === "PENDING").reduce((s, t) => s + t.amount, 0);
+    const totalOverdue = data.transactions.filter(t => t.status === "OVERDUE").reduce((s, t) => s + t.amount, 0);
+
+    // Receitas por categoria
+    const incomeByCat: Record<string, { total: number; count: number }> = {};
+    incomes.forEach(t => {
+      const cat = t.categoryName || "Sem categoria";
+      if (!incomeByCat[cat]) incomeByCat[cat] = { total: 0, count: 0 };
+      incomeByCat[cat].total += t.amount;
+      incomeByCat[cat].count++;
+    });
+
+    // Despesas por categoria
+    const expenseByCat: Record<string, { total: number; count: number }> = {};
+    expenses.forEach(t => {
+      const cat = t.categoryName || "Sem categoria";
+      if (!expenseByCat[cat]) expenseByCat[cat] = { total: 0, count: 0 };
+      expenseByCat[cat].total += t.amount;
+      expenseByCat[cat].count++;
+    });
+
+    // Receitas por status
+    const incomeByStatus: Record<string, number> = {};
+    incomes.forEach(t => { incomeByStatus[t.status] = (incomeByStatus[t.status] || 0) + t.amount; });
+
+    // Despesas por status
+    const expenseByStatus: Record<string, number> = {};
+    expenses.forEach(t => { expenseByStatus[t.status] = (expenseByStatus[t.status] || 0) + t.amount; });
+
+    // Evolução mensal
+    const monthlyMap: Record<string, { income: number; expense: number }> = {};
+    data.transactions.forEach(t => {
+      if (!t.dueDate) return;
+      const d = new Date(t.dueDate);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!monthlyMap[key]) monthlyMap[key] = { income: 0, expense: 0 };
+      if (t.type === "INCOME") monthlyMap[key].income += t.amount;
+      else monthlyMap[key].expense += t.amount;
+    });
+    const monthlyData = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b)).map(([key, v]) => {
+      const [yr, mo] = key.split("-").map(Number);
+      const label = new Date(yr, mo - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+      return { label, income: v.income, expense: v.expense, saldo: v.income - v.expense };
+    });
+
+    const statusLabel = (s: string) => ({ PAID: "Pago", PENDING: "Pendente", OVERDUE: "Atrasado" }[s] || s);
+
+    // ===== PÁGINA 1: CABEÇALHO =====
+    // Linha azul no topo
+    doc.rect(0, 0, PAGE_WIDTH, 4).fill("#3B82F6");
+
+    doc.moveDown(1);
+    doc.fontSize(22).font("Helvetica-Bold").fillColor("#1E293B")
+      .text("Relatório Financeiro", { align: "center" });
+    doc.fontSize(13).font("Helvetica").fillColor("#475569")
       .text(data.entityName, { align: "center" });
 
-    // Formatar período com datas específicas
+    // Período
     let periodText = data.period;
     if (data.startDate && data.endDate) {
-      const startFormatted = format(new Date(data.startDate), "dd/MM/yyyy", { locale: ptBR });
-      const endFormatted = format(new Date(data.endDate), "dd/MM/yyyy", { locale: ptBR });
-      periodText = `${data.period} (${startFormatted} até ${endFormatted})`;
-    } else if (data.startDate) {
-      const startFormatted = format(new Date(data.startDate), "dd/MM/yyyy", { locale: ptBR });
-      periodText = `${data.period} (a partir de ${startFormatted})`;
-    } else if (data.endDate) {
-      const endFormatted = format(new Date(data.endDate), "dd/MM/yyyy", { locale: ptBR });
-      periodText = `${data.period} (até ${endFormatted})`;
+      const sf = format(new Date(data.startDate), "dd/MM/yyyy", { locale: ptBR });
+      const ef = format(new Date(data.endDate), "dd/MM/yyyy", { locale: ptBR });
+      periodText = `${data.period} (${sf} até ${ef})`;
     }
-    
-    doc
-      .fontSize(10)
-      .fillColor("#6B7280")
-      .text(`Período: ${periodText}`, { align: "center" });
+    doc.fontSize(9).fillColor("#64748B").text(`Período: ${periodText}`, { align: "center" });
 
-    // Formatar horário com timezone GMT-3 (São Paulo)
     const now = new Date();
-    const gmtMinus3Time = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-    doc
-      .fontSize(8)
-      .text(`Gerado em: ${format(gmtMinus3Time, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, {
-        align: "center",
-      });
+    const gmtMinus3Time = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    doc.fontSize(8).text(`Gerado em: ${format(gmtMinus3Time, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, { align: "center" });
 
-    doc.moveDown(2);
+    doc.moveDown(1);
+    drawSeparator(doc.y, "#3B82F6");
+    doc.moveDown(1.5);
 
-    // Linha separadora
-    doc.strokeColor("#E5E7EB").lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-
-    doc.moveDown();
-
-    // Resumo Executivo
-    doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Resumo Executivo");
-
+    // ===== RESUMO EXECUTIVO (5 cards) =====
+    doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Resumo Executivo");
     doc.moveDown(0.5);
 
-    const summaryY = doc.y;
-    
-    // Box de Receitas
-    doc.rect(50, summaryY, 160, 60).fillAndStroke("#D1FAE5", "#16A34A");
-    doc.fontSize(10).fillColor("#16A34A").text("Total de Receitas", 60, summaryY + 15);
-    doc
-      .fontSize(16)
-      .font("Helvetica-Bold")
-      .text(formatBRL(data.summary.totalIncome / 100), 60, summaryY + 35);
+    const cardW = (CONTENT_WIDTH - 16) / 5;
+    const cardH = 55;
+    const cardY = doc.y;
+    const cards = [
+      { label: "Total Receitas", value: formatBRL(totalIncome / 100), color: "#16A34A", border: "#16A34A", bg: "#F0FDF4", sub: `${incomes.length} lançamentos` },
+      { label: "Total Despesas", value: formatBRL(totalExpense / 100), color: "#DC2626", border: "#DC2626", bg: "#FEF2F2", sub: `${expenses.length} lançamentos` },
+      { label: "Saldo Líquido", value: `${saldoLiquido >= 0 ? "+" : ""}${formatBRL(saldoLiquido / 100)}`, color: saldoLiquido >= 0 ? "#3B82F6" : "#F59E0B", border: saldoLiquido >= 0 ? "#3B82F6" : "#F59E0B", bg: saldoLiquido >= 0 ? "#EFF6FF" : "#FFFBEB", sub: "" },
+      { label: "Pendente", value: formatBRL(totalPending / 100), color: "#D97706", border: "#D97706", bg: "#FFFBEB", sub: `${data.transactions.filter(t => t.status === "PENDING").length} lançamentos` },
+      { label: "Atrasado", value: formatBRL(totalOverdue / 100), color: "#DC2626", border: "#DC2626", bg: "#FEF2F2", sub: `${data.transactions.filter(t => t.status === "OVERDUE").length} lançamentos` },
+    ];
 
-    // Box de Despesas
-    doc.rect(220, summaryY, 160, 60).fillAndStroke("#FECACA", "#DC2626");
-    doc.fontSize(10).fillColor("#DC2626").text("Total de Despesas", 230, summaryY + 15);
-    doc
-      .fontSize(16)
-      .font("Helvetica-Bold")
-      .text(formatBRL(data.summary.totalExpenses / 100), 230, summaryY + 35);
-
-    // Box de Saldo
-    const balance = (data.summary.totalIncome - data.summary.totalExpenses) / 100;
-    const balanceColor = balance >= 0 ? "#16A34A" : "#DC2626";
-    const balanceBg = balance >= 0 ? "#D1FAE5" : "#FECACA";
-
-    doc.rect(390, summaryY, 160, 60).fillAndStroke(balanceBg, balanceColor);
-    doc.fontSize(10).fillColor(balanceColor).text("Saldo", 400, summaryY + 15);
-    doc
-      .fontSize(16)
-      .font("Helvetica-Bold")
-      .text(formatBRL(balance), 400, summaryY + 35);
-
-    doc.y = summaryY + 80;
-    doc.moveDown(2);
-
-    // Seção de Transações a Vencer
-    if (data.upcomingTransactions && data.upcomingTransactions.length > 0) {
-      doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Transações a Vencer");
-      doc.fontSize(10).font("Helvetica").fillColor("#6B7280").text("Próximos 7 dias");
-      doc.moveDown(0.5);
-
-      const upcomingTableTop = doc.y;
-      const upcomingColWidths = [200, 100, 80, 100];
-      const upcomingHeaders = ["Descrição", "Categoria", "Vencimento", "Valor"];
-
-      let upcomingXPos = 50;
-      upcomingHeaders.forEach((header, i) => {
-        doc
-          .fontSize(9)
-          .font("Helvetica-Bold")
-          .fillColor("#FFFFFF")
-          .rect(upcomingXPos, upcomingTableTop, upcomingColWidths[i], 20)
-          .fillAndStroke("#F59E0B", "#F59E0B")
-          .fillColor("#FFFFFF")
-          .text(header, upcomingXPos + 5, upcomingTableTop + 6, { width: upcomingColWidths[i] - 10 });
-        upcomingXPos += upcomingColWidths[i];
-      });
-
-      let upcomingRowY = upcomingTableTop + 20;
-
-      data.upcomingTransactions.slice(0, 5).forEach((transaction: any, index: number) => {
-        const bgColor = "#FEF3C7"; // Amarelo claro para destacar
-
-        upcomingXPos = 50;
-        const daysText = transaction.daysUntilDue === 0 
-          ? "Hoje" 
-          : transaction.daysUntilDue === 1 
-          ? "Amanhã" 
-          : `${transaction.daysUntilDue} dias`;
-        
-        const rowData = [
-          transaction.description.substring(0, 35),
-          (transaction.categoryName || "Sem Categoria").substring(0, 15),
-          daysText,
-          formatBRL(transaction.amount / 100),
-        ];
-
-        rowData.forEach((cellData, i) => {
-          doc
-            .rect(upcomingXPos, upcomingRowY, upcomingColWidths[i], 20)
-            .fillAndStroke(bgColor, "#E5E7EB")
-            .fontSize(8)
-            .font("Helvetica")
-            .fillColor("#000000")
-            .text(cellData, upcomingXPos + 5, upcomingRowY + 6, { width: upcomingColWidths[i] - 10 });
-          upcomingXPos += upcomingColWidths[i];
-        });
-
-        upcomingRowY += 20;
-      });
-
-      doc.y = upcomingRowY;
-      doc.moveDown(2);
-    }
-
-    // Seção de Receitas a Receber
-    if (data.upcomingIncomeTransactions && data.upcomingIncomeTransactions.length > 0) {
-      doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Receitas a Receber");
-      doc.fontSize(10).font("Helvetica").fillColor("#6B7280").text("Próximos 7 dias");
-      doc.moveDown(0.5);
-
-      const incomeTableTop = doc.y;
-      const incomeColWidths = [200, 100, 80, 100];
-      const incomeHeaders = ["Descrição", "Categoria", "Recebimento", "Valor"];
-
-      let incomeXPos = 50;
-      incomeHeaders.forEach((header, i) => {
-        doc
-          .fontSize(9)
-          .font("Helvetica-Bold")
-          .fillColor("#FFFFFF")
-          .rect(incomeXPos, incomeTableTop, incomeColWidths[i], 20)
-          .fillAndStroke("#10B981", "#10B981")
-          .fillColor("#FFFFFF")
-          .text(header, incomeXPos + 5, incomeTableTop + 6, { width: incomeColWidths[i] - 10 });
-        incomeXPos += incomeColWidths[i];
-      });
-
-      let incomeRowY = incomeTableTop + 20;
-
-      data.upcomingIncomeTransactions.slice(0, 5).forEach((transaction: any, index: number) => {
-        const bgColor = "#D1FAE5"; // Verde claro para destacar receitas
-
-        incomeXPos = 50;
-        const daysText = transaction.daysUntilDue === 0 
-          ? "Hoje" 
-          : transaction.daysUntilDue === 1 
-          ? "Amanhã" 
-          : `${transaction.daysUntilDue} dias`;
-        
-        const rowData = [
-          transaction.description.substring(0, 35),
-          (transaction.categoryName || "Sem Categoria").substring(0, 15),
-          daysText,
-          "+" + formatBRL(transaction.amount / 100),
-        ];
-
-        rowData.forEach((cellData, i) => {
-          doc
-            .rect(incomeXPos, incomeRowY, incomeColWidths[i], 20)
-            .fillAndStroke(bgColor, "#E5E7EB")
-            .fontSize(8)
-            .font("Helvetica")
-            .fillColor(i === 3 ? "#10B981" : "#000000")
-            .text(cellData, incomeXPos + 5, incomeRowY + 6, { width: incomeColWidths[i] - 10 });
-          incomeXPos += incomeColWidths[i];
-        });
-
-        incomeRowY += 20;
-      });
-
-      doc.y = incomeRowY;
-      doc.moveDown(2);
-    }
-
-    // Tabela de Transações
-    doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Transações");
-
-    doc.moveDown();
-
-    // Cabeçalho da tabela
-    const tableTop = doc.y;
-    const colWidths = [55, 250, 50, 70, 50, 55];
-    const headers = ["Data", "Descrição", "Tipo", "Valor", "Status", "Vencimento"];
-
-    let xPos = 50;
-    headers.forEach((header, i) => {
-      doc
-        .fontSize(9)
-        .font("Helvetica-Bold")
-        .fillColor("#FFFFFF")
-        .rect(xPos, tableTop, colWidths[i], 20)
-        .fillAndStroke("#2563EB", "#2563EB")
-        .fillColor("#FFFFFF")
-        .text(header, xPos + 5, tableTop + 6, { width: colWidths[i] - 10 });
-      xPos += colWidths[i];
+    cards.forEach((card, i) => {
+      const x = MARGIN + i * (cardW + 4);
+      doc.rect(x, cardY, cardW, cardH).fillAndStroke(card.bg, "#E2E8F0");
+      doc.rect(x, cardY, cardW, 3).fill(card.border);
+      doc.fontSize(7).font("Helvetica-Bold").fillColor("#64748B").text(card.label.toUpperCase(), x + 6, cardY + 8, { width: cardW - 12 });
+      doc.fontSize(11).font("Helvetica-Bold").fillColor(card.color).text(card.value, x + 6, cardY + 22, { width: cardW - 12 });
+      if (card.sub) {
+        doc.fontSize(6).font("Helvetica").fillColor("#94A3B8").text(card.sub, x + 6, cardY + 38, { width: cardW - 12 });
+      }
     });
 
-    doc.y = tableTop + 25;
+    doc.y = cardY + cardH + 20;
 
-    // Linhas da tabela
-    let rowY = doc.y;
-    data.transactions.forEach((transaction, index) => {
-      if (rowY > 700) {
-        doc.addPage();
-        rowY = 50;
-      }
+    // ===== ANÁLISE POR CATEGORIA E STATUS =====
+    doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Análise por Categoria e Status");
+    doc.moveDown(0.5);
 
-      const bgColor = index % 2 === 0 ? "#F9FAFB" : "#FFFFFF";
+    const halfWidth = (CONTENT_WIDTH - 10) / 2;
 
-      xPos = 50;
-      const rowData = [
-        transaction.dueDate ? format(new Date(transaction.dueDate), "dd/MM/yyyy") : "",
-        transaction.description.substring(0, 50),
-        transaction.type === "INCOME" ? "Receita" : "Despesa",
-        formatBRL(transaction.amount / 100),
-        transaction.status === "PAID" ? "Pago" : transaction.status === "PENDING" ? "Pendente" : "Vencido",
-        transaction.dueDate ? format(new Date(transaction.dueDate), "dd/MM/yyyy") : "",
-      ];
+    // --- Receitas por Categoria (lado esquerdo) ---
+    const catStartY = doc.y;
+    doc.fontSize(10).font("Helvetica-Bold").fillColor("#16A34A").text("Receitas por Categoria", MARGIN, catStartY);
+    let catY = catStartY + 16;
 
-      rowData.forEach((data, i) => {
-        doc
-          .rect(xPos, rowY, colWidths[i], 20)
-          .fillAndStroke(bgColor, "#E5E7EB")
-          .fontSize(8)
-          .font("Helvetica")
-          .fillColor("#000000")
-          .text(data, xPos + 5, rowY + 6, { width: colWidths[i] - 10 });
-        xPos += colWidths[i];
+    const incCatEntries = Object.entries(incomeByCat).sort(([, a], [, b]) => b.total - a.total);
+    if (incCatEntries.length > 0) {
+      // Header
+      const iColW = [halfWidth * 0.45, halfWidth * 0.3, halfWidth * 0.25];
+      let ix = MARGIN;
+      ["Categoria", "Total", "%"].forEach((h, hi) => {
+        doc.rect(ix, catY, iColW[hi], 16).fillAndStroke("#F0FDF4", "#BBF7D0");
+        doc.fontSize(7).font("Helvetica-Bold").fillColor("#16A34A").text(h, ix + 4, catY + 5, { width: iColW[hi] - 8 });
+        ix += iColW[hi];
       });
+      catY += 16;
 
-      rowY += 20;
+      incCatEntries.forEach(([cat, v], idx) => {
+        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
+        ix = MARGIN;
+        const pct = totalIncome > 0 ? Math.round((v.total / totalIncome) * 100) : 0;
+        const rowData = [cat.substring(0, 20), formatBRL(v.total / 100), `${pct}%`];
+        rowData.forEach((cell, ci) => {
+          doc.rect(ix, catY, iColW[ci], 14).fillAndStroke(bg, "#F1F5F9");
+          doc.fontSize(7).font("Helvetica").fillColor("#1E293B").text(cell, ix + 4, catY + 4, { width: iColW[ci] - 8 });
+          ix += iColW[ci];
+        });
+        catY += 14;
+      });
+    } else {
+      doc.fontSize(8).font("Helvetica").fillColor("#94A3B8").text("Nenhuma receita no período", MARGIN, catY);
+      catY += 14;
+    }
+
+    // Receitas por status
+    catY += 8;
+    doc.fontSize(8).font("Helvetica-Bold").fillColor("#64748B").text("Por Status", MARGIN, catY);
+    catY += 12;
+    Object.entries(incomeByStatus).forEach(([st, val]) => {
+      const pct = totalIncome > 0 ? Math.round((val / totalIncome) * 100) : 0;
+      doc.fontSize(7).font("Helvetica").fillColor("#1E293B")
+        .text(`${statusLabel(st)}: ${formatBRL(val / 100)} (${pct}%)`, MARGIN + 4, catY);
+      catY += 11;
     });
 
-    // Rodapé da primeira página
-    doc
-      .fontSize(8)
-      .fillColor("#6B7280")
-      .text(
-        "Sistema de Gestão Financeira - Relatório gerado automaticamente",
-        50,
-        750,
-        { align: "center" }
-      );
+    // --- Despesas por Categoria (lado direito) ---
+    const rightX = MARGIN + halfWidth + 10;
+    let dCatY = catStartY;
+    doc.fontSize(10).font("Helvetica-Bold").fillColor("#DC2626").text("Despesas por Categoria", rightX, dCatY);
+    dCatY += 16;
 
-    // ========== SEGUNDA PÁGINA: GRÁFICOS ==========
-    if (data.categoryExpenses && data.categoryExpenses.length > 0) {
-      doc.addPage();
-
-      // Título da página
-      doc
-        .fontSize(18)
-        .font("Helvetica-Bold")
-        .fillColor("#2563EB")
-        .text("Análise Visual", { align: "center" });
-
-      doc.moveDown(2);
-
-      // Tabela de Despesas por Categoria
-      doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Despesas por Categoria e Status");
-      doc.moveDown();
-
-      const categoryTableTop = doc.y;
-      const categoryColWidths = [150, 80, 80, 80, 90];
-      const categoryHeaders = ["Categoria", "Pago", "Pendente", "Vencido", "Total"];
-
-      let categoryXPos = 50;
-      categoryHeaders.forEach((header, i) => {
-        doc
-          .fontSize(9)
-          .font("Helvetica-Bold")
-          .fillColor("#FFFFFF")
-          .rect(categoryXPos, categoryTableTop, categoryColWidths[i], 25)
-          .fillAndStroke("#2563EB", "#2563EB")
-          .fillColor("#FFFFFF")
-          .text(header, categoryXPos + 5, categoryTableTop + 8, { width: categoryColWidths[i] - 10 });
-        categoryXPos += categoryColWidths[i];
+    const expCatEntries = Object.entries(expenseByCat).sort(([, a], [, b]) => b.total - a.total);
+    if (expCatEntries.length > 0) {
+      const eColW = [halfWidth * 0.45, halfWidth * 0.3, halfWidth * 0.25];
+      let ex = rightX;
+      ["Categoria", "Total", "%"].forEach((h, hi) => {
+        doc.rect(ex, dCatY, eColW[hi], 16).fillAndStroke("#FEF2F2", "#FECACA");
+        doc.fontSize(7).font("Helvetica-Bold").fillColor("#DC2626").text(h, ex + 4, dCatY + 5, { width: eColW[hi] - 8 });
+        ex += eColW[hi];
       });
+      dCatY += 16;
 
-      let categoryRowY = categoryTableTop + 25;
-
-      data.categoryExpenses.forEach((cat: any, index: number) => {
-        const bgColor = index % 2 === 0 ? "#F9FAFB" : "#FFFFFF";
-
-        categoryXPos = 50;
-        const rowData = [
-          cat.categoryName || "Sem Categoria",
-          formatBRL(cat.paid / 100),
-          formatBRL(cat.pending / 100),
-          formatBRL(cat.overdue / 100),
-          formatBRL(cat.total / 100),
-        ];
-
-        rowData.forEach((cellData, i) => {
-          doc
-            .rect(categoryXPos, categoryRowY, categoryColWidths[i], 22)
-            .fillAndStroke(bgColor, "#E5E7EB")
-            .fontSize(8)
-            .font("Helvetica")
-            .fillColor("#000000")
-            .text(cellData, categoryXPos + 5, categoryRowY + 7, { width: categoryColWidths[i] - 10 });
-          categoryXPos += categoryColWidths[i];
+      expCatEntries.forEach(([cat, v], idx) => {
+        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
+        ex = rightX;
+        const pct = totalExpense > 0 ? Math.round((v.total / totalExpense) * 100) : 0;
+        const rowData = [cat.substring(0, 20), formatBRL(v.total / 100), `${pct}%`];
+        rowData.forEach((cell, ci) => {
+          doc.rect(ex, dCatY, eColW[ci], 14).fillAndStroke(bg, "#F1F5F9");
+          doc.fontSize(7).font("Helvetica").fillColor("#1E293B").text(cell, ex + 4, dCatY + 4, { width: eColW[ci] - 8 });
+          ex += eColW[ci];
         });
-
-        categoryRowY += 22;
+        dCatY += 14;
       });
-
-      // Linha de total
-      const totalPaid = data.categoryExpenses.reduce((sum: number, cat: any) => sum + cat.paid, 0);
-      const totalPending = data.categoryExpenses.reduce((sum: number, cat: any) => sum + cat.pending, 0);
-      const totalOverdue = data.categoryExpenses.reduce((sum: number, cat: any) => sum + cat.overdue, 0);
-      const totalAll = data.categoryExpenses.reduce((sum: number, cat: any) => sum + cat.total, 0);
-
-      categoryXPos = 50;
-      const totalRowData = [
-        "Total Geral",
-        formatBRL(totalPaid / 100),
-        formatBRL(totalPending / 100),
-        formatBRL(totalOverdue / 100),
-        formatBRL(totalAll / 100),
-      ];
-
-      totalRowData.forEach((cellData, i) => {
-        doc
-          .rect(categoryXPos, categoryRowY, categoryColWidths[i], 25)
-          .fillAndStroke("#EFF6FF", "#2563EB")
-          .fontSize(9)
-          .font("Helvetica-Bold")
-          .fillColor("#000000")
-          .text(cellData, categoryXPos + 5, categoryRowY + 8, { width: categoryColWidths[i] - 10 });
-        categoryXPos += categoryColWidths[i];
-      });
-
-      doc.y = categoryRowY + 40;
-
-      // Gráfico de Pizza (Distribuição por Categoria)
-      if (data.categoryData && data.categoryData.length > 0) {
-        doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000").text("Distribuição por Categoria");
-        doc.moveDown();
-
-        const pieX = 150;
-        const pieY = doc.y + 80;
-        const pieRadius = 70;
-
-        const total = data.categoryData.reduce((sum: number, cat: any) => sum + cat.value, 0);
-        let startAngle = -Math.PI / 2; // Começar no topo
-
-        const COLORS = ["#6B7280", "#EF4444", "#10B981", "#06B6D4", "#F59E0B", "#8B5CF6"];
-
-        data.categoryData.forEach((cat: any, index: number) => {
-          const sliceAngle = (cat.value / total) * 2 * Math.PI;
-          const endAngle = startAngle + sliceAngle;
-
-          // Desenhar fatia
-          doc.save();
-          doc
-            .moveTo(pieX, pieY)
-            .lineTo(
-              pieX + pieRadius * Math.cos(startAngle),
-              pieY + pieRadius * Math.sin(startAngle)
-            )
-            .arc(pieX, pieY, pieRadius, startAngle, endAngle)
-            .lineTo(pieX, pieY)
-            .fillAndStroke(COLORS[index % COLORS.length], "#FFFFFF");
-          doc.restore();
-
-          startAngle = endAngle;
-        });
-
-        // Legenda
-        let legendY = pieY - 70;
-        const legendX = 350;
-
-        data.categoryData.forEach((cat: any, index: number) => {
-          // Quadrado de cor
-          doc.rect(legendX, legendY, 12, 12).fillAndStroke(COLORS[index % COLORS.length], COLORS[index % COLORS.length]);
-
-          // Texto
-          const percentage = ((cat.value / total) * 100).toFixed(0);
-          doc
-            .fontSize(9)
-            .font("Helvetica")
-            .fillColor("#000000")
-            .text(`${cat.name} ${percentage}%`, legendX + 18, legendY + 2);
-
-          legendY += 18;
-        });
-      }
-
-      // Rodapé da segunda página
-      doc
-        .fontSize(8)
-        .fillColor("#6B7280")
-        .text(
-          "Sistema de Gestão Financeira - Relatório gerado automaticamente",
-          50,
-          750,
-          { align: "center" }
-        );
+    } else {
+      doc.fontSize(8).font("Helvetica").fillColor("#94A3B8").text("Nenhuma despesa no período", rightX, dCatY);
+      dCatY += 14;
     }
+
+    // Despesas por status
+    dCatY += 8;
+    doc.fontSize(8).font("Helvetica-Bold").fillColor("#64748B").text("Por Status", rightX, dCatY);
+    dCatY += 12;
+    Object.entries(expenseByStatus).forEach(([st, val]) => {
+      const pct = totalExpense > 0 ? Math.round((val / totalExpense) * 100) : 0;
+      doc.fontSize(7).font("Helvetica").fillColor("#1E293B")
+        .text(`${statusLabel(st)}: ${formatBRL(val / 100)} (${pct}%)`, rightX + 4, dCatY);
+      dCatY += 11;
+    });
+
+    doc.y = Math.max(catY, dCatY) + 20;
+
+    // ===== EVOLUÇÃO MENSAL =====
+    if (monthlyData.length > 0) {
+      ensureSpace(40 + monthlyData.length * 18);
+      doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Evolução Mensal");
+      doc.moveDown(0.5);
+
+      const mColW = [CONTENT_WIDTH * 0.25, CONTENT_WIDTH * 0.25, CONTENT_WIDTH * 0.25, CONTENT_WIDTH * 0.25];
+      let mY = drawTableHeader(["Mês", "Receitas", "Despesas", "Saldo"], mColW, doc.y, "#F59E0B");
+
+      monthlyData.forEach((m, idx) => {
+        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
+        let mx = MARGIN;
+        const rowData = [
+          m.label,
+          formatBRL(m.income / 100),
+          formatBRL(m.expense / 100),
+          `${m.saldo >= 0 ? "+" : ""}${formatBRL(m.saldo / 100)}`,
+        ];
+        const colors = ["#1E293B", "#16A34A", "#DC2626", m.saldo >= 0 ? "#3B82F6" : "#F59E0B"];
+
+        rowData.forEach((cell, ci) => {
+          doc.rect(mx, mY, mColW[ci], 16).fillAndStroke(bg, "#F1F5F9");
+          doc.fontSize(8).font(ci === 0 ? "Helvetica-Bold" : "Helvetica").fillColor(colors[ci])
+            .text(cell, mx + 4, mY + 4, { width: mColW[ci] - 8, align: ci === 0 ? "left" : "right" });
+          mx += mColW[ci];
+        });
+        mY += 16;
+      });
+
+      // Total
+      let mx = MARGIN;
+      const totalRow = ["TOTAL", formatBRL(totalIncome / 100), formatBRL(totalExpense / 100), `${saldoLiquido >= 0 ? "+" : ""}${formatBRL(saldoLiquido / 100)}`];
+      const totalColors = ["#1E293B", "#16A34A", "#DC2626", saldoLiquido >= 0 ? "#3B82F6" : "#F59E0B"];
+      totalRow.forEach((cell, ci) => {
+        doc.rect(mx, mY, mColW[ci], 20).fillAndStroke("#F8FAFC", "#E2E8F0");
+        doc.fontSize(9).font("Helvetica-Bold").fillColor(totalColors[ci])
+          .text(cell, mx + 4, mY + 6, { width: mColW[ci] - 8, align: ci === 0 ? "left" : "right" });
+        mx += mColW[ci];
+      });
+
+      doc.y = mY + 30;
+    }
+
+    // ===== TABELA DE RECEITAS =====
+    if (incomes.length > 0) {
+      ensureSpace(60);
+      doc.fontSize(13).font("Helvetica-Bold").fillColor("#16A34A").text(`Receitas (${incomes.length})`);
+      doc.moveDown(0.3);
+
+      const rColW = [60, 180, 80, 80, 50, 65];
+      let rY = drawTableHeader(["Vencimento", "Descrição", "Categoria", "Valor", "Status", "Conta"], rColW, doc.y, "#16A34A");
+
+      incomes.forEach((t, idx) => {
+        if (rY > PAGE_HEIGHT - 60) {
+          addFooter();
+          doc.addPage();
+          rY = MARGIN;
+          rY = drawTableHeader(["Vencimento", "Descrição", "Categoria", "Valor", "Status", "Conta"], rColW, rY, "#16A34A");
+        }
+        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
+        let rx = MARGIN;
+        const rowData = [
+          t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy") : "",
+          (t.description || "").substring(0, 35),
+          (t.categoryName || "Sem cat.").substring(0, 15),
+          "+" + formatBRL(t.amount / 100),
+          statusLabel(t.status),
+          (t.bankAccountName || "").substring(0, 12),
+        ];
+        rowData.forEach((cell, ci) => {
+          doc.rect(rx, rY, rColW[ci], 16).fillAndStroke(bg, "#F1F5F9");
+          const color = ci === 3 ? "#16A34A" : "#1E293B";
+          doc.fontSize(7).font(ci === 3 ? "Helvetica-Bold" : "Helvetica").fillColor(color)
+            .text(cell, rx + 3, rY + 4, { width: rColW[ci] - 6 });
+          rx += rColW[ci];
+        });
+        rY += 16;
+      });
+
+      // Total receitas
+      let rx = MARGIN;
+      doc.rect(rx, rY, rColW[0] + rColW[1] + rColW[2], 20).fillAndStroke("#F0FDF4", "#BBF7D0");
+      doc.fontSize(9).font("Helvetica-Bold").fillColor("#16A34A").text("TOTAL RECEITAS", rx + 4, rY + 6);
+      rx += rColW[0] + rColW[1] + rColW[2];
+      doc.rect(rx, rY, rColW[3], 20).fillAndStroke("#F0FDF4", "#BBF7D0");
+      doc.fontSize(9).font("Helvetica-Bold").fillColor("#16A34A").text(formatBRL(totalIncome / 100), rx + 3, rY + 6, { width: rColW[3] - 6 });
+      rx += rColW[3];
+      doc.rect(rx, rY, rColW[4] + rColW[5], 20).fillAndStroke("#F0FDF4", "#BBF7D0");
+
+      doc.y = rY + 30;
+    }
+
+    // ===== TABELA DE DESPESAS =====
+    if (expenses.length > 0) {
+      ensureSpace(60);
+      doc.fontSize(13).font("Helvetica-Bold").fillColor("#DC2626").text(`Despesas (${expenses.length})`);
+      doc.moveDown(0.3);
+
+      const eColW = [60, 180, 80, 80, 50, 65];
+      let eY = drawTableHeader(["Vencimento", "Descrição", "Categoria", "Valor", "Status", "Conta"], eColW, doc.y, "#DC2626");
+
+      expenses.forEach((t, idx) => {
+        if (eY > PAGE_HEIGHT - 60) {
+          addFooter();
+          doc.addPage();
+          eY = MARGIN;
+          eY = drawTableHeader(["Vencimento", "Descrição", "Categoria", "Valor", "Status", "Conta"], eColW, eY, "#DC2626");
+        }
+        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
+        let ex = MARGIN;
+        const rowData = [
+          t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy") : "",
+          (t.description || "").substring(0, 35),
+          (t.categoryName || "Sem cat.").substring(0, 15),
+          "-" + formatBRL(t.amount / 100),
+          statusLabel(t.status),
+          (t.bankAccountName || "").substring(0, 12),
+        ];
+        rowData.forEach((cell, ci) => {
+          doc.rect(ex, eY, eColW[ci], 16).fillAndStroke(bg, "#F1F5F9");
+          const color = ci === 3 ? "#DC2626" : "#1E293B";
+          doc.fontSize(7).font(ci === 3 ? "Helvetica-Bold" : "Helvetica").fillColor(color)
+            .text(cell, ex + 3, eY + 4, { width: eColW[ci] - 6 });
+          ex += eColW[ci];
+        });
+        eY += 16;
+      });
+
+      // Total despesas
+      let ex = MARGIN;
+      doc.rect(ex, eY, eColW[0] + eColW[1] + eColW[2], 20).fillAndStroke("#FEF2F2", "#FECACA");
+      doc.fontSize(9).font("Helvetica-Bold").fillColor("#DC2626").text("TOTAL DESPESAS", ex + 4, eY + 6);
+      ex += eColW[0] + eColW[1] + eColW[2];
+      doc.rect(ex, eY, eColW[3], 20).fillAndStroke("#FEF2F2", "#FECACA");
+      doc.fontSize(9).font("Helvetica-Bold").fillColor("#DC2626").text(formatBRL(totalExpense / 100), ex + 3, eY + 6, { width: eColW[3] - 6 });
+      ex += eColW[3];
+      doc.rect(ex, eY, eColW[4] + eColW[5], 20).fillAndStroke("#FEF2F2", "#FECACA");
+
+      doc.y = eY + 30;
+    }
+
+    // ===== GRÁFICO DE PIZZA (Distribuição por Categoria) =====
+    if (data.categoryData && data.categoryData.length > 0) {
+      ensureSpace(200);
+      doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Distribuição de Despesas por Categoria");
+      doc.moveDown(1);
+
+      const pieX = MARGIN + 100;
+      const pieY = doc.y + 70;
+      const pieRadius = 65;
+      const total = data.categoryData.reduce((sum: number, cat: any) => sum + cat.value, 0);
+      let startAngle = -Math.PI / 2;
+      const COLORS = ["#6B7280", "#EF4444", "#10B981", "#06B6D4", "#F59E0B", "#8B5CF6", "#EC4899", "#14B8A6"];
+
+      data.categoryData.forEach((cat: any, index: number) => {
+        const sliceAngle = (cat.value / total) * 2 * Math.PI;
+        const endAngle = startAngle + sliceAngle;
+        doc.save();
+        doc.moveTo(pieX, pieY)
+          .lineTo(pieX + pieRadius * Math.cos(startAngle), pieY + pieRadius * Math.sin(startAngle))
+          .arc(pieX, pieY, pieRadius, startAngle, endAngle)
+          .lineTo(pieX, pieY)
+          .fillAndStroke(COLORS[index % COLORS.length], "#FFFFFF");
+        doc.restore();
+        startAngle = endAngle;
+      });
+
+      // Legenda
+      let legendY = pieY - 60;
+      const legendX = MARGIN + 250;
+      data.categoryData.forEach((cat: any, index: number) => {
+        doc.rect(legendX, legendY, 10, 10).fillAndStroke(COLORS[index % COLORS.length], COLORS[index % COLORS.length]);
+        const percentage = ((cat.value / total) * 100).toFixed(0);
+        doc.fontSize(8).font("Helvetica").fillColor("#1E293B")
+          .text(`${cat.name} (${percentage}%)`, legendX + 15, legendY + 1);
+        legendY += 16;
+      });
+
+      doc.y = pieY + pieRadius + 20;
+    }
+
+    // ===== RODAPÉ FINAL =====
+    addFooter();
 
     doc.end();
   });
