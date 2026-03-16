@@ -222,19 +222,30 @@ export function generateTransactionsPDF(data: {
     };
 
     // Desenha uma célula de tabela com texto truncado (sem quebra de linha)
+    // Usa widthOfString do PDFKit para medir a largura real e truncar com precisão
     const cell = (
       text: string, x: number, y: number, w: number, h: number,
       bg: string, border: string, textColor: string, bold: boolean, fontSize = 8
     ) => {
       doc.rect(x, y, w, h).fillAndStroke(bg, border);
-      // Truncar texto manualmente para evitar quebra de linha
-      const maxChars = Math.floor((w - 10) / (fontSize * 0.52)); // estimativa de chars
-      const displayText = text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
-      doc.fontSize(fontSize)
-        .font(bold ? "Helvetica-Bold" : "Helvetica")
-        .fillColor(textColor)
+      const fontName = bold ? "Helvetica-Bold" : "Helvetica";
+      doc.fontSize(fontSize).font(fontName);
+      const maxWidth = w - 10;
+      const ellipsis = "…";
+      let displayText = text;
+      // Medir largura real do texto e truncar até caber
+      if (doc.widthOfString(text) > maxWidth) {
+        let lo = 0, hi = text.length;
+        while (lo < hi) {
+          const mid = Math.floor((lo + hi + 1) / 2);
+          if (doc.widthOfString(text.substring(0, mid) + ellipsis) <= maxWidth) lo = mid;
+          else hi = mid - 1;
+        }
+        displayText = text.substring(0, lo) + ellipsis;
+      }
+      doc.fillColor(textColor)
         .text(displayText, x + 5, y + (h - fontSize) / 2 + 1, {
-          width: w - 10,
+          width: maxWidth,
           lineBreak: false,
         });
     };
