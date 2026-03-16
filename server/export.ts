@@ -167,47 +167,118 @@ export function generateTransactionsPDF(data: {
   upcomingIncomeTransactions?: any[];
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    const doc = new PDFDocument({ margin: 40, size: "A4", autoFirstPage: true });
     const chunks: Buffer[] = [];
     const PAGE_WIDTH = 595.28;
     const PAGE_HEIGHT = 841.89;
     const MARGIN = 40;
     const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+    const FOOTER_Y = PAGE_HEIGHT - 25;
 
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    // ===== HELPER: desenhar linha separadora =====
-    const drawSeparator = (y: number, color = "#E2E8F0") => {
-      doc.strokeColor(color).lineWidth(1).moveTo(MARGIN, y).lineTo(PAGE_WIDTH - MARGIN, y).stroke();
-    };
+    // ===== HELPERS =====
 
-    // ===== HELPER: desenhar cabeçalho de tabela =====
-    const drawTableHeader = (headers: string[], colWidths: number[], y: number, color = "#2563EB") => {
-      let x = MARGIN;
-      headers.forEach((header, i) => {
-        doc.rect(x, y, colWidths[i], 22).fillAndStroke(color, color);
-        doc.fontSize(8).font("Helvetica-Bold").fillColor("#FFFFFF")
-          .text(header, x + 4, y + 7, { width: colWidths[i] - 8, align: "left" });
-        x += colWidths[i];
-      });
-      return y + 22;
-    };
-
-    // ===== HELPER: verificar se precisa nova página =====
-    const ensureSpace = (needed: number) => {
-      if (doc.y > PAGE_HEIGHT - MARGIN - needed) {
-        addFooter();
-        doc.addPage();
-        doc.y = MARGIN;
-      }
-    };
-
-    // ===== HELPER: rodapé =====
     const addFooter = () => {
       doc.fontSize(7).font("Helvetica").fillColor("#94A3B8")
-        .text("UnifiquePro · Relatório gerado automaticamente", MARGIN, PAGE_HEIGHT - 30, { align: "center", width: CONTENT_WIDTH });
+        .text("UnifiquePro · Relatório gerado automaticamente", MARGIN, FOOTER_Y, {
+          align: "center",
+          width: CONTENT_WIDTH,
+        });
+    };
+
+    // Verifica se há espaço suficiente; se não, adiciona nova página
+    const checkSpace = (needed: number): number => {
+      if (doc.y + needed > FOOTER_Y - 10) {
+        addFooter();
+        doc.addPage();
+        return MARGIN;
+      }
+      return doc.y;
+    };
+
+    const drawLine = (y: number, color = "#E2E8F0") => {
+      doc.strokeColor(color).lineWidth(0.5).moveTo(MARGIN, y).lineTo(PAGE_WIDTH - MARGIN, y).stroke();
+    };
+
+    // Desenha tabela de categoria | pago | pendente | vencido | total
+    // Retorna o Y final após a tabela
+    const drawCategoryTable = (
+      title: string,
+      entries: Array<{ categoryName: string; paid: number; pending: number; overdue: number; total: number }>,
+      headerColor: string,
+      startY: number
+    ): number => {
+      const COL = [220, 80, 80, 80, 55]; // larguras das colunas
+      const ROW_H = 22;
+      const HEADER_H = 26;
+
+      let y = startY;
+
+      // Título da seção
+      y = checkSpace(HEADER_H + ROW_H * 2 + 30);
+      doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text(title, MARGIN, y);
+      y += 20;
+
+      // Cabeçalho da tabela
+      const headers = ["Categoria", "Pago", "Pendente", "Vencido", "Total"];
+      let x = MARGIN;
+      headers.forEach((h, i) => {
+        doc.rect(x, y, COL[i], HEADER_H).fillAndStroke(headerColor, headerColor);
+        doc.fontSize(9).font("Helvetica-Bold").fillColor("#FFFFFF")
+          .text(h, x + 6, y + 9, { width: COL[i] - 12, align: "left" });
+        x += COL[i];
+      });
+      y += HEADER_H;
+
+      // Linhas de dados
+      if (entries.length === 0) {
+        y = checkSpace(ROW_H);
+        doc.rect(MARGIN, y, CONTENT_WIDTH, ROW_H).fillAndStroke("#F9FAFB", "#E2E8F0");
+        doc.fontSize(8).font("Helvetica").fillColor("#94A3B8")
+          .text("Nenhum lançamento no período", MARGIN + 6, y + 7, { width: CONTENT_WIDTH - 12 });
+        y += ROW_H;
+      } else {
+        entries.forEach((cat, idx) => {
+          y = checkSpace(ROW_H);
+          const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
+          x = MARGIN;
+          const cells = [
+            cat.categoryName || "Sem Categoria",
+            formatBRL(cat.paid / 100),
+            formatBRL(cat.pending / 100),
+            formatBRL(cat.overdue / 100),
+            formatBRL(cat.total / 100),
+          ];
+          cells.forEach((cell, ci) => {
+            doc.rect(x, y, COL[ci], ROW_H).fillAndStroke(bg, "#E2E8F0");
+            doc.fontSize(8).font("Helvetica").fillColor("#1E293B")
+              .text(cell, x + 6, y + 7, { width: COL[ci] - 12, align: "left" });
+            x += COL[ci];
+          });
+          y += ROW_H;
+        });
+      }
+
+      // Linha de Total Geral
+      y = checkSpace(ROW_H + 4);
+      const tPaid = entries.reduce((s, c) => s + c.paid, 0);
+      const tPending = entries.reduce((s, c) => s + c.pending, 0);
+      const tOverdue = entries.reduce((s, c) => s + c.overdue, 0);
+      const tTotal = entries.reduce((s, c) => s + c.total, 0);
+      x = MARGIN;
+      const totalCells = ["Total Geral", formatBRL(tPaid / 100), formatBRL(tPending / 100), formatBRL(tOverdue / 100), formatBRL(tTotal / 100)];
+      totalCells.forEach((cell, ci) => {
+        doc.rect(x, y, COL[ci], ROW_H).fillAndStroke("#EFF6FF", headerColor);
+        doc.fontSize(9).font("Helvetica-Bold").fillColor("#1E293B")
+          .text(cell, x + 6, y + 7, { width: COL[ci] - 12, align: "left" });
+        x += COL[ci];
+      });
+      y += ROW_H;
+
+      return y;
     };
 
     // ===== DADOS CALCULADOS =====
@@ -216,387 +287,244 @@ export function generateTransactionsPDF(data: {
     const totalIncome = incomes.reduce((s, t) => s + t.amount, 0);
     const totalExpense = expenses.reduce((s, t) => s + t.amount, 0);
     const saldoLiquido = totalIncome - totalExpense;
-    const totalPaid = data.transactions.filter(t => t.status === "PAID").reduce((s, t) => s + t.amount, 0);
     const totalPending = data.transactions.filter(t => t.status === "PENDING").reduce((s, t) => s + t.amount, 0);
     const totalOverdue = data.transactions.filter(t => t.status === "OVERDUE").reduce((s, t) => s + t.amount, 0);
 
-    // Receitas por categoria
-    const incomeByCat: Record<string, { total: number; count: number }> = {};
+    // Receitas por categoria e status
+    const incomeCatMap: Record<string, { paid: number; pending: number; overdue: number }> = {};
     incomes.forEach(t => {
-      const cat = t.categoryName || "Sem categoria";
-      if (!incomeByCat[cat]) incomeByCat[cat] = { total: 0, count: 0 };
-      incomeByCat[cat].total += t.amount;
-      incomeByCat[cat].count++;
+      const cat = t.categoryName || "Sem Categoria";
+      if (!incomeCatMap[cat]) incomeCatMap[cat] = { paid: 0, pending: 0, overdue: 0 };
+      if (t.status === "PAID") incomeCatMap[cat].paid += t.amount;
+      else if (t.status === "PENDING") incomeCatMap[cat].pending += t.amount;
+      else incomeCatMap[cat].overdue += t.amount;
     });
+    const incomeCatEntries = Object.entries(incomeCatMap)
+      .map(([categoryName, v]) => ({ categoryName, ...v, total: v.paid + v.pending + v.overdue }))
+      .sort((a, b) => b.total - a.total);
 
-    // Despesas por categoria
-    const expenseByCat: Record<string, { total: number; count: number }> = {};
-    expenses.forEach(t => {
-      const cat = t.categoryName || "Sem categoria";
-      if (!expenseByCat[cat]) expenseByCat[cat] = { total: 0, count: 0 };
-      expenseByCat[cat].total += t.amount;
-      expenseByCat[cat].count++;
-    });
-
-    // Receitas por status
-    const incomeByStatus: Record<string, number> = {};
-    incomes.forEach(t => { incomeByStatus[t.status] = (incomeByStatus[t.status] || 0) + t.amount; });
-
-    // Despesas por status
-    const expenseByStatus: Record<string, number> = {};
-    expenses.forEach(t => { expenseByStatus[t.status] = (expenseByStatus[t.status] || 0) + t.amount; });
-
-    // Evolução mensal
-    const monthlyMap: Record<string, { income: number; expense: number }> = {};
-    data.transactions.forEach(t => {
-      if (!t.dueDate) return;
-      const d = new Date(t.dueDate);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (!monthlyMap[key]) monthlyMap[key] = { income: 0, expense: 0 };
-      if (t.type === "INCOME") monthlyMap[key].income += t.amount;
-      else monthlyMap[key].expense += t.amount;
-    });
-    const monthlyData = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b)).map(([key, v]) => {
-      const [yr, mo] = key.split("-").map(Number);
-      const label = new Date(yr, mo - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
-      return { label, income: v.income, expense: v.expense, saldo: v.income - v.expense };
-    });
+    // Despesas por categoria e status (usar categoryExpenses do servidor se disponível, senão calcular)
+    let expenseCatEntries: Array<{ categoryName: string; paid: number; pending: number; overdue: number; total: number }>;
+    if (data.categoryExpenses && data.categoryExpenses.length > 0) {
+      expenseCatEntries = data.categoryExpenses;
+    } else {
+      const expCatMap: Record<string, { paid: number; pending: number; overdue: number }> = {};
+      expenses.forEach(t => {
+        const cat = t.categoryName || "Sem Categoria";
+        if (!expCatMap[cat]) expCatMap[cat] = { paid: 0, pending: 0, overdue: 0 };
+        if (t.status === "PAID") expCatMap[cat].paid += t.amount;
+        else if (t.status === "PENDING") expCatMap[cat].pending += t.amount;
+        else expCatMap[cat].overdue += t.amount;
+      });
+      expenseCatEntries = Object.entries(expCatMap)
+        .map(([categoryName, v]) => ({ categoryName, ...v, total: v.paid + v.pending + v.overdue }))
+        .sort((a, b) => b.total - a.total);
+    }
 
     const statusLabel = (s: string) => ({ PAID: "Pago", PENDING: "Pendente", OVERDUE: "Atrasado" }[s] || s);
 
     // ===== PÁGINA 1: CABEÇALHO =====
-    // Linha azul no topo
-    doc.rect(0, 0, PAGE_WIDTH, 4).fill("#3B82F6");
+    // Barra azul no topo
+    doc.rect(0, 0, PAGE_WIDTH, 5).fill("#2563EB");
 
-    doc.moveDown(1);
+    let y = 20;
     doc.fontSize(22).font("Helvetica-Bold").fillColor("#1E293B")
-      .text("Relatório Financeiro", { align: "center" });
-    doc.fontSize(13).font("Helvetica").fillColor("#475569")
-      .text(data.entityName, { align: "center" });
+      .text("Relatório Financeiro", MARGIN, y, { align: "center", width: CONTENT_WIDTH });
+    y += 28;
 
-    // Período
+    doc.fontSize(13).font("Helvetica").fillColor("#475569")
+      .text(data.entityName, MARGIN, y, { align: "center", width: CONTENT_WIDTH });
+    y += 18;
+
     let periodText = data.period;
     if (data.startDate && data.endDate) {
       const sf = format(new Date(data.startDate), "dd/MM/yyyy", { locale: ptBR });
       const ef = format(new Date(data.endDate), "dd/MM/yyyy", { locale: ptBR });
       periodText = `${data.period} (${sf} até ${ef})`;
     }
-    doc.fontSize(9).fillColor("#64748B").text(`Período: ${periodText}`, { align: "center" });
+    doc.fontSize(9).fillColor("#64748B")
+      .text(`Período: ${periodText}`, MARGIN, y, { align: "center", width: CONTENT_WIDTH });
+    y += 13;
 
     const now = new Date();
-    const gmtMinus3Time = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-    doc.fontSize(8).text(`Gerado em: ${format(gmtMinus3Time, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, { align: "center" });
+    const spTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    doc.fontSize(8).fillColor("#94A3B8")
+      .text(`Gerado em: ${format(spTime, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, MARGIN, y, { align: "center", width: CONTENT_WIDTH });
+    y += 18;
 
-    doc.moveDown(1);
-    drawSeparator(doc.y, "#3B82F6");
-    doc.moveDown(1.5);
+    drawLine(y, "#2563EB");
+    y += 16;
 
-    // ===== RESUMO EXECUTIVO (5 cards) =====
-    doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Resumo Executivo");
-    doc.moveDown(0.5);
+    // ===== RESUMO EXECUTIVO =====
+    doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Resumo Executivo", MARGIN, y);
+    y += 18;
 
-    const cardW = (CONTENT_WIDTH - 16) / 5;
-    const cardH = 55;
-    const cardY = doc.y;
+    const CARD_W = (CONTENT_WIDTH - 16) / 5;
+    const CARD_H = 58;
     const cards = [
-      { label: "Total Receitas", value: formatBRL(totalIncome / 100), color: "#16A34A", border: "#16A34A", bg: "#F0FDF4", sub: `${incomes.length} lançamentos` },
-      { label: "Total Despesas", value: formatBRL(totalExpense / 100), color: "#DC2626", border: "#DC2626", bg: "#FEF2F2", sub: `${expenses.length} lançamentos` },
-      { label: "Saldo Líquido", value: `${saldoLiquido >= 0 ? "+" : ""}${formatBRL(saldoLiquido / 100)}`, color: saldoLiquido >= 0 ? "#3B82F6" : "#F59E0B", border: saldoLiquido >= 0 ? "#3B82F6" : "#F59E0B", bg: saldoLiquido >= 0 ? "#EFF6FF" : "#FFFBEB", sub: "" },
-      { label: "Pendente", value: formatBRL(totalPending / 100), color: "#D97706", border: "#D97706", bg: "#FFFBEB", sub: `${data.transactions.filter(t => t.status === "PENDING").length} lançamentos` },
-      { label: "Atrasado", value: formatBRL(totalOverdue / 100), color: "#DC2626", border: "#DC2626", bg: "#FEF2F2", sub: `${data.transactions.filter(t => t.status === "OVERDUE").length} lançamentos` },
+      { label: "Total Receitas", value: formatBRL(totalIncome / 100), color: "#16A34A", bg: "#F0FDF4", border: "#16A34A", sub: `${incomes.length} lançamentos` },
+      { label: "Total Despesas", value: formatBRL(totalExpense / 100), color: "#DC2626", bg: "#FEF2F2", border: "#DC2626", sub: `${expenses.length} lançamentos` },
+      { label: "Saldo Líquido", value: `${saldoLiquido >= 0 ? "+" : ""}${formatBRL(saldoLiquido / 100)}`, color: saldoLiquido >= 0 ? "#2563EB" : "#F59E0B", bg: saldoLiquido >= 0 ? "#EFF6FF" : "#FFFBEB", border: saldoLiquido >= 0 ? "#2563EB" : "#F59E0B", sub: "" },
+      { label: "Pendente", value: formatBRL(totalPending / 100), color: "#D97706", bg: "#FFFBEB", border: "#D97706", sub: `${data.transactions.filter(t => t.status === "PENDING").length} lançamentos` },
+      { label: "Atrasado", value: formatBRL(totalOverdue / 100), color: "#DC2626", bg: "#FEF2F2", border: "#DC2626", sub: `${data.transactions.filter(t => t.status === "OVERDUE").length} lançamentos` },
     ];
 
     cards.forEach((card, i) => {
-      const x = MARGIN + i * (cardW + 4);
-      doc.rect(x, cardY, cardW, cardH).fillAndStroke(card.bg, "#E2E8F0");
-      doc.rect(x, cardY, cardW, 3).fill(card.border);
-      doc.fontSize(7).font("Helvetica-Bold").fillColor("#64748B").text(card.label.toUpperCase(), x + 6, cardY + 8, { width: cardW - 12 });
-      doc.fontSize(11).font("Helvetica-Bold").fillColor(card.color).text(card.value, x + 6, cardY + 22, { width: cardW - 12 });
+      const cx = MARGIN + i * (CARD_W + 4);
+      doc.rect(cx, y, CARD_W, CARD_H).fillAndStroke(card.bg, "#E2E8F0");
+      doc.rect(cx, y, CARD_W, 3).fill(card.border);
+      doc.fontSize(7).font("Helvetica-Bold").fillColor("#64748B")
+        .text(card.label.toUpperCase(), cx + 6, y + 8, { width: CARD_W - 12 });
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(card.color)
+        .text(card.value, cx + 6, y + 22, { width: CARD_W - 12 });
       if (card.sub) {
-        doc.fontSize(6).font("Helvetica").fillColor("#94A3B8").text(card.sub, x + 6, cardY + 38, { width: cardW - 12 });
+        doc.fontSize(6).font("Helvetica").fillColor("#94A3B8")
+          .text(card.sub, cx + 6, y + 40, { width: CARD_W - 12 });
       }
     });
+    y += CARD_H + 24;
 
-    doc.y = cardY + cardH + 20;
+    // ===== RECEITAS POR CATEGORIA E STATUS =====
+    doc.y = y;
+    y = drawCategoryTable("Receitas por Categoria e Status", incomeCatEntries, "#16A34A", y);
+    y += 20;
 
-    // ===== ANÁLISE POR CATEGORIA E STATUS =====
-    doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Análise por Categoria e Status");
-    doc.moveDown(0.5);
+    // ===== DESPESAS POR CATEGORIA E STATUS =====
+    doc.y = y;
+    y = drawCategoryTable("Despesas por Categoria e Status", expenseCatEntries, "#2563EB", y);
+    y += 20;
 
-    const halfWidth = (CONTENT_WIDTH - 10) / 2;
+    // ===== TABELA DE TRANSAÇÕES =====
+    y = checkSpace(60);
+    doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Transações", MARGIN, y);
+    y += 18;
 
-    // --- Receitas por Categoria (lado esquerdo) ---
-    const catStartY = doc.y;
-    doc.fontSize(10).font("Helvetica-Bold").fillColor("#16A34A").text("Receitas por Categoria", MARGIN, catStartY);
-    let catY = catStartY + 16;
+    const T_COL = [60, 195, 80, 75, 55, 50];
+    const T_HEADERS = ["Vencimento", "Descrição", "Categoria", "Valor", "Status", "Tipo"];
+    const T_ROW_H = 18;
+    const T_HEADER_H = 22;
 
-    const incCatEntries = Object.entries(incomeByCat).sort(([, a], [, b]) => b.total - a.total);
-    if (incCatEntries.length > 0) {
-      // Header
-      const iColW = [halfWidth * 0.45, halfWidth * 0.3, halfWidth * 0.25];
-      let ix = MARGIN;
-      ["Categoria", "Total", "%"].forEach((h, hi) => {
-        doc.rect(ix, catY, iColW[hi], 16).fillAndStroke("#F0FDF4", "#BBF7D0");
-        doc.fontSize(7).font("Helvetica-Bold").fillColor("#16A34A").text(h, ix + 4, catY + 5, { width: iColW[hi] - 8 });
-        ix += iColW[hi];
+    const drawTransactionHeader = (startY: number): number => {
+      let x = MARGIN;
+      T_HEADERS.forEach((h, i) => {
+        doc.rect(x, startY, T_COL[i], T_HEADER_H).fillAndStroke("#2563EB", "#2563EB");
+        doc.fontSize(8).font("Helvetica-Bold").fillColor("#FFFFFF")
+          .text(h, x + 4, startY + 7, { width: T_COL[i] - 8, align: "left" });
+        x += T_COL[i];
       });
-      catY += 16;
+      return startY + T_HEADER_H;
+    };
 
-      incCatEntries.forEach(([cat, v], idx) => {
-        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
-        ix = MARGIN;
-        const pct = totalIncome > 0 ? Math.round((v.total / totalIncome) * 100) : 0;
-        const rowData = [cat.substring(0, 20), formatBRL(v.total / 100), `${pct}%`];
-        rowData.forEach((cell, ci) => {
-          doc.rect(ix, catY, iColW[ci], 14).fillAndStroke(bg, "#F1F5F9");
-          doc.fontSize(7).font("Helvetica").fillColor("#1E293B").text(cell, ix + 4, catY + 4, { width: iColW[ci] - 8 });
-          ix += iColW[ci];
-        });
-        catY += 14;
+    y = drawTransactionHeader(y);
+
+    data.transactions.forEach((t, idx) => {
+      if (y + T_ROW_H > FOOTER_Y - 10) {
+        addFooter();
+        doc.addPage();
+        y = MARGIN;
+        y = drawTransactionHeader(y);
+      }
+      const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
+      let x = MARGIN;
+      const isIncome = t.type === "INCOME";
+      const cells = [
+        t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy") : "",
+        (t.description || "").substring(0, 38),
+        (t.categoryName || "Sem cat.").substring(0, 16),
+        formatBRL(t.amount / 100),
+        statusLabel(t.status),
+        isIncome ? "Receita" : "Despesa",
+      ];
+      cells.forEach((cell, ci) => {
+        doc.rect(x, y, T_COL[ci], T_ROW_H).fillAndStroke(bg, "#E2E8F0");
+        const color = ci === 3 ? (isIncome ? "#16A34A" : "#DC2626") : "#1E293B";
+        doc.fontSize(7).font(ci === 3 ? "Helvetica-Bold" : "Helvetica").fillColor(color)
+          .text(cell, x + 4, y + 5, { width: T_COL[ci] - 8, align: "left" });
+        x += T_COL[ci];
       });
-    } else {
-      doc.fontSize(8).font("Helvetica").fillColor("#94A3B8").text("Nenhuma receita no período", MARGIN, catY);
-      catY += 14;
-    }
-
-    // Receitas por status
-    catY += 8;
-    doc.fontSize(8).font("Helvetica-Bold").fillColor("#64748B").text("Por Status", MARGIN, catY);
-    catY += 12;
-    Object.entries(incomeByStatus).forEach(([st, val]) => {
-      const pct = totalIncome > 0 ? Math.round((val / totalIncome) * 100) : 0;
-      doc.fontSize(7).font("Helvetica").fillColor("#1E293B")
-        .text(`${statusLabel(st)}: ${formatBRL(val / 100)} (${pct}%)`, MARGIN + 4, catY);
-      catY += 11;
+      y += T_ROW_H;
     });
 
-    // --- Despesas por Categoria (lado direito) ---
-    const rightX = MARGIN + halfWidth + 10;
-    let dCatY = catStartY;
-    doc.fontSize(10).font("Helvetica-Bold").fillColor("#DC2626").text("Despesas por Categoria", rightX, dCatY);
-    dCatY += 16;
+    y += 24;
 
-    const expCatEntries = Object.entries(expenseByCat).sort(([, a], [, b]) => b.total - a.total);
-    if (expCatEntries.length > 0) {
-      const eColW = [halfWidth * 0.45, halfWidth * 0.3, halfWidth * 0.25];
-      let ex = rightX;
-      ["Categoria", "Total", "%"].forEach((h, hi) => {
-        doc.rect(ex, dCatY, eColW[hi], 16).fillAndStroke("#FEF2F2", "#FECACA");
-        doc.fontSize(7).font("Helvetica-Bold").fillColor("#DC2626").text(h, ex + 4, dCatY + 5, { width: eColW[hi] - 8 });
-        ex += eColW[hi];
-      });
-      dCatY += 16;
+    // ===== DRE SIMPLIFICADO =====
+    y = checkSpace(200);
+    doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("DRE — Demonstração do Resultado do Exercício", MARGIN, y);
+    y += 8;
+    doc.fontSize(8).font("Helvetica").fillColor("#64748B").text(`Período: ${periodText}`, MARGIN, y);
+    y += 18;
 
-      expCatEntries.forEach(([cat, v], idx) => {
-        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
-        ex = rightX;
-        const pct = totalExpense > 0 ? Math.round((v.total / totalExpense) * 100) : 0;
-        const rowData = [cat.substring(0, 20), formatBRL(v.total / 100), `${pct}%`];
-        rowData.forEach((cell, ci) => {
-          doc.rect(ex, dCatY, eColW[ci], 14).fillAndStroke(bg, "#F1F5F9");
-          doc.fontSize(7).font("Helvetica").fillColor("#1E293B").text(cell, ex + 4, dCatY + 4, { width: eColW[ci] - 8 });
-          ex += eColW[ci];
-        });
-        dCatY += 14;
-      });
-    } else {
-      doc.fontSize(8).font("Helvetica").fillColor("#94A3B8").text("Nenhuma despesa no período", rightX, dCatY);
-      dCatY += 14;
-    }
+    const DRE_COL1 = CONTENT_WIDTH * 0.65;
+    const DRE_COL2 = CONTENT_WIDTH * 0.35;
+    const DRE_ROW_H = 22;
 
-    // Despesas por status
-    dCatY += 8;
-    doc.fontSize(8).font("Helvetica-Bold").fillColor("#64748B").text("Por Status", rightX, dCatY);
-    dCatY += 12;
-    Object.entries(expenseByStatus).forEach(([st, val]) => {
-      const pct = totalExpense > 0 ? Math.round((val / totalExpense) * 100) : 0;
-      doc.fontSize(7).font("Helvetica").fillColor("#1E293B")
-        .text(`${statusLabel(st)}: ${formatBRL(val / 100)} (${pct}%)`, rightX + 4, dCatY);
-      dCatY += 11;
+    // Cabeçalho DRE
+    doc.rect(MARGIN, y, DRE_COL1, DRE_ROW_H).fillAndStroke("#1E293B", "#1E293B");
+    doc.rect(MARGIN + DRE_COL1, y, DRE_COL2, DRE_ROW_H).fillAndStroke("#1E293B", "#1E293B");
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#FFFFFF")
+      .text("Descrição", MARGIN + 8, y + 7, { width: DRE_COL1 - 16 });
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#FFFFFF")
+      .text("Valor", MARGIN + DRE_COL1 + 8, y + 7, { width: DRE_COL2 - 16, align: "right" });
+    y += DRE_ROW_H;
+
+    const dreRow = (label: string, value: number, indent: number, bold: boolean, bg: string, valueColor?: string) => {
+      y = checkSpace(DRE_ROW_H);
+      doc.rect(MARGIN, y, DRE_COL1, DRE_ROW_H).fillAndStroke(bg, "#E2E8F0");
+      doc.rect(MARGIN + DRE_COL1, y, DRE_COL2, DRE_ROW_H).fillAndStroke(bg, "#E2E8F0");
+      const font = bold ? "Helvetica-Bold" : "Helvetica";
+      const textColor = "#1E293B";
+      doc.fontSize(bold ? 9 : 8).font(font).fillColor(textColor)
+        .text(label, MARGIN + 8 + indent, y + 7, { width: DRE_COL1 - 16 - indent });
+      const vColor = valueColor || (value >= 0 ? "#16A34A" : "#DC2626");
+      doc.fontSize(bold ? 9 : 8).font(font).fillColor(vColor)
+        .text(formatBRL(value / 100), MARGIN + DRE_COL1 + 8, y + 7, { width: DRE_COL2 - 16, align: "right" });
+      y += DRE_ROW_H;
+    };
+
+    const dreLabel = (label: string, bg: string) => {
+      y = checkSpace(DRE_ROW_H - 4);
+      doc.rect(MARGIN, y, CONTENT_WIDTH, DRE_ROW_H - 4).fillAndStroke(bg, bg);
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#475569")
+        .text(label.toUpperCase(), MARGIN + 8, y + 5, { width: CONTENT_WIDTH - 16 });
+      y += DRE_ROW_H - 4;
+    };
+
+    // Receitas
+    dreLabel("Receitas", "#F0FDF4");
+    incomes.length > 0
+      ? Object.entries(incomeCatMap).sort(([, a], [, b]) => (b.paid + b.pending + b.overdue) - (a.paid + a.pending + a.overdue)).forEach(([cat, v]) => {
+          dreRow(cat, v.paid + v.pending + v.overdue, 8, false, "#FFFFFF", "#16A34A");
+        })
+      : dreRow("Sem receitas no período", 0, 8, false, "#FFFFFF", "#94A3B8");
+
+    dreRow("(+) Total de Receitas", totalIncome, 0, true, "#F0FDF4", "#16A34A");
+
+    y += 4;
+
+    // Despesas
+    dreLabel("Despesas", "#FEF2F2");
+    const expCatMapDRE: Record<string, number> = {};
+    expenses.forEach(t => { expCatMapDRE[t.categoryName || "Sem Categoria"] = (expCatMapDRE[t.categoryName || "Sem Categoria"] || 0) + t.amount; });
+    Object.entries(expCatMapDRE).sort(([, a], [, b]) => b - a).forEach(([cat, val]) => {
+      dreRow(`(-) ${cat}`, -val, 8, false, "#FFFFFF", "#DC2626");
     });
+    if (expenses.length === 0) dreRow("Sem despesas no período", 0, 8, false, "#FFFFFF", "#94A3B8");
 
-    doc.y = Math.max(catY, dCatY) + 20;
+    dreRow("(-) Total de Despesas", -totalExpense, 0, true, "#FEF2F2", "#DC2626");
 
-    // ===== EVOLUÇÃO MENSAL =====
-    if (monthlyData.length > 0) {
-      ensureSpace(40 + monthlyData.length * 18);
-      doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Evolução Mensal");
-      doc.moveDown(0.5);
+    y += 8;
 
-      const mColW = [CONTENT_WIDTH * 0.25, CONTENT_WIDTH * 0.25, CONTENT_WIDTH * 0.25, CONTENT_WIDTH * 0.25];
-      let mY = drawTableHeader(["Mês", "Receitas", "Despesas", "Saldo"], mColW, doc.y, "#F59E0B");
-
-      monthlyData.forEach((m, idx) => {
-        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
-        let mx = MARGIN;
-        const rowData = [
-          m.label,
-          formatBRL(m.income / 100),
-          formatBRL(m.expense / 100),
-          `${m.saldo >= 0 ? "+" : ""}${formatBRL(m.saldo / 100)}`,
-        ];
-        const colors = ["#1E293B", "#16A34A", "#DC2626", m.saldo >= 0 ? "#3B82F6" : "#F59E0B"];
-
-        rowData.forEach((cell, ci) => {
-          doc.rect(mx, mY, mColW[ci], 16).fillAndStroke(bg, "#F1F5F9");
-          doc.fontSize(8).font(ci === 0 ? "Helvetica-Bold" : "Helvetica").fillColor(colors[ci])
-            .text(cell, mx + 4, mY + 4, { width: mColW[ci] - 8, align: ci === 0 ? "left" : "right" });
-          mx += mColW[ci];
-        });
-        mY += 16;
-      });
-
-      // Total
-      let mx = MARGIN;
-      const totalRow = ["TOTAL", formatBRL(totalIncome / 100), formatBRL(totalExpense / 100), `${saldoLiquido >= 0 ? "+" : ""}${formatBRL(saldoLiquido / 100)}`];
-      const totalColors = ["#1E293B", "#16A34A", "#DC2626", saldoLiquido >= 0 ? "#3B82F6" : "#F59E0B"];
-      totalRow.forEach((cell, ci) => {
-        doc.rect(mx, mY, mColW[ci], 20).fillAndStroke("#F8FAFC", "#E2E8F0");
-        doc.fontSize(9).font("Helvetica-Bold").fillColor(totalColors[ci])
-          .text(cell, mx + 4, mY + 6, { width: mColW[ci] - 8, align: ci === 0 ? "left" : "right" });
-        mx += mColW[ci];
-      });
-
-      doc.y = mY + 30;
-    }
-
-    // ===== TABELA DE RECEITAS =====
-    if (incomes.length > 0) {
-      ensureSpace(60);
-      doc.fontSize(13).font("Helvetica-Bold").fillColor("#16A34A").text(`Receitas (${incomes.length})`);
-      doc.moveDown(0.3);
-
-      const rColW = [60, 180, 80, 80, 50, 65];
-      let rY = drawTableHeader(["Vencimento", "Descrição", "Categoria", "Valor", "Status", "Conta"], rColW, doc.y, "#16A34A");
-
-      incomes.forEach((t, idx) => {
-        if (rY > PAGE_HEIGHT - 60) {
-          addFooter();
-          doc.addPage();
-          rY = MARGIN;
-          rY = drawTableHeader(["Vencimento", "Descrição", "Categoria", "Valor", "Status", "Conta"], rColW, rY, "#16A34A");
-        }
-        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
-        let rx = MARGIN;
-        const rowData = [
-          t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy") : "",
-          (t.description || "").substring(0, 35),
-          (t.categoryName || "Sem cat.").substring(0, 15),
-          "+" + formatBRL(t.amount / 100),
-          statusLabel(t.status),
-          (t.bankAccountName || "").substring(0, 12),
-        ];
-        rowData.forEach((cell, ci) => {
-          doc.rect(rx, rY, rColW[ci], 16).fillAndStroke(bg, "#F1F5F9");
-          const color = ci === 3 ? "#16A34A" : "#1E293B";
-          doc.fontSize(7).font(ci === 3 ? "Helvetica-Bold" : "Helvetica").fillColor(color)
-            .text(cell, rx + 3, rY + 4, { width: rColW[ci] - 6 });
-          rx += rColW[ci];
-        });
-        rY += 16;
-      });
-
-      // Total receitas
-      let rx = MARGIN;
-      doc.rect(rx, rY, rColW[0] + rColW[1] + rColW[2], 20).fillAndStroke("#F0FDF4", "#BBF7D0");
-      doc.fontSize(9).font("Helvetica-Bold").fillColor("#16A34A").text("TOTAL RECEITAS", rx + 4, rY + 6);
-      rx += rColW[0] + rColW[1] + rColW[2];
-      doc.rect(rx, rY, rColW[3], 20).fillAndStroke("#F0FDF4", "#BBF7D0");
-      doc.fontSize(9).font("Helvetica-Bold").fillColor("#16A34A").text(formatBRL(totalIncome / 100), rx + 3, rY + 6, { width: rColW[3] - 6 });
-      rx += rColW[3];
-      doc.rect(rx, rY, rColW[4] + rColW[5], 20).fillAndStroke("#F0FDF4", "#BBF7D0");
-
-      doc.y = rY + 30;
-    }
-
-    // ===== TABELA DE DESPESAS =====
-    if (expenses.length > 0) {
-      ensureSpace(60);
-      doc.fontSize(13).font("Helvetica-Bold").fillColor("#DC2626").text(`Despesas (${expenses.length})`);
-      doc.moveDown(0.3);
-
-      const eColW = [60, 180, 80, 80, 50, 65];
-      let eY = drawTableHeader(["Vencimento", "Descrição", "Categoria", "Valor", "Status", "Conta"], eColW, doc.y, "#DC2626");
-
-      expenses.forEach((t, idx) => {
-        if (eY > PAGE_HEIGHT - 60) {
-          addFooter();
-          doc.addPage();
-          eY = MARGIN;
-          eY = drawTableHeader(["Vencimento", "Descrição", "Categoria", "Valor", "Status", "Conta"], eColW, eY, "#DC2626");
-        }
-        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB";
-        let ex = MARGIN;
-        const rowData = [
-          t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy") : "",
-          (t.description || "").substring(0, 35),
-          (t.categoryName || "Sem cat.").substring(0, 15),
-          "-" + formatBRL(t.amount / 100),
-          statusLabel(t.status),
-          (t.bankAccountName || "").substring(0, 12),
-        ];
-        rowData.forEach((cell, ci) => {
-          doc.rect(ex, eY, eColW[ci], 16).fillAndStroke(bg, "#F1F5F9");
-          const color = ci === 3 ? "#DC2626" : "#1E293B";
-          doc.fontSize(7).font(ci === 3 ? "Helvetica-Bold" : "Helvetica").fillColor(color)
-            .text(cell, ex + 3, eY + 4, { width: eColW[ci] - 6 });
-          ex += eColW[ci];
-        });
-        eY += 16;
-      });
-
-      // Total despesas
-      let ex = MARGIN;
-      doc.rect(ex, eY, eColW[0] + eColW[1] + eColW[2], 20).fillAndStroke("#FEF2F2", "#FECACA");
-      doc.fontSize(9).font("Helvetica-Bold").fillColor("#DC2626").text("TOTAL DESPESAS", ex + 4, eY + 6);
-      ex += eColW[0] + eColW[1] + eColW[2];
-      doc.rect(ex, eY, eColW[3], 20).fillAndStroke("#FEF2F2", "#FECACA");
-      doc.fontSize(9).font("Helvetica-Bold").fillColor("#DC2626").text(formatBRL(totalExpense / 100), ex + 3, eY + 6, { width: eColW[3] - 6 });
-      ex += eColW[3];
-      doc.rect(ex, eY, eColW[4] + eColW[5], 20).fillAndStroke("#FEF2F2", "#FECACA");
-
-      doc.y = eY + 30;
-    }
-
-    // ===== GRÁFICO DE PIZZA (Distribuição por Categoria) =====
-    if (data.categoryData && data.categoryData.length > 0) {
-      ensureSpace(200);
-      doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B").text("Distribuição de Despesas por Categoria");
-      doc.moveDown(1);
-
-      const pieX = MARGIN + 100;
-      const pieY = doc.y + 70;
-      const pieRadius = 65;
-      const total = data.categoryData.reduce((sum: number, cat: any) => sum + cat.value, 0);
-      let startAngle = -Math.PI / 2;
-      const COLORS = ["#6B7280", "#EF4444", "#10B981", "#06B6D4", "#F59E0B", "#8B5CF6", "#EC4899", "#14B8A6"];
-
-      data.categoryData.forEach((cat: any, index: number) => {
-        const sliceAngle = (cat.value / total) * 2 * Math.PI;
-        const endAngle = startAngle + sliceAngle;
-        doc.save();
-        doc.moveTo(pieX, pieY)
-          .lineTo(pieX + pieRadius * Math.cos(startAngle), pieY + pieRadius * Math.sin(startAngle))
-          .arc(pieX, pieY, pieRadius, startAngle, endAngle)
-          .lineTo(pieX, pieY)
-          .fillAndStroke(COLORS[index % COLORS.length], "#FFFFFF");
-        doc.restore();
-        startAngle = endAngle;
-      });
-
-      // Legenda
-      let legendY = pieY - 60;
-      const legendX = MARGIN + 250;
-      data.categoryData.forEach((cat: any, index: number) => {
-        doc.rect(legendX, legendY, 10, 10).fillAndStroke(COLORS[index % COLORS.length], COLORS[index % COLORS.length]);
-        const percentage = ((cat.value / total) * 100).toFixed(0);
-        doc.fontSize(8).font("Helvetica").fillColor("#1E293B")
-          .text(`${cat.name} (${percentage}%)`, legendX + 15, legendY + 1);
-        legendY += 16;
-      });
-
-      doc.y = pieY + pieRadius + 20;
-    }
+    // Resultado
+    y = checkSpace(DRE_ROW_H + 4);
+    const resultBg = saldoLiquido >= 0 ? "#EFF6FF" : "#FFFBEB";
+    const resultColor = saldoLiquido >= 0 ? "#2563EB" : "#F59E0B";
+    doc.rect(MARGIN, y, CONTENT_WIDTH, DRE_ROW_H + 4).fillAndStroke(resultBg, resultColor);
+    doc.rect(MARGIN, y, CONTENT_WIDTH, 3).fill(resultColor);
+    doc.fontSize(11).font("Helvetica-Bold").fillColor(resultColor)
+      .text("= RESULTADO LÍQUIDO DO PERÍODO", MARGIN + 8, y + 8, { width: DRE_COL1 - 16 });
+    doc.fontSize(11).font("Helvetica-Bold").fillColor(resultColor)
+      .text(`${saldoLiquido >= 0 ? "+" : ""}${formatBRL(saldoLiquido / 100)}`, MARGIN + DRE_COL1 + 8, y + 8, { width: DRE_COL2 - 16, align: "right" });
+    y += DRE_ROW_H + 4;
 
     // ===== RODAPÉ FINAL =====
     addFooter();
@@ -604,7 +532,6 @@ export function generateTransactionsPDF(data: {
     doc.end();
   });
 }
-
 // ========== ATTACHMENTS ZIP EXPORT ==========
 
 import archiver from "archiver";
