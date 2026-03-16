@@ -329,9 +329,9 @@ export function registerPasswordAuthRoutes(app: Express) {
       console.log("[Password Auth] Change password request received");
       const { currentPassword, newPassword } = req.body;
 
-      if (!currentPassword || !newPassword) {
-        console.log("[Password Auth] Missing passwords");
-        res.status(400).json({ error: "Senha atual e nova senha sao obrigatorias" });
+      if (!newPassword) {
+        console.log("[Password Auth] Missing new password");
+        res.status(400).json({ error: "Nova senha e obrigatoria" });
         return;
       }
 

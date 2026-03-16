@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -606,24 +608,53 @@ export function Reports() {
       </html>
     `;
 
-    // Usar iframe oculto para evitar bloqueio de popup
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.top = '-10000px';
-    iframe.style.left = '-10000px';
-    iframe.style.width = '1100px';
-    iframe.style.height = '900px';
-    document.body.appendChild(iframe);
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (iframeDoc) {
-      iframeDoc.open();
-      iframeDoc.write(htmlContent);
-      iframeDoc.close();
-      setTimeout(() => {
-        iframe.contentWindow?.print();
-        setTimeout(() => document.body.removeChild(iframe), 1000);
-      }, 600);
-    }
+    // Criar container temporário oculto para renderizar o HTML
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '-20000px';
+    container.style.left = '0';
+    container.style.width = '900px';
+    container.style.background = '#fff';
+    container.innerHTML = htmlContent;
+    document.body.appendChild(container);
+
+    // Encontrar o elemento .page dentro do container
+    const pageEl = container.querySelector('.page') as HTMLElement || container;
+
+    html2canvas(pageEl, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      width: 900,
+      windowWidth: 900,
+    }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Primeira página
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Páginas adicionais se necessário
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`relatorio-financeiro-${startDate}-a-${endDate}.pdf`);
+      document.body.removeChild(container);
+    }).catch((err) => {
+      console.error('Erro ao gerar PDF:', err);
+      document.body.removeChild(container);
+      toast.error('Erro ao gerar PDF. Tente novamente.');
+    });
   };
 
   const exportToExcel = () => {
