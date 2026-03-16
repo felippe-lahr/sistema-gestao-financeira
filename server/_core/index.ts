@@ -82,6 +82,11 @@ async function startServer() {
   // 2.5. Cookie Parser - Parse cookies from requests
   app.use(cookieParser());
 
+  // 2.55. Body Parser - DEVE vir antes dos rate limiters e rotas para que req.body esteja disponível
+  // IMPORTANTE: se o body parser vier depois das rotas, req.body será undefined nas rotas de auth
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
   // 2.6. Trust proxy - necessário para Railway (reverse proxy)
   // Sem isso, o rate limiter vê o IP do proxy e bloqueia todos os usuários juntos
   app.set('trust proxy', 1);
@@ -118,10 +123,6 @@ async function startServer() {
   app.use('/api/auth/register', registerLimiter);
   app.use('/api/auth/verify-email', registerLimiter);
   app.use('/api/auth/resend-verification', registerLimiter);
-
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // ========== ROUTES ==========
   
