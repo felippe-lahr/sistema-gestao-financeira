@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,12 @@ export default function Transactions() {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   
+  // Estados para edição inline do nome da transação
+  const [editingDescriptionId, setEditingDescriptionId] = useState<number | null>(null);
+  const [editingDescriptionValue, setEditingDescriptionValue] = useState("");
+  const [savingDescriptionId, setSavingDescriptionId] = useState<number | null>(null);
+  const inlineInputRef = useRef<HTMLInputElement>(null);
+
   // Estados para categorização rápida inline
   const [quickCategoryTx, setQuickCategoryTx] = useState<any>(null);
   const [quickCategoryDrawerOpen, setQuickCategoryDrawerOpen] = useState(false);
@@ -554,6 +560,30 @@ export default function Transactions() {
       toast.success("Categoria atualizada!");
     } catch (error: any) {
       toast.error(error.message || "Erro ao atualizar categoria");
+    }
+  };
+
+  // Função para salvar a descrição editada inline
+  const handleSaveInlineDescription = async (transactionId: number) => {
+    const newDescription = editingDescriptionValue.trim();
+    if (!newDescription) {
+      setEditingDescriptionId(null);
+      return;
+    }
+    setSavingDescriptionId(transactionId);
+    try {
+      await utils.client.transactions.update.mutate({
+        id: transactionId,
+        description: newDescription,
+      });
+      utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
+      toast.success("Descrição atualizada!");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao atualizar descrição");
+    } finally {
+      setSavingDescriptionId(null);
+      setEditingDescriptionId(null);
     }
   };
 
@@ -1413,7 +1443,34 @@ export default function Transactions() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{transaction.description}</h3>
+                            {/* Edição inline da descrição - clique para editar */}
+                            {editingDescriptionId === transaction.id && canWrite ? (
+                              <input
+                                ref={inlineInputRef}
+                                type="text"
+                                value={editingDescriptionValue}
+                                onChange={(e) => setEditingDescriptionValue(e.target.value)}
+                                onBlur={() => handleSaveInlineDescription(transaction.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') { e.preventDefault(); handleSaveInlineDescription(transaction.id); }
+                                  if (e.key === 'Escape') { setEditingDescriptionId(null); }
+                                }}
+                                disabled={savingDescriptionId === transaction.id}
+                                className="font-semibold text-sm bg-transparent border-b-2 border-primary outline-none min-w-[120px] max-w-[300px] px-0 py-0.5"
+                                autoFocus
+                              />
+                            ) : (
+                              <h3
+                                className={`font-semibold ${canWrite ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+                                title={canWrite ? 'Clique para editar o nome' : undefined}
+                                onClick={() => {
+                                  if (!canWrite) return;
+                                  setEditingDescriptionId(transaction.id);
+                                  setEditingDescriptionValue(transaction.description);
+                                  setTimeout(() => inlineInputRef.current?.focus(), 50);
+                                }}
+                              >{transaction.description}</h3>
+                            )}
                             {transaction.attachmentCount > 0 && (
                               <Paperclip className="h-4 w-4 text-muted-foreground" />
                             )}
@@ -1498,7 +1555,31 @@ export default function Transactions() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-base">{transaction.description}</h3>
+                              {/* Edição inline mobile */}
+                              {editingDescriptionId === transaction.id && canWrite ? (
+                                <input
+                                  type="text"
+                                  value={editingDescriptionValue}
+                                  onChange={(e) => setEditingDescriptionValue(e.target.value)}
+                                  onBlur={() => handleSaveInlineDescription(transaction.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') { e.preventDefault(); handleSaveInlineDescription(transaction.id); }
+                                    if (e.key === 'Escape') { setEditingDescriptionId(null); }
+                                  }}
+                                  disabled={savingDescriptionId === transaction.id}
+                                  className="font-semibold text-base bg-transparent border-b-2 border-primary outline-none min-w-[100px] w-full px-0 py-0.5"
+                                  autoFocus
+                                />
+                              ) : (
+                                <h3
+                                  className={`font-semibold text-base ${canWrite ? 'cursor-pointer active:text-primary' : ''}`}
+                                  onClick={() => {
+                                    if (!canWrite) return;
+                                    setEditingDescriptionId(transaction.id);
+                                    setEditingDescriptionValue(transaction.description);
+                                  }}
+                                >{transaction.description}</h3>
+                              )}
                               {transaction.attachmentCount > 0 && (
                                 <Paperclip className="h-4 w-4 text-muted-foreground" />
                               )}
