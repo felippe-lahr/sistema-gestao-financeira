@@ -48,114 +48,128 @@ export function OnboardingTour() {
   const startTour = () => {
     setStarted(true);
 
-    const popoverConfig = {
-      className: "onboarding-popover",
-      nextBtnText: "Próximo →",
-      prevBtnText: "← Anterior",
-      doneBtnText: "Começar agora! 🚀",
-    };
+    // No mobile, não tentamos destacar elementos do menu (sidebar fica oculta)
+    const el = (selector: string) => (isMobile ? undefined : selector);
 
     const steps = [
-      // Passo 1 — Boas-vindas (modal central, sem elemento destacado)
+      // Passo 1 — Boas-vindas (modal central)
       {
         popover: {
-          ...popoverConfig,
           title: "👋 Bem-vindo ao UnifiquePro!",
           description: `
             <div style="text-align:center; padding: 4px 0;">
-              <p style="font-size:15px; color:#555; margin-bottom:12px;">
+              <p style="font-size:15px; margin-bottom:12px;">
                 Vamos te mostrar como organizar suas finanças em menos de 1 minuto.
               </p>
-              <p style="font-size:13px; color:#888;">
+              <p style="font-size:13px; opacity:0.7;">
                 Use os botões abaixo para navegar pelo tour, ou pressione <strong>ESC</strong> para pular.
               </p>
             </div>
           `,
         },
       },
-      // Passo 2 — Entidades
+      // Passo 2 — Início / Dashboard Geral
       {
-        element: isMobile ? undefined : "[data-tour='nav-entities']",
+        element: el("[data-tour='nav-home']"),
         popover: {
-          ...popoverConfig,
+          title: "🏠 Início — Dashboard Geral",
+          description: `
+            <p>O <strong>Dashboard Geral</strong> exibe uma visão consolidada de todas as suas entidades — receitas, despesas, saldo e indicadores financeiros em um só lugar.</p>
+            <p style="margin-top:8px; font-size:13px; opacity:0.7;">Cada entidade também tem seu próprio dashboard com dados específicos.</p>
+          `,
+          side: isMobile ? "bottom" : "right",
+          align: "start",
+        },
+      },
+      // Passo 3 — Entidades
+      {
+        element: el("[data-tour='nav-entities']"),
+        popover: {
           title: "🏢 Entidades",
           description: `
             <p>Cada <strong>Entidade</strong> é um centro de custo independente — pode ser uma empresa, fazenda, projeto ou qualquer unidade financeira.</p>
-            <p style="margin-top:8px; font-size:13px; color:#888;">Comece criando sua primeira entidade para organizar receitas e despesas separadamente.</p>
+            <p style="margin-top:8px; font-size:13px; opacity:0.7;">Comece criando sua primeira entidade para organizar receitas e despesas separadamente.</p>
           `,
           side: isMobile ? "bottom" : "right",
           align: "start",
         },
       },
-      // Passo 3 — Transações
+      // Passo 4 — Transações
       {
-        element: isMobile ? undefined : "[data-tour='nav-transactions']",
+        element: el("[data-tour='nav-transactions']"),
         popover: {
-          ...popoverConfig,
           title: "💰 Transações",
           description: `
-            <p>Registre <strong>receitas</strong> e <strong>despesas</strong> de forma simples. Você também pode importar extratos bancários no formato OFX.</p>
-            <p style="margin-top:8px; font-size:13px; color:#888;">Cada transação pode ter categoria, conta bancária, meio de pagamento e anexos.</p>
+            <p>Registre <strong>receitas</strong> e <strong>despesas</strong> de forma simples. Categorize, adicione anexos e acompanhe o status de cada lançamento.</p>
+            <p style="margin-top:8px; font-size:13px; opacity:0.7;">Cada transação pode ter categoria, conta bancária, meio de pagamento e documentos anexados.</p>
           `,
           side: isMobile ? "bottom" : "right",
           align: "start",
         },
       },
-      // Passo 4 — Agenda
+      // Passo 5 — Contas Bancárias
       {
-        element: isMobile ? undefined : "[data-tour='nav-agenda']",
+        element: el("[data-tour='nav-bank-accounts']"),
         popover: {
-          ...popoverConfig,
-          title: "📅 Agenda Financeira",
+          title: "🏦 Contas Bancárias",
           description: `
-            <p>Acompanhe os <strong>vencimentos</strong> e pagamentos programados em uma agenda visual.</p>
-            <p style="margin-top:8px; font-size:13px; color:#888;">Nunca mais perca um prazo de pagamento ou recebimento.</p>
+            <p>Gerencie suas <strong>contas bancárias</strong> e importe extratos no formato <strong>OFX</strong> diretamente do seu banco.</p>
+            <p style="margin-top:8px; font-size:13px; opacity:0.7;">A importação OFX categoriza automaticamente as transações, economizando tempo no lançamento manual.</p>
           `,
           side: isMobile ? "bottom" : "right",
           align: "start",
         },
       },
-      // Passo 5 — Relatórios (apenas desktop, pois é acessado pelo dashboard de entidade)
+      // Passo 6 — Agenda
+      {
+        element: el("[data-tour='nav-agenda']"),
+        popover: {
+          title: "📅 Agenda",
+          description: `
+            <p>A <strong>Agenda</strong> é sua central de compromissos financeiros e pessoais. Acompanhe vencimentos, pagamentos programados e eventos.</p>
+            <p style="margin-top:8px; font-size:13px; opacity:0.7;">Sincronize com o <strong>Google Agenda</strong> para ter todos os seus compromissos em um só lugar.</p>
+          `,
+          side: isMobile ? "bottom" : "right",
+          align: "start",
+        },
+      },
+      // Passo 7 — Relatórios PDF
       {
         popover: {
-          ...popoverConfig,
           title: "📊 Relatórios PDF",
           description: `
-            <p>Gere <strong>relatórios financeiros completos</strong> em PDF com um clique — incluindo análise por categoria, evolução mensal e DRE.</p>
-            <p style="margin-top:8px; font-size:13px; color:#888;">Acesse os relatórios pelo painel de cada entidade.</p>
+            <p>Gere <strong>relatórios financeiros completos</strong> em PDF com um clique — incluindo análise por categoria, evolução mensal e DRE (Demonstração do Resultado do Exercício).</p>
+            <p style="margin-top:8px; font-size:13px; opacity:0.7;">Acesse os relatórios pelo painel de cada entidade.</p>
           `,
         },
       },
-      // Passo 6 — Configurações / Perfil
+      // Passo 8 — Perfil / Configurações
       {
-        element: isMobile ? undefined : "[data-tour='user-menu']",
+        element: el("[data-tour='user-menu']"),
         popover: {
-          ...popoverConfig,
           title: "⚙️ Seu Perfil",
           description: `
             <p>Acesse seu <strong>perfil</strong> para configurar nome, senha e preferências da conta.</p>
-            <p style="margin-top:8px; font-size:13px; color:#888;">Você também pode retomar este tour a qualquer momento nas configurações.</p>
+            <p style="margin-top:8px; font-size:13px; opacity:0.7;">Você também pode retomar este tour a qualquer momento em <strong>Meu Perfil → Tour de Introdução</strong>.</p>
           `,
           side: "top",
           align: "end",
         },
       },
-      // Passo 7 — Conclusão
+      // Passo 9 — Conclusão
       {
         popover: {
-          ...popoverConfig,
           title: "🎉 Tudo pronto!",
           description: `
             <div style="text-align:center; padding: 4px 0;">
-              <p style="font-size:15px; color:#555; margin-bottom:12px;">
+              <p style="font-size:15px; margin-bottom:12px;">
                 Você está pronto para começar a usar o <strong>UnifiquePro</strong>!
               </p>
-              <p style="font-size:13px; color:#888;">
+              <p style="font-size:13px; opacity:0.7;">
                 Crie sua primeira entidade e comece a registrar suas finanças agora mesmo.
               </p>
             </div>
           `,
-          doneBtnText: "Criar minha primeira entidade 🚀",
         },
       },
     ];
@@ -211,9 +225,9 @@ export function RestartOnboardingButton() {
     <button
       onClick={handleRestart}
       disabled={resetOnboarding.isPending}
-      className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
     >
-      {resetOnboarding.isPending ? "Aguarde..." : "Ver tour de introdução"}
+      {resetOnboarding.isPending ? "Aguarde..." : "▶ Ver tour de introdução"}
     </button>
   );
 }
