@@ -2468,3 +2468,51 @@ export async function getOrganizationByStripeCustomer(
 
   return result.length > 0 ? result[0] : null;
 }
+
+/**
+ * Garante que a coluna onboardingCompleted existe na tabela users.
+ * Migração segura: usa ADD COLUMN IF NOT EXISTS.
+ */
+export async function ensureOnboardingColumn(): Promise<void> {
+  try {
+    const { ENV } = await import("./_core/env");
+    const { default: postgres } = await import("postgres");
+    const client = postgres(ENV.databaseUrl, { max: 1 });
+    await client`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "onboardingCompleted" boolean NOT NULL DEFAULT false;
+    `;
+    await client.end();
+    console.log('[db] onboardingCompleted column ensured');
+  } catch (err: any) {
+    console.warn('[db] Could not ensure onboardingCompleted column:', err?.message);
+  }
+}
+
+/**
+ * Reseta o onboarding para um usuário (permite rever o tour).
+ */
+export async function resetOnboarding(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`UPDATE users SET "onboardingCompleted" = false, "updatedAt" = NOW() WHERE id = ${userId}`);
+}
+
+/**
+ * Marca o onboarding como concluído para um usuário.
+ */
+export async function completeOnboarding(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`UPDATE users SET "onboardingCompleted" = true, "updatedAt" = NOW() WHERE id = ${userId}`);
+}
+
+/**
+ * Retorna se o onboarding foi concluído para um usuário.
+ */
+export async function getOnboardingStatus(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.execute(sql`SELECT "onboardingCompleted" FROM users WHERE id = ${userId} LIMIT 1`);
+  const rows = result.rows as any[];
+  return rows.length > 0 ? Boolean(rows[0].onboardingCompleted) : false;
+}

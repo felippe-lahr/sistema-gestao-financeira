@@ -30,6 +30,7 @@ export const users = pgTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   googleCalendarRefreshToken: text("googleCalendarRefreshToken"), // Token para sync com Google Calendar
   googleCalendarConnectedAt: timestamp("googleCalendarConnectedAt"), // Quando conectou
+  onboardingCompleted: boolean("onboardingCompleted").default(false).notNull(), // Tour de onboarding concluído
 });
 
 export type User = typeof users.$inferSelect;

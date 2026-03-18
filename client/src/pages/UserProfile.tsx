@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { User, Lock, Mail, Eye, EyeOff, KeyRound } from "lucide-react";
+import { User, Lock, Mail, Eye, EyeOff, KeyRound, PlayCircle } from "lucide-react";
+import { RestartOnboardingButton } from "@/components/OnboardingTour";
 
 export default function UserProfile() {
   const { user } = useAuth();
@@ -234,6 +235,20 @@ export default function UserProfile() {
                 {hasPassword ? "Alterar Senha" : "Definir Senha"}
               </Button>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Tour de Onboarding */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PlayCircle className="h-5 w-5" />
+              Tour de Introdução
+            </CardTitle>
+            <CardDescription>Reveja o tour guiado de boas-vindas da plataforma.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RestartOnboardingButton />
           </CardContent>
         </Card>
       </div>

@@ -291,4 +291,69 @@
     filter: invert(1) brightness(2);
     cursor: pointer;
   }
+
+  /* ===== Driver.js Onboarding Tour Styles ===== */
+  .driver-popover.onboarding-popover-wrapper {
+    border-radius: 12px !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+    max-width: 340px !important;
+    font-family: inherit !important;
+    padding: 20px !important;
+  }
+
+  .driver-popover-title {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    margin-bottom: 10px !important;
+  }
+
+  .driver-popover-description {
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+  }
+
+  .driver-popover-footer {
+    margin-top: 16px !important;
+    gap: 8px !important;
+  }
+
+  .driver-popover-next-btn {
+    background: #2563eb !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    border: none !important;
+    cursor: pointer !important;
+    transition: background 0.2s !important;
+  }
+
+  .driver-popover-next-btn:hover {
+    background: #1d4ed8 !important;
+  }
+
+  .driver-popover-prev-btn {
+    background: transparent !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+  }
+
+  .driver-popover-close-btn {
+    font-size: 18px !important;
+  }
+
+  .driver-popover-progress-text {
+    font-size: 12px !important;
+  }
+
+  /* Mobile adjustments for driver.js */
+  @media (max-width: 640px) {
+    .driver-popover.onboarding-popover-wrapper {
+      max-width: calc(100vw - 32px) !important;
+    }
+  }
 }

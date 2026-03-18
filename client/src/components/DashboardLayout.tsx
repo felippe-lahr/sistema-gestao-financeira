@@ -31,6 +31,7 @@ import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { OnboardingTour } from './OnboardingTour';
 
 // Componente de Login
 function LoginForm() {
@@ -497,6 +498,15 @@ function DashboardLayoutContent({
             <SidebarMenu className="px-2 py-1 flex-1">
               {menuItems.map(item => {
                 const isActive = location === item.path;
+                // Mapear path para data-tour id
+                const tourId = {
+                  '/': 'nav-home',
+                  '/entities': 'nav-entities',
+                  '/transactions': 'nav-transactions',
+                  '/bank-accounts': 'nav-bank-accounts',
+                  '/agenda': 'nav-agenda',
+                  '/settings': 'nav-settings',
+                }[item.path];
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
@@ -504,6 +514,7 @@ function DashboardLayoutContent({
                       onClick={() => setLocation(item.path)}
                       tooltip={item.label}
                       className={`h-10 transition-all font-normal`}
+                      data-tour={tourId}
                     >
                       <item.icon
                         className={`h-5 w-5 ${isActive ? "text-primary" : ""}`}
@@ -552,7 +563,7 @@ function DashboardLayoutContent({
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <button data-tour="user-menu" className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <Avatar className="h-9 w-9 border dark:border-gray-700 shrink-0">
                     <AvatarFallback className="text-xs font-medium">
                       {user?.name?.charAt(0).toUpperCase()}
@@ -615,6 +626,7 @@ function DashboardLayoutContent({
         )}
         <main className="flex-1 p-4">{children}</main>
       </SidebarInset>
+      <OnboardingTour />
     </>
   );
 }

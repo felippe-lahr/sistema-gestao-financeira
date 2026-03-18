@@ -25,6 +25,19 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+    // Onboarding
+    completeOnboarding: protectedProcedure.mutation(async ({ ctx }) => {
+      await db.completeOnboarding(ctx.user.id);
+      return { success: true };
+    }),
+    resetOnboarding: protectedProcedure.mutation(async ({ ctx }) => {
+      await db.resetOnboarding(ctx.user.id);
+      return { success: true };
+    }),
+    getOnboardingStatus: protectedProcedure.query(async ({ ctx }) => {
+      const completed = await db.getOnboardingStatus(ctx.user.id);
+      return { completed };
+    }),
   }),
 
   // ========== ENTITIES ==========

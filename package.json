@@ -67,6 +67,7 @@
     "csv-parse": "^6.1.0",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.2",
+    "driver.js": "^1.4.0",
     "drizzle-orm": "^0.44.6",
     "embla-carousel-react": "^8.6.0",
     "exceljs": "^4.4.0",
