@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { trpc } from "@/lib/trpc";
@@ -19,17 +19,21 @@ function iconTitle(icon: string, label: string) {
   return `<span style="display:inline-flex;align-items:center;gap:8px;color:#2563eb">${icon}<span>${label}</span></span>`;
 }
 
+// Chave usada no sessionStorage para controlar se o tour já foi exibido nesta sessão
+const SESSION_KEY = "onboarding_tour_shown";
+
 /**
  * OnboardingTour — Tour interativo de boas-vindas para novos usuários.
  * Usa driver.js para destacar elementos da interface com overlay e tooltips.
- * O tour só aparece uma vez por conta (controlado pelo campo onboardingCompleted no banco).
+ * O tour só aparece UMA VEZ por sessão (sessionStorage) e nunca mais se o
+ * usuário optou por "Não mostrar novamente" (flag no banco de dados).
  * Funciona em desktop e mobile (layout adaptado).
  */
 export function OnboardingTour() {
   const isMobile = useIsMobile();
   const driverRef = useRef<ReturnType<typeof driver> | null>(null);
-  const [started, setStarted] = useState(false);
-
+  // started é persistido no módulo (fora do componente) para sobreviver a remontagens
+  const startedRef = useRef(false);
   const { data: onboardingStatus, isLoading } = trpc.auth.getOnboardingStatus.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
@@ -40,27 +44,35 @@ export function OnboardingTour() {
 
   const markComplete = async () => {
     try {
+      // Marca no sessionStorage para não mostrar mais nesta sessão
+      sessionStorage.setItem(SESSION_KEY, "1");
       await completeOnboarding.mutateAsync();
       utils.auth.getOnboardingStatus.invalidate();
     } catch {
-      // silencioso
+      sessionStorage.setItem(SESSION_KEY, "1");
     }
   };
 
   useEffect(() => {
     if (isLoading) return;
+    // Se o banco diz que já completou, nunca mostrar
     if (onboardingStatus?.completed) return;
-    if (started) return;
+    // Se já foi mostrado nesta sessão (sessionStorage), não mostrar de novo
+    if (sessionStorage.getItem(SESSION_KEY)) return;
+    // Se já iniciou neste ciclo de vida do componente, não mostrar de novo
+    if (startedRef.current) return;
 
     const timer = setTimeout(() => {
       startTour();
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [isLoading, onboardingStatus, started]);
+  }, [isLoading, onboardingStatus]);
 
   const startTour = () => {
-    setStarted(true);
+    startedRef.current = true;
+    // Marca no sessionStorage imediatamente para evitar reexibição ao navegar
+    sessionStorage.setItem(SESSION_KEY, "1");
 
     // No mobile, não tentamos destacar elementos do menu (sidebar fica oculta)
     const el = (selector: string) => (isMobile ? undefined : selector);
