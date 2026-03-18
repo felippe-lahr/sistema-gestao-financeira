@@ -173,7 +173,7 @@ export function OnboardingTour() {
       // Passo 9 — Conclusão
       {
         popover: {
-          title: "🎉 Tudo pronto!",
+          title: "<div style='text-align:center'>🎉 Tudo pronto!</div>",
           description: `
             <div style="text-align:center;padding:4px 0;">
               <p style="font-size:15px;margin-bottom:12px;">
@@ -190,7 +190,7 @@ export function OnboardingTour() {
               </button>
             </div>
           `,
-          doneBtnText: "Começar agora! 🚀",
+          doneBtnText: "Começar!",
         },
       },
     ];
@@ -206,7 +206,7 @@ export function OnboardingTour() {
       progressText: "Passo {{current}} de {{total}}",
       nextBtnText: "Próximo →",
       prevBtnText: "← Anterior",
-      doneBtnText: "Começar agora! 🚀",
+      doneBtnText: "Começar!",
       onDestroyStarted: () => {
         markComplete();
         driverInstance.destroy();
