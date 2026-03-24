@@ -562,6 +562,9 @@ export const appRouter = router({
           bankAccountId: z.number().optional(),
           paymentMethodId: z.number().optional(),
           notes: z.string().optional(),
+          isRecurring: z.boolean().optional(),
+          recurrenceCount: z.number().positive().optional(),
+          recurrenceFrequency: z.enum(["DAY", "WEEK", "MONTH", "YEAR"]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -585,6 +588,60 @@ export const appRouter = router({
 
         if (input.amount !== undefined) {
           updateData.amount = Math.round(input.amount * 100);
+        }
+
+        // Se marcou como recorrente e tem count/frequency, criar parcelas futuras
+        if (input.isRecurring && input.recurrenceCount && input.recurrenceFrequency && input.recurrenceCount > 1) {
+          // Atualizar a transação original como parent da recorrência
+          updateData.isRecurring = false;
+          updateData.parentTransactionId = input.id;
+          await db.updateTransaction(input.id, updateData);
+
+          const count = input.recurrenceCount;
+          const frequency = input.recurrenceFrequency;
+          const baseDate = input.dueDate || transaction.dueDate;
+          const baseDescription = input.description || transaction.description;
+          const baseAmount = input.amount !== undefined ? Math.round(input.amount * 100) : transaction.amount;
+          const baseType = input.type || transaction.type;
+
+          // Atualizar descrição da transação original com numeração
+          await db.updateTransaction(input.id, { description: `${baseDescription} (1/${count})` });
+
+          // Criar parcelas futuras (a partir de i=1, pois i=0 é a original)
+          for (let i = 1; i < count; i++) {
+            let newDueDate = new Date(baseDate);
+            switch (frequency) {
+              case "DAY":
+                newDueDate.setDate(newDueDate.getDate() + i);
+                break;
+              case "WEEK":
+                newDueDate.setDate(newDueDate.getDate() + (i * 7));
+                break;
+              case "MONTH":
+                newDueDate.setMonth(newDueDate.getMonth() + i);
+                break;
+              case "YEAR":
+                newDueDate.setFullYear(newDueDate.getFullYear() + i);
+                break;
+            }
+            await db.createTransaction({
+              entityId: transaction.entityId,
+              type: baseType,
+              description: `${baseDescription} (${i + 1}/${count})`,
+              amount: baseAmount,
+              dueDate: newDueDate,
+              paymentDate: undefined,
+              status: "PENDING",
+              categoryId: input.categoryId || transaction.categoryId,
+              bankAccountId: input.bankAccountId || transaction.bankAccountId,
+              paymentMethodId: input.paymentMethodId || transaction.paymentMethodId,
+              isRecurring: false,
+              recurrencePattern: null,
+              parentTransactionId: input.id,
+              notes: input.notes || transaction.notes,
+            });
+          }
+          return { success: true };
         }
 
         await db.updateTransaction(input.id, updateData);

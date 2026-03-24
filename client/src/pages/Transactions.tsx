@@ -543,6 +543,9 @@ export default function Transactions() {
       bankAccountId: formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined,
       paymentMethodId: formData.paymentMethodId ? parseInt(formData.paymentMethodId) : undefined,
       notes: formData.notes || undefined,
+      isRecurring: formData.isRecurring,
+      recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
+      recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
     });
   };
 
@@ -2132,14 +2135,12 @@ function TransactionForm({
         />
       </div>
 
-      {!isEdit && (
-        <div className="flex items-center space-x-2">
-          <Checkbox id="recurring" checked={formData.isRecurring} onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: checked as boolean })} />
-          <Label htmlFor="recurring" className="cursor-pointer">
-            Despesa recorrente
-          </Label>
-        </div>
-      )}
+      <div className="flex items-center space-x-2">
+        <Checkbox id="recurring" checked={formData.isRecurring} onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: checked as boolean })} />
+        <Label htmlFor="recurring" className="cursor-pointer">
+          Transação recorrente
+        </Label>
+      </div>
       
       <div className="flex items-center space-x-2">
         <Checkbox id="addToAgenda" checked={formData.addToAgenda} onCheckedChange={(checked) => setFormData({ ...formData, addToAgenda: checked as boolean })} />
@@ -2148,7 +2149,7 @@ function TransactionForm({
         </Label>
       </div>
 
-      {formData.isRecurring && !isEdit && (
+      {formData.isRecurring && (
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="space-y-2 flex-1">
