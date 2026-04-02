@@ -66,7 +66,18 @@ export function OnboardingTour() {
       startTour();
     }, 800);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Destruir driver.js ao desmontar para evitar erro removeChild
+      if (driverRef.current) {
+        try {
+          driverRef.current.destroy();
+        } catch {
+          // Ignorar erros ao destruir
+        }
+        driverRef.current = null;
+      }
+    };
   }, [isLoading, onboardingStatus]);
 
   const startTour = () => {
