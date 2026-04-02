@@ -57,6 +57,33 @@ function SheetContent({
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        onPointerDownOutside={(e) => {
+          // Prevenir fechamento quando o clique é em um portal (Select, Popover, DatePicker, etc.)
+          const target = e.target as HTMLElement;
+          if (
+            target?.closest?.("[data-radix-popper-content-wrapper]") ||
+            target?.closest?.("[data-radix-select-content]") ||
+            target?.closest?.("[role='listbox']") ||
+            target?.closest?.(".rdp") ||
+            target?.closest?.("[data-slot='popover-content']") ||
+            target?.closest?.("[data-slot='select-content']")
+          ) {
+            e.preventDefault();
+          }
+        }}
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (
+            target?.closest?.("[data-radix-popper-content-wrapper]") ||
+            target?.closest?.("[data-radix-select-content]") ||
+            target?.closest?.("[role='listbox']") ||
+            target?.closest?.(".rdp") ||
+            target?.closest?.("[data-slot='popover-content']") ||
+            target?.closest?.("[data-slot='select-content']")
+          ) {
+            e.preventDefault();
+          }
+        }}
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
           side === "right" &&
