@@ -40,12 +40,29 @@ export function registerGoogleAuthRoutes(app: Express) {
    * Inicia o fluxo OAuth com o Google.
    * Gera um state token aleatório, armazena em cookie HttpOnly e redireciona para o Google.
    */
+  // Rota de diagnóstico temporária para verificar configuração do OAuth
+  app.get("/api/auth/google/debug", (_req: Request, res: Response) => {
+    const redirectUri = `${ENV.appUrl}/api/auth/google/callback`;
+    res.json({
+      appUrl: ENV.appUrl,
+      redirectUri,
+      googleClientIdConfigured: !!ENV.googleClientId,
+      googleClientIdPrefix: ENV.googleClientId ? ENV.googleClientId.substring(0, 20) + "..." : "NOT SET",
+      googleClientSecretConfigured: !!ENV.googleClientSecret,
+    });
+  });
+
   app.get("/api/auth/google", (req: Request, res: Response) => {
     if (!ENV.googleClientId || !ENV.googleClientSecret) {
       console.error("[Google Auth] GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET não configurados");
       res.redirect("/?error=google_not_configured");
       return;
     }
+
+    const redirectUri = `${ENV.appUrl}/api/auth/google/callback`;
+    console.log("[Google Auth] APP_URL:", ENV.appUrl);
+    console.log("[Google Auth] Redirect URI:", redirectUri);
+    console.log("[Google Auth] Client ID prefix:", ENV.googleClientId.substring(0, 20));
 
     // Gerar state token aleatório para prevenir CSRF
     const state = randomBytes(32).toString("hex");
@@ -66,6 +83,7 @@ export function registerGoogleAuthRoutes(app: Express) {
       prompt: "select_account",
     });
 
+    console.log("[Google Auth] Auth URL gerada:", authUrl);
     console.log("[Google Auth] Redirecionando para Google OAuth");
     res.redirect(302, authUrl);
   });
