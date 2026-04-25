@@ -728,7 +728,9 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
           <button
             onClick={() => setShowInactive(!showInactive)}
             className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors ${
-              showInactive ? "bg-muted border-border" : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              showInactive
+                ? "bg-amber-50 border-amber-400 text-amber-700 dark:bg-amber-900/20 dark:border-amber-500 dark:text-amber-400"
+                : "bg-white border-border text-muted-foreground hover:text-foreground hover:border-gray-400 dark:bg-gray-800"
             }`}
           >
             <EyeOff className="h-3 w-3" />
