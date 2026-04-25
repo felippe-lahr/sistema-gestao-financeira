@@ -269,16 +269,18 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
 
       {/* Sheet de criação/edição */}
       <Sheet open={sheetOpen} onOpenChange={(o) => { setSheetOpen(o); if (!o) { setEditingCard(null); resetForm(); } }}>
-        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
-          <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-            <SheetTitle>{editingCard ? "Editar Cartão" : "Novo Cartão"}</SheetTitle>
-            <Button variant="ghost" size="icon" onClick={() => setSheetOpen(false)}>
-              <X className="h-4 w-4" />
-            </Button>
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+          {/* Header Fixo */}
+          <div className="sticky top-0 z-10 border-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
+            <SheetTitle className="text-2xl font-bold">{editingCard ? "Editar Cartão" : "Novo Cartão"}</SheetTitle>
+            <button onClick={() => setSheetOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* Conteúdo Scrollável */}
+            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
             {/* Preview do cartão */}
             <div
               className="h-36 rounded-2xl p-5 flex flex-col justify-between text-white shadow-lg"
@@ -382,10 +384,14 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             </div>
 
             </div>
-            <div className="px-6 py-4 border-t shrink-0">
+            {/* Footer Fixo */}
+            <div className="sticky bottom-0 z-10 border-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
+              <Button variant="outline" type="button" onClick={() => setSheetOpen(false)}>
+                Cancelar
+              </Button>
               <Button
                 type="submit"
-                className="w-full"
+                className="bg-blue-600 hover:bg-blue-700"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 {createMutation.isPending || updateMutation.isPending
