@@ -2464,9 +2464,8 @@ export const appRouter = router({
         const dbInstance = await getDb();
         if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const { creditCards } = await import("../drizzle/schema");
-        const org = await db.getOrganizationForUser(ctx.user.id);
         const [card] = await dbInstance.insert(creditCards).values({
-          organizationId: org?.id,
+          organizationId: null,
           userId: ctx.user.id,
           entityId: input.entityId,
           name: input.name,
