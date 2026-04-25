@@ -1992,19 +1992,12 @@ function TransactionForm({
 
       <div className="space-y-2">
         <Label htmlFor="category">Categoria</Label>
-        {/* Seletor em cascata: primeiro escolhe a categoria pai, depois a subcategoria */}
+        {/* Passo 1: seletor de categoria pai — sempre selecionável */}
         <Select
           value={selectedParentId?.toString() || ""}
           onValueChange={(v) => {
-            // Ao trocar a categoria pai, limpa a subcategoria
-            const subs = getSubcategories(parseInt(v));
-            if (subs.length === 0) {
-              // Sem subcategorias: seleciona diretamente a categoria pai
-              setFormData({ ...formData, categoryId: v });
-            } else {
-              // Com subcategorias: limpa a seleção até escolher subcategoria
-              setFormData({ ...formData, categoryId: "" });
-            }
+            // Seleciona a categoria pai como categoryId (válido imediatamente)
+            setFormData({ ...formData, categoryId: v });
           }}
         >
           <SelectTrigger>
@@ -2017,21 +2010,21 @@ function TransactionForm({
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || "#6B7280" }} />
                   {cat.name}
                   {getSubcategories(cat.id).length > 0 && (
-                    <span className="text-xs text-muted-foreground">({getSubcategories(cat.id).length})</span>
+                    <span className="text-xs text-muted-foreground ml-1">▾ {getSubcategories(cat.id).length} subcategorias</span>
                   )}
                 </div>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {/* Seletor de subcategoria — aparece apenas se a categoria pai tiver subcategorias */}
+        {/* Passo 2: seletor de subcategoria — aparece dinamicamente quando a categoria pai tem filhos */}
         {selectedParentId && getSubcategories(selectedParentId).length > 0 && (
           <Select
-            value={formData.categoryId}
+            value={(selectedCategory as any)?.parentId ? formData.categoryId : ""}
             onValueChange={(v) => setFormData({ ...formData, categoryId: v })}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Selecione uma subcategoria" />
+              <SelectValue placeholder="Refinar por subcategoria (opcional)" />
             </SelectTrigger>
             <SelectContent>
               {getSubcategories(selectedParentId).map((sub) => (
