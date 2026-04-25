@@ -638,9 +638,16 @@ export default function Transactions() {
       return false;
     }
 
-    // Category filter
-    if (filterCategoryId && filterCategoryId !== "all" && t.categoryId?.toString() !== filterCategoryId) {
-      return false;
+    // Category filter — inclui subcategorias quando filtra pela categoria pai
+    if (filterCategoryId && filterCategoryId !== "all") {
+      const filterId = parseInt(filterCategoryId);
+      const txCatId = t.categoryId;
+      if (!txCatId) return false;
+      // Verifica se a transação é da categoria selecionada OU de uma subcategoria dela
+      const txCategory = categories?.find((c) => c.id === txCatId);
+      const isDirectMatch = txCatId === filterId;
+      const isSubcategoryMatch = (txCategory as any)?.parentId === filterId;
+      if (!isDirectMatch && !isSubcategoryMatch) return false;
     }
 
     // Status filter
@@ -1039,11 +1046,28 @@ export default function Transactions() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
-                    {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id.toString()}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
+                    {categories?.filter((c) => !(c as any).parentId).map((parent) => {
+                      const subs = categories?.filter((c) => (c as any).parentId === parent.id) || [];
+                      return (
+                        <>
+                          <SelectItem key={parent.id} value={parent.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: parent.color || "#6B7280" }} />
+                              <span className="font-medium">{parent.name}</span>
+                              {subs.length > 0 && <span className="text-xs text-muted-foreground">(+ subcategorias)</span>}
+                            </div>
+                          </SelectItem>
+                          {subs.map((sub) => (
+                            <SelectItem key={sub.id} value={sub.id.toString()}>
+                              <div className="flex items-center gap-2 pl-3">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: sub.color || parent.color || "#6B7280" }} />
+                                <span className="text-muted-foreground">{sub.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -1184,16 +1208,33 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Categoria:</span>
           <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
-            <SelectTrigger className="w-[150px] bg-white dark:bg-gray-800">
+            <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
               <SelectValue placeholder="Todas" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {categories?.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id.toString()}>
-                  {cat.name}
-                </SelectItem>
-              ))}
+              {categories?.filter((c) => !(c as any).parentId).map((parent) => {
+                const subs = categories?.filter((c) => (c as any).parentId === parent.id) || [];
+                return (
+                  <>
+                    <SelectItem key={parent.id} value={parent.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: parent.color || "#6B7280" }} />
+                        <span className="font-medium">{parent.name}</span>
+                        {subs.length > 0 && <span className="text-xs text-muted-foreground">(+ sub)</span>}
+                      </div>
+                    </SelectItem>
+                    {subs.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id.toString()}>
+                        <div className="flex items-center gap-2 pl-3">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: sub.color || parent.color || "#6B7280" }} />
+                          <span className="text-muted-foreground">{sub.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
