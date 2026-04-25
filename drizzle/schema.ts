@@ -135,9 +135,6 @@ export const transactions = pgTable("transactions", {
   recurrencePattern: text("recurrencePattern"), // JSON: { frequency: 'daily'|'weekly'|'monthly'|'yearly', interval: number, endDate?: string }
   parentTransactionId: integer("parentTransactionId"), // For recurring transactions
    notes: text("notes"),
-  // Cartão de crédito (quando a transação é lançada no cartão)
-  creditCardId: integer("creditCardId"),         // FK para credit_cards
-  creditCardInvoiceId: integer("creditCardInvoiceId"), // FK para credit_card_invoices
   // Origem da transação: MANUAL (cadastrada pelo usuário) ou OFX (importada do extrato bancário)
   importOrigin: varchar("importOrigin", { length: 10 }).default("MANUAL").notNull(),
   // Referência ao registro OFX original (quando importOrigin = 'OFX')
