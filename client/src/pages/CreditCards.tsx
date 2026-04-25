@@ -269,15 +269,16 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
 
       {/* Sheet de criação/edição */}
       <Sheet open={sheetOpen} onOpenChange={(o) => { setSheetOpen(o); if (!o) { setEditingCard(null); resetForm(); } }}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-          <div className="flex items-center justify-between mb-6">
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
             <SheetTitle>{editingCard ? "Editar Cartão" : "Novo Cartão"}</SheetTitle>
             <Button variant="ghost" size="icon" onClick={() => setSheetOpen(false)}>
               <X className="h-4 w-4" />
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
             {/* Preview do cartão */}
             <div
               className="h-36 rounded-2xl p-5 flex flex-col justify-between text-white shadow-lg"
@@ -380,15 +381,18 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {createMutation.isPending || updateMutation.isPending
-                ? "Salvando..."
-                : editingCard ? "Salvar Alterações" : "Criar Cartão"}
-            </Button>
+            </div>
+            <div className="px-6 py-4 border-t shrink-0">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {createMutation.isPending || updateMutation.isPending
+                  ? "Salvando..."
+                  : editingCard ? "Salvar Alterações" : "Criar Cartão"}
+              </Button>
+            </div>
           </form>
         </SheetContent>
       </Sheet>
