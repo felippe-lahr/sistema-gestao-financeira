@@ -86,6 +86,7 @@ export default function Transactions() {
     categoryId: "",
     bankAccountId: "",
     paymentMethodId: "",
+    creditCardId: "",
     notes: "",
     isRecurring: false,
     recurrenceCount: "1",
@@ -140,6 +141,10 @@ export default function Transactions() {
   );
 
   const { data: paymentMethods } = trpc.paymentMethods.listByEntity.useQuery(
+    { entityId: selectedEntityId! },
+    { enabled: !!selectedEntityId }
+  );
+  const { data: creditCards } = trpc.creditCards.listByEntity.useQuery(
     { entityId: selectedEntityId! },
     { enabled: !!selectedEntityId }
   );
@@ -462,6 +467,7 @@ export default function Transactions() {
       categoryId: "",
       bankAccountId: "",
       paymentMethodId: "",
+      creditCardId: "",
       notes: "",
       isRecurring: false,
       recurrenceCount: "1",
@@ -485,15 +491,15 @@ export default function Transactions() {
       paymentDate: formData.paymentDate ? new Date(formData.paymentDate + "T12:00:00") : undefined,
       status: formData.status,
       categoryId: formData.categoryId ? parseInt(formData.categoryId) : undefined,
-      bankAccountId: formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined,
+      bankAccountId: formData.creditCardId ? undefined : (formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined),
       paymentMethodId: formData.paymentMethodId ? parseInt(formData.paymentMethodId) : undefined,
+      creditCardId: formData.creditCardId ? parseInt(formData.creditCardId) : undefined,
       notes: formData.notes || undefined,
       isRecurring: formData.isRecurring,
       recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
       recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
     });
   };
-
   const handleEdit = async (transaction: any) => {
     setEditingTransaction(transaction);
     setFormData({
@@ -506,6 +512,7 @@ export default function Transactions() {
       categoryId: transaction.categoryId?.toString() || "",
       bankAccountId: transaction.bankAccountId?.toString() || "",
       paymentMethodId: transaction.paymentMethodId?.toString() || "",
+      creditCardId: transaction.creditCardId?.toString() || "",
       notes: transaction.notes || "",
       isRecurring: transaction.isRecurring || false,
       recurrenceCount: "1",
@@ -540,16 +547,16 @@ export default function Transactions() {
       paymentDate: formData.paymentDate ? new Date(formData.paymentDate + "T12:00:00") : undefined,
       status: formData.status,
       categoryId: formData.categoryId ? parseInt(formData.categoryId) : undefined,
-      bankAccountId: formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined,
+      bankAccountId: formData.creditCardId ? undefined : (formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined),
       paymentMethodId: formData.paymentMethodId ? parseInt(formData.paymentMethodId) : undefined,
+      creditCardId: formData.creditCardId ? parseInt(formData.creditCardId) : undefined,
       notes: formData.notes || undefined,
       isRecurring: formData.isRecurring,
       recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
       recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
     });
   };
-
-  // Categorização rápida inline via Popover — recebe transação e categoryId diretamente
+  // Categorizaação rápida inline via Popover — recebe transação e categoryId diretamente
   const handleSaveQuickCategory = async (transaction: any, categoryId: number) => {
     try {
       // Não enviar amount: o banco já armazena em centavos e o servidor multiplicaria por 100 novamente
@@ -863,6 +870,7 @@ export default function Transactions() {
                   categories={categories || []}
                   bankAccounts={bankAccounts || []}
                   paymentMethods={paymentMethods || []}
+                  creditCards={creditCards || []}
                   selectedEntityId={selectedEntityId}
                   setSelectedEntityId={setSelectedEntityId}
                   attachments={attachments}
@@ -907,6 +915,7 @@ export default function Transactions() {
               categories={categories || []}
               bankAccounts={bankAccounts || []}
               paymentMethods={paymentMethods || []}
+              creditCards={creditCards || []}
               selectedEntityId={selectedEntityId}
               setSelectedEntityId={setSelectedEntityId}
               attachments={attachments}
@@ -1925,6 +1934,7 @@ function TransactionForm({
   categories,
   bankAccounts,
   paymentMethods,
+  creditCards,
   selectedEntityId,
   setSelectedEntityId,
   attachments,
@@ -1940,6 +1950,7 @@ function TransactionForm({
   categories: any[];
   bankAccounts: any[];
   paymentMethods: any[];
+  creditCards: any[];
   selectedEntityId: number | null;
   setSelectedEntityId: (id: number) => void;
   attachments: any[];
@@ -2081,21 +2092,76 @@ function TransactionForm({
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="bankAccount">Conta Corrente</Label>
-        <Select value={formData.bankAccountId} onValueChange={(v) => setFormData({ ...formData, bankAccountId: v })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione uma conta" />
-          </SelectTrigger>
-          <SelectContent>
-            {bankAccounts.map((account) => (
-              <SelectItem key={account.id} value={account.id.toString()}>
-                {account.name} {account.bank && `- ${account.bank}`}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Cartão de Crédito (apenas para despesas) */}
+      {formData.type === "EXPENSE" && creditCards.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Label>Lançar no Cartão de Crédito</Label>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, creditCardId: formData.creditCardId ? "" : creditCards[0].id.toString(), bankAccountId: "" })}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                formData.creditCardId ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                formData.creditCardId ? "translate-x-4" : "translate-x-1"
+              }`} />
+            </button>
+          </div>
+          {formData.creditCardId ? (
+            <Select value={formData.creditCardId} onValueChange={(v) => setFormData({ ...formData, creditCardId: v, bankAccountId: "" })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o cartão" />
+              </SelectTrigger>
+              <SelectContent>
+                {creditCards.map((card) => (
+                  <SelectItem key={card.id} value={card.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color || "#7C3AED" }} />
+                      {card.name} {card.lastFourDigits && `•••• ${card.lastFourDigits}`}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="bankAccount">Conta Corrente</Label>
+              <Select value={formData.bankAccountId} onValueChange={(v) => setFormData({ ...formData, bankAccountId: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      {account.name} {account.bank && `- ${account.bank}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Conta Corrente (quando não há cartões ou é receita) */}
+      {(formData.type === "INCOME" || creditCards.length === 0) && (
+        <div className="space-y-2">
+          <Label htmlFor="bankAccount">Conta Corrente</Label>
+          <Select value={formData.bankAccountId} onValueChange={(v) => setFormData({ ...formData, bankAccountId: v })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma conta" />
+            </SelectTrigger>
+            <SelectContent>
+              {bankAccounts.map((account) => (
+                <SelectItem key={account.id} value={account.id.toString()}>
+                  {account.name} {account.bank && `- ${account.bank}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="paymentMethod">Meio de Pagamento</Label>

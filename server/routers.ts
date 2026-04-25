@@ -2428,5 +2428,156 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CARTÕES DE CRÉDITO
+  // ─────────────────────────────────────────────────────────────────────────
+  creditCards: router({
+    listByEntity: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        const dbInstance = await getDb();
+        if (!dbInstance) return [];
+        const { creditCards } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        return dbInstance
+          .select()
+          .from(creditCards)
+          .where(and(eq(creditCards.entityId, input.entityId), eq(creditCards.isActive, true)))
+          .orderBy(creditCards.name);
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        entityId: z.number(),
+        name: z.string().min(1),
+        brand: z.enum(["VISA", "MASTERCARD", "ELO", "AMERICAN_EXPRESS", "HIPERCARD", "OTHER"]).default("OTHER"),
+        lastFourDigits: z.string().max(4).optional(),
+        creditLimit: z.number().min(0).default(0),
+        closingDay: z.number().min(1).max(31).default(1),
+        dueDay: z.number().min(1).max(31).default(10),
+        color: z.string().default("#7C3AED"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards } = await import("../drizzle/schema");
+        const org = await db.getOrganizationForUser(ctx.user.id);
+        const [card] = await dbInstance.insert(creditCards).values({
+          organizationId: org?.id,
+          userId: ctx.user.id,
+          entityId: input.entityId,
+          name: input.name,
+          brand: input.brand,
+          lastFourDigits: input.lastFourDigits,
+          creditLimit: Math.round(input.creditLimit * 100),
+          closingDay: input.closingDay,
+          dueDay: input.dueDay,
+          color: input.color,
+        }).returning();
+        return card;
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        brand: z.enum(["VISA", "MASTERCARD", "ELO", "AMERICAN_EXPRESS", "HIPERCARD", "OTHER"]).optional(),
+        lastFourDigits: z.string().max(4).optional(),
+        creditLimit: z.number().min(0).optional(),
+        closingDay: z.number().min(1).max(31).optional(),
+        dueDay: z.number().min(1).max(31).optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const updates: any = { updatedAt: new Date() };
+        if (input.name !== undefined) updates.name = input.name;
+        if (input.brand !== undefined) updates.brand = input.brand;
+        if (input.lastFourDigits !== undefined) updates.lastFourDigits = input.lastFourDigits;
+        if (input.creditLimit !== undefined) updates.creditLimit = Math.round(input.creditLimit * 100);
+        if (input.closingDay !== undefined) updates.closingDay = input.closingDay;
+        if (input.dueDay !== undefined) updates.dueDay = input.dueDay;
+        if (input.color !== undefined) updates.color = input.color;
+        const [updated] = await dbInstance.update(creditCards).set(updates).where(eq(creditCards.id, input.id)).returning();
+        return updated;
+      }),
+
+    deactivate: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        await dbInstance.update(creditCards).set({ isActive: false, updatedAt: new Date() }).where(eq(creditCards.id, input.id));
+        return { success: true };
+      }),
+
+    getSummary: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) return null;
+        const { creditCards, transactions } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
+        if (!card) return null;
+        const now = new Date();
+        let invoiceMonth = now.getMonth() + 1;
+        let invoiceYear = now.getFullYear();
+        if (now.getDate() > card.closingDay) {
+          if (invoiceMonth === 12) { invoiceMonth = 1; invoiceYear++; }
+          else { invoiceMonth++; }
+        }
+        const invoiceTxs = await dbInstance
+          .select({ amount: transactions.amount })
+          .from(transactions)
+          .where(and(eq(transactions.creditCardId, input.cardId), eq(transactions.status, "PENDING")));
+        const usedAmount = invoiceTxs.reduce((acc, t) => acc + t.amount, 0);
+        const availableLimit = card.creditLimit - usedAmount;
+        const dueDate = new Date(invoiceYear, invoiceMonth - 1, card.dueDay);
+        return {
+          card,
+          usedAmount,
+          availableLimit,
+          creditLimit: card.creditLimit,
+          invoiceMonth,
+          invoiceYear,
+          dueDate,
+          usagePercent: card.creditLimit > 0 ? Math.round((usedAmount / card.creditLimit) * 100) : 0,
+        };
+      }),
+
+    listTransactions: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        month: z.number().optional(),
+        year: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) return [];
+        const { transactions } = await import("../drizzle/schema");
+        const { eq, and, gte, lte } = await import("drizzle-orm");
+        const conditions: any[] = [eq(transactions.creditCardId, input.cardId)];
+        if (input.month && input.year) {
+          const start = new Date(input.year, input.month - 1, 1);
+          const end = new Date(input.year, input.month, 0, 23, 59, 59);
+          conditions.push(gte(transactions.dueDate, start));
+          conditions.push(lte(transactions.dueDate, end));
+        }
+        return dbInstance
+          .select()
+          .from(transactions)
+          .where(and(...conditions))
+          .orderBy(transactions.dueDate);
+      }),
+  }),
 });
 export type AppRouter = typeof appRouter;

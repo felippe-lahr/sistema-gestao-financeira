@@ -2551,3 +2551,80 @@ export async function getOnboardingStatus(userId: number): Promise<boolean> {
   const rows = result.rows as any[];
   return rows.length > 0 ? Boolean(rows[0].onboardingCompleted) : false;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRAÇÃO: Módulo de Cartão de Crédito
+// ─────────────────────────────────────────────────────────────────────────────
+export async function ensureCreditCardTables(): Promise<void> {
+  try {
+    const { ENV } = await import("./_core/env");
+    const { default: postgres } = await import("postgres");
+    const client = postgres(ENV.databaseUrl, { max: 1 });
+
+    // Criar enum card_brand se não existir
+    await client`
+      DO $$ BEGIN
+        CREATE TYPE card_brand AS ENUM ('VISA','MASTERCARD','ELO','AMERICAN_EXPRESS','HIPERCARD','OTHER');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `;
+
+    // Criar enum invoice_status se não existir
+    await client`
+      DO $$ BEGIN
+        CREATE TYPE invoice_status AS ENUM ('OPEN','CLOSED','PAID');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `;
+
+    // Criar tabela credit_cards
+    await client`
+      CREATE TABLE IF NOT EXISTS credit_cards (
+        id SERIAL PRIMARY KEY,
+        "organizationId" integer REFERENCES organizations(id) ON DELETE CASCADE,
+        "userId" integer NOT NULL,
+        "entityId" integer NOT NULL,
+        name varchar(255) NOT NULL,
+        brand card_brand NOT NULL DEFAULT 'OTHER',
+        "lastFourDigits" varchar(4),
+        "creditLimit" integer NOT NULL DEFAULT 0,
+        "closingDay" integer NOT NULL DEFAULT 1,
+        "dueDay" integer NOT NULL DEFAULT 10,
+        color varchar(7) DEFAULT '#7C3AED',
+        "isActive" boolean NOT NULL DEFAULT true,
+        "createdAt" timestamp NOT NULL DEFAULT NOW(),
+        "updatedAt" timestamp NOT NULL DEFAULT NOW()
+      );
+    `;
+
+    // Criar tabela credit_card_invoices
+    await client`
+      CREATE TABLE IF NOT EXISTS credit_card_invoices (
+        id SERIAL PRIMARY KEY,
+        "creditCardId" integer NOT NULL REFERENCES credit_cards(id) ON DELETE CASCADE,
+        month integer NOT NULL,
+        year integer NOT NULL,
+        status invoice_status NOT NULL DEFAULT 'OPEN',
+        "totalAmount" integer NOT NULL DEFAULT 0,
+        "dueDate" timestamp,
+        "paidAt" timestamp,
+        "paidFromAccountId" integer,
+        "createdAt" timestamp NOT NULL DEFAULT NOW(),
+        "updatedAt" timestamp NOT NULL DEFAULT NOW()
+      );
+    `;
+
+    // Adicionar colunas creditCardId e creditCardInvoiceId na tabela transactions
+    await client`
+      ALTER TABLE transactions ADD COLUMN IF NOT EXISTS "creditCardId" integer;
+    `;
+    await client`
+      ALTER TABLE transactions ADD COLUMN IF NOT EXISTS "creditCardInvoiceId" integer;
+    `;
+
+    await client.end();
+    console.log('[db] credit_cards and credit_card_invoices tables ensured');
+  } catch (err: any) {
+    console.warn('[db] Could not ensure credit card tables:', err?.message);
+  }
+}
