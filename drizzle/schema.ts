@@ -107,6 +107,8 @@ export const categories = pgTable("categories", {
   type: transactionTypeEnum("type").notNull(),
   color: varchar("color", { length: 7 }).default("#6B7280"),
   icon: varchar("icon", { length: 50 }),
+  parentId: integer("parentId"), // Self-reference: null = categoria pai, number = subcategoria
+  isActive: boolean("isActive").default(true).notNull(), // Soft delete — preserva histórico
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

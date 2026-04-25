@@ -131,10 +131,12 @@ export const appRouter = router({
 
   // ========== CATEGORIES ==========
   categories: router({
-    listByEntity: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
-      await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
-      return await db.getCategoriesByEntityId(input.entityId, ctx.user.id);
-    }),
+    listByEntity: protectedProcedure
+      .input(z.object({ entityId: z.number(), includeInactive: z.boolean().optional() }))
+      .query(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        return await db.getCategoriesByEntityId(input.entityId, ctx.user.id, input.includeInactive ?? false);
+      }),
 
     create: protectedProcedure
       .input(
@@ -144,6 +146,7 @@ export const appRouter = router({
           type: z.enum(["INCOME", "EXPENSE"]),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
           icon: z.string().max(50).optional(),
+          parentId: z.number().optional(), // Subcategoria: ID da categoria pai
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -155,6 +158,7 @@ export const appRouter = router({
           type: input.type,
           color: input.color,
           icon: input.icon,
+          parentId: input.parentId ?? null,
         });
         return { id: categoryId };
       }),
@@ -197,6 +201,7 @@ export const appRouter = router({
           name: z.string().min(1).max(255).optional(),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
           icon: z.string().max(50).optional(),
+          parentId: z.number().nullable().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -208,15 +213,28 @@ export const appRouter = router({
           name: input.name,
           color: input.color,
           icon: input.icon,
+          parentId: input.parentId,
         });
         return { success: true };
       }),
+
+    // Soft delete: desativa categoria (e subcategorias)
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
       const category = await db.getCategoryById(input.id);
       if (!category || category.userId !== ctx.user.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
       await db.deleteCategory(input.id);
+      return { success: true };
+    }),
+
+    // Reativar categoria inativa
+    reactivate: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+      const category = await db.getCategoryById(input.id);
+      if (!category || category.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      await db.updateCategory(input.id, { isActive: true });
       return { success: true };
     }),
   }),

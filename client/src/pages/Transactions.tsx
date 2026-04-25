@@ -1908,9 +1908,16 @@ function TransactionForm({
   utils: any;
   setPreviewAttachment: (attachment: any) => void;
 }) {
-  const incomeCategories = categories.filter((c) => c.type === "INCOME");
-  const expenseCategories = categories.filter((c) => c.type === "EXPENSE");
+  const incomeCategories = categories.filter((c) => c.type === "INCOME" && (c as any).isActive !== false);
+  const expenseCategories = categories.filter((c) => c.type === "EXPENSE" && (c as any).isActive !== false);
   const relevantCategories = formData.type === "INCOME" ? incomeCategories : expenseCategories;
+  // Hierarquia: categorias pai (sem parentId) e subcategorias
+  const parentCategories = relevantCategories.filter((c) => !(c as any).parentId);
+  const getSubcategories = (parentId: number) => relevantCategories.filter((c) => (c as any).parentId === parentId);
+  // Categoria pai selecionada (para mostrar subcategorias)
+  const selectedCategory = relevantCategories.find((c) => c.id.toString() === formData.categoryId);
+  const selectedParentId = selectedCategory ? ((selectedCategory as any).parentId || selectedCategory.id) : null;
+  const selectedParentCategory = selectedParentId ? relevantCategories.find((c) => c.id === selectedParentId) : null;
 
   return (
     <div className="space-y-4">
@@ -1985,21 +1992,59 @@ function TransactionForm({
 
       <div className="space-y-2">
         <Label htmlFor="category">Categoria</Label>
-        <Select value={formData.categoryId} onValueChange={(v) => setFormData({ ...formData, categoryId: v })}>
+        {/* Seletor em cascata: primeiro escolhe a categoria pai, depois a subcategoria */}
+        <Select
+          value={selectedParentId?.toString() || ""}
+          onValueChange={(v) => {
+            // Ao trocar a categoria pai, limpa a subcategoria
+            const subs = getSubcategories(parseInt(v));
+            if (subs.length === 0) {
+              // Sem subcategorias: seleciona diretamente a categoria pai
+              setFormData({ ...formData, categoryId: v });
+            } else {
+              // Com subcategorias: limpa a seleção até escolher subcategoria
+              setFormData({ ...formData, categoryId: "" });
+            }
+          }}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Selecione uma categoria" />
           </SelectTrigger>
           <SelectContent>
-            {relevantCategories.map((cat) => (
+            {parentCategories.map((cat) => (
               <SelectItem key={cat.id} value={cat.id.toString()}>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || "#6B7280" }} />
                   {cat.name}
+                  {getSubcategories(cat.id).length > 0 && (
+                    <span className="text-xs text-muted-foreground">({getSubcategories(cat.id).length})</span>
+                  )}
                 </div>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {/* Seletor de subcategoria — aparece apenas se a categoria pai tiver subcategorias */}
+        {selectedParentId && getSubcategories(selectedParentId).length > 0 && (
+          <Select
+            value={formData.categoryId}
+            onValueChange={(v) => setFormData({ ...formData, categoryId: v })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma subcategoria" />
+            </SelectTrigger>
+            <SelectContent>
+              {getSubcategories(selectedParentId).map((sub) => (
+                <SelectItem key={sub.id} value={sub.id.toString()}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sub.color || selectedParentCategory?.color || "#6B7280" }} />
+                    {sub.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="space-y-2">

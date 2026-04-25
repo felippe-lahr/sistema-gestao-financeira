@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight, ChevronRight, RotateCcw, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -461,14 +461,16 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     type: "EXPENSE" as "INCOME" | "EXPENSE",
     color: "#EF4444",
+    parentId: "" as string,
   });
 
   const utils = trpc.useUtils();
-  const { data: categories, isLoading } = trpc.categories.listByEntity.useQuery({ entityId });
+  const { data: categories, isLoading } = trpc.categories.listByEntity.useQuery({ entityId, includeInactive: showInactive });
 
   const createMutation = trpc.categories.create.useMutation({
     onSuccess: () => {
@@ -498,10 +500,20 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
   const deleteMutation = trpc.categories.delete.useMutation({
     onSuccess: () => {
       utils.categories.listByEntity.invalidate();
-      toast.success("Categoria excluída com sucesso!");
+      toast.success("Categoria desativada com sucesso!");
     },
     onError: (error) => {
-      toast.error("Erro ao excluir categoria: " + error.message);
+      toast.error("Erro ao desativar categoria: " + error.message);
+    },
+  });
+
+  const reactivateMutation = trpc.categories.reactivate.useMutation({
+    onSuccess: () => {
+      utils.categories.listByEntity.invalidate();
+      toast.success("Categoria reativada com sucesso!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao reativar categoria: " + error.message);
     },
   });
 
@@ -510,6 +522,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
       name: "",
       type: "EXPENSE",
       color: "#EF4444",
+      parentId: "",
     });
   };
 
@@ -518,12 +531,12 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
       toast.error("O nome da categoria é obrigatório");
       return;
     }
-
     createMutation.mutate({
       entityId,
       name: formData.name,
       type: formData.type,
       color: formData.color,
+      parentId: formData.parentId ? parseInt(formData.parentId) : undefined,
     });
   };
 
@@ -533,6 +546,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
       name: category.name,
       type: category.type,
       color: category.color || "#EF4444",
+      parentId: category.parentId?.toString() || "",
     });
     setIsEditOpen(true);
   };
@@ -542,14 +556,20 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
       toast.error("O nome da categoria é obrigatório");
       return;
     }
-
     updateMutation.mutate({
       id: editingCategory.id,
       name: formData.name,
       color: formData.color,
+      parentId: formData.parentId ? parseInt(formData.parentId) : null,
     });
   };
 
+  // Categorias pai (sem parentId) — ativas
+  const incomeParents = categories?.filter((c) => c.type === "INCOME" && !c.parentId) || [];
+  const expenseParents = categories?.filter((c) => c.type === "EXPENSE" && !c.parentId) || [];
+  // Helper: subcategorias de uma categoria pai
+  const getSubcategories = (parentId: number) => categories?.filter((c) => c.parentId === parentId) || [];
+  // Totais para o contador
   const incomeCategories = categories?.filter((c) => c.type === "INCOME") || [];
   const expenseCategories = categories?.filter((c) => c.type === "EXPENSE") || [];
 
@@ -563,180 +583,237 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">
-          {categories?.length || 0} categoria(s) cadastrada(s)
-        </p>
-        {canWrite && (
-        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Categoria
-        </Button>
-        )}
-
-        <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-            <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
-              <SheetTitle className="text-2xl font-bold">Nova Categoria</SheetTitle>
-              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-8 py-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome *</Label>
-                  <Input
-                    id="name"
-                    placeholder="Ex: Alimentação, Salário"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Tipo *</Label>
-                    <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                      <SelectTrigger id="type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="INCOME">Receita</SelectItem>
-                        <SelectItem value="EXPENSE">Despesa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="color">Cor</Label>
-                    <Input
-                      id="color"
-                      type="color"
-                      value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    />
-                  </div>
+  // Helper: renderiza um card de categoria com suas subcategorias
+  const renderCategoryCard = (category: any) => {
+    const subs = getSubcategories(category.id);
+    const isInactive = !category.isActive;
+    return (
+      <div key={category.id} className="space-y-1">
+        <Card className={isInactive ? "opacity-50 border-dashed" : ""}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: category.color || "#6B7280" }} />
+                <div>
+                  <span className="font-medium">{category.name}</span>
+                  {isInactive && <span className="ml-2 text-xs text-muted-foreground">(inativa)</span>}
+                  {subs.length > 0 && <p className="text-xs text-muted-foreground">{subs.length} subcategoria(s)</p>}
                 </div>
               </div>
+              <div className="flex items-center gap-1">
+                {isInactive ? (
+                  canDelete && (
+                    <Button variant="ghost" size="icon" title="Reativar" onClick={() => reactivateMutation.mutate({ id: category.id })} disabled={reactivateMutation.isPending}>
+                      <RotateCcw className="h-4 w-4 text-green-600" />
+                    </Button>
+                  )
+                ) : (
+                  <>
+                    {canWrite && (
+                      <>
+                        <Button variant="ghost" size="icon" title="Adicionar subcategoria" onClick={() => { resetForm(); setFormData({ name: "", type: category.type, color: category.color || "#6B7280", parentId: category.id.toString() }); setIsCreateOpen(true); }}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(category)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {canDelete && (
+                      <Button variant="ghost" size="icon" title="Desativar" onClick={() => deleteMutation.mutate({ id: category.id })} disabled={deleteMutation.isPending}>
+                        <EyeOff className="h-4 w-4 text-red-500" />
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
-                {createMutation.isPending ? "Criando..." : "Criar Categoria"}
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
+          </CardContent>
+        </Card>
+        {/* Subcategorias */}
+        {subs.length > 0 && (
+          <div className="ml-6 space-y-1">
+            {subs.map((sub) => (
+              <Card key={sub.id} className={`border-l-4 ${!sub.isActive ? "opacity-50 border-dashed" : ""}`} style={{ borderLeftColor: sub.color || category.color || "#6B7280" }}>
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                      <div className="w-5 h-5 rounded-full flex-shrink-0" style={{ backgroundColor: sub.color || "#6B7280" }} />
+                      <span className="text-sm">{sub.name}</span>
+                      {!sub.isActive && <span className="text-xs text-muted-foreground">(inativa)</span>}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!sub.isActive ? (
+                        canDelete && (
+                          <Button variant="ghost" size="icon" title="Reativar" onClick={() => reactivateMutation.mutate({ id: sub.id })} disabled={reactivateMutation.isPending}>
+                            <RotateCcw className="h-3 w-3 text-green-600" />
+                          </Button>
+                        )
+                      ) : (
+                        <>
+                          {canWrite && (
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(sub)}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button variant="ghost" size="icon" title="Desativar" onClick={() => deleteMutation.mutate({ id: sub.id })} disabled={deleteMutation.isPending}>
+                              <EyeOff className="h-3 w-3 text-red-500" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            {(incomeCategories.length + expenseCategories.length)} categoria(s)
+          </p>
+          <button
+            onClick={() => setShowInactive(!showInactive)}
+            className={`text-xs flex items-center gap-1 px-2 py-1 rounded-full border transition-colors ${
+              showInactive ? "bg-muted border-muted-foreground/30 text-muted-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <EyeOff className="h-3 w-3" />
+            {showInactive ? "Ocultar inativas" : "Ver inativas"}
+          </button>
+        </div>
+        {canWrite && (
+          <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Categoria
+          </Button>
+        )}
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Receitas */}
         <div className="space-y-3">
-          <h3 className="font-semibold text-lg">Receitas</h3>
-          {incomeCategories.length === 0 ? (
+          <h3 className="font-semibold text-lg text-green-700 dark:text-green-400">Receitas</h3>
+          {incomeParents.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 Nenhuma categoria de receita
               </CardContent>
             </Card>
           ) : (
-            incomeCategories.map((category) => (
-              <Card key={category.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-8 h-8 rounded-full"
-                        style={{ backgroundColor: category.color || "#10B981" }}
-                      />
-                      <span className="font-medium">{category.name}</span>
-                    </div>
-                     <div className="flex items-center gap-2">
-                      {canWrite && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(category)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      )}
-                      {canDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteMutation.mutate({ id: category.id })}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+            incomeParents.map(renderCategoryCard)
           )}
         </div>
         {/* Despesas */}
         <div className="space-y-3">
-          <h3 className="font-semibold text-lg">Despesas</h3>
-          {expenseCategories.length === 0 ? (
+          <h3 className="font-semibold text-lg text-red-700 dark:text-red-400">Despesas</h3>
+          {expenseParents.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 Nenhuma categoria de despesa
               </CardContent>
             </Card>
           ) : (
-            expenseCategories.map((category) => (
-              <Card key={category.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-8 h-8 rounded-full"
-                        style={{ backgroundColor: category.color || "#EF4444" }}
-                      />
-                      <span className="font-medium">{category.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {canWrite && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(category)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      )}
-                      {canDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteMutation.mutate({ id: category.id })}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+            expenseParents.map(renderCategoryCard)
           )}
         </div>
       </div>
 
+      {/* Create Sheet */}
+      <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+          <div className="sticky top-0 z-10 border-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
+            <SheetTitle className="text-2xl font-bold">
+              {formData.parentId ? "Nova Subcategoria" : "Nova Categoria"}
+            </SheetTitle>
+            <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+            <div className="space-y-4">
+              {/* Se for subcategoria, mostra a categoria pai */}
+              {formData.parentId && (
+                <div className="p-3 bg-muted rounded-lg text-sm">
+                  <span className="text-muted-foreground">Subcategoria de: </span>
+                  <span className="font-medium">{categories?.find((c) => c.id === parseInt(formData.parentId))?.name}</span>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome *</Label>
+                <Input
+                  id="name"
+                  placeholder={formData.parentId ? "Ex: Almoço, Jantar" : "Ex: Alimentação, Salário"}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {!formData.parentId && (
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Tipo *</Label>
+                    <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value, parentId: "" })}>
+                      <SelectTrigger id="type"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INCOME">Receita</SelectItem>
+                        <SelectItem value="EXPENSE">Despesa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="color">Cor</Label>
+                  <Input id="color" type="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} />
+                </div>
+              </div>
+              {/* Seletor de categoria pai (opcional, para criar subcategoria a partir do zero) */}
+              {!formData.parentId && (
+                <div className="space-y-2">
+                  <Label>Categoria Pai <span className="text-muted-foreground text-xs">(opcional — deixe vazio para criar categoria principal)</span></Label>
+                  <Select value={formData.parentId || "none"} onValueChange={(v) => setFormData({ ...formData, parentId: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="Nenhuma (categoria principal)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma (categoria principal)</SelectItem>
+                      {categories?.filter((c) => !c.parentId && c.type === formData.type && c.isActive).map((c) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color || "#6B7280" }} />
+                            {c.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="sticky bottom-0 z-10 border-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+              {createMutation.isPending ? "Criando..." : (formData.parentId ? "Criar Subcategoria" : "Criar Categoria")}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* Edit Sheet */}
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
+          <div className="sticky top-0 z-10 border-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">Editar Categoria</SheetTitle>
-            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
+            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -753,25 +830,34 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-color">Cor</Label>
-                <Input
-                  id="edit-color"
-                  type="color"
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                />
+                <Input id="edit-color" type="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Tipo (não editável)</Label>
-                <div className="p-2 bg-muted rounded text-sm">
-                  {formData.type === "INCOME" ? "Receita" : "Despesa"}
-                </div>
+                <div className="p-2 bg-muted rounded text-sm">{formData.type === "INCOME" ? "Receita" : "Despesa"}</div>
+              </div>
+              {/* Categoria pai — editável */}
+              <div className="space-y-2">
+                <Label>Categoria Pai <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+                <Select value={formData.parentId || "none"} onValueChange={(v) => setFormData({ ...formData, parentId: v === "none" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="Nenhuma (categoria principal)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma (categoria principal)</SelectItem>
+                    {categories?.filter((c) => !c.parentId && c.type === formData.type && c.isActive && c.id !== editingCategory?.id).map((c) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color || "#6B7280" }} />
+                          {c.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
-          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-              Cancelar
-            </Button>
+          <div className="sticky bottom-0 z-10 border-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
             <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
               {updateMutation.isPending ? "Atualizando..." : "Atualizar"}
             </Button>

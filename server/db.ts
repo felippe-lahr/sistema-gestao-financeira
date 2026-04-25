@@ -166,28 +166,38 @@ export async function deleteEntity(entityId: number) {
 
 // ========== CATEGORY OPERATIONS ==========
 
-export async function getCategoriesByEntityId(entityId: number, userId?: number) {
+export async function getCategoriesByEntityId(entityId: number, userId?: number, includeInactive = false) {
   const db = await getDb();
   if (!db) return [];
 
   // Return categories that are either:
   // 1. Specific to this entity (entityId matches)
   // 2. Shared categories (entityId is null) belonging to the user
+  // By default, only return active categories (isActive = true)
+  const activeFilter = includeInactive ? [] : [eq(categories.isActive, true)];
+
   if (userId) {
     return await db
       .select()
       .from(categories)
       .where(
-        or(
-          eq(categories.entityId, entityId),
-          and(isNull(categories.entityId), eq(categories.userId, userId))
+        and(
+          or(
+            eq(categories.entityId, entityId),
+            and(isNull(categories.entityId), eq(categories.userId, userId))
+          ),
+          ...activeFilter
         )
       )
       .orderBy(categories.name);
   }
 
   // Fallback: only entity-specific categories
-  return await db.select().from(categories).where(eq(categories.entityId, entityId)).orderBy(categories.name);
+  return await db
+    .select()
+    .from(categories)
+    .where(and(eq(categories.entityId, entityId), ...activeFilter))
+    .orderBy(categories.name);
 }
 
 export async function getCategoryById(categoryId: number) {
@@ -216,7 +226,10 @@ export async function deleteCategory(categoryId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.delete(categories).where(eq(categories.id, categoryId));
+  // Soft delete: deactivate category and all its subcategories
+  // This preserves transaction history while hiding from UI
+  await db.update(categories).set({ isActive: false }).where(eq(categories.id, categoryId));
+  await db.update(categories).set({ isActive: false }).where(eq(categories.parentId, categoryId));
 }
 
 // ========== TRANSACTION OPERATIONS ==========
@@ -2473,6 +2486,28 @@ export async function getOrganizationByStripeCustomer(
  * Garante que a coluna onboardingCompleted existe na tabela users.
  * Migração segura: usa ADD COLUMN IF NOT EXISTS.
  */
+/**
+ * Garante que as colunas de subcategorias existem na tabela categories.
+ * Executado no startup para compatibilidade com bancos existentes.
+ */
+export async function ensureCategorySubcategoryColumns(): Promise<void> {
+  try {
+    const { ENV } = await import("./_core/env");
+    const { default: postgres } = await import("postgres");
+    const client = postgres(ENV.databaseUrl, { max: 1 });
+    await client`
+      ALTER TABLE categories ADD COLUMN IF NOT EXISTS "parentId" integer;
+    `;
+    await client`
+      ALTER TABLE categories ADD COLUMN IF NOT EXISTS "isActive" boolean NOT NULL DEFAULT true;
+    `;
+    await client.end();
+    console.log('[db] categories subcategory columns ensured (parentId, isActive)');
+  } catch (err: any) {
+    console.warn('[db] Could not ensure category subcategory columns:', err?.message);
+  }
+}
+
 export async function ensureOnboardingColumn(): Promise<void> {
   try {
     const { ENV } = await import("./_core/env");

@@ -17,7 +17,7 @@ import { registerOfxRoutes } from "./ofx-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
-import { ensureEntitySharingTables, ensureEmailVerificationsTable, ensureOnboardingColumn } from "../db";
+import { ensureEntitySharingTables, ensureEmailVerificationsTable, ensureOnboardingColumn, ensureCategorySubcategoryColumns } from "../db";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -182,6 +182,8 @@ async function startServer() {
   await ensureEmailVerificationsTable();
   // Garantir que a coluna de onboarding existe
   await ensureOnboardingColumn();
+  // Garantir que as colunas de subcategorias existem
+  await ensureCategorySubcategoryColumns();
 
   // Start cron jobs
   startCronJobs();
