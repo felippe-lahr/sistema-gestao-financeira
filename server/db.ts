@@ -339,14 +339,31 @@ export async function createTransaction(transaction: InsertTransaction) {
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(transactions).values(transaction).returning();
-  return Number(result[0].id);
+  const transactionId = Number(result[0].id);
+
+  // Se tiver creditCardId, salvar via SQL raw (campo não está no schema Drizzle)
+  if ((transaction as any).creditCardId) {
+    await db.execute(
+      sql`UPDATE transactions SET "creditCardId" = ${(transaction as any).creditCardId} WHERE id = ${transactionId}`
+    );
+  }
+
+  return transactionId;
 }
 
-export async function updateTransaction(transactionId: number, data: Partial<InsertTransaction>) {
+export async function updateTransaction(transactionId: number, data: Partial<InsertTransaction> & { creditCardId?: number | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(transactions).set(data).where(eq(transactions.id, transactionId));
+  const { creditCardId, ...drizzleData } = data as any;
+  if (Object.keys(drizzleData).length > 0) {
+    await db.update(transactions).set(drizzleData).where(eq(transactions.id, transactionId));
+  }
+  if (creditCardId !== undefined) {
+    await db.execute(
+      sql`UPDATE transactions SET "creditCardId" = ${creditCardId} WHERE id = ${transactionId}`
+    );
+  }
 }
 
 export async function deleteTransaction(transactionId: number) {

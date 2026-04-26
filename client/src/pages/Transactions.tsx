@@ -87,6 +87,8 @@ export default function Transactions() {
     bankAccountId: "",
     paymentMethodId: "",
     creditCardId: "",
+    purchaseDate: "",
+    installments: "1",
     notes: "",
     isRecurring: false,
     recurrenceCount: "1",
@@ -468,6 +470,8 @@ export default function Transactions() {
       bankAccountId: "",
       paymentMethodId: "",
       creditCardId: "",
+      purchaseDate: "",
+      installments: "1",
       notes: "",
       isRecurring: false,
       recurrenceCount: "1",
@@ -494,6 +498,8 @@ export default function Transactions() {
       bankAccountId: formData.creditCardId ? undefined : (formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined),
       paymentMethodId: formData.paymentMethodId ? parseInt(formData.paymentMethodId) : undefined,
       creditCardId: formData.creditCardId ? parseInt(formData.creditCardId) : undefined,
+      purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate + "T12:00:00") : undefined,
+      installments: formData.creditCardId && parseInt(formData.installments) > 1 ? parseInt(formData.installments) : undefined,
       notes: formData.notes || undefined,
       isRecurring: formData.isRecurring,
       recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
@@ -513,6 +519,8 @@ export default function Transactions() {
       bankAccountId: transaction.bankAccountId?.toString() || "",
       paymentMethodId: transaction.paymentMethodId?.toString() || "",
       creditCardId: transaction.creditCardId?.toString() || "",
+      purchaseDate: "",
+      installments: "1",
       notes: transaction.notes || "",
       isRecurring: transaction.isRecurring || false,
       recurrenceCount: "1",
@@ -550,6 +558,8 @@ export default function Transactions() {
       bankAccountId: formData.creditCardId ? undefined : (formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined),
       paymentMethodId: formData.paymentMethodId ? parseInt(formData.paymentMethodId) : undefined,
       creditCardId: formData.creditCardId ? parseInt(formData.creditCardId) : undefined,
+      purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate + "T12:00:00") : undefined,
+      installments: formData.creditCardId && parseInt(formData.installments) > 1 ? parseInt(formData.installments) : undefined,
       notes: formData.notes || undefined,
       isRecurring: formData.isRecurring,
       recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
@@ -2094,12 +2104,12 @@ function TransactionForm({
 
       {/* Cartão de Crédito (apenas para despesas) */}
       {formData.type === "EXPENSE" && creditCards.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Label>Lançar no Cartão de Crédito</Label>
             <button
               type="button"
-              onClick={() => setFormData({ ...formData, creditCardId: formData.creditCardId ? "" : creditCards[0].id.toString(), bankAccountId: "" })}
+              onClick={() => setFormData({ ...formData, creditCardId: formData.creditCardId ? "" : creditCards[0].id.toString(), bankAccountId: "", installments: "1", purchaseDate: "" })}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                 formData.creditCardId ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
               }`}
@@ -2109,22 +2119,72 @@ function TransactionForm({
               }`} />
             </button>
           </div>
+
           {formData.creditCardId ? (
-            <Select value={formData.creditCardId} onValueChange={(v) => setFormData({ ...formData, creditCardId: v, bankAccountId: "" })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o cartão" />
-              </SelectTrigger>
-              <SelectContent>
-                {creditCards.map((card) => (
-                  <SelectItem key={card.id} value={card.id.toString()}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color || "#7C3AED" }} />
-                      {card.name} {card.lastFourDigits && `•••• ${card.lastFourDigits}`}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              {/* Seletor do cartão */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Cartão</Label>
+                <Select value={formData.creditCardId} onValueChange={(v) => setFormData({ ...formData, creditCardId: v, bankAccountId: "" })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cartão" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {creditCards.map((card) => (
+                      <SelectItem key={card.id} value={card.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color || "#7C3AED" }} />
+                          {card.name} {card.lastFourDigits && `•••• ${card.lastFourDigits}`}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Data da Compra e Parcelas lado a lado */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Data da Compra</Label>
+                  <Input
+                    type="date"
+                    value={formData.purchaseDate}
+                    onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
+                    placeholder="dd/mm/aaaa"
+                  />
+                  <p className="text-xs text-muted-foreground">Quando a compra foi feita</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Parcelas</Label>
+                  <Select value={formData.installments} onValueChange={(v) => setFormData({ ...formData, installments: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 48 }, (_, i) => i + 1).map((n) => (
+                        <SelectItem key={n} value={n.toString()}>
+                          {n === 1 ? "À vista" : `${n}x`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {parseInt(formData.installments) > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      {parseInt(formData.installments)}x de R$ {(parseCurrency(formData.amount) / parseInt(formData.installments)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Info sobre a Data de Vencimento */}
+              <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-300">
+                <span>ℹ️</span>
+                <span>
+                  A <strong>Data de Vencimento</strong> acima é quando a fatura vence (impacto no caixa).
+                  {parseInt(formData.installments) > 1 && ` As ${formData.installments} parcelas terão vencimentos mensais a partir dessa data.`}
+                </span>
+              </div>
+            </div>
           ) : (
             <div className="space-y-2">
               <Label htmlFor="bankAccount">Conta Corrente</Label>

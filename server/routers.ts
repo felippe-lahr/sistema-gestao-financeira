@@ -469,11 +469,14 @@ export const appRouter = router({
           description: z.string().min(1),
           amount: z.number().nonnegative(),
           dueDate: z.date(),
+          purchaseDate: z.date().optional(), // Data da compra (cartão de crédito)
           paymentDate: z.date().optional(),
           status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
           categoryId: z.number().optional(),
           bankAccountId: z.number().optional(),
           paymentMethodId: z.number().optional(),
+          creditCardId: z.number().optional(), // Cartão de crédito
+          installments: z.number().min(1).max(48).optional(), // Número de parcelas
           isRecurring: z.boolean().optional(),
           recurrenceCount: z.number().positive().optional(),
           recurrenceFrequency: z.enum(["DAY", "WEEK", "MONTH", "YEAR"]).optional(),
@@ -486,7 +489,64 @@ export const appRouter = router({
         // Convert amount to cents
         const amountInCents = Math.round(input.amount * 100);
 
-        // Se for recorrente, criar múltiplas transações
+        // ── PARCELAMENTO NO CARTÃO DE CRÉDITO ──────────────────────────────────
+        // Quando creditCardId + installments > 1: criar N parcelas
+        // Cada parcela tem Data de Efetivação (dueDate) avançando 1 mês
+        // A Data do Evento (purchaseDate) é a mesma para todas as parcelas
+        if (input.creditCardId && input.installments && input.installments > 1) {
+          const count = input.installments;
+          const installmentAmount = Math.round(amountInCents / count);
+          const transactionIds: number[] = [];
+          let parentTransactionId: number | null = null;
+
+          for (let i = 0; i < count; i++) {
+            // Data de Efetivação: avança 1 mês por parcela
+            const dueDate = new Date(input.dueDate);
+            dueDate.setMonth(dueDate.getMonth() + i);
+
+            const transactionId = await db.createTransaction({
+              entityId: input.entityId,
+              type: input.type,
+              description: `${input.description} - Parcela ${i + 1}/${count}`,
+              amount: installmentAmount,
+              dueDate,
+              paymentDate: undefined,
+              status: "PENDING",
+              categoryId: input.categoryId,
+              bankAccountId: undefined, // cartão não usa conta bancária
+              paymentMethodId: input.paymentMethodId,
+              isRecurring: false,
+              recurrencePattern: null,
+              parentTransactionId: parentTransactionId,
+              notes: input.notes,
+              ...(input.purchaseDate ? { notes: `Data da compra: ${input.purchaseDate.toLocaleDateString('pt-BR')}${input.notes ? ' | ' + input.notes : ''}` } : {}),
+            } as any);
+
+            // Salvar creditCardId via SQL raw
+            const dbInstance = await getDb();
+            if (dbInstance) {
+              const { sql: sqlTag } = await import("drizzle-orm");
+              await dbInstance.execute(
+                sqlTag`UPDATE transactions SET "creditCardId" = ${input.creditCardId} WHERE id = ${transactionId}`
+              );
+            }
+
+            if (i === 0) {
+              parentTransactionId = transactionId;
+              await db.updateTransaction(transactionId, { parentTransactionId: transactionId });
+            }
+            transactionIds.push(transactionId);
+          }
+
+          const createdTransactions = [];
+          for (const tid of transactionIds) {
+            const t = await db.getTransactionById(tid);
+            if (t) createdTransactions.push(t);
+          }
+          return { id: transactionIds[0], count: transactionIds.length, transactions: createdTransactions };
+        }
+
+        // ── RECORRÊNCIA NORMAL ─────────────────────────────────────────────────
         if (input.isRecurring && input.recurrenceCount && input.recurrenceFrequency) {
           const count = input.recurrenceCount;
           const frequency = input.recurrenceFrequency;
@@ -495,21 +555,11 @@ export const appRouter = router({
 
           for (let i = 0; i < count; i++) {
             let newDueDate = new Date(input.dueDate);
-            
-            // Incrementar data conforme frequência
             switch (frequency) {
-              case "DAY":
-                newDueDate.setDate(newDueDate.getDate() + i);
-                break;
-              case "WEEK":
-                newDueDate.setDate(newDueDate.getDate() + (i * 7));
-                break;
-              case "MONTH":
-                newDueDate.setMonth(newDueDate.getMonth() + i);
-                break;
-              case "YEAR":
-                newDueDate.setFullYear(newDueDate.getFullYear() + i);
-                break;
+              case "DAY": newDueDate.setDate(newDueDate.getDate() + i); break;
+              case "WEEK": newDueDate.setDate(newDueDate.getDate() + (i * 7)); break;
+              case "MONTH": newDueDate.setMonth(newDueDate.getMonth() + i); break;
+              case "YEAR": newDueDate.setFullYear(newDueDate.getFullYear() + i); break;
             }
 
             const transactionId = await db.createTransaction({
@@ -533,11 +583,9 @@ export const appRouter = router({
               parentTransactionId = transactionId;
               await db.updateTransaction(transactionId, { parentTransactionId: transactionId });
             }
-
             transactionIds.push(transactionId);
           }
 
-          // Buscar as transações criadas para retornar os dados completos
           const createdTransactions = [];
           for (const tid of transactionIds) {
             const t = await db.getTransactionById(tid);
@@ -546,7 +594,7 @@ export const appRouter = router({
           return { id: transactionIds[0], count: transactionIds.length, transactions: createdTransactions };
         }
 
-        // Se não for recorrente, criar apenas uma transação
+        // ── TRANSAÇÃO ÚNICA ────────────────────────────────────────────────────
         const transactionId = await db.createTransaction({
           entityId: input.entityId,
           type: input.type,
@@ -556,12 +604,26 @@ export const appRouter = router({
           paymentDate: input.paymentDate,
           status: input.status || "PENDING",
           categoryId: input.categoryId,
-          bankAccountId: input.bankAccountId,
+          bankAccountId: input.creditCardId ? undefined : input.bankAccountId,
           paymentMethodId: input.paymentMethodId,
           isRecurring: false,
           recurrencePattern: null,
-          notes: input.notes,
-        });
+          notes: input.purchaseDate
+            ? `Data da compra: ${input.purchaseDate.toLocaleDateString('pt-BR')}${input.notes ? ' | ' + input.notes : ''}`
+            : input.notes,
+          ...(input.creditCardId ? { creditCardId: input.creditCardId } : {}),
+        } as any);
+
+        // Salvar creditCardId via SQL raw se fornecido
+        if (input.creditCardId) {
+          const dbInstance = await getDb();
+          if (dbInstance) {
+            const { sql: sqlTag } = await import("drizzle-orm");
+            await dbInstance.execute(
+              sqlTag`UPDATE transactions SET "creditCardId" = ${input.creditCardId} WHERE id = ${transactionId}`
+            );
+          }
+        }
 
         return { id: transactionId };
       }),
@@ -579,6 +641,7 @@ export const appRouter = router({
           categoryId: z.number().optional(),
           bankAccountId: z.number().optional(),
           paymentMethodId: z.number().optional(),
+          creditCardId: z.number().optional(),
           notes: z.string().optional(),
           isRecurring: z.boolean().optional(),
           recurrenceCount: z.number().positive().optional(),
@@ -601,6 +664,7 @@ export const appRouter = router({
           categoryId: input.categoryId,
           bankAccountId: input.bankAccountId,
           paymentMethodId: input.paymentMethodId,
+          creditCardId: input.creditCardId,
           notes: input.notes,
         };
 
