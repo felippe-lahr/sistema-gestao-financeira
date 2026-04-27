@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight, Banknote, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -59,6 +59,19 @@ export default function Transactions() {
   const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
   const [bulkCategoryAssignments, setBulkCategoryAssignments] = useState<Record<number, string>>({});
   const [bulkCategorySaving, setBulkCategorySaving] = useState(false);
+  
+  // Estados para grupos de fatura de cartão de crédito
+  const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
+  const [invoiceSheet, setInvoiceSheet] = useState<{ open: boolean; group: any | null }>({ open: false, group: null });
+  const [invoicePayBankAccountId, setInvoicePayBankAccountId] = useState<string>("");
+  const [invoicePdfSheetOpen, setInvoicePdfSheetOpen] = useState(false);
+  const [invoicePdfStep, setInvoicePdfStep] = useState<"upload" | "review" | "done">("upload");
+  const [invoicePdfFile, setInvoicePdfFile] = useState<File | null>(null);
+  const [invoicePdfParsing, setInvoicePdfParsing] = useState(false);
+  const [invoicePdfImporting, setInvoicePdfImporting] = useState(false);
+  const [invoicePdfTransactions, setInvoicePdfTransactions] = useState<any[]>([]);
+  const [invoicePdfMonth, setInvoicePdfMonth] = useState<number | null>(null);
+  const [invoicePdfYear, setInvoicePdfYear] = useState<number | null>(null);
   
   // Resetar mês e ano para o atual ao abrir a página
   useEffect(() => {
@@ -127,6 +140,7 @@ export default function Transactions() {
     {
       entityId: selectedEntityId!,
       type: activeTab === "all" ? undefined : activeTab === "income" ? "INCOME" : "EXPENSE",
+      excludeCreditCard: true,
     },
     { enabled: !!selectedEntityId }
   );
@@ -148,6 +162,14 @@ export default function Transactions() {
   );
   const { data: creditCards } = trpc.creditCards.listByEntity.useQuery(
     { entityId: selectedEntityId! },
+    { enabled: !!selectedEntityId }
+  );
+  
+  // Fetch invoice groups for credit card transactions
+  const { data: invoiceGroups, isLoading: invoiceGroupsLoading } = trpc.creditCards.getInvoiceGroups.useQuery(
+    {
+      entityId: selectedEntityId!,
+    },
     { enabled: !!selectedEntityId }
   );
   
@@ -185,6 +207,19 @@ export default function Transactions() {
     },
     { enabled: !!selectedEntityId }
   );
+
+  // payInvoice mutation for invoice groups in Transactions page
+  const payInvoiceMutation = trpc.creditCards.payInvoice.useMutation({
+    onSuccess: (data) => {
+      const fmt = (c: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(c / 100);
+      toast.success(`Fatura paga com sucesso! ${fmt(data.totalAmount)} debitados da conta.`);
+      setInvoiceSheet({ open: false, group: null });
+      setInvoicePayBankAccountId("");
+      utils.creditCards.getInvoiceGroups.invalidate({ entityId: selectedEntityId! });
+      utils.transactions.listByEntity.invalidate();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao pagar fatura"),
+  });
 
   const createMutation = trpc.transactions.create.useMutation({
     onSuccess: async (data) => {
@@ -703,6 +738,96 @@ export default function Transactions() {
 
   // Transações sem categoria (calculado após filtro)
   const uncategorizedTransactions = filteredTransactions?.filter((t) => !t.categoryId) || [];
+
+  // Filtrar grupos de fatura pelo período selecionado
+  const filteredInvoiceGroups = (invoiceGroups || []).filter((group) => {
+    // Só mostrar grupos de despesa (cartão é sempre despesa) quando tab é "all" ou "expense"
+    if (activeTab === "income") return false;
+    // Filtro de período
+    if (filterPeriod === "month") {
+      return group.year === filterYear && group.month === filterMonth;
+    } else if (filterPeriod === "year") {
+      return group.year === filterYear;
+    } else if (filterPeriod === "custom" && filterStartDate && filterEndDate) {
+      const groupDate = new Date(group.year, group.month - 1, 1);
+      const start = new Date(filterStartDate);
+      const end = new Date(filterEndDate);
+      return groupDate >= start && groupDate <= end;
+    }
+    return true;
+  });
+
+  const MONTH_NAMES_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  const formatCurrencyBRL = (cents: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+
+  function toggleInvoiceExpand(key: string) {
+    setExpandedInvoices((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  async function handleInvoicePdfParse() {
+    if (!invoicePdfFile || !invoiceSheet.group) return;
+    setInvoicePdfParsing(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", invoicePdfFile);
+      formData.append("cardName", invoiceSheet.group.cardName || "Cartão de Crédito");
+      const res = await fetch("/api/credit-cards/import-pdf", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erro ao processar PDF");
+      }
+      const data = await res.json();
+      setInvoicePdfTransactions((data.transactions || []).map((tx: any) => ({ ...tx, selected: true, categoryId: null })));
+      setInvoicePdfMonth(data.invoiceMonth);
+      setInvoicePdfYear(data.invoiceYear);
+      setInvoicePdfStep("review");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao processar PDF");
+    } finally {
+      setInvoicePdfParsing(false);
+    }
+  }
+
+  async function handleInvoicePdfImport() {
+    if (!invoiceSheet.group) return;
+    const toImport = invoicePdfTransactions.filter((tx) => tx.selected);
+    if (toImport.length === 0) { toast.error("Selecione ao menos uma transação"); return; }
+    setInvoicePdfImporting(true);
+    try {
+      for (const tx of toImport) {
+        const dueDate = tx.date ? new Date(tx.date + "T12:00:00") : new Date();
+        await utils.client.transactions.create.mutate({
+          entityId: selectedEntityId!,
+          type: "EXPENSE",
+          description: tx.description,
+          amount: tx.amount / 100,
+          dueDate,
+          status: "PENDING",
+          categoryId: tx.categoryId ?? undefined,
+          creditCardId: invoiceSheet.group.cardId,
+          isRecurring: false,
+        });
+      }
+      toast.success(`${toImport.length} transaç${toImport.length !== 1 ? "ões importadas" : "ão importada"} com sucesso!`);
+      setInvoicePdfStep("done");
+      utils.creditCards.getInvoiceGroups.invalidate({ entityId: selectedEntityId! });
+      utils.transactions.listByEntity.invalidate();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao importar transações");
+    } finally {
+      setInvoicePdfImporting(false);
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive"> = {
@@ -1524,15 +1649,187 @@ export default function Transactions() {
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-4">
-          {transactionsLoading ? (
+          {(transactionsLoading || invoiceGroupsLoading) ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-20 w-full" />
               ))}
             </div>
-          ) : filteredTransactions && filteredTransactions.length > 0 ? (
+          ) : (filteredTransactions && filteredTransactions.length > 0) || filteredInvoiceGroups.length > 0 ? (
             <div className="space-y-3">
-              {filteredTransactions.map((transaction) => (
+              {/* Grupos de fatura de cartão de crédito */}
+              {filteredInvoiceGroups.map((group) => {
+                const groupKey = `${group.cardId}-${group.year}-${group.month}`;
+                const isExpanded = expandedInvoices.has(groupKey);
+                const isPaid = group.isPaid || group.status === "PAID";
+                return (
+                  <Card key={groupKey} className={`overflow-hidden transition-shadow hover:shadow-md ${isPaid ? "border-green-200 dark:border-green-800" : ""}`}>
+                    <CardContent className="p-0">
+                      {/* Header da fatura — clicável para abrir Sheet */}
+                      <div
+                        className="p-4 cursor-pointer select-none"
+                        onClick={() => {
+                          setInvoiceSheet({ open: true, group });
+                          setInvoicePayBankAccountId("");
+                          setInvoicePdfStep("upload");
+                          setInvoicePdfFile(null);
+                          setInvoicePdfTransactions([]);
+                        }}
+                      >
+                        {/* Desktop */}
+                        <div className="hidden md:flex items-center justify-between">
+                          <div className="flex items-center gap-4 flex-1">
+                            <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/30">
+                              <CreditCard className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-sm">Fatura {group.cardName}</h3>
+                                <span className="text-xs text-muted-foreground">
+                                  {MONTH_NAMES_PT[group.month - 1]}/{group.year}
+                                </span>
+                                <span
+                                  className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: group.cardColor || "#7C3AED" }}
+                                />
+                                {isPaid ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                    <CheckCircle2 className="h-3 w-3" />Pago
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                    Pendente
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {group.count} transaç{group.count !== 1 ? "ões" : "ão"} · Vence {group.dueDate ? format(new Date(group.dueDate), "dd/MM/yyyy", { locale: ptBR }) : "—"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <p className="text-base font-bold text-red-600 dark:text-red-400">
+                              -{formatCurrencyBRL(group.total)}
+                            </p>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleInvoiceExpand(groupKey); }}
+                              className="p-1 rounded hover:bg-muted transition-colors"
+                            >
+                              {isExpanded
+                                ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              }
+                            </button>
+                          </div>
+                        </div>
+                        {/* Mobile */}
+                        <div className="md:hidden space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="p-2 rounded-full bg-purple-100 dark:bg-purple-900/30 flex-shrink-0">
+                                <CreditCard className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h3 className="font-semibold text-sm">Fatura {group.cardName}</h3>
+                                  <span className="text-xs text-muted-foreground">{MONTH_NAMES_PT[group.month - 1]}/{group.year}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: group.cardColor || "#7C3AED" }} />
+                                  {isPaid ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                      <CheckCircle2 className="h-3 w-3" />Pago
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                      Pendente
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-muted-foreground">{group.count} transaç{group.count !== 1 ? "ões" : "ão"}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <p className="text-base font-bold text-red-600 dark:text-red-400">
+                                -{formatCurrencyBRL(group.total)}
+                              </p>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleInvoiceExpand(groupKey); }}
+                                className="p-1 rounded hover:bg-muted transition-colors"
+                              >
+                                {isExpanded
+                                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                }
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Transações filhas expandidas */}
+                      {isExpanded && group.transactions && group.transactions.length > 0 && (
+                        <div className="border-t border-border/50 bg-muted/20">
+                          {group.transactions.map((tx: any) => (
+                            <div key={tx.id} className="flex items-center justify-between px-4 py-3 border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="w-1 h-8 rounded-full bg-purple-300 dark:bg-purple-700 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-medium truncate">{tx.description}</span>
+                                    {tx.attachmentCount > 0 && <Paperclip className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+                                    {tx.categoryName && (
+                                      <span
+                                        className="inline-block px-1.5 py-0.5 rounded-full text-xs font-medium"
+                                        style={{
+                                          backgroundColor: (tx.categoryColor || "#6B7280") + "20",
+                                          color: tx.categoryColor || "#6B7280",
+                                        }}
+                                      >
+                                        {tx.parentCategoryName ? `${tx.parentCategoryName} › ` : ""}{tx.categoryName}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {tx.dueDate ? format(new Date(tx.dueDate), "dd/MM/yyyy", { locale: ptBR }) : "—"}
+                                    {" · "}{tx.status === "PAID" ? "Pago" : tx.status === "OVERDUE" ? "Vencido" : "Pendente"}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+                                  -{formatCurrencyBRL(tx.amount)}
+                                </span>
+                                {canWrite && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => handleEdit(tx)}
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {canDelete && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => handleDelete(tx.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {/* Transações normais */}
+              {filteredTransactions && filteredTransactions.map((transaction) => (
                 <Card key={transaction.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     {/* Desktop Layout */}
@@ -1779,6 +2076,234 @@ export default function Transactions() {
       </Tabs>
 
       {/* Drawer de Categorização Rápida Inline - removido, substituído por Popover inline nos cards */}
+
+      {/* Sheet de Fatura de Cartão de Crédito */}
+      <Sheet
+        open={invoiceSheet.open}
+        onOpenChange={(o) => {
+          if (!o) {
+            setInvoiceSheet({ open: false, group: null });
+            setInvoicePayBankAccountId("");
+            setInvoicePdfStep("upload");
+            setInvoicePdfFile(null);
+            setInvoicePdfTransactions([]);
+          }
+        }}
+      >
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
+          {invoiceSheet.group && (
+            <>
+              {/* Header */}
+              <div className="sticky top-0 z-10 border-b bg-white dark:bg-gray-800 px-6 py-4 flex items-center justify-between">
+                <SheetTitle className="text-xl font-bold flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-purple-600" />
+                  Fatura {invoiceSheet.group.cardName}
+                </SheetTitle>
+                <button
+                  onClick={() => setInvoiceSheet({ open: false, group: null })}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              {/* Conteúdo */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                {/* Resumo da fatura */}
+                <div
+                  className="rounded-xl p-4 text-white space-y-1"
+                  style={{ background: `linear-gradient(135deg, ${invoiceSheet.group.cardColor || "#7C3AED"}dd, ${invoiceSheet.group.cardColor || "#7C3AED"}88)` }}
+                >
+                  <p className="text-xs font-medium opacity-80 uppercase tracking-wider">{invoiceSheet.group.cardName}</p>
+                  <p className="text-2xl font-bold">{formatCurrencyBRL(invoiceSheet.group.total)}</p>
+                  <p className="text-xs opacity-80">
+                    Fatura de {MONTH_NAMES_PT[invoiceSheet.group.month - 1]}/{invoiceSheet.group.year}
+                    {" · "}{invoiceSheet.group.count} transaç{invoiceSheet.group.count !== 1 ? "ões" : "ão"}
+                    {" · "}Vence {invoiceSheet.group.dueDate ? format(new Date(invoiceSheet.group.dueDate), "dd/MM/yyyy", { locale: ptBR }) : "—"}
+                  </p>
+                </div>
+
+                {/* Status */}
+                {(invoiceSheet.group.isPaid || invoiceSheet.group.status === "PAID") ? (
+                  <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                    <span>Esta fatura já foi paga.</span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Pagar Fatura */}
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold">Pagar Fatura</h3>
+                      <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-xs text-amber-800 dark:text-amber-200">
+                        <p className="font-medium mb-1">O que acontece ao pagar:</p>
+                        <ul className="space-y-0.5 list-disc list-inside">
+                          <li>Todas as transações pendentes desta fatura serão marcadas como <strong>Pagas</strong></li>
+                          <li>Uma despesa de <strong>{formatCurrencyBRL(invoiceSheet.group.total)}</strong> será lançada na conta selecionada</li>
+                        </ul>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Débitar da conta *</Label>
+                        {bankAccounts && bankAccounts.length > 0 ? (
+                          <Select value={invoicePayBankAccountId} onValueChange={setInvoicePayBankAccountId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a conta bancária" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {bankAccounts.map((acc: any) => (
+                                <SelectItem key={acc.id} value={String(acc.id)}>
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: acc.color || "#6B7280" }} />
+                                    {acc.name}{acc.bank ? ` — ${acc.bank}` : ""}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Nenhuma conta bancária cadastrada.</p>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (!invoiceSheet.group || !invoicePayBankAccountId) return;
+                          payInvoiceMutation.mutate({
+                            cardId: invoiceSheet.group.cardId,
+                            month: invoiceSheet.group.month,
+                            year: invoiceSheet.group.year,
+                            bankAccountId: Number(invoicePayBankAccountId),
+                          });
+                        }}
+                        disabled={!invoicePayBankAccountId || payInvoiceMutation.isPending}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                      >
+                        {payInvoiceMutation.isPending ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processando...</>
+                        ) : (
+                          <><Banknote className="h-4 w-4 mr-2" />Confirmar Pagamento</>
+                        )}
+                      </Button>
+                    </div>
+                    <div className="border-t border-border/50" />
+                  </>
+                )}
+
+                {/* Importar PDF */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Importar PDF da Fatura</h3>
+                  {invoicePdfStep === "upload" && (
+                    <div className="space-y-3">
+                      <div
+                        className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
+                          invoicePdfFile ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                        }`}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files[0];
+                          if (file) setInvoicePdfFile(file);
+                        }}
+                      >
+                        {invoicePdfFile ? (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-primary">{invoicePdfFile.name}</p>
+                            <button
+                              onClick={() => setInvoicePdfFile(null)}
+                              className="text-xs text-muted-foreground hover:text-destructive"
+                            >
+                              Remover arquivo
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Download className="h-8 w-8 mx-auto text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Arraste o PDF aqui ou</p>
+                            <label className="cursor-pointer">
+                              <span className="text-sm text-primary hover:underline">clique para selecionar</span>
+                              <input
+                                type="file"
+                                accept=".pdf"
+                                className="hidden"
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) setInvoicePdfFile(f); }}
+                              />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        onClick={handleInvoicePdfParse}
+                        disabled={!invoicePdfFile || invoicePdfParsing}
+                        className="w-full"
+                      >
+                        {invoicePdfParsing ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processando PDF...</>
+                        ) : (
+                          "Analisar PDF com IA"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  {invoicePdfStep === "review" && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">
+                          {invoicePdfTransactions.filter((t: any) => t.selected).length} de {invoicePdfTransactions.length} transações selecionadas
+                          {invoicePdfMonth && invoicePdfYear ? ` — Fatura ${MONTH_NAMES_PT[invoicePdfMonth - 1]}/${invoicePdfYear}` : ""}
+                        </p>
+                        <div className="flex gap-2">
+                          <button onClick={() => setInvoicePdfTransactions((t: any) => t.map((tx: any) => ({ ...tx, selected: true })))} className="text-xs text-primary hover:underline">Todos</button>
+                          <span className="text-muted-foreground">·</span>
+                          <button onClick={() => setInvoicePdfTransactions((t: any) => t.map((tx: any) => ({ ...tx, selected: false })))} className="text-xs text-muted-foreground hover:underline">Nenhum</button>
+                        </div>
+                      </div>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {invoicePdfTransactions.map((tx: any, i: number) => (
+                          <div key={i} className={`rounded-lg border p-3 transition-colors ${tx.selected ? "border-primary/30 bg-primary/5" : "border-border opacity-50"}`}>
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={tx.selected}
+                                onChange={(e) => setInvoicePdfTransactions((prev: any) => prev.map((t: any, j: number) => j === i ? { ...t, selected: e.target.checked } : t))}
+                                className="mt-1 h-4 w-4 rounded border-gray-300 accent-primary"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-sm font-medium truncate">{tx.description}</p>
+                                  <p className="text-sm font-bold text-red-600 flex-shrink-0">{formatCurrencyBRL(tx.amount)}</p>
+                                </div>
+                                <p className="text-xs text-muted-foreground">{tx.date}{tx.installment ? ` · ${tx.installment}` : ""}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setInvoicePdfStep("upload")} className="flex-1">Voltar</Button>
+                        <Button
+                          onClick={handleInvoicePdfImport}
+                          disabled={invoicePdfTransactions.filter((t: any) => t.selected).length === 0 || invoicePdfImporting}
+                          className="flex-1"
+                        >
+                          {invoicePdfImporting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importando...</> : "Importar Selecionadas"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {invoicePdfStep === "done" && (
+                    <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
+                      <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        <CheckCircle2 className="h-6 w-6 text-green-600" />
+                      </div>
+                      <p className="text-sm font-semibold">Importação concluída!</p>
+                      <Button variant="outline" size="sm" onClick={() => { setInvoicePdfStep("upload"); setInvoicePdfFile(null); setInvoicePdfTransactions([]); }}>
+                        Importar outro PDF
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Drawer de Categorização em Lote */}
       <Sheet open={isBulkCategoryOpen} onOpenChange={(open) => { if (!open) { setIsBulkCategoryOpen(false); setBulkCategoryAssignments({}); } }}>

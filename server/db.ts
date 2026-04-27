@@ -244,6 +244,7 @@ export async function getTransactionsByEntityId(
     type?: "INCOME" | "EXPENSE";
     limit?: number;
     bankAccountId?: number;
+    excludeCreditCard?: boolean; // Exclude credit card transactions (they appear as invoice groups)
   }
 ) {
   const db = await getDb();
@@ -274,6 +275,9 @@ export async function getTransactionsByEntityId(
   }
   if (options?.bankAccountId) {
     conditions.push(eq(transactions.bankAccountId, options.bankAccountId));
+  }
+  if (options?.excludeCreditCard) {
+    conditions.push(sql`transactions."creditCardId" IS NULL`);
   }
   
   // Alias para categoria pai (quando a categoria da transação é uma subcategoria)
