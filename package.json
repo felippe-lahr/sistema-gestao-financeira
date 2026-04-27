@@ -89,6 +89,7 @@
     "node-cron": "^4.2.1",
     "node-fetch": "^2.7.0",
     "ofx-js": "^0.2.0",
+    "pdf-parse": "^2.4.5",
     "pdfkit": "^0.17.2",
     "postgres": "^3.4.7",
     "react": "^19.2.1",

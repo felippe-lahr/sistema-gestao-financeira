@@ -1,11 +1,16 @@
 /**
  * Credit Card PDF Import Routes
  * Rota Express para upload e processamento de faturas de cartão de crédito via IA.
+ *
+ * Estratégia:
+ * 1. Recebe o PDF via multipart/form-data
+ * 2. Extrai o texto do PDF usando pdf-parse (sem depender de S3 ou file_url)
+ * 3. Envia o texto extraído ao LLM para identificar as transações
+ * 4. Retorna o JSON estruturado para revisão no frontend
  */
 import { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { sdk } from "./sdk";
-import { uploadFile } from "./upload";
 import { invokeLLM } from "./llm";
 
 // Multer configurado para aceitar PDF em memória (max 15MB)
@@ -13,7 +18,10 @@ const pdfUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf")) {
+    if (
+      file.mimetype === "application/pdf" ||
+      file.originalname.toLowerCase().endsWith(".pdf")
+    ) {
       cb(null, true);
     } else {
       cb(new Error("Apenas arquivos PDF são aceitos."));
@@ -31,10 +39,28 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+/**
+ * Extrai texto de um buffer PDF usando pdf-parse v2 (PDFParse class)
+ */
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  try {
+    // pdf-parse v2 usa a classe PDFParse com { data: buffer }
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    await parser.destroy();
+    return result.text || "";
+  } catch (err: any) {
+    console.error("[CreditCardImport] pdf-parse error:", err?.message);
+    // Fallback: retornar string vazia para que o LLM tente com o texto disponível
+    return "";
+  }
+}
+
 export function registerCreditCardImportRoutes(app: Express) {
   /**
    * POST /api/credit-cards/import-pdf
-   * Recebe um PDF de fatura de cartão de crédito, faz upload para S3,
+   * Recebe um PDF de fatura de cartão de crédito, extrai o texto com pdf-parse,
    * envia para o LLM e retorna as transações extraídas para revisão.
    * Body: multipart/form-data com campo "file" (PDF) e "cardName" (string)
    */
@@ -51,21 +77,31 @@ export function registerCreditCardImportRoutes(app: Express) {
         if (!req.file) {
           return res.status(400).json({ error: "Nenhum arquivo PDF foi enviado" });
         }
+
         const cardName = req.body?.cardName || "Cartão de Crédito";
 
-        // Upload do PDF para S3 para obter URL pública
-        let pdfUrl: string;
-        try {
-          pdfUrl = await uploadFile(req.file, `users/${user.id}/credit-card-invoices`);
-        } catch (uploadErr: any) {
-          console.error("[CreditCardImport] S3 upload error:", uploadErr);
-          return res.status(500).json({ error: "Erro ao fazer upload do PDF. Verifique a configuração do S3." });
+        // ── Passo 1: Extrair texto do PDF ──────────────────────────────────────
+        console.log(
+          `[CreditCardImport] Processando PDF: ${req.file.originalname} (${req.file.size} bytes)`
+        );
+
+        const pdfText = await extractPdfText(req.file.buffer);
+
+        if (!pdfText || pdfText.trim().length < 50) {
+          return res.status(422).json({
+            error:
+              "Não foi possível extrair texto do PDF. Verifique se o arquivo é uma fatura válida e não está protegido por senha.",
+          });
         }
 
-        // Chamar LLM com o PDF para extrair transações
+        console.log(
+          `[CreditCardImport] Texto extraído: ${pdfText.length} caracteres`
+        );
+
+        // ── Passo 2: Enviar texto ao LLM ───────────────────────────────────────
         const systemPrompt = `Você é um assistente especializado em extrair transações de faturas de cartão de crédito brasileiras.
-Analise o PDF da fatura e extraia TODAS as transações/compras listadas.
-Retorne um JSON com o seguinte formato exato:
+Analise o texto da fatura e extraia TODAS as transações/compras listadas.
+Retorne APENAS um JSON válido com o seguinte formato exato (sem markdown, sem explicações):
 {
   "transactions": [
     {
@@ -81,17 +117,21 @@ Retorne um JSON com o seguinte formato exato:
   "invoice_total": 5678,
   "card_name": "Nome do cartão se visível"
 }
-Regras:
-- amount deve ser em CENTAVOS (inteiro), ex: R$ 12,34 = 1234
-- date no formato YYYY-MM-DD
-- installment: se for parcelado, ex "2/6", senão null
+Regras importantes:
+- amount deve ser em CENTAVOS (inteiro), ex: R$ 12,34 = 1234, R$ 1.234,56 = 123456
+- date no formato YYYY-MM-DD (use o ano da fatura se o dia/mês estiver disponível)
+- installment: se for parcelado, ex "2/6", senão use null
 - category_hint: sugira uma categoria em português (Alimentação, Transporte, Saúde, Lazer, Compras, Educação, Serviços, Outros)
-- Ignore taxas, juros, pagamentos anteriores, créditos e ajustes
+- Ignore taxas, juros, encargos, pagamentos anteriores, créditos e ajustes
 - Inclua TODAS as compras, mesmo as parceladas
-- Se não conseguir ler algum campo, use null`;
+- Se não conseguir ler algum campo, use null
+- Retorne APENAS o JSON, sem texto adicional`;
 
         let extractedData: any = null;
         try {
+          // Limitar o texto a 30.000 caracteres para não exceder o contexto do LLM
+          const truncatedText = pdfText.substring(0, 30000);
+
           const llmResult = await invokeLLM({
             messages: [
               {
@@ -100,19 +140,7 @@ Regras:
               },
               {
                 role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: `Extraia todas as transações desta fatura do cartão "${cardName}":`,
-                  },
-                  {
-                    type: "file_url",
-                    file_url: {
-                      url: pdfUrl,
-                      mime_type: "application/pdf",
-                    },
-                  },
-                ],
+                content: `Extraia todas as transações desta fatura do cartão "${cardName}":\n\n${truncatedText}`,
               },
             ],
             responseFormat: {
@@ -122,31 +150,66 @@ Regras:
 
           const content = llmResult.choices?.[0]?.message?.content;
           if (typeof content === "string") {
-            extractedData = JSON.parse(content);
+            // Limpar possível markdown code block
+            const cleaned = content
+              .replace(/```json\s*/gi, "")
+              .replace(/```\s*/gi, "")
+              .trim();
+            extractedData = JSON.parse(cleaned);
           } else if (content && typeof content === "object") {
             extractedData = content;
           }
         } catch (llmErr: any) {
-          console.error("[CreditCardImport] LLM error:", llmErr);
-          return res.status(500).json({ error: "Erro ao processar o PDF com IA. Tente novamente." });
+          console.error("[CreditCardImport] LLM error:", llmErr?.message);
+          return res.status(500).json({
+            error:
+              "Erro ao processar o PDF com IA. Tente novamente em alguns instantes.",
+          });
         }
 
         if (!extractedData || !Array.isArray(extractedData.transactions)) {
-          return res.status(422).json({ error: "Não foi possível extrair transações do PDF. Verifique se o arquivo é uma fatura válida." });
+          return res.status(422).json({
+            error:
+              "Não foi possível identificar transações no PDF. Verifique se o arquivo é uma fatura de cartão de crédito válida.",
+          });
         }
+
+        // Validar e normalizar as transações
+        const transactions = (extractedData.transactions as any[])
+          .filter((tx) => tx && tx.description && tx.amount != null)
+          .map((tx) => ({
+            description: String(tx.description || "").trim(),
+            amount: Math.abs(Math.round(Number(tx.amount) || 0)),
+            date: tx.date || null,
+            installment: tx.installment || null,
+            category_hint: tx.category_hint || null,
+          }));
+
+        if (transactions.length === 0) {
+          return res.status(422).json({
+            error:
+              "Nenhuma transação válida encontrada no PDF. Verifique se o arquivo é uma fatura de cartão de crédito.",
+          });
+        }
+
+        console.log(
+          `[CreditCardImport] Extraídas ${transactions.length} transações`
+        );
 
         return res.json({
           success: true,
-          pdfUrl,
-          transactions: extractedData.transactions || [],
+          transactions,
           invoiceMonth: extractedData.invoice_month ?? null,
           invoiceYear: extractedData.invoice_year ?? null,
           invoiceTotal: extractedData.invoice_total ?? null,
           cardName: extractedData.card_name || cardName,
+          pdfTextLength: pdfText.length,
         });
       } catch (error: any) {
-        console.error("[CreditCardImport] Unexpected error:", error);
-        return res.status(500).json({ error: "Erro interno ao processar a fatura" });
+        console.error("[CreditCardImport] Unexpected error:", error?.message);
+        return res
+          .status(500)
+          .json({ error: "Erro interno ao processar a fatura" });
       }
     }
   );
