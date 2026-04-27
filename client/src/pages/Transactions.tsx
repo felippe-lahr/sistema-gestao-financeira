@@ -1069,6 +1069,51 @@ export default function Transactions() {
         </SheetContent>
       </Sheet>
 
+      {/* Pay Invoice Sheet */}
+      <Sheet open={payInvoiceSheet.open} onOpenChange={(open) => { if (!open) { setPayInvoiceSheet({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0 }); setPayInvoiceBankAccountId(""); } }}>
+        <SheetContent side="right" className="w-full sm:w-[420px] flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-xl font-bold">Pagar Fatura</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-muted-foreground">Cartão</p>
+              <p className="font-semibold text-lg">{payInvoiceSheet.cardName}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">Transações pendentes</p>
+                <p className="font-semibold text-lg">{payInvoiceSheet.pendingCount}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">Valor total</p>
+                <p className="font-semibold text-lg text-red-600">R$ {Math.abs(payInvoiceSheet.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Conta bancária para débito</label>
+              <Select value={payInvoiceBankAccountId} onValueChange={setPayInvoiceBankAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts?.map((acc: any) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}{acc.bank ? ` (${acc.bank})` : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              className="w-full"
+              disabled={!payInvoiceBankAccountId || payInvoiceMutation.isPending}
+              onClick={handlePayInvoice}
+            >
+              {payInvoiceMutation.isPending ? 'Processando...' : 'Confirmar Pagamento'}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* Filtros */}
       {/* Mobile: Drawer de Filtros */}
       <div className="flex gap-2 items-center flex-wrap md:hidden">
