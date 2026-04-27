@@ -752,8 +752,13 @@ export default function Transactions() {
   });
 
   function openPayInvoiceSheet(group: any) {
-    // Find the cardId from the first transaction in the group
-    const cardId = group.transactions[0]?.creditCardId;
+    // Find the cardId from the first transaction or by matching card name
+    let cardId = group.transactions[0]?.creditCardId;
+    if (!cardId) {
+      // Fallback: find card by name from the creditCards list
+      const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
+      cardId = matchedCard?.id;
+    }
     if (!cardId) {
       toast.error("Não foi possível identificar o cartão");
       return;
@@ -1647,11 +1652,12 @@ export default function Transactions() {
                         <p className="text-base font-bold text-red-600">
                           -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(group.total / 100)}
                         </p>
-                        {canWrite && group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE") && (
+                        {canWrite && (
                           <Button
                             variant="outline"
                             size="sm"
                             className="ml-2 text-xs h-7 hidden md:flex"
+                            disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
                             onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
@@ -1663,16 +1669,19 @@ export default function Transactions() {
                     {expandedCards.has(group.cardName) && (
                       <div className="border-t divide-y">
                         {/* Mobile: Pagar Fatura button */}
-                        {canWrite && group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE") && (
+                        {canWrite && (
                           <div className="md:hidden p-3 bg-muted/30">
                             <Button
                               variant="outline"
                               size="sm"
                               className="w-full text-xs"
+                              disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
                               onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                              Pagar Fatura ({group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length} pendentes)
+                              {group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")
+                                ? `Pagar Fatura (${group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length} pendentes)`
+                                : "Fatura Paga"}
                             </Button>
                           </div>
                         )}
