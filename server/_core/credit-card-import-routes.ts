@@ -4,19 +4,20 @@
  *
  * Estratégia:
  * 1. Recebe o PDF via multipart/form-data
- * 2. Extrai o texto do PDF usando pdf-parse (CJS, sem canvas, sem worker, sem S3)
+ * 2. Extrai o texto do PDF usando pdfjs-dist (lazy-loaded, sem canvas)
  * 3. Envia o texto extraído ao LLM para identificar as transações
  * 4. Retorna o JSON estruturado para revisão no frontend
+ *
+ * IMPORTANTE: Não importar pdf-parse ou pdfjs-dist no nível do módulo!
+ * O pdf-parse v2 usa process.getBuiltinModule que não existe em Node < 22.12
+ * e crasha a aplicação inteira na inicialização.
+ * O pdfjs-dist é importado dinamicamente dentro da função extractPdfText().
  */
 import { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
-import { createRequire } from "module";
+import { resolve } from "path";
 import { sdk } from "./sdk";
 import { invokeLLM } from "./llm";
-
-// pdf-parse é CJS, precisa de createRequire para funcionar em ESM
-const require = createRequire(import.meta.url);
-const { PDFParse } = require("pdf-parse");
 
 // Multer configurado para aceitar PDF em memória (max 15MB)
 const pdfUpload = multer({
@@ -45,16 +46,46 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
- * Extrai texto de um buffer PDF usando pdf-parse (CJS puro, sem dependências nativas)
+ * Extrai texto de um buffer PDF usando pdfjs-dist (lazy-loaded).
+ * O import dinâmico garante que a aplicação não crasha na inicialização
+ * mesmo se o pdfjs-dist tiver problemas.
  */
 async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
-    const pdf = new PDFParse({ data: buffer });
-    const result = await pdf.getText();
-    const text = result?.text || "";
-    return text.trim();
+    // Import dinâmico — só carrega quando a função é chamada
+    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs" as any);
+
+    // Configurar o worker path usando process.cwd() que é sempre /app no Railway
+    const workerPath = resolve(
+      process.cwd(),
+      "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
+    );
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+
+    const uint8Array = new Uint8Array(buffer);
+    const loadingTask = pdfjsLib.getDocument({
+      data: uint8Array,
+      useSystemFonts: true,
+      standardFontDataUrl: undefined,
+    });
+
+    const pdf = await loadingTask.promise;
+    const numPages = pdf.numPages;
+
+    let fullText = "";
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = (content.items as any[])
+        .map((item: any) => (typeof item.str === "string" ? item.str : ""))
+        .join(" ");
+      fullText += pageText + "\n";
+    }
+
+    await pdf.destroy();
+    return fullText.trim();
   } catch (err: any) {
-    console.error("[CreditCardImport] pdf-parse error:", err?.message, err?.stack);
+    console.error("[CreditCardImport] pdfjs-dist error:", err?.message, err?.stack);
     return "";
   }
 }
@@ -62,7 +93,7 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
 export function registerCreditCardImportRoutes(app: Express) {
   /**
    * POST /api/credit-cards/import-pdf
-   * Recebe um PDF de fatura de cartão de crédito, extrai o texto com pdf-parse,
+   * Recebe um PDF de fatura de cartão de crédito, extrai o texto com pdfjs-dist,
    * envia para o LLM e retorna as transações extraídas para revisão.
    * Body: multipart/form-data com campo "file" (PDF) e "cardName" (string)
    */
