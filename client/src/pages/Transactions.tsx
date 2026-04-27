@@ -32,8 +32,8 @@ export default function Transactions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   
-  // Filter states
-  const [filterPeriod, setFilterPeriod] = useState<"all" | "month" | "year" | "custom">("all");
+  // Filter states — initialize with current month by default
+  const [filterPeriod, setFilterPeriod] = useState<"all" | "month" | "year" | "custom">("month");
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
@@ -73,12 +73,7 @@ export default function Transactions() {
   const [invoicePdfMonth, setInvoicePdfMonth] = useState<number | null>(null);
   const [invoicePdfYear, setInvoicePdfYear] = useState<number | null>(null);
   
-  // Resetar mês e ano para o atual ao abrir a página
-  useEffect(() => {
-    setFilterPeriod("month");
-    setFilterYear(new Date().getFullYear());
-    setFilterMonth(new Date().getMonth() + 1);
-  }, []);
+  // filterPeriod already initialized as "month" with current year/month above
   
   // Calcular quantos filtros estao ativos
   const activeFiltersCount = [
@@ -135,12 +130,36 @@ export default function Transactions() {
   const canWrite = myRole === "OWNER" || myRole === "ADMIN" || myRole === "EDITOR";
   const canDelete = myRole === "OWNER" || myRole === "ADMIN";
 
-  // Fetch transactions with filters
+  // Compute filter dates BEFORE queries so they can be passed as query params
+  const getFilterDates = () => {
+    if (filterPeriod === "month") {
+      return {
+        startDate: startOfMonth(new Date(filterYear, filterMonth - 1)),
+        endDate: endOfMonth(new Date(filterYear, filterMonth - 1)),
+      };
+    } else if (filterPeriod === "year") {
+      return {
+        startDate: startOfYear(new Date(filterYear, 0)),
+        endDate: endOfYear(new Date(filterYear, 0)),
+      };
+    } else if (filterPeriod === "custom" && filterStartDate && filterEndDate) {
+      return {
+        startDate: new Date(filterStartDate + "T00:00:00"),
+        endDate: new Date(filterEndDate + "T23:59:59"),
+      };
+    }
+    return { startDate: undefined, endDate: undefined };
+  };
+  const { startDate, endDate } = getFilterDates();
+
+  // Fetch transactions with filters — pass date range to avoid loading all history
   const { data: transactions, isLoading: transactionsLoading } = trpc.transactions.listByEntity.useQuery(
     {
       entityId: selectedEntityId!,
       type: activeTab === "all" ? undefined : activeTab === "income" ? "INCOME" : "EXPENSE",
       excludeCreditCard: true,
+      startDate,
+      endDate,
     },
     { enabled: !!selectedEntityId }
   );
@@ -165,36 +184,15 @@ export default function Transactions() {
     { enabled: !!selectedEntityId }
   );
   
-  // Fetch invoice groups for credit card transactions
+  // Fetch invoice groups for credit card transactions — pass date range for performance
   const { data: invoiceGroups, isLoading: invoiceGroupsLoading } = trpc.creditCards.getInvoiceGroups.useQuery(
     {
       entityId: selectedEntityId!,
+      startDate,
+      endDate,
     },
     { enabled: !!selectedEntityId }
   );
-  
-  // Helper function to get filter dates
-  const getFilterDates = () => {
-    if (filterPeriod === "month") {
-      return {
-        startDate: startOfMonth(new Date(filterYear, filterMonth - 1)),
-        endDate: endOfMonth(new Date(filterYear, filterMonth - 1)),
-      };
-    } else if (filterPeriod === "year") {
-      return {
-        startDate: startOfYear(new Date(filterYear, 0)),
-        endDate: endOfYear(new Date(filterYear, 0)),
-      };
-    } else if (filterPeriod === "custom" && filterStartDate && filterEndDate) {
-      return {
-        startDate: new Date(filterStartDate + "T00:00:00"),
-        endDate: new Date(filterEndDate + "T23:59:59"),
-      };
-    }
-    return { startDate: undefined, endDate: undefined };
-  };
-  
-  const { startDate, endDate } = getFilterDates();
   
   // Fetch transaction summary
   const { data: summary, isLoading: summaryLoading } = trpc.transactions.summary.useQuery(
