@@ -2102,6 +2102,9 @@ function TransactionForm({
         )}
       </div>
 
+      {/* Helper: calcula data de vencimento com base no cartão e data da compra */}
+      {/* (definido inline para ter acesso a creditCards e formData) */}
+
       {/* Cartão de Crédito (apenas para despesas) */}
       {formData.type === "EXPENSE" && creditCards.length > 0 && (
         <div className="space-y-3">
@@ -2125,7 +2128,26 @@ function TransactionForm({
               {/* Seletor do cartão */}
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Cartão</Label>
-                <Select value={formData.creditCardId} onValueChange={(v) => setFormData({ ...formData, creditCardId: v, bankAccountId: "" })}>
+                <Select value={formData.creditCardId} onValueChange={(v) => {
+                  const card = creditCards.find((c) => c.id.toString() === v);
+                  let newDueDate = formData.dueDate;
+                  if (card) {
+                    const purchaseDateStr = formData.purchaseDate || format(new Date(), "yyyy-MM-dd");
+                    const purchase = new Date(purchaseDateStr + "T12:00:00");
+                    const closingDay = card.closingDay || 1;
+                    const dueDay = card.dueDay || 10;
+                    // Se a compra foi antes do fechamento, vence neste mês; senão, no próximo
+                    let dueMonth = purchase.getMonth();
+                    let dueYear = purchase.getFullYear();
+                    if (purchase.getDate() >= closingDay) {
+                      dueMonth += 1;
+                      if (dueMonth > 11) { dueMonth = 0; dueYear += 1; }
+                    }
+                    const dueDate = new Date(dueYear, dueMonth, dueDay);
+                    newDueDate = format(dueDate, "yyyy-MM-dd");
+                  }
+                  setFormData({ ...formData, creditCardId: v, bankAccountId: "", dueDate: newDueDate });
+                }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o cartão" />
                   </SelectTrigger>
@@ -2149,7 +2171,25 @@ function TransactionForm({
                   <Input
                     type="date"
                     value={formData.purchaseDate}
-                    onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
+                    onChange={(e) => {
+                      const newPurchaseDate = e.target.value;
+                      const card = creditCards.find((c) => c.id.toString() === formData.creditCardId);
+                      let newDueDate = formData.dueDate;
+                      if (card && newPurchaseDate) {
+                        const purchase = new Date(newPurchaseDate + "T12:00:00");
+                        const closingDay = card.closingDay || 1;
+                        const dueDay = card.dueDay || 10;
+                        let dueMonth = purchase.getMonth();
+                        let dueYear = purchase.getFullYear();
+                        if (purchase.getDate() >= closingDay) {
+                          dueMonth += 1;
+                          if (dueMonth > 11) { dueMonth = 0; dueYear += 1; }
+                        }
+                        const dueDate = new Date(dueYear, dueMonth, dueDay);
+                        newDueDate = format(dueDate, "yyyy-MM-dd");
+                      }
+                      setFormData({ ...formData, purchaseDate: newPurchaseDate, dueDate: newDueDate });
+                    }}
                     placeholder="dd/mm/aaaa"
                   />
                   <p className="text-xs text-muted-foreground">Quando a compra foi feita</p>
