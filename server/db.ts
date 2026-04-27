@@ -310,6 +310,7 @@ export async function getTransactionsByEntityId(
       importOrigin: transactions.importOrigin,
       bankAccountName: bankAccounts.name,
       bankInstitution: bankAccounts.bank,
+      creditCardId: sql<number | null>`transactions."creditCardId"`,
       creditCardName: sql<string | null>`(SELECT name FROM credit_cards WHERE id = transactions."creditCardId")`,
       creditCardColor: sql<string | null>`(SELECT color FROM credit_cards WHERE id = transactions."creditCardId")`,
       attachmentCount: sql<number>`(SELECT COUNT(*) FROM ${attachments} WHERE ${attachments.transactionId} = ${transactions.id})`,

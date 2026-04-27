@@ -63,6 +63,10 @@ export default function Transactions() {
   // Estado para agrupamento de cartões de crédito (expandir/colapsar)
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   
+  // Estado para pagamento de fatura de cartão
+  const [payInvoiceSheet, setPayInvoiceSheet] = useState<{ open: boolean; cardName: string; cardId: number | null; total: number; pendingCount: number }>({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0 });
+  const [payInvoiceBankAccountId, setPayInvoiceBankAccountId] = useState<string>("");
+  
   // Resetar mês e ano para o atual ao abrir a página
   useEffect(() => {
     setFilterPeriod("month");
@@ -731,6 +735,48 @@ export default function Transactions() {
       if (next.has(cardName)) next.delete(cardName);
       else next.add(cardName);
       return next;
+    });
+  }
+
+  // Mutation para pagar fatura do cartão
+  const payInvoiceMutation = trpc.creditCards.payInvoice.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Fatura paga com sucesso! ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(data.totalAmount / 100)} debitados da conta.`);
+      setPayInvoiceSheet({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0 });
+      setPayInvoiceBankAccountId("");
+      utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
+      utils.dashboard.metrics.invalidate();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao pagar fatura"),
+  });
+
+  function openPayInvoiceSheet(group: any) {
+    // Find the cardId from the first transaction in the group
+    const cardId = group.transactions[0]?.creditCardId;
+    if (!cardId) {
+      toast.error("Não foi possível identificar o cartão");
+      return;
+    }
+    const pendingTxs = group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE");
+    if (pendingTxs.length === 0) {
+      toast.info("Todas as transações desta fatura já estão pagas");
+      return;
+    }
+    const pendingTotal = pendingTxs.reduce((sum: number, t: any) => sum + t.amount, 0);
+    setPayInvoiceSheet({ open: true, cardName: group.cardName, cardId: Number(cardId), total: pendingTotal, pendingCount: pendingTxs.length });
+    if (bankAccounts && bankAccounts.length > 0) {
+      setPayInvoiceBankAccountId(String(bankAccounts[0].id));
+    }
+  }
+
+  function handlePayInvoice() {
+    if (!payInvoiceSheet.cardId || !payInvoiceBankAccountId) return;
+    payInvoiceMutation.mutate({
+      cardId: payInvoiceSheet.cardId,
+      month: filterMonth,
+      year: filterYear,
+      bankAccountId: Number(payInvoiceBankAccountId),
     });
   }
 
@@ -1584,12 +1630,52 @@ export default function Transactions() {
                           <p className="text-xs text-muted-foreground">{group.transactions.length} transaç{group.transactions.length === 1 ? 'ão' : 'ões'}</p>
                         </div>
                       </div>
-                      <p className="text-base font-bold text-red-600">
-                        -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(group.total / 100)}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const pendingCount = group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length;
+                          const allPaid = pendingCount === 0;
+                          return (
+                            <>
+                              {allPaid ? (
+                                <Badge variant="default" className="bg-green-600 text-xs">Pago</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs">{pendingCount} pendente{pendingCount > 1 ? 's' : ''}</Badge>
+                              )}
+                            </>
+                          );
+                        })()}
+                        <p className="text-base font-bold text-red-600">
+                          -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(group.total / 100)}
+                        </p>
+                        {canWrite && group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-2 text-xs h-7 hidden md:flex"
+                            onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            Pagar Fatura
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     {expandedCards.has(group.cardName) && (
                       <div className="border-t divide-y">
+                        {/* Mobile: Pagar Fatura button */}
+                        {canWrite && group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE") && (
+                          <div className="md:hidden p-3 bg-muted/30">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-xs"
+                              onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                              Pagar Fatura ({group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length} pendentes)
+                            </Button>
+                          </div>
+                        )}
                         {group.transactions.map((transaction: any) => (
                           <div key={transaction.id} className="p-3 pl-12 hover:bg-muted/30 transition-colors">
                             {/* Desktop */}
@@ -1636,9 +1722,21 @@ export default function Transactions() {
                                   {getCategoryHierarchyBadge(transaction)}
                                   {getStatusBadge(transaction.status)}
                                 </div>
-                                <p className="text-xs text-muted-foreground">
-                                  {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
-                                </p>
+                                <div className="flex items-center gap-1">
+                                  <p className="text-xs text-muted-foreground">
+                                    {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                                  </p>
+                                  {canWrite && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(transaction); }}>
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {canDelete && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDelete(transaction.id); }}>
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
