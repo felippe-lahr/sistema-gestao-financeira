@@ -2587,22 +2587,23 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const dbInstance = await getDb();
         if (!dbInstance) return null;
-        const { creditCards, transactions } = await import("../drizzle/schema");
-        const { eq, and } = await import("drizzle-orm");
+        const { creditCards } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const { sql: sqlTag } = await import("drizzle-orm");
         const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
         if (!card) return null;
         const now = new Date();
         let invoiceMonth = now.getMonth() + 1;
         let invoiceYear = now.getFullYear();
-        if (now.getDate() > card.closingDay) {
+        if (now.getDate() >= card.closingDay) {
           if (invoiceMonth === 12) { invoiceMonth = 1; invoiceYear++; }
           else { invoiceMonth++; }
         }
-        const invoiceTxs = await dbInstance
-          .select({ amount: transactions.amount })
-          .from(transactions)
-          .where(and(eq(transactions.creditCardId, input.cardId), eq(transactions.status, "PENDING")));
-        const usedAmount = invoiceTxs.reduce((acc, t) => acc + t.amount, 0);
+        // Usar SQL raw porque creditCardId não está no schema Drizzle
+        const result = await dbInstance.execute(
+          sqlTag`SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE "creditCardId" = ${input.cardId}`
+        );
+        const usedAmount = Number((result.rows[0] as any)?.total ?? 0);
         const availableLimit = card.creditLimit - usedAmount;
         const dueDate = new Date(invoiceYear, invoiceMonth - 1, card.dueDay);
         return {
@@ -2617,6 +2618,46 @@ export const appRouter = router({
         };
       }),
 
+    // Retorna faturas agrupadas por mês (próximos N meses)
+    getInvoicesByMonth: protectedProcedure
+      .input(z.object({ cardId: z.number(), months: z.number().default(6) }))
+      .query(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) return [];
+        const { creditCards } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const { sql: sqlTag } = await import("drizzle-orm");
+        const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
+        if (!card) return [];
+        // Buscar todas as transações do cartão agrupadas por mês/ano do dueDate
+        const rows = await dbInstance.execute(
+          sqlTag`
+            SELECT
+              EXTRACT(YEAR FROM "dueDate") as year,
+              EXTRACT(MONTH FROM "dueDate") as month,
+              SUM(amount) as total,
+              COUNT(*) as count
+            FROM transactions
+            WHERE "creditCardId" = ${input.cardId}
+            GROUP BY EXTRACT(YEAR FROM "dueDate"), EXTRACT(MONTH FROM "dueDate")
+            ORDER BY year ASC, month ASC
+          `
+        );
+        return (rows.rows as any[]).map((row) => {
+          const year = Number(row.year);
+          const month = Number(row.month);
+          const dueDate = new Date(year, month - 1, card.dueDay);
+          return {
+            year,
+            month,
+            total: Number(row.total),
+            count: Number(row.count),
+            dueDate,
+            isPaid: dueDate < new Date(),
+          };
+        });
+      }),
+
     listTransactions: protectedProcedure
       .input(z.object({
         cardId: z.number(),
@@ -2626,20 +2667,20 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const dbInstance = await getDb();
         if (!dbInstance) return [];
-        const { transactions } = await import("../drizzle/schema");
-        const { eq, and, gte, lte } = await import("drizzle-orm");
-        const conditions: any[] = [eq(transactions.creditCardId, input.cardId)];
+        const { sql: sqlTag } = await import("drizzle-orm");
+        // Usar SQL raw porque creditCardId não está no schema Drizzle
         if (input.month && input.year) {
-          const start = new Date(input.year, input.month - 1, 1);
-          const end = new Date(input.year, input.month, 0, 23, 59, 59);
-          conditions.push(gte(transactions.dueDate, start));
-          conditions.push(lte(transactions.dueDate, end));
+          const start = new Date(input.year, input.month - 1, 1).toISOString();
+          const end = new Date(input.year, input.month, 0, 23, 59, 59).toISOString();
+          const result = await dbInstance.execute(
+            sqlTag`SELECT * FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${start} AND "dueDate" <= ${end} ORDER BY "dueDate" ASC`
+          );
+          return result.rows;
         }
-        return dbInstance
-          .select()
-          .from(transactions)
-          .where(and(...conditions))
-          .orderBy(transactions.dueDate);
+        const result = await dbInstance.execute(
+          sqlTag`SELECT * FROM transactions WHERE "creditCardId" = ${input.cardId} ORDER BY "dueDate" ASC`
+        );
+        return result.rows;
       }),
   }),
 });

@@ -430,6 +430,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
 // ─── Card visual de um cartão ─────────────────────────────────────────────────
 function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => void; onDelete: () => void }) {
   const { data: summary } = trpc.creditCards.getSummary.useQuery({ cardId: card.id });
+  const { data: invoices } = trpc.creditCards.getInvoicesByMonth.useQuery({ cardId: card.id, months: 6 });
+  const [showInvoices, setShowInvoices] = useState(false);
 
   const usagePercent = summary?.usagePercent ?? 0;
   const usedAmount = summary?.usedAmount ?? 0;
@@ -437,6 +439,8 @@ function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => v
   const dueDate = summary?.dueDate ? new Date(summary.dueDate) : null;
 
   const usageColor = usagePercent >= 90 ? "bg-red-500" : usagePercent >= 70 ? "bg-amber-500" : "bg-green-500";
+
+  const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
   return (
     <div className="rounded-2xl overflow-hidden shadow-md border border-border/50 flex flex-col">
@@ -498,11 +502,66 @@ function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => v
           </div>
         </div>
 
-        {/* Vencimento */}
+        {/* Vencimento próxima fatura */}
         {dueDate && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t border-border/50">
             <Clock className="h-3 w-3" />
-            <span>Vence em {format(dueDate, "dd 'de' MMMM", { locale: ptBR })}</span>
+            <span>Próxima fatura vence em {format(dueDate, "dd 'de' MMMM", { locale: ptBR })}</span>
+          </div>
+        )}
+
+        {/* Botão para ver faturas por mês */}
+        {invoices && invoices.length > 0 && (
+          <div className="pt-1 border-t border-border/50">
+            <button
+              onClick={() => setShowInvoices(!showInvoices)}
+              className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
+            >
+              <span>Faturas por mês ({invoices.length})</span>
+              <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showInvoices ? "rotate-90" : ""}`} />
+            </button>
+
+            {showInvoices && (
+              <div className="mt-2 space-y-1.5">
+                {invoices.map((inv: any) => {
+                  const invDue = new Date(inv.dueDate);
+                  const isCurrentMonth = invDue.getMonth() === new Date().getMonth() && invDue.getFullYear() === new Date().getFullYear();
+                  const isPast = invDue < new Date();
+                  return (
+                    <div
+                      key={`${inv.year}-${inv.month}`}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
+                        isCurrentMonth
+                          ? "bg-primary/10 border border-primary/20"
+                          : isPast
+                          ? "bg-muted/50 opacity-60"
+                          : "bg-muted/30"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {isPast ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        ) : isCurrentMonth ? (
+                          <AlertCircle className="h-3 w-3 text-primary" />
+                        ) : (
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                        )}
+                        <span className="font-medium">
+                          {MONTH_NAMES[inv.month - 1]}/{inv.year}
+                          {isCurrentMonth && <span className="ml-1 text-primary">(atual)</span>}
+                        </span>
+                        <span className="text-muted-foreground">{inv.count} compra{inv.count !== 1 ? "s" : ""}</span>
+                      </div>
+                      <span className={`font-semibold ${
+                        isPast ? "text-muted-foreground" : isCurrentMonth ? "text-primary" : "text-foreground"
+                      }`}>
+                        {formatCurrency(inv.total)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
