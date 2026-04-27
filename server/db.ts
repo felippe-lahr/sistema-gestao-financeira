@@ -1,4 +1,4 @@
-import { eq, or, and, isNull, desc, asc, gte, lte, sql } from "drizzle-orm";
+import { eq, or, and, isNull, desc, asc, gte, lte, sql, aliasedTable } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -33,6 +33,7 @@ import {
   organizationMembers,
   entityMembers,
   entityInvites,
+  creditCards,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -275,6 +276,10 @@ export async function getTransactionsByEntityId(
     conditions.push(eq(transactions.bankAccountId, options.bankAccountId));
   }
   
+  // Alias para categoria pai (quando a categoria da transação é uma subcategoria)
+  const parentCats = aliasedTable(categories, 'parent_cats');
+  const creditCardsAlias = aliasedTable(creditCards, 'cc_alias');
+
   let query = db
     .select({
       id: transactions.id,
@@ -295,13 +300,19 @@ export async function getTransactionsByEntityId(
       updatedAt: transactions.updatedAt,
       categoryName: categories.name,
       categoryColor: categories.color,
+      parentCategoryId: categories.parentId,
+      parentCategoryName: parentCats.name,
+      parentCategoryColor: parentCats.color,
       importOrigin: transactions.importOrigin,
       bankAccountName: bankAccounts.name,
       bankInstitution: bankAccounts.bank,
+      creditCardName: sql<string | null>`(SELECT name FROM credit_cards WHERE id = transactions."creditCardId")`,
+      creditCardColor: sql<string | null>`(SELECT color FROM credit_cards WHERE id = transactions."creditCardId")`,
       attachmentCount: sql<number>`(SELECT COUNT(*) FROM ${attachments} WHERE ${attachments.transactionId} = ${transactions.id})`,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .leftJoin(parentCats, eq(categories.parentId, parentCats.id))
     .leftJoin(bankAccounts, eq(transactions.bankAccountId, bankAccounts.id))
     .where(and(...conditions))
     .$dynamic();

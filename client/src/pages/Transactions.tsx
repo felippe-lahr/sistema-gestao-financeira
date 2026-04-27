@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -723,6 +723,47 @@ export default function Transactions() {
       <Badge style={{ backgroundColor: color || "#6B7280", color: "#fff" }} className="font-normal">
         {name}
       </Badge>
+    );
+  };
+
+  // Badge de categoria com hierarquia (pai > subcategoria)
+  const getCategoryHierarchyBadge = (transaction: any) => {
+    const categoryId = transaction.categoryId;
+    if (!categoryId) return null;
+    const catName = transaction.categoryName || categories?.find((c: any) => c.id === categoryId)?.name;
+    const catColor = transaction.categoryColor || categories?.find((c: any) => c.id === categoryId)?.color || "#6B7280";
+    const parentName = transaction.parentCategoryName;
+    const parentColor = transaction.parentCategoryColor || catColor;
+    if (!catName) return null;
+    if (parentName) {
+      // É uma subcategoria: mostrar pai > filho
+      return (
+        <span className="inline-flex items-center gap-0.5 rounded-full overflow-hidden text-xs font-medium border" style={{ borderColor: parentColor + '55' }}>
+          <span className="px-2 py-0.5" style={{ backgroundColor: parentColor + '22', color: parentColor }}>{ parentName }</span>
+          <span className="px-2 py-0.5 text-white" style={{ backgroundColor: catColor }}>{ catName }</span>
+        </span>
+      );
+    }
+    return (
+      <Badge style={{ backgroundColor: catColor, color: "#fff" }} className="font-normal">
+        {catName}
+      </Badge>
+    );
+  };
+
+  // Badge de cartão de crédito
+  const getCreditCardBadge = (transaction: any) => {
+    const cardName = transaction.creditCardName;
+    const cardColor = transaction.creditCardColor;
+    if (!cardName) return null;
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+        style={{ backgroundColor: cardColor || '#6366f1' }}
+      >
+        <CreditCard className="h-3 w-3" />
+        {cardName}
+      </span>
     );
   };
 
@@ -1537,7 +1578,8 @@ export default function Transactions() {
                             {transaction.attachmentCount > 0 && (
                               <Paperclip className="h-4 w-4 text-muted-foreground" />
                             )}
-                            {getCategoryBadge(transaction.categoryId, (transaction as any).categoryName, (transaction as any).categoryColor)}
+                            {getCategoryHierarchyBadge(transaction)}
+                            {getCreditCardBadge(transaction)}
                             {!transaction.categoryId && canWrite && (
                               <Popover>
                                 <PopoverTrigger asChild>
@@ -1658,7 +1700,8 @@ export default function Transactions() {
 
                       {/* Row 2: Category Badge + OFX Badge */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        {getCategoryBadge(transaction.categoryId, (transaction as any).categoryName, (transaction as any).categoryColor)}
+                        {getCategoryHierarchyBadge(transaction)}
+                        {getCreditCardBadge(transaction)}
                         {!transaction.categoryId && canWrite && (
                           <Popover>
                             <PopoverTrigger asChild>
