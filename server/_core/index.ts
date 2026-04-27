@@ -14,6 +14,7 @@ import { registerGoogleAuthRoutes } from "./google-auth";
 import { registerUploadRoutes } from "./upload-routes";
 import { registerStripeRoutes } from "./stripe-routes";
 import { registerOfxRoutes } from "./ofx-routes";
+import { registerCreditCardImportRoutes } from "./credit-card-import-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
@@ -138,6 +139,8 @@ async function startServer() {
   registerUploadRoutes(app);
   // OFX import routes
   registerOfxRoutes(app);
+  // Credit card PDF import routes
+  registerCreditCardImportRoutes(app);
   // Stripe billing routes (webhook must come before json body parser)
   registerStripeRoutes(app);
 

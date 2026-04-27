@@ -2600,8 +2600,9 @@ export const appRouter = router({
           else { invoiceMonth++; }
         }
         // Usar SQL raw porque creditCardId não está no schema Drizzle
+        // Conta apenas transações PENDING (faturas pagas liberam o limite)
         const result = await dbInstance.execute(
-          sqlTag`SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE "creditCardId" = ${input.cardId}`
+          sqlTag`SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE "creditCardId" = ${input.cardId} AND status != 'PAID'`
         );
         const usedAmount = Number((result.rows[0] as any)?.total ?? 0);
         const availableLimit = card.creditLimit - usedAmount;
@@ -2624,7 +2625,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const dbInstance = await getDb();
         if (!dbInstance) return [];
-        const { creditCards } = await import("../drizzle/schema");
+        const { creditCards, creditCardInvoices } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
         const { sql: sqlTag } = await import("drizzle-orm");
         const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
@@ -2643,19 +2644,107 @@ export const appRouter = router({
             ORDER BY year ASC, month ASC
           `
         );
+        // Buscar registros de fatura já pagos na tabela credit_card_invoices
+        const invoiceRecords = await dbInstance
+          .select()
+          .from(creditCardInvoices)
+          .where(eq(creditCardInvoices.creditCardId, input.cardId));
+        const invoiceMap = new Map<string, any>();
+        for (const inv of invoiceRecords) {
+          invoiceMap.set(`${inv.year}-${inv.month}`, inv);
+        }
         return (rows.rows as any[]).map((row) => {
           const year = Number(row.year);
           const month = Number(row.month);
           const dueDate = new Date(year, month - 1, card.dueDay);
+          const invoiceRecord = invoiceMap.get(`${year}-${month}`);
+          const status = invoiceRecord?.status ?? "OPEN";
           return {
             year,
             month,
             total: Number(row.total),
             count: Number(row.count),
             dueDate,
-            isPaid: dueDate < new Date(),
+            isPaid: status === "PAID",
+            status,
+            invoiceId: invoiceRecord?.id ?? null,
+            paidFromAccountId: invoiceRecord?.paidFromAccountId ?? null,
           };
         });
+      }),
+    payInvoice: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        month: z.number().min(1).max(12),
+        year: z.number().min(2000).max(2100),
+        bankAccountId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards, creditCardInvoices } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const { sql: sqlTag } = await import("drizzle-orm");
+        // Verificar acesso ao cartão
+        const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
+        if (!card) throw new TRPCError({ code: "NOT_FOUND", message: "Cartão não encontrado" });
+        await requireEntityAccess(card.entityId, ctx.user.id, "EDITOR");
+        // Buscar todas as transações PENDING do cartão naquele mês/ano
+        const startDate = new Date(input.year, input.month - 1, 1).toISOString();
+        const endDate = new Date(input.year, input.month, 0, 23, 59, 59).toISOString();
+        const txRows = await dbInstance.execute(
+          sqlTag`SELECT id, amount FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status = 'PENDING'`
+        );
+        const pendingTxs = txRows.rows as any[];
+        if (pendingTxs.length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Não há transações pendentes nesta fatura" });
+        }
+        const totalAmount = pendingTxs.reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
+        const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+        // Criar transação de despesa na conta bancária
+        const paymentDescription = `Pagamento Fatura ${card.name} - ${MONTH_NAMES[input.month - 1]}/${input.year}`;
+        const paymentTxId = await db.createTransaction({
+          entityId: card.entityId,
+          type: "EXPENSE",
+          description: paymentDescription,
+          amount: totalAmount,
+          dueDate: new Date(),
+          paymentDate: new Date(),
+          status: "PAID",
+          bankAccountId: input.bankAccountId,
+          categoryId: null,
+          paymentMethodId: null,
+          isRecurring: false,
+          recurrencePattern: null,
+          notes: `Pagamento automático de fatura do cartão ${card.name}`,
+        });
+        // Marcar todas as transações do cartão naquele mês como PAID
+        await dbInstance.execute(
+          sqlTag`UPDATE transactions SET status = 'PAID', "paymentDate" = NOW(), "updatedAt" = NOW() WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status = 'PENDING'`
+        );
+        // Upsert na tabela credit_card_invoices
+        const existingInvoice = await dbInstance
+          .select()
+          .from(creditCardInvoices)
+          .where(and(eq(creditCardInvoices.creditCardId, input.cardId), eq(creditCardInvoices.month, input.month), eq(creditCardInvoices.year, input.year)))
+          .limit(1);
+        if (existingInvoice.length > 0) {
+          await dbInstance.update(creditCardInvoices)
+            .set({ status: "PAID", paidAt: new Date(), paidFromAccountId: input.bankAccountId, totalAmount, updatedAt: new Date() })
+            .where(eq(creditCardInvoices.id, existingInvoice[0].id));
+        } else {
+          await dbInstance.insert(creditCardInvoices).values({
+            creditCardId: input.cardId,
+            month: input.month,
+            year: input.year,
+            status: "PAID",
+            totalAmount,
+            dueDate: new Date(input.year, input.month - 1, card.dueDay),
+            paidAt: new Date(),
+            paidFromAccountId: input.bankAccountId,
+          });
+        }
+        return { success: true, paymentTxId, totalAmount };
       }),
 
     listTransactions: protectedProcedure

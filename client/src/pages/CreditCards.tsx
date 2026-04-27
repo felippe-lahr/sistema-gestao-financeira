@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,11 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  Banknote,
+  FileUp,
+  Loader2,
+  Upload,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -62,6 +67,8 @@ const BRAND_COLORS: Record<string, string> = {
   OTHER: "#6B7280",
 };
 
+const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 }
@@ -69,7 +76,6 @@ function formatCurrency(cents: number) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function CreditCards() {
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
-
   const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery(undefined, {
     onSuccess: (data) => {
       if (!selectedEntityId && data && data.length > 0) {
@@ -77,11 +83,9 @@ export default function CreditCards() {
       }
     },
   });
-
   if (!selectedEntityId && entities && entities.length > 0) {
     setSelectedEntityId(entities[0].id);
   }
-
   if (entitiesLoading) {
     return (
       <div className="p-6 space-y-4">
@@ -92,7 +96,6 @@ export default function CreditCards() {
       </div>
     );
   }
-
   if (!entities || entities.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
@@ -101,7 +104,6 @@ export default function CreditCards() {
       </div>
     );
   }
-
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Cabeçalho */}
@@ -124,21 +126,41 @@ export default function CreditCards() {
           </Select>
         )}
       </div>
-
       {selectedEntityId && (
         <CreditCardsContent entityId={selectedEntityId} />
       )}
     </div>
   );
 }
-
 // ─── Conteúdo da entidade selecionada ─────────────────────────────────────────
+type PdfImportStep = "upload" | "review" | "done";
+type PdfTransaction = {
+  description: string;
+  amount: number;
+  date: string;
+  installment: string | null;
+  category_hint: string | null;
+  selected: boolean;
+  categoryId: number | null;
+};
+
 function CreditCardsContent({ entityId }: { entityId: number }) {
   const utils = trpc.useUtils();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<any>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; cardId: number | null }>({ open: false, cardId: null });
-
+  // PDF Import state
+  const [pdfSheetOpen, setPdfSheetOpen] = useState(false);
+  const [pdfStep, setPdfStep] = useState<PdfImportStep>("upload");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfCardId, setPdfCardId] = useState<string>("");
+  const [pdfParsing, setPdfParsing] = useState(false);
+  const [pdfImporting, setPdfImporting] = useState(false);
+  const [pdfTransactions, setPdfTransactions] = useState<PdfTransaction[]>([]);
+  const [pdfInvoiceMonth, setPdfInvoiceMonth] = useState<number | null>(null);
+  const [pdfInvoiceYear, setPdfInvoiceYear] = useState<number | null>(null);
+  const [pdfIsDragging, setPdfIsDragging] = useState(false);
+  const { data: categories } = trpc.categories.listByEntity.useQuery({ entityId }, { enabled: pdfSheetOpen });
   const [form, setForm] = useState({
     name: "",
     brand: "OTHER" as string,
@@ -148,9 +170,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     dueDay: "10",
     color: "#7C3AED",
   });
-
   const { data: cards, isLoading } = trpc.creditCards.listByEntity.useQuery({ entityId });
-
   const createMutation = trpc.creditCards.create.useMutation({
     onSuccess: () => {
       utils.creditCards.listByEntity.invalidate({ entityId });
@@ -160,7 +180,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     },
     onError: (err) => toast.error(err.message),
   });
-
   const updateMutation = trpc.creditCards.update.useMutation({
     onSuccess: () => {
       utils.creditCards.listByEntity.invalidate({ entityId });
@@ -171,7 +190,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     },
     onError: (err) => toast.error(err.message),
   });
-
   const deactivateMutation = trpc.creditCards.deactivate.useMutation({
     onSuccess: () => {
       utils.creditCards.listByEntity.invalidate({ entityId });
@@ -180,17 +198,14 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     },
     onError: (err) => toast.error(err.message),
   });
-
   function resetForm() {
     setForm({ name: "", brand: "OTHER", lastFourDigits: "", creditLimit: "", closingDay: "1", dueDay: "10", color: "#7C3AED" });
   }
-
   function openCreate() {
     setEditingCard(null);
     resetForm();
     setSheetOpen(true);
   }
-
   function openEdit(card: any) {
     setEditingCard(card);
     setForm({
@@ -204,7 +219,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     });
     setSheetOpen(true);
   }
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const limitValue = parseCurrency(form.creditLimit);
@@ -232,7 +246,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       });
     }
   }
-
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -240,9 +253,108 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       </div>
     );
   }
-
+  async function handlePdfFile(file: File) {
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      toast.error("Apenas arquivos PDF são aceitos");
+      return;
+    }
+    setPdfFile(file);
+  }
+  async function handlePdfParse() {
+    if (!pdfFile || !pdfCardId) {
+      toast.error("Selecione o cartão e o arquivo PDF");
+      return;
+    }
+    const selectedCard = cards?.find((c: any) => String(c.id) === pdfCardId);
+    setPdfParsing(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", pdfFile);
+      formData.append("cardName", selectedCard?.name || "Cartão de Crédito");
+      const res = await fetch("/api/credit-cards/import-pdf", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erro ao processar PDF");
+      }
+      const data = await res.json();
+      setPdfTransactions((data.transactions || []).map((tx: any) => ({
+        ...tx,
+        selected: true,
+        categoryId: null,
+      })));
+      setPdfInvoiceMonth(data.invoiceMonth);
+      setPdfInvoiceYear(data.invoiceYear);
+      setPdfStep("review");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao processar PDF");
+    } finally {
+      setPdfParsing(false);
+    }
+  }
+  async function handlePdfImport() {
+    const selectedCard = cards?.find((c: any) => String(c.id) === pdfCardId);
+    if (!selectedCard) return;
+    const toImport = pdfTransactions.filter((tx) => tx.selected);
+    if (toImport.length === 0) {
+      toast.error("Selecione ao menos uma transação para importar");
+      return;
+    }
+    setPdfImporting(true);
+    try {
+      for (const tx of toImport) {
+        const dueDate = tx.date ? new Date(tx.date + "T12:00:00") : new Date();
+        // amount do LLM já está em centavos, mas o create mutation espera valor em reais (converte internamente)
+        // Então passamos amount / 100 para que o backend faça Math.round(amount * 100)
+        await utils.client.transactions.create.mutate({
+          entityId,
+          type: "EXPENSE",
+          description: tx.description,
+          amount: tx.amount / 100,
+          dueDate,
+          status: "PENDING",
+          categoryId: tx.categoryId ?? undefined,
+          creditCardId: selectedCard.id,
+          isRecurring: false,
+        });
+      }
+      toast.success(`${toImport.length} transaç${toImport.length !== 1 ? "ões importadas" : "ão importada"} com sucesso!`);
+      setPdfStep("done");
+      utils.creditCards.getSummary.invalidate({ cardId: selectedCard.id });
+      utils.creditCards.getInvoicesByMonth.invalidate({ cardId: selectedCard.id });
+      utils.transactions.listByEntity.invalidate();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao importar transações");
+    } finally {
+      setPdfImporting(false);
+    }
+  }
+  function closePdfSheet() {
+    setPdfSheetOpen(false);
+    setPdfStep("upload");
+    setPdfFile(null);
+    setPdfCardId("");
+    setPdfTransactions([]);
+    setPdfInvoiceMonth(null);
+    setPdfInvoiceYear(null);
+  }
   return (
     <>
+      {/* Botão de importar PDF */}
+      <div className="flex justify-end mb-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => { setPdfSheetOpen(true); setPdfStep("upload"); }}
+          className="flex items-center gap-2"
+        >
+          <FileUp className="h-4 w-4" />
+          Importar Fatura PDF
+        </Button>
+      </div>
       {/* Grid de cartões */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Botão de adicionar */}
@@ -255,18 +367,17 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           </div>
           <span className="text-sm font-medium">Novo Cartão</span>
         </button>
-
         {/* Cards dos cartões */}
         {cards?.map((card) => (
           <CreditCardCard
             key={card.id}
             card={card}
+            entityId={entityId}
             onEdit={() => openEdit(card)}
             onDelete={() => setDeleteDialog({ open: true, cardId: card.id })}
           />
         ))}
       </div>
-
       {/* Sheet de criação/edição */}
       <Sheet open={sheetOpen} onOpenChange={(o) => { setSheetOpen(o); if (!o) { setEditingCard(null); resetForm(); } }}>
         <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
@@ -277,27 +388,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
               <X className="h-5 w-5" />
             </button>
           </div>
-
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-            {/* Conteúdo Scrollável */}
             <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
-            {/* Preview do cartão */}
-            <div
-              className="h-36 rounded-2xl p-5 flex flex-col justify-between text-white shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${form.color}dd, ${form.color}88)` }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium opacity-80">{BRAND_LABELS[form.brand] || "Cartão"}</span>
-                <CreditCard className="h-6 w-6 opacity-70" />
-              </div>
-              <div>
-                <p className="text-lg font-bold tracking-wider">
-                  {form.lastFourDigits ? `•••• •••• •••• ${form.lastFourDigits}` : "•••• •••• •••• ••••"}
-                </p>
-                <p className="text-sm opacity-80 mt-1">{form.name || "Nome do cartão"}</p>
-              </div>
-            </div>
-
             {/* Nome */}
             <div className="space-y-1.5">
               <Label>Nome do Cartão *</Label>
@@ -308,7 +400,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                 required
               />
             </div>
-
             {/* Bandeira */}
             <div className="space-y-1.5">
               <Label>Bandeira</Label>
@@ -321,7 +412,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                 </SelectContent>
               </Select>
             </div>
-
             {/* Últimos 4 dígitos */}
             <div className="space-y-1.5">
               <Label>Últimos 4 Dígitos</Label>
@@ -332,7 +422,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                 maxLength={4}
               />
             </div>
-
             {/* Limite */}
             <div className="space-y-1.5">
               <Label>Limite de Crédito</Label>
@@ -342,7 +431,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                 placeholder="R$ 0,00"
               />
             </div>
-
             {/* Dia de fechamento e vencimento */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -366,7 +454,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                 />
               </div>
             </div>
-
             {/* Cor */}
             <div className="space-y-2">
               <Label>Cor do Cartão</Label>
@@ -382,7 +469,6 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                 ))}
               </div>
             </div>
-
             </div>
             {/* Footer Fixo */}
             <div className="sticky bottom-0 z-10 border-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
@@ -402,7 +488,207 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           </form>
         </SheetContent>
       </Sheet>
-
+      {/* Sheet de importação de PDF */}
+      <Sheet open={pdfSheetOpen} onOpenChange={(o) => { if (!o) closePdfSheet(); }}>
+        <SheetContent side="right" className="w-full sm:w-[700px] flex flex-col">
+          {/* Header */}
+          <div className="sticky top-0 z-10 border-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
+            <SheetTitle className="text-xl font-bold flex items-center gap-2">
+              <FileUp className="h-5 w-5" />
+              Importar Fatura PDF
+            </SheetTitle>
+            <button onClick={closePdfSheet} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {/* Steps indicator */}
+          <div className="px-8 pt-4 flex items-center gap-2">
+            {(["upload", "review", "done"] as PdfImportStep[]).map((step, i) => (
+              <>
+                <div key={step} className={`flex items-center gap-1.5 text-xs font-medium ${
+                  pdfStep === step ? "text-primary" : i < ["upload","review","done"].indexOf(pdfStep) ? "text-green-600" : "text-muted-foreground"
+                }`}>
+                  <div className={`h-5 w-5 rounded-full flex items-center justify-center text-xs ${
+                    i < ["upload","review","done"].indexOf(pdfStep) ? "bg-green-600 text-white" : pdfStep === step ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {i < ["upload","review","done"].indexOf(pdfStep) ? <Check className="h-3 w-3" /> : i + 1}
+                  </div>
+                  {step === "upload" ? "Upload" : step === "review" ? "Revisão" : "Concluído"}
+                </div>
+                {i < 2 && <div className="flex-1 h-px bg-border" />}
+              </>
+            ))}
+          </div>
+          {/* Conteúdo por step */}
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+            {pdfStep === "upload" && (
+              <div className="space-y-5">
+                <p className="text-sm text-muted-foreground">Selecione o cartão e faça upload da fatura em PDF. A IA irá extrair todas as transações automaticamente.</p>
+                {/* Seletor de cartão */}
+                <div className="space-y-2">
+                  <Label>Cartão de Crédito *</Label>
+                  <Select value={pdfCardId} onValueChange={setPdfCardId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o cartão" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cards?.map((c: any) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          <div className="flex items-center gap-2">
+                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: c.color || "#7C3AED" }} />
+                            {c.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Área de upload */}
+                <div
+                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+                    pdfIsDragging ? "border-primary bg-primary/5" : pdfFile ? "border-green-500 bg-green-50 dark:bg-green-900/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20"
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setPdfIsDragging(true); }}
+                  onDragLeave={() => setPdfIsDragging(false)}
+                  onDrop={(e) => { e.preventDefault(); setPdfIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handlePdfFile(f); }}
+                  onClick={() => document.getElementById("pdf-upload-input")?.click()}
+                >
+                  <input
+                    id="pdf-upload-input"
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfFile(f); }}
+                  />
+                  {pdfFile ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <CheckCircle2 className="h-10 w-10 text-green-500" />
+                      <p className="font-medium text-green-700 dark:text-green-400">{pdfFile.name}</p>
+                      <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024).toFixed(0)} KB</p>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setPdfFile(null); }} className="text-xs text-red-500 hover:underline">Remover</button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="h-10 w-10 text-muted-foreground/50" />
+                      <p className="font-medium">Arraste o PDF aqui ou clique para selecionar</p>
+                      <p className="text-xs text-muted-foreground">Fatura do cartão em formato PDF (máx. 15MB)</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {pdfStep === "review" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {pdfTransactions.filter(t => t.selected).length} de {pdfTransactions.length} transações selecionadas
+                    {pdfInvoiceMonth && pdfInvoiceYear ? ` — Fatura ${MONTH_NAMES[pdfInvoiceMonth - 1]}/${pdfInvoiceYear}` : ""}
+                  </p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setPdfTransactions(t => t.map(tx => ({ ...tx, selected: true })))} className="text-xs text-primary hover:underline">Selecionar todos</button>
+                    <span className="text-muted-foreground">·</span>
+                    <button type="button" onClick={() => setPdfTransactions(t => t.map(tx => ({ ...tx, selected: false })))} className="text-xs text-muted-foreground hover:underline">Desmarcar todos</button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {pdfTransactions.map((tx, i) => (
+                    <div key={i} className={`rounded-lg border p-3 transition-colors ${
+                      tx.selected ? "border-primary/30 bg-primary/5" : "border-border opacity-50"
+                    }`}>
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={tx.selected}
+                          onChange={(e) => setPdfTransactions(prev => prev.map((t, j) => j === i ? { ...t, selected: e.target.checked } : t))}
+                          className="mt-1 h-4 w-4 rounded border-gray-300 accent-primary"
+                        />
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium truncate">{tx.description}</p>
+                            <p className="text-sm font-bold text-red-600 flex-shrink-0">{formatCurrency(tx.amount)}</p>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span>{tx.date}</span>
+                            {tx.installment && <span className="bg-muted px-1.5 py-0.5 rounded">{tx.installment}</span>}
+                            {tx.category_hint && <span className="text-primary/70">{tx.category_hint}</span>}
+                          </div>
+                          {/* Seletor de categoria */}
+                          <Select
+                            value={tx.categoryId ? String(tx.categoryId) : ""}
+                            onValueChange={(v) => setPdfTransactions(prev => prev.map((t, j) => j === i ? { ...t, categoryId: v ? Number(v) : null } : t))}
+                          >
+                            <SelectTrigger className="h-7 text-xs">
+                              <SelectValue placeholder="Categoria (opcional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories?.filter((c: any) => c.type === "EXPENSE").map((c: any) => (
+                                <SelectItem key={c.id} value={String(c.id)}>
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color || "#6B7280" }} />
+                                    {c.name}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {pdfStep === "done" && (
+              <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
+                <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <CheckCircle2 className="h-8 w-8 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold">Importação concluída!</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {pdfTransactions.filter(t => t.selected).length} transações foram adicionadas ao cartão.
+                  </p>
+                </div>
+                <Button onClick={closePdfSheet} className="bg-primary hover:bg-primary/90">Fechar</Button>
+              </div>
+            )}
+          </div>
+          {/* Footer */}
+          {pdfStep !== "done" && (
+            <div className="sticky bottom-0 z-10 border-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-between">
+              <Button variant="outline" onClick={pdfStep === "review" ? () => setPdfStep("upload") : closePdfSheet}>
+                {pdfStep === "review" ? "Voltar" : "Cancelar"}
+              </Button>
+              {pdfStep === "upload" && (
+                <Button
+                  onClick={handlePdfParse}
+                  disabled={!pdfFile || !pdfCardId || pdfParsing}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  {pdfParsing ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processando com IA...</>
+                  ) : (
+                    <><FileUp className="h-4 w-4 mr-2" />Processar PDF</>
+                  )}
+                </Button>
+              )}
+              {pdfStep === "review" && (
+                <Button
+                  onClick={handlePdfImport}
+                  disabled={pdfTransactions.filter(t => t.selected).length === 0 || pdfImporting}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {pdfImporting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importando...</>
+                  ) : (
+                    <><Check className="h-4 w-4 mr-2" />Importar {pdfTransactions.filter(t => t.selected).length} transações</>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
       {/* Dialog de confirmação de exclusão */}
       <AlertDialog open={deleteDialog.open} onOpenChange={(o) => setDeleteDialog({ open: o, cardId: null })}>
         <AlertDialogContent>
@@ -426,22 +712,48 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     </>
   );
 }
-
 // ─── Card visual de um cartão ─────────────────────────────────────────────────
-function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => void; onDelete: () => void }) {
+function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entityId: number; onEdit: () => void; onDelete: () => void }) {
+  const utils = trpc.useUtils();
   const { data: summary } = trpc.creditCards.getSummary.useQuery({ cardId: card.id });
-  const { data: invoices } = trpc.creditCards.getInvoicesByMonth.useQuery({ cardId: card.id, months: 6 });
+  const { data: invoices } = trpc.creditCards.getInvoicesByMonth.useQuery({ cardId: card.id, months: 12 });
+  const { data: bankAccounts } = trpc.bankAccounts.listByEntity.useQuery({ entityId });
   const [showInvoices, setShowInvoices] = useState(false);
-
+  // Sheet de pagamento de fatura
+  const [paySheet, setPaySheet] = useState<{ open: boolean; invoice: any | null }>({ open: false, invoice: null });
+  const [payBankAccountId, setPayBankAccountId] = useState<string>("");
+  const payInvoiceMutation = trpc.creditCards.payInvoice.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Fatura paga com sucesso! ${formatCurrency(data.totalAmount)} debitados da conta.`);
+      setPaySheet({ open: false, invoice: null });
+      setPayBankAccountId("");
+      utils.creditCards.getSummary.invalidate({ cardId: card.id });
+      utils.creditCards.getInvoicesByMonth.invalidate({ cardId: card.id });
+      utils.transactions.listByEntity.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
   const usagePercent = summary?.usagePercent ?? 0;
   const usedAmount = summary?.usedAmount ?? 0;
   const availableLimit = summary?.availableLimit ?? card.creditLimit;
   const dueDate = summary?.dueDate ? new Date(summary.dueDate) : null;
-
   const usageColor = usagePercent >= 90 ? "bg-red-500" : usagePercent >= 70 ? "bg-amber-500" : "bg-green-500";
-
-  const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-
+  function openPaySheet(inv: any) {
+    setPaySheet({ open: true, invoice: inv });
+    // Pré-selecionar primeira conta bancária
+    if (bankAccounts && bankAccounts.length > 0) {
+      setPayBankAccountId(String(bankAccounts[0].id));
+    }
+  }
+  function handlePayInvoice() {
+    if (!paySheet.invoice || !payBankAccountId) return;
+    payInvoiceMutation.mutate({
+      cardId: card.id,
+      month: paySheet.invoice.month,
+      year: paySheet.invoice.year,
+      bankAccountId: Number(payBankAccountId),
+    });
+  }
   return (
     <div className="rounded-2xl overflow-hidden shadow-md border border-border/50 flex flex-col">
       {/* Topo colorido — visual do cartão */}
@@ -473,7 +785,6 @@ function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => v
           <p className="text-sm font-semibold mt-0.5">{card.name}</p>
         </div>
       </div>
-
       {/* Corpo — informações de limite */}
       <div className="p-4 space-y-3 bg-card flex-1">
         {/* Barra de uso */}
@@ -489,7 +800,6 @@ function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => v
             />
           </div>
         </div>
-
         {/* Valores */}
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
@@ -501,7 +811,6 @@ function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => v
             <p className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(availableLimit)}</p>
           </div>
         </div>
-
         {/* Vencimento próxima fatura */}
         {dueDate && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t border-border/50">
@@ -509,7 +818,6 @@ function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => v
             <span>Próxima fatura vence em {format(dueDate, "dd 'de' MMMM", { locale: ptBR })}</span>
           </div>
         )}
-
         {/* Botão para ver faturas por mês */}
         {invoices && invoices.length > 0 && (
           <div className="pt-1 border-t border-border/50">
@@ -520,43 +828,54 @@ function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => v
               <span>Faturas por mês ({invoices.length})</span>
               <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showInvoices ? "rotate-90" : ""}`} />
             </button>
-
             {showInvoices && (
               <div className="mt-2 space-y-1.5">
                 {invoices.map((inv: any) => {
                   const invDue = new Date(inv.dueDate);
                   const isCurrentMonth = invDue.getMonth() === new Date().getMonth() && invDue.getFullYear() === new Date().getFullYear();
-                  const isPast = invDue < new Date();
+                  const isPaid = inv.isPaid || inv.status === "PAID";
                   return (
                     <div
                       key={`${inv.year}-${inv.month}`}
                       className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
-                        isCurrentMonth
+                        isPaid
+                          ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
+                          : isCurrentMonth
                           ? "bg-primary/10 border border-primary/20"
-                          : isPast
-                          ? "bg-muted/50 opacity-60"
                           : "bg-muted/30"
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        {isPast ? (
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {isPaid ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
                         ) : isCurrentMonth ? (
-                          <AlertCircle className="h-3 w-3 text-primary" />
+                          <AlertCircle className="h-3 w-3 text-primary flex-shrink-0" />
                         ) : (
-                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                         )}
-                        <span className="font-medium">
+                        <span className="font-medium truncate">
                           {MONTH_NAMES[inv.month - 1]}/{inv.year}
-                          {isCurrentMonth && <span className="ml-1 text-primary">(atual)</span>}
+                          {isCurrentMonth && !isPaid && <span className="ml-1 text-primary">(atual)</span>}
+                          {isPaid && <span className="ml-1 text-green-600 dark:text-green-400">(paga)</span>}
                         </span>
-                        <span className="text-muted-foreground">{inv.count} compra{inv.count !== 1 ? "s" : ""}</span>
+                        <span className="text-muted-foreground flex-shrink-0">{inv.count} compra{inv.count !== 1 ? "s" : ""}</span>
                       </div>
-                      <span className={`font-semibold ${
-                        isPast ? "text-muted-foreground" : isCurrentMonth ? "text-primary" : "text-foreground"
-                      }`}>
-                        {formatCurrency(inv.total)}
-                      </span>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <span className={`font-semibold ${
+                          isPaid ? "text-green-600 dark:text-green-400" : isCurrentMonth ? "text-primary" : "text-foreground"
+                        }`}>
+                          {formatCurrency(inv.total)}
+                        </span>
+                        {!isPaid && (
+                          <button
+                            onClick={() => openPaySheet(inv)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-600 hover:bg-green-700 text-white transition-colors"
+                          >
+                            <Banknote className="h-3 w-3" />
+                            Pagar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -565,6 +884,85 @@ function CreditCardCard({ card, onEdit, onDelete }: { card: any; onEdit: () => v
           </div>
         )}
       </div>
+
+      {/* Sheet de pagamento de fatura */}
+      <Sheet open={paySheet.open} onOpenChange={(o) => { if (!o) { setPaySheet({ open: false, invoice: null }); setPayBankAccountId(""); } }}>
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
+          {/* Header */}
+          <div className="sticky top-0 z-10 border-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
+            <SheetTitle className="text-xl font-bold">Pagar Fatura</SheetTitle>
+            <button onClick={() => setPaySheet({ open: false, invoice: null })} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {/* Conteúdo */}
+          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+            {/* Resumo da fatura */}
+            <div
+              className="rounded-xl p-4 text-white space-y-1"
+              style={{ background: `linear-gradient(135deg, ${card.color}dd, ${card.color}88)` }}
+            >
+              <p className="text-xs font-medium opacity-80 uppercase tracking-wider">{card.name}</p>
+              <p className="text-2xl font-bold">
+                {paySheet.invoice ? formatCurrency(paySheet.invoice.total) : "—"}
+              </p>
+              <p className="text-xs opacity-80">
+                Fatura de {paySheet.invoice ? `${MONTH_NAMES[paySheet.invoice.month - 1]}/${paySheet.invoice.year}` : "—"}
+                {" · "}{paySheet.invoice?.count ?? 0} transaç{paySheet.invoice?.count !== 1 ? "ões" : "ão"}
+              </p>
+            </div>
+            {/* Aviso */}
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-xs text-amber-800 dark:text-amber-200">
+              <p className="font-medium mb-1">O que acontece ao pagar:</p>
+              <ul className="space-y-0.5 list-disc list-inside">
+                <li>Todas as transações pendentes desta fatura serão marcadas como <strong>Pagas</strong></li>
+                <li>Uma despesa de <strong>{paySheet.invoice ? formatCurrency(paySheet.invoice.total) : "—"}</strong> será lançada na conta selecionada</li>
+                <li>O limite do cartão será liberado</li>
+              </ul>
+            </div>
+            {/* Seletor de conta bancária */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Débitar da conta *</Label>
+              {bankAccounts && bankAccounts.length > 0 ? (
+                <Select value={payBankAccountId} onValueChange={setPayBankAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a conta bancária" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((acc: any) => (
+                      <SelectItem key={acc.id} value={String(acc.id)}>
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: acc.color || "#6B7280" }} />
+                          {acc.name}{acc.bank ? ` — ${acc.bank}` : ""}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhuma conta bancária cadastrada.</p>
+              )}
+            </div>
+          </div>
+          {/* Footer */}
+          <div className="sticky bottom-0 z-10 border-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setPaySheet({ open: false, invoice: null })}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handlePayInvoice}
+              disabled={!payBankAccountId || payInvoiceMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {payInvoiceMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processando...</>
+              ) : (
+                <><Banknote className="h-4 w-4 mr-2" />Confirmar Pagamento</>
+              )}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
