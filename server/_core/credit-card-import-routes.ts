@@ -4,7 +4,7 @@
  *
  * Estratégia:
  * 1. Recebe o PDF via multipart/form-data
- * 2. Extrai o texto do PDF usando pdf-parse (sem depender de S3 ou file_url)
+ * 2. Extrai o texto do PDF usando pdfjs-dist (sem canvas, sem S3, sem file_url)
  * 3. Envia o texto extraído ao LLM para identificar as transações
  * 4. Retorna o JSON estruturado para revisão no frontend
  */
@@ -12,6 +12,8 @@ import { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { sdk } from "./sdk";
 import { invokeLLM } from "./llm";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
 
 // Multer configurado para aceitar PDF em memória (max 15MB)
 const pdfUpload = multer({
@@ -40,19 +42,62 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
- * Extrai texto de um buffer PDF usando pdf-parse v2 (PDFParse class)
+ * Extrai texto de um buffer PDF usando pdfjs-dist (sem canvas, funciona em Node.js puro)
  */
 async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
-    // pdf-parse v2 usa a classe PDFParse com { data: buffer }
-    const { PDFParse } = await import("pdf-parse");
-    const parser = new PDFParse({ data: buffer });
-    const result = await parser.getText();
-    await parser.destroy();
-    return result.text || "";
+    // Importação dinâmica do pdfjs-dist legacy (suporte a Node.js sem canvas)
+    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs" as any);
+
+    // Configurar o worker path para o arquivo local
+    // Em produção, o worker fica em node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs
+    try {
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      // Tentar resolver o worker path relativo ao arquivo atual
+      const workerPath = resolve(
+        __dirname,
+        "../../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
+      );
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+    } catch {
+      // Fallback: tentar path relativo ao cwd
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = resolve(
+          process.cwd(),
+          "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
+        );
+      } catch {
+        // Último fallback: deixar sem worker (pode dar warning mas funciona)
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+      }
+    }
+
+    const uint8Array = new Uint8Array(buffer);
+    const loadingTask = pdfjsLib.getDocument({
+      data: uint8Array,
+      useSystemFonts: true,
+      // Suprimir warning de standardFontDataUrl
+      standardFontDataUrl: undefined,
+    });
+
+    const pdf = await loadingTask.promise;
+    const numPages = pdf.numPages;
+
+    let fullText = "";
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = (content.items as any[])
+        .map((item: any) => (typeof item.str === "string" ? item.str : ""))
+        .join(" ");
+      fullText += pageText + "\n";
+    }
+
+    await pdf.destroy();
+    return fullText.trim();
   } catch (err: any) {
-    console.error("[CreditCardImport] pdf-parse error:", err?.message);
-    // Fallback: retornar string vazia para que o LLM tente com o texto disponível
+    console.error("[CreditCardImport] pdfjs-dist error:", err?.message);
     return "";
   }
 }
@@ -60,7 +105,7 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
 export function registerCreditCardImportRoutes(app: Express) {
   /**
    * POST /api/credit-cards/import-pdf
-   * Recebe um PDF de fatura de cartão de crédito, extrai o texto com pdf-parse,
+   * Recebe um PDF de fatura de cartão de crédito, extrai o texto com pdfjs-dist,
    * envia para o LLM e retorna as transações extraídas para revisão.
    * Body: multipart/form-data com campo "file" (PDF) e "cardName" (string)
    */
@@ -87,16 +132,16 @@ export function registerCreditCardImportRoutes(app: Express) {
 
         const pdfText = await extractPdfText(req.file.buffer);
 
-        if (!pdfText || pdfText.trim().length < 50) {
+        console.log(
+          `[CreditCardImport] Texto extraído: ${pdfText.length} caracteres`
+        );
+
+        if (!pdfText || pdfText.trim().length < 30) {
           return res.status(422).json({
             error:
               "Não foi possível extrair texto do PDF. Verifique se o arquivo é uma fatura válida e não está protegido por senha.",
           });
         }
-
-        console.log(
-          `[CreditCardImport] Texto extraído: ${pdfText.length} caracteres`
-        );
 
         // ── Passo 2: Enviar texto ao LLM ───────────────────────────────────────
         const systemPrompt = `Você é um assistente especializado em extrair transações de faturas de cartão de crédito brasileiras.
@@ -121,8 +166,8 @@ Regras importantes:
 - amount deve ser em CENTAVOS (inteiro), ex: R$ 12,34 = 1234, R$ 1.234,56 = 123456
 - date no formato YYYY-MM-DD (use o ano da fatura se o dia/mês estiver disponível)
 - installment: se for parcelado, ex "2/6", senão use null
-- category_hint: sugira uma categoria em português (Alimentação, Transporte, Saúde, Lazer, Compras, Educação, Serviços, Outros)
-- Ignore taxas, juros, encargos, pagamentos anteriores, créditos e ajustes
+- category_hint: sugira uma categoria em português (Alimentação, Transporte, Saúde, Lazer, Compras, Educação, Serviços, Assinaturas, Outros)
+- Ignore taxas, juros, encargos, IOF, pagamentos anteriores, créditos e ajustes
 - Inclua TODAS as compras, mesmo as parceladas
 - Se não conseguir ler algum campo, use null
 - Retorne APENAS o JSON, sem texto adicional`;
