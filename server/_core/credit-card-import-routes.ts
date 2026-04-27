@@ -4,18 +4,22 @@
  *
  * Estratégia:
  * 1. Recebe o PDF via multipart/form-data
- * 2. Extrai o texto do PDF usando pdfjs-dist (lazy-loaded, sem canvas)
+ * 2. Extrai o texto do PDF usando pdftotext (poppler-utils CLI)
  * 3. Envia o texto extraído ao LLM para identificar as transações
  * 4. Retorna o JSON estruturado para revisão no frontend
  *
- * IMPORTANTE: Não importar pdf-parse ou pdfjs-dist no nível do módulo!
- * O pdf-parse v2 usa process.getBuiltinModule que não existe em Node < 22.12
- * e crasha a aplicação inteira na inicialização.
- * O pdfjs-dist é importado dinamicamente dentro da função extractPdfText().
+ * IMPORTANTE: Usa pdftotext (poppler-utils) via child_process.
+ * - Não depende de DOMMatrix, canvas, ou process.getBuiltinModule
+ * - Funciona em qualquer versão do Node.js
+ * - poppler-utils é instalado via nixpacks.toml (aptPkgs)
  */
 import { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
-import { resolve } from "path";
+import { execSync } from "child_process";
+import { writeFileSync, unlinkSync, existsSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
+import { randomUUID } from "crypto";
 import { sdk } from "./sdk";
 import { invokeLLM } from "./llm";
 
@@ -46,54 +50,61 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
- * Extrai texto de um buffer PDF usando pdfjs-dist (lazy-loaded).
- * O import dinâmico garante que a aplicação não crasha na inicialização
- * mesmo se o pdfjs-dist tiver problemas.
+ * Extrai texto de um buffer PDF usando pdftotext (poppler-utils).
+ * Salva o buffer em um arquivo temporário, executa pdftotext, e retorna o texto.
+ * Não depende de nenhuma biblioteca JavaScript para PDF.
  */
-async function extractPdfText(buffer: Buffer): Promise<string> {
+function extractPdfText(buffer: Buffer): string {
+  const tmpFile = join(tmpdir(), `pdf-import-${randomUUID()}.pdf`);
   try {
-    // Import dinâmico — só carrega quando a função é chamada
-    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs" as any);
+    writeFileSync(tmpFile, buffer);
 
-    // Configurar o worker path usando process.cwd() que é sempre /app no Railway
-    const workerPath = resolve(
-      process.cwd(),
-      "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
-    );
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
-
-    const uint8Array = new Uint8Array(buffer);
-    const loadingTask = pdfjsLib.getDocument({
-      data: uint8Array,
-      useSystemFonts: true,
-      standardFontDataUrl: undefined,
+    // pdftotext converte PDF para texto puro
+    // -layout preserva o layout original (melhor para faturas)
+    // - (traço) envia para stdout
+    const text = execSync(`pdftotext -layout "${tmpFile}" -`, {
+      encoding: "utf-8",
+      timeout: 30000, // 30 segundos de timeout
+      maxBuffer: 10 * 1024 * 1024, // 10MB de output máximo
     });
 
-    const pdf = await loadingTask.promise;
-    const numPages = pdf.numPages;
-
-    let fullText = "";
-    for (let i = 1; i <= numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = (content.items as any[])
-        .map((item: any) => (typeof item.str === "string" ? item.str : ""))
-        .join(" ");
-      fullText += pageText + "\n";
-    }
-
-    await pdf.destroy();
-    return fullText.trim();
+    return text.trim();
   } catch (err: any) {
-    console.error("[CreditCardImport] pdfjs-dist error:", err?.message, err?.stack);
-    return "";
+    console.error("[CreditCardImport] pdftotext error:", err?.message);
+    // Fallback: tentar sem -layout
+    try {
+      const text = execSync(`pdftotext "${tmpFile}" -`, {
+        encoding: "utf-8",
+        timeout: 30000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      return text.trim();
+    } catch (err2: any) {
+      console.error("[CreditCardImport] pdftotext fallback error:", err2?.message);
+      return "";
+    }
+  } finally {
+    // Limpar arquivo temporário
+    try {
+      if (existsSync(tmpFile)) unlinkSync(tmpFile);
+    } catch {}
   }
 }
 
 export function registerCreditCardImportRoutes(app: Express) {
+  // Verificar se pdftotext está disponível no sistema
+  try {
+    execSync("which pdftotext", { encoding: "utf-8" });
+    console.log("[CreditCardImport] pdftotext found, PDF import available");
+  } catch {
+    console.warn(
+      "[CreditCardImport] WARNING: pdftotext not found! Install poppler-utils. PDF import will not work."
+    );
+  }
+
   /**
    * POST /api/credit-cards/import-pdf
-   * Recebe um PDF de fatura de cartão de crédito, extrai o texto com pdfjs-dist,
+   * Recebe um PDF de fatura de cartão de crédito, extrai o texto com pdftotext,
    * envia para o LLM e retorna as transações extraídas para revisão.
    * Body: multipart/form-data com campo "file" (PDF) e "cardName" (string)
    */
@@ -118,7 +129,7 @@ export function registerCreditCardImportRoutes(app: Express) {
           `[CreditCardImport] Processando PDF: ${req.file.originalname} (${req.file.size} bytes)`
         );
 
-        const pdfText = await extractPdfText(req.file.buffer);
+        const pdfText = extractPdfText(req.file.buffer);
 
         console.log(
           `[CreditCardImport] Texto extraído: ${pdfText.length} caracteres`
