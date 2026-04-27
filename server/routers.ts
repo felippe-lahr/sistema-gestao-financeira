@@ -2760,48 +2760,70 @@ export const appRouter = router({
         const dbInstance = await getDb();
         if (!dbInstance) return [];
         const { sql: sqlTag } = await import("drizzle-orm");
-        const { creditCards: creditCardsTable, creditCardInvoices } = await import("../drizzle/schema");
+        const { creditCards: creditCardsTable } = await import("../drizzle/schema");
         const { eq, and } = await import("drizzle-orm");
-
         // Buscar todos os cartões ativos da entidade
         const cards = await dbInstance
           .select()
           .from(creditCardsTable)
           .where(and(eq(creditCardsTable.entityId, input.entityId), eq(creditCardsTable.isActive, true)));
-
         if (cards.length === 0) return [];
-
         const cardIds = cards.map(c => c.id);
-
+        const cardIdsStr = cardIds.join(',');
         // Montar filtro de datas para SQL raw
         let dateCondition = '';
-        const dateParams: any[] = [];
         if (input.startDate) {
           dateCondition += ` AND t."dueDate" >= '${input.startDate.toISOString()}'`;
         }
         if (input.endDate) {
           dateCondition += ` AND t."dueDate" <= '${input.endDate.toISOString()}'`;
         }
-
-        // Buscar grupos de fatura (agrupados por cartão + mês/ano) usando SQL raw
-        const cardIdsStr = cardIds.join(',');
-        const groupRows = await dbInstance.execute(
+        const cardMap = new Map<number, any>();
+        for (const card of cards) {
+          cardMap.set(card.id, card);
+        }
+        // ── Query 1: buscar TODAS as transações de cartão da entidade de uma vez ──
+        const allTxRows = await dbInstance.execute(
           sqlTag`
             SELECT
-              t."creditCardId" as card_id,
-              EXTRACT(YEAR FROM t."dueDate") as year,
-              EXTRACT(MONTH FROM t."dueDate") as month,
-              SUM(t.amount) as total,
-              COUNT(*) as count
+              t.id,
+              t."entityId",
+              t.type,
+              t.description,
+              t.amount,
+              t."dueDate",
+              t."paymentDate",
+              t.status,
+              t."categoryId",
+              t."bankAccountId",
+              t."paymentMethodId",
+              t."isRecurring",
+              t."parentTransactionId",
+              t.notes,
+              t."createdAt",
+              t."updatedAt",
+              t."importOrigin",
+              t."creditCardId",
+              c.name as "categoryName",
+              c.color as "categoryColor",
+              c."parentId" as "parentCategoryId",
+              pc.name as "parentCategoryName",
+              pc.color as "parentCategoryColor",
+              ba.name as "bankAccountName",
+              ba.bank as "bankInstitution",
+              EXTRACT(YEAR FROM t."dueDate")::int as tx_year,
+              EXTRACT(MONTH FROM t."dueDate")::int as tx_month,
+              (SELECT COUNT(*) FROM attachments WHERE "transactionId" = t.id)::int as "attachmentCount"
             FROM transactions t
+            LEFT JOIN categories c ON t."categoryId" = c.id
+            LEFT JOIN categories pc ON c."parentId" = pc.id
+            LEFT JOIN bank_accounts ba ON t."bankAccountId" = ba.id
             WHERE t."creditCardId" = ANY(ARRAY[${sqlTag.raw(cardIdsStr)}]::int[])
               ${sqlTag.raw(dateCondition)}
-            GROUP BY t."creditCardId", EXTRACT(YEAR FROM t."dueDate"), EXTRACT(MONTH FROM t."dueDate")
-            ORDER BY year DESC, month DESC, card_id ASC
+            ORDER BY t."dueDate" ASC
           `
         );
-
-        // Buscar todos os registros de fatura para os cartões da entidade
+        // ── Query 2: buscar registros de fatura (status PAID etc.) ──
         const allInvoiceRows = await dbInstance.execute(
           sqlTag`SELECT * FROM credit_card_invoices WHERE "creditCardId" = ANY(ARRAY[${sqlTag.raw(cardIdsStr)}]::int[])`
         );
@@ -2809,96 +2831,65 @@ export const appRouter = router({
         for (const inv of (allInvoiceRows.rows as any[])) {
           invoiceMap.set(`${inv.creditCardId}-${inv.year}-${inv.month}`, inv);
         }
-
-        const cardMap = new Map<number, any>();
-        for (const card of cards) {
-          cardMap.set(card.id, card);
+        // ── Agrupar transações por cartão + mês/ano no código ──
+        const groupMap = new Map<string, {
+          cardId: number; year: number; month: number;
+          total: number; count: number;
+          transactions: any[];
+        }>();
+        for (const row of (allTxRows.rows as any[])) {
+          const cardId = Number(row.creditCardId);
+          const year = Number(row.tx_year);
+          const month = Number(row.tx_month);
+          const key = `${cardId}-${year}-${month}`;
+          if (!groupMap.has(key)) {
+            groupMap.set(key, { cardId, year, month, total: 0, count: 0, transactions: [] });
+          }
+          const g = groupMap.get(key)!;
+          g.total += Number(row.amount);
+          g.count += 1;
+          g.transactions.push({
+            ...row,
+            amount: Number(row.amount),
+            attachmentCount: Number(row.attachmentCount ?? 0),
+            dueDate: row.dueDate ? new Date(row.dueDate) : null,
+            paymentDate: row.paymentDate ? new Date(row.paymentDate) : null,
+            createdAt: row.createdAt ? new Date(row.createdAt) : null,
+            updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+          });
         }
-
-        // Para cada grupo, buscar as transações filhas com detalhes
+        // ── Montar resultado final ──
         const groups = [];
-        for (const row of (groupRows.rows as any[])) {
-          const cardId = Number(row.card_id);
-          const year = Number(row.year);
-          const month = Number(row.month);
-          const card = cardMap.get(cardId);
+        for (const [key, g] of groupMap.entries()) {
+          const card = cardMap.get(g.cardId);
           if (!card) continue;
-
-          const invoiceRecord = invoiceMap.get(`${cardId}-${year}-${month}`);
+          const invoiceRecord = invoiceMap.get(key);
           const status = invoiceRecord?.status ?? "OPEN";
-          const dueDate = new Date(year, month - 1, card.dueDay);
-
-          // Buscar transações filhas com detalhes (categoria, conta, etc.)
-          const startOfMonth = new Date(year, month - 1, 1).toISOString();
-          const endOfMonth = new Date(year, month, 0, 23, 59, 59).toISOString();
-
-          const txRows = await dbInstance.execute(
-            sqlTag`
-              SELECT
-                t.id,
-                t."entityId",
-                t.type,
-                t.description,
-                t.amount,
-                t."dueDate",
-                t."paymentDate",
-                t.status,
-                t."categoryId",
-                t."bankAccountId",
-                t."paymentMethodId",
-                t."isRecurring",
-                t."parentTransactionId",
-                t.notes,
-                t."createdAt",
-                t."updatedAt",
-                t."importOrigin",
-                t."creditCardId",
-                c.name as "categoryName",
-                c.color as "categoryColor",
-                c."parentId" as "parentCategoryId",
-                pc.name as "parentCategoryName",
-                pc.color as "parentCategoryColor",
-                ba.name as "bankAccountName",
-                ba.bank as "bankInstitution",
-                (SELECT COUNT(*) FROM attachments WHERE "transactionId" = t.id)::int as "attachmentCount"
-              FROM transactions t
-              LEFT JOIN categories c ON t."categoryId" = c.id
-              LEFT JOIN categories pc ON c."parentId" = pc.id
-              LEFT JOIN bank_accounts ba ON t."bankAccountId" = ba.id
-              WHERE t."creditCardId" = ${cardId}
-                AND t."dueDate" >= ${startOfMonth}
-                AND t."dueDate" <= ${endOfMonth}
-              ORDER BY t."dueDate" ASC
-            `
-          );
-
+          const dueDate = new Date(g.year, g.month - 1, card.dueDay);
           groups.push({
-            cardId,
+            cardId: g.cardId,
             cardName: card.name,
             cardColor: card.color,
             cardBrand: card.brand,
             cardLastFourDigits: card.lastFourDigits,
-            year,
-            month,
-            total: Number(row.total),
-            count: Number(row.count),
+            year: g.year,
+            month: g.month,
+            total: g.total,
+            count: g.count,
             dueDate,
             status,
             isPaid: status === "PAID",
             invoiceId: invoiceRecord?.id ?? null,
             paidFromAccountId: invoiceRecord?.paidFromAccountId ?? null,
-            transactions: (txRows.rows as any[]).map(tx => ({
-              ...tx,
-              amount: Number(tx.amount),
-              attachmentCount: Number(tx.attachmentCount ?? 0),
-              dueDate: tx.dueDate ? new Date(tx.dueDate) : null,
-              paymentDate: tx.paymentDate ? new Date(tx.paymentDate) : null,
-              createdAt: tx.createdAt ? new Date(tx.createdAt) : null,
-              updatedAt: tx.updatedAt ? new Date(tx.updatedAt) : null,
-            })),
+            transactions: g.transactions,
           });
         }
-
+        // Ordenar por ano desc, mês desc, cardId asc
+        groups.sort((a, b) => {
+          if (b.year !== a.year) return b.year - a.year;
+          if (b.month !== a.month) return b.month - a.month;
+          return a.cardId - b.cardId;
+        });
         return groups;
       }),
     listTransactions: protectedProcedure

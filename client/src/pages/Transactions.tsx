@@ -743,13 +743,16 @@ export default function Transactions() {
   const filteredInvoiceGroups = (invoiceGroups || []).filter((group) => {
     // Só mostrar grupos de despesa (cartão é sempre despesa) quando tab é "all" ou "expense"
     if (activeTab === "income") return false;
+    // Coerce year/month to number to avoid string vs number comparison issues from SQL EXTRACT
+    const groupYear = Number(group.year);
+    const groupMonth = Number(group.month);
     // Filtro de período
     if (filterPeriod === "month") {
-      return group.year === filterYear && group.month === filterMonth;
+      return groupYear === filterYear && groupMonth === filterMonth;
     } else if (filterPeriod === "year") {
-      return group.year === filterYear;
+      return groupYear === filterYear;
     } else if (filterPeriod === "custom" && filterStartDate && filterEndDate) {
-      const groupDate = new Date(group.year, group.month - 1, 1);
+      const groupDate = new Date(groupYear, groupMonth - 1, 1);
       const start = new Date(filterStartDate);
       const end = new Date(filterEndDate);
       return groupDate >= start && groupDate <= end;
@@ -1659,7 +1662,9 @@ export default function Transactions() {
             <div className="space-y-3">
               {/* Grupos de fatura de cartão de crédito */}
               {filteredInvoiceGroups.map((group) => {
-                const groupKey = `${group.cardId}-${group.year}-${group.month}`;
+                const gYear = Number(group.year);
+                const gMonth = Number(group.month);
+                const groupKey = `${group.cardId}-${gYear}-${gMonth}`;
                 const isExpanded = expandedInvoices.has(groupKey);
                 const isPaid = group.isPaid || group.status === "PAID";
                 return (
@@ -1686,7 +1691,7 @@ export default function Transactions() {
                               <div className="flex items-center gap-2">
                                 <h3 className="font-semibold text-sm">Fatura {group.cardName}</h3>
                                 <span className="text-xs text-muted-foreground">
-                                  {MONTH_NAMES_PT[group.month - 1]}/{group.year}
+                                  {MONTH_NAMES_PT[gMonth - 1]}/{gYear}
                                 </span>
                                 <span
                                   className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -1732,7 +1737,7 @@ export default function Transactions() {
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <h3 className="font-semibold text-sm">Fatura {group.cardName}</h3>
-                                  <span className="text-xs text-muted-foreground">{MONTH_NAMES_PT[group.month - 1]}/{group.year}</span>
+                                  <span className="text-xs text-muted-foreground">{MONTH_NAMES_PT[gMonth - 1]}/{gYear}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: group.cardColor || "#7C3AED" }} />
