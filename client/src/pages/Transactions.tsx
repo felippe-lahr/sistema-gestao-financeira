@@ -1087,7 +1087,7 @@ export default function Transactions() {
               </div>
               <div className="bg-muted/50 rounded-lg p-4">
                 <p className="text-sm text-muted-foreground">Valor total</p>
-                <p className="font-semibold text-lg text-red-600">R$ {Math.abs(payInvoiceSheet.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <p className="font-semibold text-lg text-red-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(payInvoiceSheet.total) / 100)}</p>
               </div>
             </div>
             <div className="space-y-2">
