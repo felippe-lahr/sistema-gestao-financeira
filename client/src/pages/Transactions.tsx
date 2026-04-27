@@ -752,15 +752,11 @@ export default function Transactions() {
   });
 
   function openPayInvoiceSheet(group: any) {
-    // Find the cardId from the first transaction or by matching card name
-    let cardId = group.transactions[0]?.creditCardId;
+    // Find the cardId by matching card name from the creditCards list
+    const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
+    const cardId = matchedCard?.id;
     if (!cardId) {
-      // Fallback: find card by name from the creditCards list
-      const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
-      cardId = matchedCard?.id;
-    }
-    if (!cardId) {
-      toast.error("Não foi possível identificar o cartão");
+      toast.error("Não foi possível identificar o cartão. Verifique se o cartão está cadastrado.");
       return;
     }
     const pendingTxs = group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE");
