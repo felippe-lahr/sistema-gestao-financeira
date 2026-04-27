@@ -57,7 +57,7 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
       // Tentar resolver o worker path relativo ao arquivo atual
       const workerPath = resolve(
         __dirname,
-        "../../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
+        "../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
       );
       pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
     } catch {
