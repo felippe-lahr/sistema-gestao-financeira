@@ -2606,7 +2606,8 @@ export const appRouter = router({
         const result = await dbInstance.execute(
           sqlTag`SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE "creditCardId" = ${input.cardId} AND status != 'PAID'`
         );
-        const usedAmount = Number((result.rows[0] as any)?.total ?? 0);
+        const resultRows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+        const usedAmount = Number(resultRows[0]?.total ?? 0);
         const availableLimit = card.creditLimit - usedAmount;
         const dueDate = new Date(invoiceYear, invoiceMonth - 1, card.dueDay);
         return {
@@ -2655,7 +2656,8 @@ export const appRouter = router({
         for (const inv of invoiceRecords) {
           invoiceMap.set(`${inv.year}-${inv.month}`, inv);
         }
-        return (rows.rows as any[]).map((row) => {
+        const rowsArr = (Array.isArray(rows) ? rows : ((rows as any).rows ?? [])) as any[];
+        return rowsArr.map((row) => {
           const year = Number(row.year);
           const month = Number(row.month);
           const dueDate = new Date(year, month - 1, card.dueDay);
@@ -2697,7 +2699,7 @@ export const appRouter = router({
         const txRows = await dbInstance.execute(
           sqlTag`SELECT id, amount FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status = 'PENDING'`
         );
-        const pendingTxs = txRows.rows as any[];
+        const pendingTxs = (Array.isArray(txRows) ? txRows : ((txRows as any).rows ?? [])) as any[];
         if (pendingTxs.length === 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Não há transações pendentes nesta fatura" });
         }
@@ -2828,7 +2830,8 @@ export const appRouter = router({
           sqlTag`SELECT * FROM credit_card_invoices WHERE "creditCardId" = ANY(ARRAY[${sqlTag.raw(cardIdsStr)}]::int[])`
         );
         const invoiceMap = new Map<string, any>();
-        for (const inv of (allInvoiceRows.rows as any[])) {
+        const invoiceArr = (Array.isArray(allInvoiceRows) ? allInvoiceRows : ((allInvoiceRows as any).rows ?? [])) as any[];
+        for (const inv of invoiceArr) {
           invoiceMap.set(`${inv.creditCardId}-${inv.year}-${inv.month}`, inv);
         }
         // ── Agrupar transações por cartão + mês/ano no código ──
@@ -2837,7 +2840,8 @@ export const appRouter = router({
           total: number; count: number;
           transactions: any[];
         }>();
-        for (const row of (allTxRows.rows as any[])) {
+        const txArr = (Array.isArray(allTxRows) ? allTxRows : ((allTxRows as any).rows ?? [])) as any[];
+        for (const row of txArr) {
           const cardId = Number(row.creditCardId);
           const year = Number(row.tx_year);
           const month = Number(row.tx_month);
@@ -2909,12 +2913,12 @@ export const appRouter = router({
           const result = await dbInstance.execute(
             sqlTag`SELECT * FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${start} AND "dueDate" <= ${end} ORDER BY "dueDate" ASC`
           );
-          return result.rows;
+          return (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
         }
         const result = await dbInstance.execute(
           sqlTag`SELECT * FROM transactions WHERE "creditCardId" = ${input.cardId} ORDER BY "dueDate" ASC`
         );
-        return result.rows;
+        return (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
       }),
   }),
 });

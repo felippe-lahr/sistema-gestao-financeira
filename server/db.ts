@@ -2580,7 +2580,7 @@ export async function getOnboardingStatus(userId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
   const result = await db.execute(sql`SELECT "onboardingCompleted" FROM users WHERE id = ${userId} LIMIT 1`);
-  const rows = result.rows as any[];
+  const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
   return rows.length > 0 ? Boolean(rows[0].onboardingCompleted) : false;
 }
 

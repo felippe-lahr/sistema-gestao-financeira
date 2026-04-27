@@ -752,9 +752,11 @@ export default function Transactions() {
   });
 
   function openPayInvoiceSheet(group: any) {
+    console.log('[DEBUG openPayInvoiceSheet]', { groupCardName: group.cardName, creditCards: creditCards?.map((c: any) => c.name), group });
     // Find the cardId by matching card name from the creditCards list
     const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
     const cardId = matchedCard?.id;
+    console.log('[DEBUG openPayInvoiceSheet] matchedCard:', matchedCard, 'cardId:', cardId);
     if (!cardId) {
       toast.error("Não foi possível identificar o cartão. Verifique se o cartão está cadastrado.");
       return;
@@ -1654,7 +1656,7 @@ export default function Transactions() {
                             size="sm"
                             className="ml-2 text-xs h-7 hidden md:flex"
                             disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
-                            onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
+                            onClick={(e) => { e.stopPropagation(); console.log('[DEBUG] Pagar Fatura clicked', group.cardName); openPayInvoiceSheet(group); }}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                             Pagar Fatura
@@ -1672,7 +1674,7 @@ export default function Transactions() {
                               size="sm"
                               className="w-full text-xs"
                               disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
-                              onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
+                              onClick={(e) => { e.stopPropagation(); console.log('[DEBUG] Pagar Fatura clicked', group.cardName); openPayInvoiceSheet(group); }}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                               {group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")
