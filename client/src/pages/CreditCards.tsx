@@ -137,9 +137,14 @@ type PdfImportStep = "upload" | "review" | "done";
 type PdfTransaction = {
   description: string;
   amount: number;
-  date: string;
+  purchase_date: string | null;
+  date: string | null; // legado
   installment: string | null;
+  installment_current: number | null;
+  installment_total: number | null;
   category_hint: string | null;
+  is_duplicate: boolean;
+  has_future_installments: boolean;
   selected: boolean;
   categoryId: number | null;
 };
@@ -163,6 +168,9 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   const [pdfTransactions, setPdfTransactions] = useState<PdfTransaction[]>([]);
   const [pdfInvoiceMonth, setPdfInvoiceMonth] = useState<number | null>(null);
   const [pdfInvoiceYear, setPdfInvoiceYear] = useState<number | null>(null);
+  const [pdfInvoiceDueDate, setPdfInvoiceDueDate] = useState<string | null>(null);
+  const [pdfImportedCount, setPdfImportedCount] = useState<number>(0);
+  const [pdfSkippedCount, setPdfSkippedCount] = useState<number>(0);
   const [pdfIsDragging, setPdfIsDragging] = useState(false);
   const { data: categories } = trpc.categories.listByEntity.useQuery({ entityId }, { enabled: pdfSheetOpen });
   const [form, setForm] = useState({
@@ -279,6 +287,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       const formData = new FormData();
       formData.append("file", pdfFile);
       formData.append("cardName", selectedCard?.name || "Cartão de Crédito");
+      if (selectedCard?.id) formData.append("creditCardId", String(selectedCard.id));
       const res = await fetch("/api/credit-cards/import-pdf", {
         method: "POST",
         body: formData,
@@ -291,11 +300,13 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       const data = await res.json();
       setPdfTransactions((data.transactions || []).map((tx: any) => ({
         ...tx,
-        selected: true,
+        // Marcar duplicatas como desmarcadas por padrão
+        selected: !tx.is_duplicate,
         categoryId: null,
       })));
       setPdfInvoiceMonth(data.invoiceMonth);
       setPdfInvoiceYear(data.invoiceYear);
+      setPdfInvoiceDueDate(data.invoiceDueDate ?? null);
       setPdfStep("review");
     } catch (err: any) {
       toast.error(err.message || "Erro ao processar PDF");
@@ -306,30 +317,85 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   async function handlePdfImport() {
     const selectedCard = cards?.find((c: any) => String(c.id) === pdfCardId);
     if (!selectedCard) return;
-    const toImport = pdfTransactions.filter((tx) => tx.selected);
+    const toImport = pdfTransactions.filter((tx) => tx.selected && !tx.is_duplicate);
     if (toImport.length === 0) {
       toast.error("Selecione ao menos uma transação para importar");
       return;
     }
     setPdfImporting(true);
+    let importedCount = 0;
+    let skippedCount = pdfTransactions.filter(tx => tx.is_duplicate).length;
     try {
+      // Data de vencimento da fatura = dueDate de todas as transações
+      // Se não tiver invoiceDueDate, usar o primeiro dia do mês de vencimento
+      const invoiceDueDateBase = pdfInvoiceDueDate
+        ? new Date(pdfInvoiceDueDate + "T12:00:00")
+        : pdfInvoiceMonth && pdfInvoiceYear
+          ? new Date(pdfInvoiceYear, pdfInvoiceMonth - 1, 5, 12, 0, 0)
+          : new Date();
+
       for (const tx of toImport) {
-        const dueDate = tx.date ? new Date(tx.date + "T12:00:00") : new Date();
-        // amount do LLM já está em centavos, mas o create mutation espera valor em reais (converte internamente)
-        // Então passamos amount / 100 para que o backend faça Math.round(amount * 100)
-        await utils.client.transactions.create.mutate({
-          entityId,
-          type: "EXPENSE",
-          description: tx.description,
-          amount: tx.amount / 100,
-          dueDate,
-          status: "PENDING",
-          categoryId: tx.categoryId ?? undefined,
-          creditCardId: selectedCard.id,
-          isRecurring: false,
-        });
+        const installCurrent = tx.installment_current;
+        const installTotal = tx.installment_total;
+        const isInstallment = installCurrent != null && installTotal != null;
+
+        if (isInstallment && tx.has_future_installments) {
+          // Parcela atual + parcelas futuras restantes
+          const remainingInstallments = installTotal! - installCurrent!;
+          // Criar a parcela atual (no mês da fatura)
+          await utils.client.transactions.create.mutate({
+            entityId,
+            type: "EXPENSE",
+            description: `${tx.description} (${installCurrent}/${installTotal})`,
+            amount: tx.amount / 100,
+            dueDate: invoiceDueDateBase,
+            purchaseDate: tx.purchase_date ? new Date(tx.purchase_date + "T12:00:00") : undefined,
+            status: "PENDING",
+            categoryId: tx.categoryId ?? undefined,
+            creditCardId: selectedCard.id,
+            isRecurring: false,
+          });
+          importedCount++;
+          // Criar parcelas futuras
+          for (let i = 1; i <= remainingInstallments; i++) {
+            const futureDate = new Date(invoiceDueDateBase);
+            futureDate.setMonth(futureDate.getMonth() + i);
+            await utils.client.transactions.create.mutate({
+              entityId,
+              type: "EXPENSE",
+              description: `${tx.description} (${installCurrent! + i}/${installTotal})`,
+              amount: tx.amount / 100,
+              dueDate: futureDate,
+              purchaseDate: tx.purchase_date ? new Date(tx.purchase_date + "T12:00:00") : undefined,
+              status: "PENDING",
+              categoryId: tx.categoryId ?? undefined,
+              creditCardId: selectedCard.id,
+              isRecurring: false,
+            });
+            importedCount++;
+          }
+        } else {
+          // Transação à vista ou última parcela
+          const description = isInstallment
+            ? `${tx.description} (${installCurrent}/${installTotal})`
+            : tx.description;
+          await utils.client.transactions.create.mutate({
+            entityId,
+            type: "EXPENSE",
+            description,
+            amount: tx.amount / 100,
+            dueDate: invoiceDueDateBase,
+            purchaseDate: tx.purchase_date ? new Date(tx.purchase_date + "T12:00:00") : undefined,
+            status: "PENDING",
+            categoryId: tx.categoryId ?? undefined,
+            creditCardId: selectedCard.id,
+            isRecurring: false,
+          });
+          importedCount++;
+        }
       }
-      toast.success(`${toImport.length} transaç${toImport.length !== 1 ? "ões importadas" : "ão importada"} com sucesso!`);
+      setPdfImportedCount(importedCount);
+      setPdfSkippedCount(skippedCount);
       setPdfStep("done");
       utils.creditCards.getSummary.invalidate({ cardId: selectedCard.id });
       utils.creditCards.getInvoicesByMonth.invalidate({ cardId: selectedCard.id });
@@ -348,6 +414,9 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     setPdfTransactions([]);
     setPdfInvoiceMonth(null);
     setPdfInvoiceYear(null);
+    setPdfInvoiceDueDate(null);
+    setPdfImportedCount(0);
+    setPdfSkippedCount(0);
   }
   return (
     <>
@@ -587,58 +656,94 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             )}
             {pdfStep === "review" && (
               <div className="space-y-4">
+                {/* Cabeçalho com resumo */}
+                <div className="rounded-lg bg-muted/40 border p-3 space-y-1">
+                  {pdfInvoiceMonth && pdfInvoiceYear && (
+                    <p className="text-sm font-semibold">
+                      Fatura {MONTH_NAMES[pdfInvoiceMonth - 1]}/{pdfInvoiceYear}
+                      {pdfInvoiceDueDate && ` — Vencimento: ${new Date(pdfInvoiceDueDate + "T12:00:00").toLocaleDateString("pt-BR")}`}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                    <span className="text-green-600 font-medium">✓ {pdfTransactions.filter(t => !t.is_duplicate).length} para importar</span>
+                    {pdfTransactions.filter(t => t.is_duplicate).length > 0 && (
+                      <span className="text-amber-600 font-medium">⚠ {pdfTransactions.filter(t => t.is_duplicate).length} já existem (serão ignoradas)</span>
+                    )}
+                    {pdfTransactions.filter(t => !t.is_duplicate && t.has_future_installments).length > 0 && (
+                      <span className="text-blue-600 font-medium">↻ {pdfTransactions.filter(t => !t.is_duplicate && t.has_future_installments).length} com parcelas futuras</span>
+                    )}
+                  </div>
+                </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    {pdfTransactions.filter(t => t.selected).length} de {pdfTransactions.length} transações selecionadas
-                    {pdfInvoiceMonth && pdfInvoiceYear ? ` — Fatura ${MONTH_NAMES[pdfInvoiceMonth - 1]}/${pdfInvoiceYear}` : ""}
+                  <p className="text-xs text-muted-foreground">
+                    {pdfTransactions.filter(t => t.selected && !t.is_duplicate).length} selecionadas para importar
                   </p>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setPdfTransactions(t => t.map(tx => ({ ...tx, selected: true })))} className="text-xs text-primary hover:underline">Selecionar todos</button>
+                    <button type="button" onClick={() => setPdfTransactions(t => t.map(tx => ({ ...tx, selected: !tx.is_duplicate })))} className="text-xs text-primary hover:underline">Selecionar novas</button>
                     <span className="text-muted-foreground">·</span>
-                    <button type="button" onClick={() => setPdfTransactions(t => t.map(tx => ({ ...tx, selected: false })))} className="text-xs text-muted-foreground hover:underline">Desmarcar todos</button>
+                    <button type="button" onClick={() => setPdfTransactions(t => t.map(tx => ({ ...tx, selected: false })))} className="text-xs text-muted-foreground hover:underline">Desmarcar todas</button>
                   </div>
                 </div>
                 <div className="space-y-2">
                   {pdfTransactions.map((tx, i) => (
                     <div key={i} className={`rounded-lg border p-3 transition-colors ${
-                      tx.selected ? "border-primary/30 bg-primary/5" : "border-border opacity-50"
+                      tx.is_duplicate
+                        ? "border-amber-200 bg-amber-50 dark:bg-amber-900/10 opacity-60"
+                        : tx.selected
+                          ? "border-primary/30 bg-primary/5"
+                          : "border-border opacity-50"
                     }`}>
                       <div className="flex items-start gap-3">
                         <input
                           type="checkbox"
-                          checked={tx.selected}
-                          onChange={(e) => setPdfTransactions(prev => prev.map((t, j) => j === i ? { ...t, selected: e.target.checked } : t))}
-                          className="mt-1 h-4 w-4 rounded border-gray-300 accent-primary"
+                          checked={tx.selected && !tx.is_duplicate}
+                          disabled={tx.is_duplicate}
+                          onChange={(e) => !tx.is_duplicate && setPdfTransactions(prev => prev.map((t, j) => j === i ? { ...t, selected: e.target.checked } : t))}
+                          className="mt-1 h-4 w-4 rounded border-gray-300 accent-primary disabled:opacity-40"
                         />
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-medium truncate">{tx.description}</p>
                             <p className="text-sm font-bold text-red-600 flex-shrink-0">{formatCurrency(tx.amount)}</p>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span>{tx.date}</span>
-                            {tx.installment && <span className="bg-muted px-1.5 py-0.5 rounded">{tx.installment}</span>}
-                            {tx.category_hint && <span className="text-primary/70">{tx.category_hint}</span>}
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                            {tx.purchase_date && <span>Compra: {new Date(tx.purchase_date + "T12:00:00").toLocaleDateString("pt-BR")}</span>}
+                            {tx.installment && (
+                              <span className={`px-1.5 py-0.5 rounded font-medium ${
+                                tx.has_future_installments ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-muted text-muted-foreground"
+                              }`}>
+                                Parcela {tx.installment}
+                                {tx.has_future_installments && " → cria futuras"}
+                              </span>
+                            )}
+                            {tx.is_duplicate && (
+                              <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded font-medium">
+                                Já importada
+                              </span>
+                            )}
+                            {tx.category_hint && !tx.is_duplicate && <span className="text-primary/70">{tx.category_hint}</span>}
                           </div>
-                          {/* Seletor de categoria */}
-                          <Select
-                            value={tx.categoryId ? String(tx.categoryId) : ""}
-                            onValueChange={(v) => setPdfTransactions(prev => prev.map((t, j) => j === i ? { ...t, categoryId: v ? Number(v) : null } : t))}
-                          >
-                            <SelectTrigger className="h-7 text-xs">
-                              <SelectValue placeholder="Categoria (opcional)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories?.filter((c: any) => c.type === "EXPENSE").map((c: any) => (
-                                <SelectItem key={c.id} value={String(c.id)}>
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color || "#6B7280" }} />
-                                    {c.name}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {/* Seletor de categoria (apenas para não-duplicatas) */}
+                          {!tx.is_duplicate && (
+                            <Select
+                              value={tx.categoryId ? String(tx.categoryId) : ""}
+                              onValueChange={(v) => setPdfTransactions(prev => prev.map((t, j) => j === i ? { ...t, categoryId: v ? Number(v) : null } : t))}
+                            >
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue placeholder="Categoria (opcional)" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categories?.filter((c: any) => c.type === "EXPENSE").map((c: any) => (
+                                  <SelectItem key={c.id} value={String(c.id)}>
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color || "#6B7280" }} />
+                                      {c.name}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -653,9 +758,12 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                 </div>
                 <div>
                   <p className="text-lg font-semibold">Importação concluída!</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {pdfTransactions.filter(t => t.selected).length} transações foram adicionadas ao cartão.
-                  </p>
+                  <div className="text-sm text-muted-foreground mt-2 space-y-1">
+                    <p><span className="text-green-600 font-medium">{pdfImportedCount} transação(s)</span> adicionadas ao cartão</p>
+                    {pdfSkippedCount > 0 && (
+                      <p><span className="text-amber-600 font-medium">{pdfSkippedCount} transação(s)</span> ignoradas (já existiam)</p>
+                    )}
+                  </div>
                 </div>
                 <Button onClick={closePdfSheet} className="bg-primary hover:bg-primary/90">Fechar</Button>
               </div>
@@ -683,13 +791,13 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
               {pdfStep === "review" && (
                 <Button
                   onClick={handlePdfImport}
-                  disabled={pdfTransactions.filter(t => t.selected).length === 0 || pdfImporting}
+                  disabled={pdfTransactions.filter(t => t.selected && !t.is_duplicate).length === 0 || pdfImporting}
                   className="bg-green-600 hover:bg-green-700"
                 >
                   {pdfImporting ? (
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importando...</>
                   ) : (
-                    <><Check className="h-4 w-4 mr-2" />Importar {pdfTransactions.filter(t => t.selected).length} transações</>
+                    <><Check className="h-4 w-4 mr-2" />Importar {pdfTransactions.filter(t => t.selected && !t.is_duplicate).length} transações</>
                   )}
                 </Button>
               )}
