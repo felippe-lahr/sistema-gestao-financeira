@@ -87,15 +87,16 @@ function extractPdfText(buffer: Buffer): string {
 }
 
 /**
- * Normaliza uma descrição para comparação de duplicatas.
- * Remove espaços extras, converte para minúsculas, remove caracteres especiais.
+ * Normaliza uma data para comparação de duplicatas (formato YYYY-MM-DD).
  */
-function normalizeDescription(desc: string): string {
-  return desc
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/[^a-z0-9\s]/g, "")
-    .trim();
+function normalizeDate(date: string | Date | null | undefined): string {
+  if (!date) return "";
+  try {
+    const d = typeof date === "string" ? new Date(date + (date.includes("T") ? "" : "T12:00:00")) : date;
+    return d.toISOString().substring(0, 10); // YYYY-MM-DD
+  } catch {
+    return String(date).substring(0, 10);
+  }
 }
 
 export function registerCreditCardImportRoutes(app: Express) {
@@ -202,27 +203,38 @@ Regras CRÍTICAS:
         const invoiceYear: number = extractedData.invoice_year ?? null;
 
         // ── Verificar duplicatas no banco se creditCardId foi fornecido ─────────
-        let existingNormalized: Set<string> = new Set();
-        if (creditCardId && invoiceMonth && invoiceYear) {
+        // Chave de conciliação: amount (centavos) + purchase_date (YYYY-MM-DD)
+        let existingKeys: Set<string> = new Set();
+        if (creditCardId) {
           try {
             const dbInstance = await getDb();
             if (dbInstance) {
               const { sql: sqlTag } = await import("drizzle-orm");
-              // Buscar transações do mesmo cartão no mesmo mês/ano da fatura
-              const startDate = new Date(invoiceYear, invoiceMonth - 1, 1);
-              const endDate = new Date(invoiceYear, invoiceMonth, 0, 23, 59, 59);
+              // Buscar TODAS as transações do cartão (sem filtro de mês)
+              // para conciliar por valor + data da compra
               const result = await dbInstance.execute(
-                sqlTag`SELECT description, amount FROM transactions 
-                       WHERE "creditCardId" = ${creditCardId}
-                       AND "dueDate" >= ${startDate}
-                       AND "dueDate" <= ${endDate}`
+                sqlTag`SELECT amount, "dueDate", notes FROM transactions 
+                       WHERE "creditCardId" = ${creditCardId}`
               );
               const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
               for (const row of rows) {
-                const key = `${normalizeDescription(row.description)}|${row.amount}`;
-                existingNormalized.add(key);
+                // Extrair purchase_date das notes se disponível (formato: "Data da compra: DD/MM/YYYY")
+                let purchaseDateStr = "";
+                if (row.notes) {
+                  const match = String(row.notes).match(/Data da compra: (\d{2}\/\d{2}\/\d{4})/);
+                  if (match) {
+                    const [day, month, year] = match[1].split("/");
+                    purchaseDateStr = `${year}-${month}-${day}`;
+                  }
+                }
+                // Se não tem purchase_date nas notes, usar dueDate como fallback
+                if (!purchaseDateStr && row.dueDate) {
+                  purchaseDateStr = normalizeDate(row.dueDate);
+                }
+                const key = `${row.amount}|${purchaseDateStr}`;
+                existingKeys.add(key);
               }
-              console.log(`[CreditCardImport] ${existingNormalized.size} transações já existem no mês ${invoiceMonth}/${invoiceYear}`);
+              console.log(`[CreditCardImport] ${existingKeys.size} transações existentes no cartão para conciliação`);
             }
           } catch (dbErr: any) {
             console.error("[CreditCardImport] Error checking duplicates:", dbErr?.message);
@@ -234,9 +246,9 @@ Regras CRÍTICAS:
           .filter((tx) => tx && tx.description && tx.amount != null)
           .map((tx) => {
             const amountCents = Math.abs(Math.round(Number(tx.amount) || 0));
-            const descNorm = normalizeDescription(String(tx.description || "").trim());
-            const key = `${descNorm}|${amountCents}`;
-            const isDuplicate = existingNormalized.has(key);
+            const purchaseDateNorm = normalizeDate(tx.purchase_date);
+            const key = `${amountCents}|${purchaseDateNorm}`;
+            const isDuplicate = existingKeys.has(key);
 
             return {
               description: String(tx.description || "").trim(),

@@ -326,8 +326,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     let importedCount = 0;
     let skippedCount = pdfTransactions.filter(tx => tx.is_duplicate).length;
     try {
-      // Data de vencimento da fatura = dueDate de todas as transações
-      // Se não tiver invoiceDueDate, usar o primeiro dia do mês de vencimento
+      // Data de vencimento da fatura — usada como fallback quando não há purchase_date
       const invoiceDueDateBase = pdfInvoiceDueDate
         ? new Date(pdfInvoiceDueDate + "T12:00:00")
         : pdfInvoiceMonth && pdfInvoiceYear
@@ -339,26 +338,30 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
         const installTotal = tx.installment_total;
         const isInstallment = installCurrent != null && installTotal != null;
 
+        // Data da transação = data da compra (purchase_date) ou fallback para vencimento da fatura
+        const txDate = tx.purchase_date
+          ? new Date(tx.purchase_date + "T12:00:00")
+          : invoiceDueDateBase;
+
         if (isInstallment && tx.has_future_installments) {
-          // Parcela atual + parcelas futuras restantes
+          // Parcela atual (data = data da compra)
           const remainingInstallments = installTotal! - installCurrent!;
-          // Criar a parcela atual (no mês da fatura)
           await utils.client.transactions.create.mutate({
             entityId,
             type: "EXPENSE",
             description: `${tx.description} (${installCurrent}/${installTotal})`,
             amount: tx.amount / 100,
-            dueDate: invoiceDueDateBase,
-            purchaseDate: tx.purchase_date ? new Date(tx.purchase_date + "T12:00:00") : undefined,
+            dueDate: txDate,
+            purchaseDate: txDate,
             status: "PENDING",
             categoryId: tx.categoryId ?? undefined,
             creditCardId: selectedCard.id,
             isRecurring: false,
           });
           importedCount++;
-          // Criar parcelas futuras
+          // Criar parcelas futuras — cada parcela avança 1 mês a partir da data da compra
           for (let i = 1; i <= remainingInstallments; i++) {
-            const futureDate = new Date(invoiceDueDateBase);
+            const futureDate = new Date(txDate);
             futureDate.setMonth(futureDate.getMonth() + i);
             await utils.client.transactions.create.mutate({
               entityId,
@@ -366,7 +369,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
               description: `${tx.description} (${installCurrent! + i}/${installTotal})`,
               amount: tx.amount / 100,
               dueDate: futureDate,
-              purchaseDate: tx.purchase_date ? new Date(tx.purchase_date + "T12:00:00") : undefined,
+              purchaseDate: txDate,
               status: "PENDING",
               categoryId: tx.categoryId ?? undefined,
               creditCardId: selectedCard.id,
@@ -384,8 +387,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             type: "EXPENSE",
             description,
             amount: tx.amount / 100,
-            dueDate: invoiceDueDateBase,
-            purchaseDate: tx.purchase_date ? new Date(tx.purchase_date + "T12:00:00") : undefined,
+            dueDate: txDate,
+            purchaseDate: txDate,
             status: "PENDING",
             categoryId: tx.categoryId ?? undefined,
             creditCardId: selectedCard.id,
