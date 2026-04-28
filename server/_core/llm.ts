@@ -66,6 +66,7 @@ export type InvokeParams = {
   output_schema?: OutputSchema;
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
+  model?: string;
 };
 
 export type ToolCall = {
@@ -265,9 +266,17 @@ const normalizeResponseFormat = ({
   };
 };
 
-export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+// Models to try in order: primary, then fallbacks
+const MODEL_CHAIN = ["gemini-2.5-flash", "gpt-4.1-mini", "gpt-4.1-nano"];
+const MAX_RETRIES = 2; // retries per model
+const RETRY_DELAY_MS = 2000; // 2 seconds between retries
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function invokeLLMSingle(
+  params: InvokeParams,
+  modelOverride?: string
+): Promise<Response> {
   const {
     messages,
     tools,
@@ -280,7 +289,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: modelOverride || params.model || "gemini-2.5-flash",
     messages: messages.map(normalizeMessage),
   };
 
@@ -296,7 +305,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
+  payload.max_tokens = 32768;
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
@@ -309,7 +318,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveApiUrl(), {
+  return fetch(resolveApiUrl(), {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -317,13 +326,50 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     },
     body: JSON.stringify(payload),
   });
+}
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  assertApiKey();
+
+  const models = params.model ? [params.model] : MODEL_CHAIN;
+  let lastError: Error | null = null;
+
+  for (const model of models) {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`[LLM] Retry ${attempt}/${MAX_RETRIES} for model ${model}...`);
+          await sleep(RETRY_DELAY_MS * attempt);
+        }
+
+        const response = await invokeLLMSingle(params, model);
+
+        if (response.ok) {
+          if (model !== models[0]) {
+            console.log(`[LLM] Success with fallback model: ${model}`);
+          }
+          return (await response.json()) as InvokeResult;
+        }
+
+        const errorText = await response.text();
+        lastError = new Error(
+          `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+        );
+
+        // Only retry on 429 (rate limit) or 5xx (server errors)
+        if (response.status !== 429 && response.status < 500) {
+          console.error(`[LLM] Non-retryable error (${response.status}) with model ${model}`);
+          break; // Try next model
+        }
+
+        console.warn(`[LLM] Retryable error (${response.status}) with model ${model}, attempt ${attempt + 1}`);
+      } catch (fetchErr: any) {
+        lastError = fetchErr;
+        console.warn(`[LLM] Network error with model ${model}: ${fetchErr?.message}`);
+      }
+    }
+    console.warn(`[LLM] All retries exhausted for model ${model}, trying next fallback...`);
   }
 
-  return (await response.json()) as InvokeResult;
+  throw lastError || new Error("All LLM models failed");
 }
