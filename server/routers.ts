@@ -2574,16 +2574,29 @@ export const appRouter = router({
       }),
 
     deactivate: protectedProcedure
-      .input(z.object({ id: z.number() }))
+      .input(z.object({ id: z.number(), deleteTransactions: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const dbInstance = await getDb();
         if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const { creditCards } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
+        const { eq, sql: sqlTag } = await import("drizzle-orm");
+        if (input.deleteTransactions) {
+          await dbInstance.execute(sqlTag`DELETE FROM transactions WHERE "creditCardId" = ${input.id}`);
+        }
         await dbInstance.update(creditCards).set({ isActive: false, updatedAt: new Date() }).where(eq(creditCards.id, input.id));
         return { success: true };
       }),
-
+    getTransactionCount: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) return { count: 0 };
+        const { sql: sqlTag } = await import("drizzle-orm");
+        const result = await dbInstance.execute(sqlTag`SELECT COUNT(*) as count FROM transactions WHERE "creditCardId" = ${input.id}`);
+        const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+        const count = rows[0] ? Number(rows[0].count) : 0;
+        return { count };
+      }),
     getSummary: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {

@@ -148,7 +148,11 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   const utils = trpc.useUtils();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<any>(null);
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; cardId: number | null }>({ open: false, cardId: null });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; cardId: number | null; cardName?: string }>({ open: false, cardId: null });
+  const { data: txCountData } = trpc.creditCards.getTransactionCount.useQuery(
+    { id: deleteDialog.cardId! },
+    { enabled: deleteDialog.open && !!deleteDialog.cardId }
+  );
   // PDF Import state
   const [pdfSheetOpen, setPdfSheetOpen] = useState(false);
   const [pdfStep, setPdfStep] = useState<PdfImportStep>("upload");
@@ -198,6 +202,10 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     },
     onError: (err) => toast.error(err.message),
   });
+  function handleDeleteCard(deleteTransactions: boolean) {
+    if (!deleteDialog.cardId) return;
+    deactivateMutation.mutate({ id: deleteDialog.cardId, deleteTransactions });
+  }
   function resetForm() {
     setForm({ name: "", brand: "OTHER", lastFourDigits: "", creditLimit: "", closingDay: "1", dueDay: "10", color: "#7C3AED" });
   }
@@ -374,7 +382,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             card={card}
             entityId={entityId}
             onEdit={() => openEdit(card)}
-            onDelete={() => setDeleteDialog({ open: true, cardId: card.id })}
+            onDelete={() => setDeleteDialog({ open: true, cardId: card.id, cardName: card.name })}
           />
         ))}
       </div>
@@ -694,18 +702,44 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remover Cartão?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O cartão será desativado. As transações vinculadas a ele serão mantidas no histórico.
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                {txCountData && txCountData.count > 0 ? (
+                  <>
+                    <p>O cartão <strong className="text-foreground">{deleteDialog.cardName}</strong> possui <strong className="text-foreground">{txCountData.count} transação(s)</strong> vinculada(s).</p>
+                    <p>O que deseja fazer com as transações?</p>
+                  </>
+                ) : (
+                  <p>O cartão <strong className="text-foreground">{deleteDialog.cardName}</strong> será desativado. Esta ação não pode ser desfeita.</p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => deleteDialog.cardId && deactivateMutation.mutate({ id: deleteDialog.cardId })}
-            >
-              Remover
-            </AlertDialogAction>
+          <AlertDialogFooter className="flex-col sm:flex-col gap-2">
+            <AlertDialogCancel className="sm:mr-auto">Cancelar</AlertDialogCancel>
+            {txCountData && txCountData.count > 0 ? (
+              <>
+                <AlertDialogAction
+                  className="bg-orange-500 hover:bg-orange-600 text-white"
+                  onClick={() => handleDeleteCard(false)}
+                >
+                  Remover cartão, manter transações
+                </AlertDialogAction>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => handleDeleteCard(true)}
+                >
+                  Remover cartão e {txCountData.count} transação(s)
+                </AlertDialogAction>
+              </>
+            ) : (
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => handleDeleteCard(false)}
+              >
+                Remover
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

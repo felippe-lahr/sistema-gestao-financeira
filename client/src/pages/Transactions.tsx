@@ -752,11 +752,9 @@ export default function Transactions() {
   });
 
   function openPayInvoiceSheet(group: any) {
-    console.log('[DEBUG openPayInvoiceSheet]', { groupCardName: group.cardName, creditCards: creditCards?.map((c: any) => c.name), group });
     // Find the cardId by matching card name from the creditCards list
     const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
     const cardId = matchedCard?.id;
-    console.log('[DEBUG openPayInvoiceSheet] matchedCard:', matchedCard, 'cardId:', cardId);
     if (!cardId) {
       toast.error("Não foi possível identificar o cartão. Verifique se o cartão está cadastrado.");
       return;
@@ -1701,7 +1699,7 @@ export default function Transactions() {
                             size="sm"
                             className="ml-2 text-xs h-7 hidden md:flex"
                             disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
-                            onClick={(e) => { e.stopPropagation(); console.log('[DEBUG] Pagar Fatura clicked', group.cardName); openPayInvoiceSheet(group); }}
+                            onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                             Pagar Fatura
@@ -1719,7 +1717,7 @@ export default function Transactions() {
                               size="sm"
                               className="w-full text-xs"
                               disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
-                              onClick={(e) => { e.stopPropagation(); console.log('[DEBUG] Pagar Fatura clicked', group.cardName); openPayInvoiceSheet(group); }}
+                              onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                               {group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")
@@ -2600,7 +2598,6 @@ function TransactionForm({
           transactionId={editingTransaction?.id}
           attachments={attachments}
           onUpload={async (file, type) => {
-            console.log('[DEBUG] onUpload called with file:', file.name, 'type:', type);
             try {
               // Upload file to Supabase Storage
               const blobUrl = await uploadFile(file);
@@ -2636,9 +2633,6 @@ function TransactionForm({
                 toast.success("Arquivo adicionado! Será salvo ao criar a transação.");
               }
             } catch (error) {
-              console.error("[DEBUG] Erro completo ao fazer upload:", error);
-              console.error("[DEBUG] Error message:", error instanceof Error ? error.message : String(error));
-              console.error("[DEBUG] Error stack:", error instanceof Error ? error.stack : 'No stack');
               toast.error("Erro ao fazer upload do arquivo: " + (error instanceof Error ? error.message : String(error)));
             }
           }}
