@@ -326,42 +326,60 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     let importedCount = 0;
     let skippedCount = pdfTransactions.filter(tx => tx.is_duplicate).length;
     try {
-      // Data de vencimento da fatura — usada como fallback quando não há purchase_date
-      const invoiceDueDateBase = pdfInvoiceDueDate
-        ? new Date(pdfInvoiceDueDate + "T12:00:00")
-        : pdfInvoiceMonth && pdfInvoiceYear
-          ? new Date(pdfInvoiceYear, pdfInvoiceMonth - 1, 5, 12, 0, 0)
-          : new Date();
+      // Função para calcular dueDate baseado na data da compra e nas configurações do cartão
+      // Regra: compra antes do fechamento → vence no mês seguinte
+      //        compra no dia do fechamento ou depois → vence dois meses à frente
+      const calcDueDate = (purchaseDateStr: string | null): Date => {
+        const closingDay = selectedCard.closingDay || 1;
+        const dueDay = selectedCard.dueDay || 10;
+        if (!purchaseDateStr) {
+          // Sem data de compra: usar vencimento da fatura extraído do PDF
+          if (pdfInvoiceDueDate) return new Date(pdfInvoiceDueDate + "T12:00:00");
+          if (pdfInvoiceMonth && pdfInvoiceYear) return new Date(pdfInvoiceYear, pdfInvoiceMonth - 1, dueDay, 12, 0, 0);
+          return new Date();
+        }
+        const purchase = new Date(purchaseDateStr + "T12:00:00");
+        let dueMonth = purchase.getMonth();
+        let dueYear = purchase.getFullYear();
+        if (purchase.getDate() >= closingDay) {
+          dueMonth += 2; // próxima fatura: fecha no mês seguinte, vence no subsequente
+        } else {
+          dueMonth += 1; // fatura corrente: vence no mês seguinte
+        }
+        if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
+        if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
+        return new Date(dueYear, dueMonth, dueDay, 12, 0, 0);
+      };
 
       for (const tx of toImport) {
         const installCurrent = tx.installment_current;
         const installTotal = tx.installment_total;
         const isInstallment = installCurrent != null && installTotal != null;
 
-        // Data da transação = data da compra (purchase_date) ou fallback para vencimento da fatura
-        const txDate = tx.purchase_date
-          ? new Date(tx.purchase_date + "T12:00:00")
-          : invoiceDueDateBase;
+        // Data da compra (para registro histórico)
+        const purchaseDate = tx.purchase_date ? new Date(tx.purchase_date + "T12:00:00") : undefined;
+        // dueDate calculado pela lógica de fechamento/vencimento do cartão
+        const baseDueDate = calcDueDate(tx.purchase_date);
 
         if (isInstallment && tx.has_future_installments) {
-          // Parcela atual (data = data da compra)
+          // Parcela atual
           const remainingInstallments = installTotal! - installCurrent!;
           await utils.client.transactions.create.mutate({
             entityId,
             type: "EXPENSE",
             description: `${tx.description} (${installCurrent}/${installTotal})`,
             amount: tx.amount / 100,
-            dueDate: txDate,
-            purchaseDate: txDate,
+            dueDate: baseDueDate,
+            purchaseDate,
             status: "PENDING",
             categoryId: tx.categoryId ?? undefined,
             creditCardId: selectedCard.id,
             isRecurring: false,
           });
           importedCount++;
-          // Criar parcelas futuras — cada parcela avança 1 mês a partir da data da compra
+          // Criar parcelas futuras — cada parcela avança 1 mês a partir do dueDate base
           for (let i = 1; i <= remainingInstallments; i++) {
-            const futureDate = new Date(txDate);
+            const futureDate = new Date(baseDueDate);
             futureDate.setMonth(futureDate.getMonth() + i);
             await utils.client.transactions.create.mutate({
               entityId,
@@ -369,7 +387,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
               description: `${tx.description} (${installCurrent! + i}/${installTotal})`,
               amount: tx.amount / 100,
               dueDate: futureDate,
-              purchaseDate: txDate,
+              purchaseDate,
               status: "PENDING",
               categoryId: tx.categoryId ?? undefined,
               creditCardId: selectedCard.id,
@@ -387,8 +405,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             type: "EXPENSE",
             description,
             amount: tx.amount / 100,
-            dueDate: txDate,
-            purchaseDate: txDate,
+            dueDate: baseDueDate,
+            purchaseDate,
             status: "PENDING",
             categoryId: tx.categoryId ?? undefined,
             creditCardId: selectedCard.id,
