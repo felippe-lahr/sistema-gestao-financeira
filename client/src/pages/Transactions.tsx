@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CategorySelect } from "@/components/CategorySelect";
+import { QuickCategoryList } from "@/components/QuickCategoryList";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
 import { AttachmentUploader } from "@/components/AttachmentUploader";
@@ -1222,36 +1224,13 @@ export default function Transactions() {
               {/* Categoria */}
               <div className="space-y-2">
                 <Label>Categoria</Label>
-                <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {categories?.filter((c) => !(c as any).parentId).map((parent) => {
-                      const subs = categories?.filter((c) => (c as any).parentId === parent.id) || [];
-                      return (
-                        <>
-                          <SelectItem key={parent.id} value={parent.id.toString()}>
-                            <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: parent.color || "#6B7280" }} />
-                              <span className="font-medium">{parent.name}</span>
-                              {subs.length > 0 && <span className="text-xs text-muted-foreground">(+ subcategorias)</span>}
-                            </div>
-                          </SelectItem>
-                          {subs.map((sub) => (
-                            <SelectItem key={sub.id} value={sub.id.toString()}>
-                              <div className="flex items-center gap-2 pl-3">
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: sub.color || parent.color || "#6B7280" }} />
-                                <span className="text-muted-foreground">{sub.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                <CategorySelect
+                  categories={categories || []}
+                  value={filterCategoryId}
+                  onValueChange={setFilterCategoryId}
+                  placeholder="Todas"
+                  includeAll
+                />
               </div>
 
               {/* Status */}
@@ -1853,23 +1832,13 @@ export default function Transactions() {
                                     Sem categoria
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-56 p-1" align="start">
+                                <PopoverContent className="w-64 p-1" align="start">
                                   <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
-                                  <div className="max-h-48 overflow-y-auto">
-                                    {categories?.filter(c => c.type === transaction.type || c.type === 'BOTH').map((cat) => (
-                                      <button
-                                        key={cat.id}
-                                        onClick={() => handleSaveQuickCategory(transaction, cat.id)}
-                                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors text-left"
-                                      >
-                                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
-                                        {cat.name}
-                                      </button>
-                                    ))}
-                                    {(!categories || categories.filter(c => c.type === transaction.type || c.type === 'BOTH').length === 0) && (
-                                      <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma categoria cadastrada</p>
-                                    )}
-                                  </div>
+                                  <QuickCategoryList
+                                    categories={categories || []}
+                                    filterType={transaction.type}
+                                    onSelect={(catId) => handleSaveQuickCategory(transaction, catId)}
+                                  />
                                 </PopoverContent>
                               </Popover>
                             )}
@@ -1975,23 +1944,13 @@ export default function Transactions() {
                                 Sem categoria
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-56 p-1" align="start" side="top">
+                            <PopoverContent className="w-64 p-1" align="start" side="top">
                               <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
-                              <div className="max-h-48 overflow-y-auto">
-                                {categories?.filter(c => c.type === transaction.type || c.type === 'BOTH').map((cat) => (
-                                  <button
-                                    key={cat.id}
-                                    onClick={() => handleSaveQuickCategory(transaction, cat.id)}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors text-left"
-                                  >
-                                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
-                                    {cat.name}
-                                  </button>
-                                ))}
-                                {(!categories || categories.filter(c => c.type === transaction.type || c.type === 'BOTH').length === 0) && (
-                                  <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma categoria cadastrada</p>
-                                )}
-                              </div>
+                              <QuickCategoryList
+                                categories={categories || []}
+                                filterType={transaction.type}
+                                onSelect={(catId) => handleSaveQuickCategory(transaction, catId)}
+                              />
                             </PopoverContent>
                           </Popover>
                         )}
@@ -2083,24 +2042,14 @@ export default function Transactions() {
                   </div>
                 </div>
                 <div className="w-full sm:w-52 flex-shrink-0">
-                  <Select
+                  <CategorySelect
+                    categories={categories || []}
                     value={bulkCategoryAssignments[tx.id] || ""}
                     onValueChange={(v) => setBulkCategoryAssignments(prev => ({ ...prev, [tx.id]: v }))}
-                  >
-                    <SelectTrigger className="w-full h-9 text-sm">
-                      <SelectValue placeholder="Selecionar categoria..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories?.filter(c => c.type === tx.type || c.type === 'BOTH').map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
-                            {cat.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    filterType={tx.type}
+                    placeholder="Selecionar categoria..."
+                    triggerClassName="h-9 text-sm"
+                  />
                 </div>
               </div>
             ))}
@@ -2362,52 +2311,12 @@ function TransactionForm({
 
       <div className="space-y-2">
         <Label htmlFor="category">Categoria</Label>
-        {/* Passo 1: seletor de categoria pai — sempre selecionável */}
-        <Select
-          value={selectedParentId?.toString() || ""}
-          onValueChange={(v) => {
-            // Seleciona a categoria pai como categoryId (válido imediatamente)
-            setFormData({ ...formData, categoryId: v });
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione uma categoria" />
-          </SelectTrigger>
-          <SelectContent>
-            {parentCategories.map((cat) => (
-              <SelectItem key={cat.id} value={cat.id.toString()}>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || "#6B7280" }} />
-                  {cat.name}
-                  {getSubcategories(cat.id).length > 0 && (
-                    <span className="text-xs text-muted-foreground ml-1">▾ {getSubcategories(cat.id).length} subcategorias</span>
-                  )}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {/* Passo 2: seletor de subcategoria — aparece dinamicamente quando a categoria pai tem filhos */}
-        {selectedParentId && getSubcategories(selectedParentId).length > 0 && (
-          <Select
-            value={(selectedCategory as any)?.parentId ? formData.categoryId : ""}
-            onValueChange={(v) => setFormData({ ...formData, categoryId: v })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Refinar por subcategoria (opcional)" />
-            </SelectTrigger>
-            <SelectContent>
-              {getSubcategories(selectedParentId).map((sub) => (
-                <SelectItem key={sub.id} value={sub.id.toString()}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sub.color || selectedParentCategory?.color || "#6B7280" }} />
-                    {sub.name}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <CategorySelect
+          categories={relevantCategories}
+          value={formData.categoryId || ""}
+          onValueChange={(v) => setFormData({ ...formData, categoryId: v })}
+          placeholder="Selecione uma categoria"
+        />
       </div>
 
       {/* Helper: calcula data de vencimento com base no cartão e data da compra */}

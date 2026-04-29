@@ -39,6 +39,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CurrencyInput, parseCurrency } from "@/components/CurrencyInput";
+import { CategorySelect } from "@/components/CategorySelect";
 
 // ─── Paleta de cores (mesma das categorias) ───────────────────────────────────
 const COLOR_PALETTE = [
@@ -756,24 +757,14 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                           </div>
                           {/* Seletor de categoria (apenas para não-duplicatas) */}
                           {!tx.is_duplicate && (
-                            <Select
+                            <CategorySelect
+                              categories={categories || []}
                               value={tx.categoryId ? String(tx.categoryId) : ""}
                               onValueChange={(v) => setPdfTransactions(prev => prev.map((t, j) => j === i ? { ...t, categoryId: v ? Number(v) : null } : t))}
-                            >
-                              <SelectTrigger className="h-7 text-xs">
-                                <SelectValue placeholder="Categoria (opcional)" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {categories?.filter((c: any) => c.type === "EXPENSE").map((c: any) => (
-                                  <SelectItem key={c.id} value={String(c.id)}>
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color || "#6B7280" }} />
-                                      {c.name}
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              filterType="EXPENSE"
+                              placeholder="Categoria (opcional)"
+                              triggerClassName="h-7 text-xs"
+                            />
                           )}
                         </div>
                       </div>
