@@ -12,11 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CategorySelect } from "@/components/CategorySelect";
+import { QuickCategoryList } from "@/components/QuickCategoryList";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
 import { AttachmentUploader } from "@/components/AttachmentUploader";
@@ -32,8 +34,8 @@ export default function Transactions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   
-  // Filter states
-  const [filterPeriod, setFilterPeriod] = useState<"all" | "month" | "year" | "custom">("all");
+  // Filter states — initialize with current month by default for performance
+  const [filterPeriod, setFilterPeriod] = useState<"all" | "month" | "year" | "custom">("month");
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
@@ -59,6 +61,13 @@ export default function Transactions() {
   const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
   const [bulkCategoryAssignments, setBulkCategoryAssignments] = useState<Record<number, string>>({});
   const [bulkCategorySaving, setBulkCategorySaving] = useState(false);
+  
+  // Estado para agrupamento de cartões de crédito (expandir/colapsar)
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  
+  // Estado para pagamento de fatura de cartão
+  const [payInvoiceSheet, setPayInvoiceSheet] = useState<{ open: boolean; cardName: string; cardId: number | null; total: number; pendingCount: number }>({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0 });
+  const [payInvoiceBankAccountId, setPayInvoiceBankAccountId] = useState<string>("");
   
   // Resetar mês e ano para o atual ao abrir a página
   useEffect(() => {
@@ -86,6 +95,9 @@ export default function Transactions() {
     categoryId: "",
     bankAccountId: "",
     paymentMethodId: "",
+    creditCardId: "",
+    purchaseDate: "",
+    installments: "1",
     notes: "",
     isRecurring: false,
     recurrenceCount: "1",
@@ -119,32 +131,7 @@ export default function Transactions() {
   const canWrite = myRole === "OWNER" || myRole === "ADMIN" || myRole === "EDITOR";
   const canDelete = myRole === "OWNER" || myRole === "ADMIN";
 
-  // Fetch transactions with filters
-  const { data: transactions, isLoading: transactionsLoading } = trpc.transactions.listByEntity.useQuery(
-    {
-      entityId: selectedEntityId!,
-      type: activeTab === "all" ? undefined : activeTab === "income" ? "INCOME" : "EXPENSE",
-    },
-    { enabled: !!selectedEntityId }
-  );
-
-  // Fetch categories, bank accounts, and payment methods for the selected entity
-  const { data: categories } = trpc.categories.listByEntity.useQuery(
-    { entityId: selectedEntityId! },
-    { enabled: !!selectedEntityId }
-  );
-
-  const { data: bankAccounts } = trpc.bankAccounts.listByEntity.useQuery(
-    { entityId: selectedEntityId! },
-    { enabled: !!selectedEntityId }
-  );
-
-  const { data: paymentMethods } = trpc.paymentMethods.listByEntity.useQuery(
-    { entityId: selectedEntityId! },
-    { enabled: !!selectedEntityId }
-  );
-  
-  // Helper function to get filter dates
+  // Compute filter dates BEFORE queries so they can be passed as query params for performance
   const getFilterDates = () => {
     if (filterPeriod === "month") {
       return {
@@ -164,8 +151,34 @@ export default function Transactions() {
     }
     return { startDate: undefined, endDate: undefined };
   };
-  
   const { startDate, endDate } = getFilterDates();
+
+  const { data: transactions, isLoading: transactionsLoading } = trpc.transactions.listByEntity.useQuery(
+    {
+      entityId: selectedEntityId!,
+      type: activeTab === "all" ? undefined : activeTab === "income" ? "INCOME" : "EXPENSE",
+      startDate,
+      endDate,
+    },
+    { enabled: !!selectedEntityId }
+  );
+  // Fetch categories, bank accounts, and payment methods for the selected entity
+  const { data: categories } = trpc.categories.listByEntity.useQuery(
+    { entityId: selectedEntityId! },
+    { enabled: !!selectedEntityId }
+  );
+  const { data: bankAccounts } = trpc.bankAccounts.listByEntity.useQuery(
+    { entityId: selectedEntityId! },
+    { enabled: !!selectedEntityId }
+  );
+  const { data: paymentMethods } = trpc.paymentMethods.listByEntity.useQuery(
+    { entityId: selectedEntityId! },
+    { enabled: !!selectedEntityId }
+  );
+  const { data: creditCards } = trpc.creditCards.listByEntity.useQuery(
+    { entityId: selectedEntityId! },
+    { enabled: !!selectedEntityId }
+  );
   
   // Fetch transaction summary
   const { data: summary, isLoading: summaryLoading } = trpc.transactions.summary.useQuery(
@@ -462,6 +475,9 @@ export default function Transactions() {
       categoryId: "",
       bankAccountId: "",
       paymentMethodId: "",
+      creditCardId: "",
+      purchaseDate: "",
+      installments: "1",
       notes: "",
       isRecurring: false,
       recurrenceCount: "1",
@@ -485,15 +501,17 @@ export default function Transactions() {
       paymentDate: formData.paymentDate ? new Date(formData.paymentDate + "T12:00:00") : undefined,
       status: formData.status,
       categoryId: formData.categoryId ? parseInt(formData.categoryId) : undefined,
-      bankAccountId: formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined,
+      bankAccountId: formData.creditCardId ? undefined : (formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined),
       paymentMethodId: formData.paymentMethodId ? parseInt(formData.paymentMethodId) : undefined,
+      creditCardId: formData.creditCardId ? parseInt(formData.creditCardId) : undefined,
+      purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate + "T12:00:00") : undefined,
+      installments: formData.creditCardId && parseInt(formData.installments) > 1 ? parseInt(formData.installments) : undefined,
       notes: formData.notes || undefined,
       isRecurring: formData.isRecurring,
       recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
       recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
     });
   };
-
   const handleEdit = async (transaction: any) => {
     setEditingTransaction(transaction);
     setFormData({
@@ -506,6 +524,9 @@ export default function Transactions() {
       categoryId: transaction.categoryId?.toString() || "",
       bankAccountId: transaction.bankAccountId?.toString() || "",
       paymentMethodId: transaction.paymentMethodId?.toString() || "",
+      creditCardId: transaction.creditCardId?.toString() || "",
+      purchaseDate: "",
+      installments: "1",
       notes: transaction.notes || "",
       isRecurring: transaction.isRecurring || false,
       recurrenceCount: "1",
@@ -540,16 +561,18 @@ export default function Transactions() {
       paymentDate: formData.paymentDate ? new Date(formData.paymentDate + "T12:00:00") : undefined,
       status: formData.status,
       categoryId: formData.categoryId ? parseInt(formData.categoryId) : undefined,
-      bankAccountId: formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined,
+      bankAccountId: formData.creditCardId ? undefined : (formData.bankAccountId ? parseInt(formData.bankAccountId) : undefined),
       paymentMethodId: formData.paymentMethodId ? parseInt(formData.paymentMethodId) : undefined,
+      creditCardId: formData.creditCardId ? parseInt(formData.creditCardId) : undefined,
+      purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate + "T12:00:00") : undefined,
+      installments: formData.creditCardId && parseInt(formData.installments) > 1 ? parseInt(formData.installments) : undefined,
       notes: formData.notes || undefined,
       isRecurring: formData.isRecurring,
       recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
       recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
     });
   };
-
-  // Categorização rápida inline via Popover — recebe transação e categoryId diretamente
+  // Categorizaação rápida inline via Popover — recebe transação e categoryId diretamente
   const handleSaveQuickCategory = async (transaction: any, categoryId: number) => {
     try {
       // Não enviar amount: o banco já armazena em centavos e o servidor multiplicaria por 100 novamente
@@ -638,9 +661,16 @@ export default function Transactions() {
       return false;
     }
 
-    // Category filter
-    if (filterCategoryId && filterCategoryId !== "all" && t.categoryId?.toString() !== filterCategoryId) {
-      return false;
+    // Category filter — inclui subcategorias quando filtra pela categoria pai
+    if (filterCategoryId && filterCategoryId !== "all") {
+      const filterId = parseInt(filterCategoryId);
+      const txCatId = t.categoryId;
+      if (!txCatId) return false;
+      // Verifica se a transação é da categoria selecionada OU de uma subcategoria dela
+      const txCategory = categories?.find((c) => c.id === txCatId);
+      const isDirectMatch = txCatId === filterId;
+      const isSubcategoryMatch = (txCategory as any)?.parentId === filterId;
+      if (!isDirectMatch && !isSubcategoryMatch) return false;
     }
 
     // Status filter
@@ -680,6 +710,79 @@ export default function Transactions() {
   // Transações sem categoria (calculado após filtro)
   const uncategorizedTransactions = filteredTransactions?.filter((t) => !t.categoryId) || [];
 
+  // Agrupar transações de cartão de crédito por nome do cartão
+  const { cardGroups, nonCardTransactions } = (() => {
+    if (!filteredTransactions) return { cardGroups: [] as any[], nonCardTransactions: [] as any[] };
+    const groups = new Map<string, { cardName: string; cardColor: string; transactions: any[]; total: number }>();
+    const nonCard: any[] = [];
+    for (const t of filteredTransactions) {
+      if (t.creditCardName) {
+        const key = t.creditCardName;
+        if (!groups.has(key)) {
+          groups.set(key, { cardName: t.creditCardName, cardColor: t.creditCardColor || '#7C3AED', transactions: [], total: 0 });
+        }
+        const g = groups.get(key)!;
+        g.transactions.push(t);
+        g.total += t.amount;
+      } else {
+        nonCard.push(t);
+      }
+    }
+    return { cardGroups: Array.from(groups.values()), nonCardTransactions: nonCard };
+  })();
+
+  function toggleCardExpand(cardName: string) {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardName)) next.delete(cardName);
+      else next.add(cardName);
+      return next;
+    });
+  }
+
+  // Mutation para pagar fatura do cartão
+  const payInvoiceMutation = trpc.creditCards.payInvoice.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Fatura paga com sucesso! ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(data.totalAmount / 100)} debitados da conta.`);
+      setPayInvoiceSheet({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0 });
+      setPayInvoiceBankAccountId("");
+      utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
+      utils.dashboard.metrics.invalidate();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao pagar fatura"),
+  });
+
+  function openPayInvoiceSheet(group: any) {
+    // Find the cardId by matching card name from the creditCards list
+    const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
+    const cardId = matchedCard?.id;
+    if (!cardId) {
+      toast.error("Não foi possível identificar o cartão. Verifique se o cartão está cadastrado.");
+      return;
+    }
+    const pendingTxs = group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE");
+    if (pendingTxs.length === 0) {
+      toast.info("Todas as transações desta fatura já estão pagas");
+      return;
+    }
+    const pendingTotal = pendingTxs.reduce((sum: number, t: any) => sum + t.amount, 0);
+    setPayInvoiceSheet({ open: true, cardName: group.cardName, cardId: Number(cardId), total: pendingTotal, pendingCount: pendingTxs.length });
+    if (bankAccounts && bankAccounts.length > 0) {
+      setPayInvoiceBankAccountId(String(bankAccounts[0].id));
+    }
+  }
+
+  function handlePayInvoice() {
+    if (!payInvoiceSheet.cardId || !payInvoiceBankAccountId) return;
+    payInvoiceMutation.mutate({
+      cardId: payInvoiceSheet.cardId,
+      month: filterMonth,
+      year: filterYear,
+      bankAccountId: Number(payInvoiceBankAccountId),
+    });
+  }
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive"> = {
       PENDING: "secondary",
@@ -699,6 +802,47 @@ export default function Transactions() {
       <Badge style={{ backgroundColor: color || "#6B7280", color: "#fff" }} className="font-normal">
         {name}
       </Badge>
+    );
+  };
+
+  // Badge de categoria com hierarquia (pai > subcategoria)
+  const getCategoryHierarchyBadge = (transaction: any) => {
+    const categoryId = transaction.categoryId;
+    if (!categoryId) return null;
+    const catName = transaction.categoryName || categories?.find((c: any) => c.id === categoryId)?.name;
+    const catColor = transaction.categoryColor || categories?.find((c: any) => c.id === categoryId)?.color || "#6B7280";
+    const parentName = transaction.parentCategoryName;
+    const parentColor = transaction.parentCategoryColor || catColor;
+    if (!catName) return null;
+    if (parentName) {
+      // É uma subcategoria: mostrar pai > filho
+      return (
+        <span className="inline-flex items-center gap-0.5 rounded-full overflow-hidden text-xs font-medium border" style={{ borderColor: parentColor + '55' }}>
+          <span className="px-2 py-0.5" style={{ backgroundColor: parentColor + '22', color: parentColor }}>{ parentName }</span>
+          <span className="px-2 py-0.5 text-white" style={{ backgroundColor: catColor }}>{ catName }</span>
+        </span>
+      );
+    }
+    return (
+      <Badge style={{ backgroundColor: catColor, color: "#fff" }} className="font-normal">
+        {catName}
+      </Badge>
+    );
+  };
+
+  // Badge de cartão de crédito
+  const getCreditCardBadge = (transaction: any) => {
+    const cardName = transaction.creditCardName;
+    const cardColor = transaction.creditCardColor;
+    if (!cardName) return null;
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+        style={{ backgroundColor: cardColor || '#6366f1' }}
+      >
+        <CreditCard className="h-3 w-3" />
+        {cardName}
+      </span>
     );
   };
 
@@ -856,6 +1000,7 @@ export default function Transactions() {
                   categories={categories || []}
                   bankAccounts={bankAccounts || []}
                   paymentMethods={paymentMethods || []}
+                  creditCards={creditCards || []}
                   selectedEntityId={selectedEntityId}
                   setSelectedEntityId={setSelectedEntityId}
                   attachments={attachments}
@@ -900,6 +1045,7 @@ export default function Transactions() {
               categories={categories || []}
               bankAccounts={bankAccounts || []}
               paymentMethods={paymentMethods || []}
+              creditCards={creditCards || []}
               selectedEntityId={selectedEntityId}
               setSelectedEntityId={setSelectedEntityId}
               attachments={attachments}
@@ -918,6 +1064,51 @@ export default function Transactions() {
             </Button>
             <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
               {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Pay Invoice Sheet */}
+      <Sheet open={payInvoiceSheet.open} onOpenChange={(open) => { if (!open) { setPayInvoiceSheet({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0 }); setPayInvoiceBankAccountId(""); } }}>
+        <SheetContent side="right" className="w-full sm:w-[420px] flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-xl font-bold">Pagar Fatura</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-muted-foreground">Cartão</p>
+              <p className="font-semibold text-lg">{payInvoiceSheet.cardName}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">Transações pendentes</p>
+                <p className="font-semibold text-lg">{payInvoiceSheet.pendingCount}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">Valor total</p>
+                <p className="font-semibold text-lg text-red-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(payInvoiceSheet.total) / 100)}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Conta bancária para débito</label>
+              <Select value={payInvoiceBankAccountId} onValueChange={setPayInvoiceBankAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts?.map((acc: any) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}{acc.bank ? ` (${acc.bank})` : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              className="w-full"
+              disabled={!payInvoiceBankAccountId || payInvoiceMutation.isPending}
+              onClick={handlePayInvoice}
+            >
+              {payInvoiceMutation.isPending ? 'Processando...' : 'Confirmar Pagamento'}
             </Button>
           </div>
         </SheetContent>
@@ -1033,19 +1224,13 @@ export default function Transactions() {
               {/* Categoria */}
               <div className="space-y-2">
                 <Label>Categoria</Label>
-                <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id.toString()}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CategorySelect
+                  categories={categories || []}
+                  value={filterCategoryId}
+                  onValueChange={setFilterCategoryId}
+                  placeholder="Todas"
+                  includeAll
+                />
               </div>
 
               {/* Status */}
@@ -1184,16 +1369,33 @@ export default function Transactions() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Categoria:</span>
           <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
-            <SelectTrigger className="w-[150px] bg-white dark:bg-gray-800">
+            <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
               <SelectValue placeholder="Todas" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {categories?.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id.toString()}>
-                  {cat.name}
-                </SelectItem>
-              ))}
+              {categories?.filter((c) => !(c as any).parentId).map((parent) => {
+                const subs = categories?.filter((c) => (c as any).parentId === parent.id) || [];
+                return (
+                  <>
+                    <SelectItem key={parent.id} value={parent.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: parent.color || "#6B7280" }} />
+                        <span className="font-medium">{parent.name}</span>
+                        {subs.length > 0 && <span className="text-xs text-muted-foreground">(+ sub)</span>}
+                      </div>
+                    </SelectItem>
+                    {subs.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id.toString()}>
+                        <div className="flex items-center gap-2 pl-3">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: sub.color || parent.color || "#6B7280" }} />
+                          <span className="text-muted-foreground">{sub.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -1431,7 +1633,150 @@ export default function Transactions() {
             </div>
           ) : filteredTransactions && filteredTransactions.length > 0 ? (
             <div className="space-y-3">
-              {filteredTransactions.map((transaction) => (
+              {/* Grupos de cartão de crédito */}
+              {cardGroups.map((group) => (
+                <Card key={`card-group-${group.cardName}`} className="overflow-hidden border-l-4" style={{ borderLeftColor: group.cardColor }}>
+                  <CardContent className="p-0">
+                    <div
+                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => toggleCardExpand(group.cardName)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {expandedCards.has(group.cardName) ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <div className="p-2 rounded-full" style={{ backgroundColor: group.cardColor + '20' }}>
+                          <CreditCard className="h-5 w-5" style={{ color: group.cardColor }} />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-sm">{group.cardName}</h3>
+                          <p className="text-xs text-muted-foreground">{group.transactions.length} transaç{group.transactions.length === 1 ? 'ão' : 'ões'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const pendingCount = group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length;
+                          const allPaid = pendingCount === 0;
+                          return (
+                            <>
+                              {allPaid ? (
+                                <Badge variant="default" className="bg-green-600 text-xs">Pago</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs">{pendingCount} pendente{pendingCount > 1 ? 's' : ''}</Badge>
+                              )}
+                            </>
+                          );
+                        })()}
+                        <p className="text-base font-bold text-red-600">
+                          -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(group.total / 100)}
+                        </p>
+                        {canWrite && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-2 text-xs h-7 hidden md:flex"
+                            disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
+                            onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            Pagar Fatura
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {expandedCards.has(group.cardName) && (
+                      <div className="border-t divide-y">
+                        {/* Mobile: Pagar Fatura button */}
+                        {canWrite && (
+                          <div className="md:hidden p-3 bg-muted/30">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-xs"
+                              disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
+                              onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                              {group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")
+                                ? `Pagar Fatura (${group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length} pendentes)`
+                                : "Fatura Paga"}
+                            </Button>
+                          </div>
+                        )}
+                        {group.transactions.map((transaction: any) => (
+                          <div key={transaction.id} className="p-3 pl-12 hover:bg-muted/30 transition-colors">
+                            {/* Desktop */}
+                            <div className="hidden md:flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="font-medium text-sm">{transaction.description}</h4>
+                                    {transaction.attachmentCount > 0 && <Paperclip className="h-3 w-3 text-muted-foreground" />}
+                                    {getCategoryHierarchyBadge(transaction)}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                {getStatusBadge(transaction.status)}
+                                <p className="text-sm font-semibold text-red-600 min-w-[100px] text-right">
+                                  -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
+                                </p>
+                                {canWrite && (
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(transaction); }}>
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {canDelete && (
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDelete(transaction.id); }}>
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            {/* Mobile */}
+                            <div className="md:hidden space-y-1">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium text-sm truncate flex-1">{transaction.description}</h4>
+                                <p className="text-sm font-semibold text-red-600">
+                                  -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
+                                </p>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {getCategoryHierarchyBadge(transaction)}
+                                  {getStatusBadge(transaction.status)}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <p className="text-xs text-muted-foreground">
+                                    {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                                  </p>
+                                  {canWrite && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(transaction); }}>
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {canDelete && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDelete(transaction.id); }}>
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+              {/* Transações normais (sem cartão de crédito) */}
+              {nonCardTransactions.map((transaction) => (
                 <Card key={transaction.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     {/* Desktop Layout */}
@@ -1477,7 +1822,8 @@ export default function Transactions() {
                             {transaction.attachmentCount > 0 && (
                               <Paperclip className="h-4 w-4 text-muted-foreground" />
                             )}
-                            {getCategoryBadge(transaction.categoryId, (transaction as any).categoryName, (transaction as any).categoryColor)}
+                            {getCategoryHierarchyBadge(transaction)}
+                            {getCreditCardBadge(transaction)}
                             {!transaction.categoryId && canWrite && (
                               <Popover>
                                 <PopoverTrigger asChild>
@@ -1486,23 +1832,13 @@ export default function Transactions() {
                                     Sem categoria
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-56 p-1" align="start">
+                                <PopoverContent className="w-64 p-1" align="start">
                                   <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
-                                  <div className="max-h-48 overflow-y-auto">
-                                    {categories?.filter(c => c.type === transaction.type || c.type === 'BOTH').map((cat) => (
-                                      <button
-                                        key={cat.id}
-                                        onClick={() => handleSaveQuickCategory(transaction, cat.id)}
-                                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors text-left"
-                                      >
-                                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
-                                        {cat.name}
-                                      </button>
-                                    ))}
-                                    {(!categories || categories.filter(c => c.type === transaction.type || c.type === 'BOTH').length === 0) && (
-                                      <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma categoria cadastrada</p>
-                                    )}
-                                  </div>
+                                  <QuickCategoryList
+                                    categories={categories || []}
+                                    filterType={transaction.type}
+                                    onSelect={(catId) => handleSaveQuickCategory(transaction, catId)}
+                                  />
                                 </PopoverContent>
                               </Popover>
                             )}
@@ -1598,7 +1934,8 @@ export default function Transactions() {
 
                       {/* Row 2: Category Badge + OFX Badge */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        {getCategoryBadge(transaction.categoryId, (transaction as any).categoryName, (transaction as any).categoryColor)}
+                        {getCategoryHierarchyBadge(transaction)}
+                        {getCreditCardBadge(transaction)}
                         {!transaction.categoryId && canWrite && (
                           <Popover>
                             <PopoverTrigger asChild>
@@ -1607,23 +1944,13 @@ export default function Transactions() {
                                 Sem categoria
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-56 p-1" align="start" side="top">
+                            <PopoverContent className="w-64 p-1" align="start" side="top">
                               <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
-                              <div className="max-h-48 overflow-y-auto">
-                                {categories?.filter(c => c.type === transaction.type || c.type === 'BOTH').map((cat) => (
-                                  <button
-                                    key={cat.id}
-                                    onClick={() => handleSaveQuickCategory(transaction, cat.id)}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors text-left"
-                                  >
-                                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
-                                    {cat.name}
-                                  </button>
-                                ))}
-                                {(!categories || categories.filter(c => c.type === transaction.type || c.type === 'BOTH').length === 0) && (
-                                  <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma categoria cadastrada</p>
-                                )}
-                              </div>
+                              <QuickCategoryList
+                                categories={categories || []}
+                                filterType={transaction.type}
+                                onSelect={(catId) => handleSaveQuickCategory(transaction, catId)}
+                              />
                             </PopoverContent>
                           </Popover>
                         )}
@@ -1715,24 +2042,14 @@ export default function Transactions() {
                   </div>
                 </div>
                 <div className="w-full sm:w-52 flex-shrink-0">
-                  <Select
+                  <CategorySelect
+                    categories={categories || []}
                     value={bulkCategoryAssignments[tx.id] || ""}
                     onValueChange={(v) => setBulkCategoryAssignments(prev => ({ ...prev, [tx.id]: v }))}
-                  >
-                    <SelectTrigger className="w-full h-9 text-sm">
-                      <SelectValue placeholder="Selecionar categoria..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories?.filter(c => c.type === tx.type || c.type === 'BOTH').map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#6B7280' }} />
-                            {cat.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    filterType={tx.type}
+                    placeholder="Selecionar categoria..."
+                    triggerClassName="h-9 text-sm"
+                  />
                 </div>
               </div>
             ))}
@@ -1884,6 +2201,7 @@ function TransactionForm({
   categories,
   bankAccounts,
   paymentMethods,
+  creditCards,
   selectedEntityId,
   setSelectedEntityId,
   attachments,
@@ -1899,6 +2217,7 @@ function TransactionForm({
   categories: any[];
   bankAccounts: any[];
   paymentMethods: any[];
+  creditCards: any[];
   selectedEntityId: number | null;
   setSelectedEntityId: (id: number) => void;
   attachments: any[];
@@ -1908,9 +2227,16 @@ function TransactionForm({
   utils: any;
   setPreviewAttachment: (attachment: any) => void;
 }) {
-  const incomeCategories = categories.filter((c) => c.type === "INCOME");
-  const expenseCategories = categories.filter((c) => c.type === "EXPENSE");
+  const incomeCategories = categories.filter((c) => c.type === "INCOME" && (c as any).isActive !== false);
+  const expenseCategories = categories.filter((c) => c.type === "EXPENSE" && (c as any).isActive !== false);
   const relevantCategories = formData.type === "INCOME" ? incomeCategories : expenseCategories;
+  // Hierarquia: categorias pai (sem parentId) e subcategorias
+  const parentCategories = relevantCategories.filter((c) => !(c as any).parentId);
+  const getSubcategories = (parentId: number) => relevantCategories.filter((c) => (c as any).parentId === parentId);
+  // Categoria pai selecionada (para mostrar subcategorias)
+  const selectedCategory = relevantCategories.find((c) => c.id.toString() === formData.categoryId);
+  const selectedParentId = selectedCategory ? ((selectedCategory as any).parentId || selectedCategory.id) : null;
+  const selectedParentCategory = selectedParentId ? relevantCategories.find((c) => c.id === selectedParentId) : null;
 
   return (
     <div className="space-y-4">
@@ -1985,38 +2311,183 @@ function TransactionForm({
 
       <div className="space-y-2">
         <Label htmlFor="category">Categoria</Label>
-        <Select value={formData.categoryId} onValueChange={(v) => setFormData({ ...formData, categoryId: v })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione uma categoria" />
-          </SelectTrigger>
-          <SelectContent>
-            {relevantCategories.map((cat) => (
-              <SelectItem key={cat.id} value={cat.id.toString()}>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || "#6B7280" }} />
-                  {cat.name}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <CategorySelect
+          categories={relevantCategories}
+          value={formData.categoryId || ""}
+          onValueChange={(v) => setFormData({ ...formData, categoryId: v })}
+          placeholder="Selecione uma categoria"
+        />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="bankAccount">Conta Corrente</Label>
-        <Select value={formData.bankAccountId} onValueChange={(v) => setFormData({ ...formData, bankAccountId: v })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione uma conta" />
-          </SelectTrigger>
-          <SelectContent>
-            {bankAccounts.map((account) => (
-              <SelectItem key={account.id} value={account.id.toString()}>
-                {account.name} {account.bank && `- ${account.bank}`}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Helper: calcula data de vencimento com base no cartão e data da compra */}
+      {/* (definido inline para ter acesso a creditCards e formData) */}
+
+      {/* Cartão de Crédito (apenas para despesas) */}
+      {formData.type === "EXPENSE" && creditCards.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Label>Lançar no Cartão de Crédito</Label>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, creditCardId: formData.creditCardId ? "" : creditCards[0].id.toString(), bankAccountId: "", installments: "1", purchaseDate: "" })}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                formData.creditCardId ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                formData.creditCardId ? "translate-x-4" : "translate-x-1"
+              }`} />
+            </button>
+          </div>
+
+          {formData.creditCardId ? (
+            <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              {/* Seletor do cartão */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Cartão</Label>
+                <Select value={formData.creditCardId} onValueChange={(v) => {
+                  const card = creditCards.find((c) => c.id.toString() === v);
+                  let newDueDate = formData.dueDate;
+                  if (card) {
+                    const purchaseDateStr = formData.purchaseDate || format(new Date(), "yyyy-MM-dd");
+                    const purchase = new Date(purchaseDateStr + "T12:00:00");
+                    const closingDay = card.closingDay || 1;
+                    const dueDay = card.dueDay || 10;
+                    // Regra: compra antes do fechamento → vence no mês seguinte
+                    //        compra no dia do fechamento ou depois → vence dois meses à frente
+                    let dueMonth = purchase.getMonth();
+                    let dueYear = purchase.getFullYear();
+                    if (purchase.getDate() >= closingDay) {
+                      dueMonth += 2; // próxima fatura (fecha no mês seguinte, vence no subsequente)
+                    } else {
+                      dueMonth += 1; // fatura do mês corrente, vence no mês seguinte
+                    }
+                    if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
+                    if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; } // caso +2 ultrapasse
+                    const dueDate = new Date(dueYear, dueMonth, dueDay);
+                    newDueDate = format(dueDate, "yyyy-MM-dd");
+                  }
+                  setFormData({ ...formData, creditCardId: v, bankAccountId: "", dueDate: newDueDate });
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cartão" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {creditCards.map((card) => (
+                      <SelectItem key={card.id} value={card.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color || "#7C3AED" }} />
+                          {card.name} {card.lastFourDigits && `•••• ${card.lastFourDigits}`}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Data da Compra e Parcelas lado a lado */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Data da Compra</Label>
+                  <Input
+                    type="date"
+                    value={formData.purchaseDate}
+                    onChange={(e) => {
+                      const newPurchaseDate = e.target.value;
+                      const card = creditCards.find((c) => c.id.toString() === formData.creditCardId);
+                      let newDueDate = formData.dueDate;
+                      if (card && newPurchaseDate) {
+                        const purchase = new Date(newPurchaseDate + "T12:00:00");
+                        const closingDay = card.closingDay || 1;
+                        const dueDay = card.dueDay || 10;
+                        // Regra: compra antes do fechamento → vence no mês seguinte
+                        //        compra no dia do fechamento ou depois → vence dois meses à frente
+                        let dueMonth = purchase.getMonth();
+                        let dueYear = purchase.getFullYear();
+                        if (purchase.getDate() >= closingDay) {
+                          dueMonth += 2;
+                        } else {
+                          dueMonth += 1;
+                        }
+                        if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
+                        if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
+                        const dueDate = new Date(dueYear, dueMonth, dueDay);
+                        newDueDate = format(dueDate, "yyyy-MM-dd");
+                      }
+                      setFormData({ ...formData, purchaseDate: newPurchaseDate, dueDate: newDueDate });
+                    }}
+                    placeholder="dd/mm/aaaa"
+                  />
+                  <p className="text-xs text-muted-foreground">Quando a compra foi feita</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Parcelas</Label>
+                  <Select value={formData.installments} onValueChange={(v) => setFormData({ ...formData, installments: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 48 }, (_, i) => i + 1).map((n) => (
+                        <SelectItem key={n} value={n.toString()}>
+                          {n === 1 ? "À vista" : `${n}x`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {parseInt(formData.installments) > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      {parseInt(formData.installments)}x de R$ {(parseCurrency(formData.amount) / parseInt(formData.installments)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Info sobre a Data de Vencimento */}
+              <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-300">
+                <span>ℹ️</span>
+                <span>
+                  A <strong>Data de Vencimento</strong> acima é quando a fatura vence (impacto no caixa).
+                  {parseInt(formData.installments) > 1 && ` As ${formData.installments} parcelas terão vencimentos mensais a partir dessa data.`}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="bankAccount">Conta Corrente</Label>
+              <Select value={formData.bankAccountId} onValueChange={(v) => setFormData({ ...formData, bankAccountId: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      {account.name} {account.bank && `- ${account.bank}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Conta Corrente (quando não há cartões ou é receita) */}
+      {(formData.type === "INCOME" || creditCards.length === 0) && (
+        <div className="space-y-2">
+          <Label htmlFor="bankAccount">Conta Corrente</Label>
+          <Select value={formData.bankAccountId} onValueChange={(v) => setFormData({ ...formData, bankAccountId: v })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma conta" />
+            </SelectTrigger>
+            <SelectContent>
+              {bankAccounts.map((account) => (
+                <SelectItem key={account.id} value={account.id.toString()}>
+                  {account.name} {account.bank && `- ${account.bank}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="paymentMethod">Meio de Pagamento</Label>
@@ -2045,7 +2516,6 @@ function TransactionForm({
           transactionId={editingTransaction?.id}
           attachments={attachments}
           onUpload={async (file, type) => {
-            console.log('[DEBUG] onUpload called with file:', file.name, 'type:', type);
             try {
               // Upload file to Supabase Storage
               const blobUrl = await uploadFile(file);
@@ -2081,9 +2551,6 @@ function TransactionForm({
                 toast.success("Arquivo adicionado! Será salvo ao criar a transação.");
               }
             } catch (error) {
-              console.error("[DEBUG] Erro completo ao fazer upload:", error);
-              console.error("[DEBUG] Error message:", error instanceof Error ? error.message : String(error));
-              console.error("[DEBUG] Error stack:", error instanceof Error ? error.stack : 'No stack');
               toast.error("Erro ao fazer upload do arquivo: " + (error instanceof Error ? error.message : String(error)));
             }
           }}

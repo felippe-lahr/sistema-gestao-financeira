@@ -14,10 +14,11 @@ import { registerGoogleAuthRoutes } from "./google-auth";
 import { registerUploadRoutes } from "./upload-routes";
 import { registerStripeRoutes } from "./stripe-routes";
 import { registerOfxRoutes } from "./ofx-routes";
+import { registerCreditCardImportRoutes } from "./credit-card-import-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
-import { ensureEntitySharingTables, ensureEmailVerificationsTable, ensureOnboardingColumn } from "../db";
+import { ensureEntitySharingTables, ensureEmailVerificationsTable, ensureOnboardingColumn, ensureCategorySubcategoryColumns, ensureCreditCardTables } from "../db";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -138,6 +139,8 @@ async function startServer() {
   registerUploadRoutes(app);
   // OFX import routes
   registerOfxRoutes(app);
+  // Credit card PDF import routes
+  registerCreditCardImportRoutes(app);
   // Stripe billing routes (webhook must come before json body parser)
   registerStripeRoutes(app);
 
@@ -182,6 +185,10 @@ async function startServer() {
   await ensureEmailVerificationsTable();
   // Garantir que a coluna de onboarding existe
   await ensureOnboardingColumn();
+  // Garantir que as colunas de subcategorias existem
+  await ensureCategorySubcategoryColumns();
+  // Garantir que as tabelas de cartão de crédito existem
+  await ensureCreditCardTables();
 
   // Start cron jobs
   startCronJobs();

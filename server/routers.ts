@@ -131,10 +131,12 @@ export const appRouter = router({
 
   // ========== CATEGORIES ==========
   categories: router({
-    listByEntity: protectedProcedure.input(z.object({ entityId: z.number() })).query(async ({ input, ctx }) => {
-      await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
-      return await db.getCategoriesByEntityId(input.entityId, ctx.user.id);
-    }),
+    listByEntity: protectedProcedure
+      .input(z.object({ entityId: z.number(), includeInactive: z.boolean().optional() }))
+      .query(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        return await db.getCategoriesByEntityId(input.entityId, ctx.user.id, input.includeInactive ?? false);
+      }),
 
     create: protectedProcedure
       .input(
@@ -144,6 +146,7 @@ export const appRouter = router({
           type: z.enum(["INCOME", "EXPENSE"]),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
           icon: z.string().max(50).optional(),
+          parentId: z.number().optional(), // Subcategoria: ID da categoria pai
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -155,6 +158,7 @@ export const appRouter = router({
           type: input.type,
           color: input.color,
           icon: input.icon,
+          parentId: input.parentId ?? null,
         });
         return { id: categoryId };
       }),
@@ -197,6 +201,7 @@ export const appRouter = router({
           name: z.string().min(1).max(255).optional(),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
           icon: z.string().max(50).optional(),
+          parentId: z.number().nullable().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -208,15 +213,28 @@ export const appRouter = router({
           name: input.name,
           color: input.color,
           icon: input.icon,
+          parentId: input.parentId,
         });
         return { success: true };
       }),
+
+    // Soft delete: desativa categoria (e subcategorias)
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
       const category = await db.getCategoryById(input.id);
       if (!category || category.userId !== ctx.user.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
       await db.deleteCategory(input.id);
+      return { success: true };
+    }),
+
+    // Reativar categoria inativa
+    reactivate: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+      const category = await db.getCategoryById(input.id);
+      if (!category || category.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      await db.updateCategory(input.id, { isActive: true });
       return { success: true };
     }),
   }),
@@ -420,6 +438,7 @@ export const appRouter = router({
           type: z.enum(["INCOME", "EXPENSE"]).optional(),
           limit: z.number().optional(),
           bankAccountId: z.number().optional(),
+          excludeCreditCard: z.boolean().optional(),
         })
       )
       .query(async ({ input, ctx }) => {
@@ -431,6 +450,7 @@ export const appRouter = router({
           type: input.type,
           limit: input.limit,
           bankAccountId: input.bankAccountId,
+          excludeCreditCard: input.excludeCreditCard,
         });
       }),
 
@@ -451,11 +471,14 @@ export const appRouter = router({
           description: z.string().min(1),
           amount: z.number().nonnegative(),
           dueDate: z.date(),
+          purchaseDate: z.date().optional(), // Data da compra (cartão de crédito)
           paymentDate: z.date().optional(),
           status: z.enum(["PENDING", "PAID", "OVERDUE"]).optional(),
           categoryId: z.number().optional(),
           bankAccountId: z.number().optional(),
           paymentMethodId: z.number().optional(),
+          creditCardId: z.number().optional(), // Cartão de crédito
+          installments: z.number().min(1).max(48).optional(), // Número de parcelas
           isRecurring: z.boolean().optional(),
           recurrenceCount: z.number().positive().optional(),
           recurrenceFrequency: z.enum(["DAY", "WEEK", "MONTH", "YEAR"]).optional(),
@@ -468,7 +491,64 @@ export const appRouter = router({
         // Convert amount to cents
         const amountInCents = Math.round(input.amount * 100);
 
-        // Se for recorrente, criar múltiplas transações
+        // ── PARCELAMENTO NO CARTÃO DE CRÉDITO ──────────────────────────────────
+        // Quando creditCardId + installments > 1: criar N parcelas
+        // Cada parcela tem Data de Efetivação (dueDate) avançando 1 mês
+        // A Data do Evento (purchaseDate) é a mesma para todas as parcelas
+        if (input.creditCardId && input.installments && input.installments > 1) {
+          const count = input.installments;
+          const installmentAmount = Math.round(amountInCents / count);
+          const transactionIds: number[] = [];
+          let parentTransactionId: number | null = null;
+
+          for (let i = 0; i < count; i++) {
+            // Data de Efetivação: avança 1 mês por parcela
+            const dueDate = new Date(input.dueDate);
+            dueDate.setMonth(dueDate.getMonth() + i);
+
+            const transactionId = await db.createTransaction({
+              entityId: input.entityId,
+              type: input.type,
+              description: `${input.description} - Parcela ${i + 1}/${count}`,
+              amount: installmentAmount,
+              dueDate,
+              paymentDate: undefined,
+              status: "PENDING",
+              categoryId: input.categoryId,
+              bankAccountId: undefined, // cartão não usa conta bancária
+              paymentMethodId: input.paymentMethodId,
+              isRecurring: false,
+              recurrencePattern: null,
+              parentTransactionId: parentTransactionId,
+              notes: input.notes,
+              ...(input.purchaseDate ? { notes: `Data da compra: ${input.purchaseDate.toLocaleDateString('pt-BR')}${input.notes ? ' | ' + input.notes : ''}` } : {}),
+            } as any);
+
+            // Salvar creditCardId via SQL raw
+            const dbInstance = await getDb();
+            if (dbInstance) {
+              const { sql: sqlTag } = await import("drizzle-orm");
+              await dbInstance.execute(
+                sqlTag`UPDATE transactions SET "creditCardId" = ${input.creditCardId} WHERE id = ${transactionId}`
+              );
+            }
+
+            if (i === 0) {
+              parentTransactionId = transactionId;
+              await db.updateTransaction(transactionId, { parentTransactionId: transactionId });
+            }
+            transactionIds.push(transactionId);
+          }
+
+          const createdTransactions = [];
+          for (const tid of transactionIds) {
+            const t = await db.getTransactionById(tid);
+            if (t) createdTransactions.push(t);
+          }
+          return { id: transactionIds[0], count: transactionIds.length, transactions: createdTransactions };
+        }
+
+        // ── RECORRÊNCIA NORMAL ─────────────────────────────────────────────────
         if (input.isRecurring && input.recurrenceCount && input.recurrenceFrequency) {
           const count = input.recurrenceCount;
           const frequency = input.recurrenceFrequency;
@@ -477,21 +557,11 @@ export const appRouter = router({
 
           for (let i = 0; i < count; i++) {
             let newDueDate = new Date(input.dueDate);
-            
-            // Incrementar data conforme frequência
             switch (frequency) {
-              case "DAY":
-                newDueDate.setDate(newDueDate.getDate() + i);
-                break;
-              case "WEEK":
-                newDueDate.setDate(newDueDate.getDate() + (i * 7));
-                break;
-              case "MONTH":
-                newDueDate.setMonth(newDueDate.getMonth() + i);
-                break;
-              case "YEAR":
-                newDueDate.setFullYear(newDueDate.getFullYear() + i);
-                break;
+              case "DAY": newDueDate.setDate(newDueDate.getDate() + i); break;
+              case "WEEK": newDueDate.setDate(newDueDate.getDate() + (i * 7)); break;
+              case "MONTH": newDueDate.setMonth(newDueDate.getMonth() + i); break;
+              case "YEAR": newDueDate.setFullYear(newDueDate.getFullYear() + i); break;
             }
 
             const transactionId = await db.createTransaction({
@@ -515,11 +585,9 @@ export const appRouter = router({
               parentTransactionId = transactionId;
               await db.updateTransaction(transactionId, { parentTransactionId: transactionId });
             }
-
             transactionIds.push(transactionId);
           }
 
-          // Buscar as transações criadas para retornar os dados completos
           const createdTransactions = [];
           for (const tid of transactionIds) {
             const t = await db.getTransactionById(tid);
@@ -528,7 +596,7 @@ export const appRouter = router({
           return { id: transactionIds[0], count: transactionIds.length, transactions: createdTransactions };
         }
 
-        // Se não for recorrente, criar apenas uma transação
+        // ── TRANSAÇÃO ÚNICA ────────────────────────────────────────────────────
         const transactionId = await db.createTransaction({
           entityId: input.entityId,
           type: input.type,
@@ -538,12 +606,26 @@ export const appRouter = router({
           paymentDate: input.paymentDate,
           status: input.status || "PENDING",
           categoryId: input.categoryId,
-          bankAccountId: input.bankAccountId,
+          bankAccountId: input.creditCardId ? undefined : input.bankAccountId,
           paymentMethodId: input.paymentMethodId,
           isRecurring: false,
           recurrencePattern: null,
-          notes: input.notes,
-        });
+          notes: input.purchaseDate
+            ? `Data da compra: ${input.purchaseDate.toLocaleDateString('pt-BR')}${input.notes ? ' | ' + input.notes : ''}`
+            : input.notes,
+          ...(input.creditCardId ? { creditCardId: input.creditCardId } : {}),
+        } as any);
+
+        // Salvar creditCardId via SQL raw se fornecido
+        if (input.creditCardId) {
+          const dbInstance = await getDb();
+          if (dbInstance) {
+            const { sql: sqlTag } = await import("drizzle-orm");
+            await dbInstance.execute(
+              sqlTag`UPDATE transactions SET "creditCardId" = ${input.creditCardId} WHERE id = ${transactionId}`
+            );
+          }
+        }
 
         return { id: transactionId };
       }),
@@ -561,6 +643,7 @@ export const appRouter = router({
           categoryId: z.number().optional(),
           bankAccountId: z.number().optional(),
           paymentMethodId: z.number().optional(),
+          creditCardId: z.number().optional(),
           notes: z.string().optional(),
           isRecurring: z.boolean().optional(),
           recurrenceCount: z.number().positive().optional(),
@@ -583,6 +666,7 @@ export const appRouter = router({
           categoryId: input.categoryId,
           bankAccountId: input.bankAccountId,
           paymentMethodId: input.paymentMethodId,
+          creditCardId: input.creditCardId,
           notes: input.notes,
         };
 
@@ -2408,6 +2492,446 @@ export const appRouter = router({
         }
         await db.adminDeleteUser(input.userId);
         return { success: true };
+      }),
+  }),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CARTÕES DE CRÉDITO
+  // ─────────────────────────────────────────────────────────────────────────
+  creditCards: router({
+    listByEntity: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        const dbInstance = await getDb();
+        if (!dbInstance) return [];
+        const { creditCards } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        return dbInstance
+          .select()
+          .from(creditCards)
+          .where(and(eq(creditCards.entityId, input.entityId), eq(creditCards.isActive, true)))
+          .orderBy(creditCards.name);
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        entityId: z.number(),
+        name: z.string().min(1),
+        brand: z.enum(["VISA", "MASTERCARD", "ELO", "AMERICAN_EXPRESS", "HIPERCARD", "OTHER"]).default("OTHER"),
+        lastFourDigits: z.string().max(4).optional(),
+        creditLimit: z.number().min(0).default(0),
+        closingDay: z.number().min(1).max(31).default(1),
+        dueDay: z.number().min(1).max(31).default(10),
+        color: z.string().default("#7C3AED"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards } = await import("../drizzle/schema");
+        const [card] = await dbInstance.insert(creditCards).values({
+          organizationId: null,
+          userId: ctx.user.id,
+          entityId: input.entityId,
+          name: input.name,
+          brand: input.brand,
+          lastFourDigits: input.lastFourDigits,
+          creditLimit: Math.round(input.creditLimit * 100),
+          closingDay: input.closingDay,
+          dueDay: input.dueDay,
+          color: input.color,
+        }).returning();
+        return card;
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        brand: z.enum(["VISA", "MASTERCARD", "ELO", "AMERICAN_EXPRESS", "HIPERCARD", "OTHER"]).optional(),
+        lastFourDigits: z.string().max(4).optional(),
+        creditLimit: z.number().min(0).optional(),
+        closingDay: z.number().min(1).max(31).optional(),
+        dueDay: z.number().min(1).max(31).optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const updates: any = { updatedAt: new Date() };
+        if (input.name !== undefined) updates.name = input.name;
+        if (input.brand !== undefined) updates.brand = input.brand;
+        if (input.lastFourDigits !== undefined) updates.lastFourDigits = input.lastFourDigits;
+        if (input.creditLimit !== undefined) updates.creditLimit = Math.round(input.creditLimit * 100);
+        if (input.closingDay !== undefined) updates.closingDay = input.closingDay;
+        if (input.dueDay !== undefined) updates.dueDay = input.dueDay;
+        if (input.color !== undefined) updates.color = input.color;
+        const [updated] = await dbInstance.update(creditCards).set(updates).where(eq(creditCards.id, input.id)).returning();
+        return updated;
+      }),
+
+    deactivate: protectedProcedure
+      .input(z.object({ id: z.number(), deleteTransactions: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards } = await import("../drizzle/schema");
+        const { eq, sql: sqlTag } = await import("drizzle-orm");
+        if (input.deleteTransactions) {
+          await dbInstance.execute(sqlTag`DELETE FROM transactions WHERE "creditCardId" = ${input.id}`);
+        }
+        await dbInstance.update(creditCards).set({ isActive: false, updatedAt: new Date() }).where(eq(creditCards.id, input.id));
+        return { success: true };
+      }),
+    getTransactionCount: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) return { count: 0 };
+        const { sql: sqlTag } = await import("drizzle-orm");
+        const result = await dbInstance.execute(sqlTag`SELECT COUNT(*) as count FROM transactions WHERE "creditCardId" = ${input.id}`);
+        const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+        const count = rows[0] ? Number(rows[0].count) : 0;
+        return { count };
+      }),
+    getSummary: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) return null;
+        const { creditCards } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const { sql: sqlTag } = await import("drizzle-orm");
+        const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
+        if (!card) return null;
+        const now = new Date();
+        let invoiceMonth = now.getMonth() + 1;
+        let invoiceYear = now.getFullYear();
+        if (now.getDate() >= card.closingDay) {
+          if (invoiceMonth === 12) { invoiceMonth = 1; invoiceYear++; }
+          else { invoiceMonth++; }
+        }
+        // Usar SQL raw porque creditCardId não está no schema Drizzle
+        // Conta apenas transações PENDING (faturas pagas liberam o limite)
+        const result = await dbInstance.execute(
+          sqlTag`SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE "creditCardId" = ${input.cardId} AND status != 'PAID'`
+        );
+        const resultRows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+        const usedAmount = Number(resultRows[0]?.total ?? 0);
+        const availableLimit = card.creditLimit - usedAmount;
+        const dueDate = new Date(invoiceYear, invoiceMonth - 1, card.dueDay);
+        return {
+          card,
+          usedAmount,
+          availableLimit,
+          creditLimit: card.creditLimit,
+          invoiceMonth,
+          invoiceYear,
+          dueDate,
+          usagePercent: card.creditLimit > 0 ? Math.round((usedAmount / card.creditLimit) * 100) : 0,
+        };
+      }),
+
+    // Retorna faturas agrupadas por mês (próximos N meses)
+    getInvoicesByMonth: protectedProcedure
+      .input(z.object({ cardId: z.number(), months: z.number().default(6) }))
+      .query(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) return [];
+        const { creditCards, creditCardInvoices } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const { sql: sqlTag } = await import("drizzle-orm");
+        const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
+        if (!card) return [];
+        // Buscar todas as transações do cartão agrupadas por mês/ano do dueDate
+        const rows = await dbInstance.execute(
+          sqlTag`
+            SELECT
+              EXTRACT(YEAR FROM "dueDate") as year,
+              EXTRACT(MONTH FROM "dueDate") as month,
+              SUM(amount) as total,
+              COUNT(*) as count
+            FROM transactions
+            WHERE "creditCardId" = ${input.cardId}
+            GROUP BY EXTRACT(YEAR FROM "dueDate"), EXTRACT(MONTH FROM "dueDate")
+            ORDER BY year ASC, month ASC
+          `
+        );
+        // Buscar registros de fatura já pagos na tabela credit_card_invoices
+        const invoiceRecords = await dbInstance
+          .select()
+          .from(creditCardInvoices)
+          .where(eq(creditCardInvoices.creditCardId, input.cardId));
+        const invoiceMap = new Map<string, any>();
+        for (const inv of invoiceRecords) {
+          invoiceMap.set(`${inv.year}-${inv.month}`, inv);
+        }
+        const rowsArr = (Array.isArray(rows) ? rows : ((rows as any).rows ?? [])) as any[];
+        return rowsArr.map((row) => {
+          const year = Number(row.year);
+          const month = Number(row.month);
+          const dueDate = new Date(year, month - 1, card.dueDay);
+          const invoiceRecord = invoiceMap.get(`${year}-${month}`);
+          const status = invoiceRecord?.status ?? "OPEN";
+          return {
+            year,
+            month,
+            total: Number(row.total),
+            count: Number(row.count),
+            dueDate,
+            isPaid: status === "PAID",
+            status,
+            invoiceId: invoiceRecord?.id ?? null,
+            paidFromAccountId: invoiceRecord?.paidFromAccountId ?? null,
+          };
+        });
+      }),
+    payInvoice: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        month: z.number().min(1).max(12),
+        year: z.number().min(2000).max(2100),
+        bankAccountId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards, creditCardInvoices } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const { sql: sqlTag } = await import("drizzle-orm");
+        // Verificar acesso ao cartão
+        const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
+        if (!card) throw new TRPCError({ code: "NOT_FOUND", message: "Cartão não encontrado" });
+        await requireEntityAccess(card.entityId, ctx.user.id, "EDITOR");
+        // Buscar todas as transações PENDING do cartão naquele mês/ano
+        const startDate = new Date(input.year, input.month - 1, 1).toISOString();
+        const endDate = new Date(input.year, input.month, 0, 23, 59, 59).toISOString();
+        const txRows = await dbInstance.execute(
+          sqlTag`SELECT id, amount FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status = 'PENDING'`
+        );
+        const pendingTxs = (Array.isArray(txRows) ? txRows : ((txRows as any).rows ?? [])) as any[];
+        if (pendingTxs.length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Não há transações pendentes nesta fatura" });
+        }
+        const totalAmount = pendingTxs.reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
+        const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+        // Criar transação de despesa na conta bancária
+        const paymentDescription = `Pagamento Fatura ${card.name} - ${MONTH_NAMES[input.month - 1]}/${input.year}`;
+        const paymentTxId = await db.createTransaction({
+          entityId: card.entityId,
+          type: "EXPENSE",
+          description: paymentDescription,
+          amount: totalAmount,
+          dueDate: new Date(),
+          paymentDate: new Date(),
+          status: "PAID",
+          bankAccountId: input.bankAccountId,
+          categoryId: null,
+          paymentMethodId: null,
+          isRecurring: false,
+          recurrencePattern: null,
+          notes: `Pagamento automático de fatura do cartão ${card.name}`,
+        });
+        // Marcar todas as transações do cartão naquele mês como PAID
+        await dbInstance.execute(
+          sqlTag`UPDATE transactions SET status = 'PAID', "paymentDate" = NOW(), "updatedAt" = NOW() WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status = 'PENDING'`
+        );
+        // Upsert na tabela credit_card_invoices
+        const existingInvoice = await dbInstance
+          .select()
+          .from(creditCardInvoices)
+          .where(and(eq(creditCardInvoices.creditCardId, input.cardId), eq(creditCardInvoices.month, input.month), eq(creditCardInvoices.year, input.year)))
+          .limit(1);
+        if (existingInvoice.length > 0) {
+          await dbInstance.update(creditCardInvoices)
+            .set({ status: "PAID", paidAt: new Date(), paidFromAccountId: input.bankAccountId, totalAmount, updatedAt: new Date() })
+            .where(eq(creditCardInvoices.id, existingInvoice[0].id));
+        } else {
+          await dbInstance.insert(creditCardInvoices).values({
+            creditCardId: input.cardId,
+            month: input.month,
+            year: input.year,
+            status: "PAID",
+            totalAmount,
+            dueDate: new Date(input.year, input.month - 1, card.dueDay),
+            paidAt: new Date(),
+            paidFromAccountId: input.bankAccountId,
+          });
+        }
+        return { success: true, paymentTxId, totalAmount };
+      }),
+
+    getInvoiceGroups: protectedProcedure
+      .input(z.object({
+        entityId: z.number(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        const dbInstance = await getDb();
+        if (!dbInstance) return [];
+        const { sql: sqlTag } = await import("drizzle-orm");
+        const { creditCards: creditCardsTable } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        // Buscar todos os cartões ativos da entidade
+        const cards = await dbInstance
+          .select()
+          .from(creditCardsTable)
+          .where(and(eq(creditCardsTable.entityId, input.entityId), eq(creditCardsTable.isActive, true)));
+        if (cards.length === 0) return [];
+        const cardIds = cards.map(c => c.id);
+        const cardIdsStr = cardIds.join(',');
+        // Montar filtro de datas para SQL raw
+        let dateCondition = '';
+        if (input.startDate) {
+          dateCondition += ` AND t."dueDate" >= '${input.startDate.toISOString()}'`;
+        }
+        if (input.endDate) {
+          dateCondition += ` AND t."dueDate" <= '${input.endDate.toISOString()}'`;
+        }
+        const cardMap = new Map<number, any>();
+        for (const card of cards) {
+          cardMap.set(card.id, card);
+        }
+        // ── Query 1: buscar TODAS as transações de cartão da entidade de uma vez ──
+        const allTxRows = await dbInstance.execute(
+          sqlTag`
+            SELECT
+              t.id,
+              t."entityId",
+              t.type,
+              t.description,
+              t.amount,
+              t."dueDate",
+              t."paymentDate",
+              t.status,
+              t."categoryId",
+              t."bankAccountId",
+              t."paymentMethodId",
+              t."isRecurring",
+              t."parentTransactionId",
+              t.notes,
+              t."createdAt",
+              t."updatedAt",
+              t."importOrigin",
+              t."creditCardId",
+              c.name as "categoryName",
+              c.color as "categoryColor",
+              c."parentId" as "parentCategoryId",
+              pc.name as "parentCategoryName",
+              pc.color as "parentCategoryColor",
+              ba.name as "bankAccountName",
+              ba.bank as "bankInstitution",
+              EXTRACT(YEAR FROM t."dueDate")::int as tx_year,
+              EXTRACT(MONTH FROM t."dueDate")::int as tx_month,
+              (SELECT COUNT(*) FROM attachments WHERE "transactionId" = t.id)::int as "attachmentCount"
+            FROM transactions t
+            LEFT JOIN categories c ON t."categoryId" = c.id
+            LEFT JOIN categories pc ON c."parentId" = pc.id
+            LEFT JOIN bank_accounts ba ON t."bankAccountId" = ba.id
+            WHERE t."creditCardId" = ANY(ARRAY[${sqlTag.raw(cardIdsStr)}]::int[])
+              ${sqlTag.raw(dateCondition)}
+            ORDER BY t."dueDate" ASC
+          `
+        );
+        // ── Query 2: buscar registros de fatura (status PAID etc.) ──
+        const allInvoiceRows = await dbInstance.execute(
+          sqlTag`SELECT * FROM credit_card_invoices WHERE "creditCardId" = ANY(ARRAY[${sqlTag.raw(cardIdsStr)}]::int[])`
+        );
+        const invoiceMap = new Map<string, any>();
+        const invoiceArr = (Array.isArray(allInvoiceRows) ? allInvoiceRows : ((allInvoiceRows as any).rows ?? [])) as any[];
+        for (const inv of invoiceArr) {
+          invoiceMap.set(`${inv.creditCardId}-${inv.year}-${inv.month}`, inv);
+        }
+        // ── Agrupar transações por cartão + mês/ano no código ──
+        const groupMap = new Map<string, {
+          cardId: number; year: number; month: number;
+          total: number; count: number;
+          transactions: any[];
+        }>();
+        const txArr = (Array.isArray(allTxRows) ? allTxRows : ((allTxRows as any).rows ?? [])) as any[];
+        for (const row of txArr) {
+          const cardId = Number(row.creditCardId);
+          const year = Number(row.tx_year);
+          const month = Number(row.tx_month);
+          const key = `${cardId}-${year}-${month}`;
+          if (!groupMap.has(key)) {
+            groupMap.set(key, { cardId, year, month, total: 0, count: 0, transactions: [] });
+          }
+          const g = groupMap.get(key)!;
+          g.total += Number(row.amount);
+          g.count += 1;
+          g.transactions.push({
+            ...row,
+            amount: Number(row.amount),
+            attachmentCount: Number(row.attachmentCount ?? 0),
+            dueDate: row.dueDate ? new Date(row.dueDate) : null,
+            paymentDate: row.paymentDate ? new Date(row.paymentDate) : null,
+            createdAt: row.createdAt ? new Date(row.createdAt) : null,
+            updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+          });
+        }
+        // ── Montar resultado final ──
+        const groups = [];
+        for (const [key, g] of groupMap.entries()) {
+          const card = cardMap.get(g.cardId);
+          if (!card) continue;
+          const invoiceRecord = invoiceMap.get(key);
+          const status = invoiceRecord?.status ?? "OPEN";
+          const dueDate = new Date(g.year, g.month - 1, card.dueDay);
+          groups.push({
+            cardId: g.cardId,
+            cardName: card.name,
+            cardColor: card.color,
+            cardBrand: card.brand,
+            cardLastFourDigits: card.lastFourDigits,
+            year: g.year,
+            month: g.month,
+            total: g.total,
+            count: g.count,
+            dueDate,
+            status,
+            isPaid: status === "PAID",
+            invoiceId: invoiceRecord?.id ?? null,
+            paidFromAccountId: invoiceRecord?.paidFromAccountId ?? null,
+            transactions: g.transactions,
+          });
+        }
+        // Ordenar por ano desc, mês desc, cardId asc
+        groups.sort((a, b) => {
+          if (b.year !== a.year) return b.year - a.year;
+          if (b.month !== a.month) return b.month - a.month;
+          return a.cardId - b.cardId;
+        });
+        return groups;
+      }),
+    listTransactions: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        month: z.number().optional(),
+        year: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) return [];
+        const { sql: sqlTag } = await import("drizzle-orm");
+        // Usar SQL raw porque creditCardId não está no schema Drizzle
+        if (input.month && input.year) {
+          const start = new Date(input.year, input.month - 1, 1).toISOString();
+          const end = new Date(input.year, input.month, 0, 23, 59, 59).toISOString();
+          const result = await dbInstance.execute(
+            sqlTag`SELECT * FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${start} AND "dueDate" <= ${end} ORDER BY "dueDate" ASC`
+          );
+          return (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+        }
+        const result = await dbInstance.execute(
+          sqlTag`SELECT * FROM transactions WHERE "creditCardId" = ${input.cardId} ORDER BY "dueDate" ASC`
+        );
+        return (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
       }),
   }),
 });

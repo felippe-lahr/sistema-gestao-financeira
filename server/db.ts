@@ -1,4 +1,4 @@
-import { eq, or, and, isNull, desc, asc, gte, lte, sql } from "drizzle-orm";
+import { eq, or, and, isNull, desc, asc, gte, lte, sql, aliasedTable } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -33,6 +33,7 @@ import {
   organizationMembers,
   entityMembers,
   entityInvites,
+  creditCards,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -166,28 +167,38 @@ export async function deleteEntity(entityId: number) {
 
 // ========== CATEGORY OPERATIONS ==========
 
-export async function getCategoriesByEntityId(entityId: number, userId?: number) {
+export async function getCategoriesByEntityId(entityId: number, userId?: number, includeInactive = false) {
   const db = await getDb();
   if (!db) return [];
 
   // Return categories that are either:
   // 1. Specific to this entity (entityId matches)
   // 2. Shared categories (entityId is null) belonging to the user
+  // By default, only return active categories (isActive = true)
+  const activeFilter = includeInactive ? [] : [eq(categories.isActive, true)];
+
   if (userId) {
     return await db
       .select()
       .from(categories)
       .where(
-        or(
-          eq(categories.entityId, entityId),
-          and(isNull(categories.entityId), eq(categories.userId, userId))
+        and(
+          or(
+            eq(categories.entityId, entityId),
+            and(isNull(categories.entityId), eq(categories.userId, userId))
+          ),
+          ...activeFilter
         )
       )
       .orderBy(categories.name);
   }
 
   // Fallback: only entity-specific categories
-  return await db.select().from(categories).where(eq(categories.entityId, entityId)).orderBy(categories.name);
+  return await db
+    .select()
+    .from(categories)
+    .where(and(eq(categories.entityId, entityId), ...activeFilter))
+    .orderBy(categories.name);
 }
 
 export async function getCategoryById(categoryId: number) {
@@ -216,7 +227,10 @@ export async function deleteCategory(categoryId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.delete(categories).where(eq(categories.id, categoryId));
+  // Soft delete: deactivate category and all its subcategories
+  // This preserves transaction history while hiding from UI
+  await db.update(categories).set({ isActive: false }).where(eq(categories.id, categoryId));
+  await db.update(categories).set({ isActive: false }).where(eq(categories.parentId, categoryId));
 }
 
 // ========== TRANSACTION OPERATIONS ==========
@@ -230,6 +244,7 @@ export async function getTransactionsByEntityId(
     type?: "INCOME" | "EXPENSE";
     limit?: number;
     bankAccountId?: number;
+    excludeCreditCard?: boolean; // Exclude credit card transactions (they appear as invoice groups)
   }
 ) {
   const db = await getDb();
@@ -261,7 +276,14 @@ export async function getTransactionsByEntityId(
   if (options?.bankAccountId) {
     conditions.push(eq(transactions.bankAccountId, options.bankAccountId));
   }
+  if (options?.excludeCreditCard) {
+    conditions.push(sql`transactions."creditCardId" IS NULL`);
+  }
   
+  // Alias para categoria pai (quando a categoria da transação é uma subcategoria)
+  const parentCats = aliasedTable(categories, 'parent_cats');
+  const creditCardsAlias = aliasedTable(creditCards, 'cc_alias');
+
   let query = db
     .select({
       id: transactions.id,
@@ -282,13 +304,19 @@ export async function getTransactionsByEntityId(
       updatedAt: transactions.updatedAt,
       categoryName: categories.name,
       categoryColor: categories.color,
+      parentCategoryId: categories.parentId,
+      parentCategoryName: parentCats.name,
+      parentCategoryColor: parentCats.color,
       importOrigin: transactions.importOrigin,
       bankAccountName: bankAccounts.name,
       bankInstitution: bankAccounts.bank,
+      creditCardName: sql<string | null>`(SELECT name FROM credit_cards WHERE id = transactions."creditCardId")`,
+      creditCardColor: sql<string | null>`(SELECT color FROM credit_cards WHERE id = transactions."creditCardId")`,
       attachmentCount: sql<number>`(SELECT COUNT(*) FROM ${attachments} WHERE ${attachments.transactionId} = ${transactions.id})`,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .leftJoin(parentCats, eq(categories.parentId, parentCats.id))
     .leftJoin(bankAccounts, eq(transactions.bankAccountId, bankAccounts.id))
     .where(and(...conditions))
     .$dynamic();
@@ -326,14 +354,31 @@ export async function createTransaction(transaction: InsertTransaction) {
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(transactions).values(transaction).returning();
-  return Number(result[0].id);
+  const transactionId = Number(result[0].id);
+
+  // Se tiver creditCardId, salvar via SQL raw (campo não está no schema Drizzle)
+  if ((transaction as any).creditCardId) {
+    await db.execute(
+      sql`UPDATE transactions SET "creditCardId" = ${(transaction as any).creditCardId} WHERE id = ${transactionId}`
+    );
+  }
+
+  return transactionId;
 }
 
-export async function updateTransaction(transactionId: number, data: Partial<InsertTransaction>) {
+export async function updateTransaction(transactionId: number, data: Partial<InsertTransaction> & { creditCardId?: number | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(transactions).set(data).where(eq(transactions.id, transactionId));
+  const { creditCardId, ...drizzleData } = data as any;
+  if (Object.keys(drizzleData).length > 0) {
+    await db.update(transactions).set(drizzleData).where(eq(transactions.id, transactionId));
+  }
+  if (creditCardId !== undefined) {
+    await db.execute(
+      sql`UPDATE transactions SET "creditCardId" = ${creditCardId} WHERE id = ${transactionId}`
+    );
+  }
 }
 
 export async function deleteTransaction(transactionId: number) {
@@ -2473,6 +2518,28 @@ export async function getOrganizationByStripeCustomer(
  * Garante que a coluna onboardingCompleted existe na tabela users.
  * Migração segura: usa ADD COLUMN IF NOT EXISTS.
  */
+/**
+ * Garante que as colunas de subcategorias existem na tabela categories.
+ * Executado no startup para compatibilidade com bancos existentes.
+ */
+export async function ensureCategorySubcategoryColumns(): Promise<void> {
+  try {
+    const { ENV } = await import("./_core/env");
+    const { default: postgres } = await import("postgres");
+    const client = postgres(ENV.databaseUrl, { max: 1 });
+    await client`
+      ALTER TABLE categories ADD COLUMN IF NOT EXISTS "parentId" integer;
+    `;
+    await client`
+      ALTER TABLE categories ADD COLUMN IF NOT EXISTS "isActive" boolean NOT NULL DEFAULT true;
+    `;
+    await client.end();
+    console.log('[db] categories subcategory columns ensured (parentId, isActive)');
+  } catch (err: any) {
+    console.warn('[db] Could not ensure category subcategory columns:', err?.message);
+  }
+}
+
 export async function ensureOnboardingColumn(): Promise<void> {
   try {
     const { ENV } = await import("./_core/env");
@@ -2513,6 +2580,83 @@ export async function getOnboardingStatus(userId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
   const result = await db.execute(sql`SELECT "onboardingCompleted" FROM users WHERE id = ${userId} LIMIT 1`);
-  const rows = result.rows as any[];
+  const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
   return rows.length > 0 ? Boolean(rows[0].onboardingCompleted) : false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRAÇÃO: Módulo de Cartão de Crédito
+// ─────────────────────────────────────────────────────────────────────────────
+export async function ensureCreditCardTables(): Promise<void> {
+  try {
+    const { ENV } = await import("./_core/env");
+    const { default: postgres } = await import("postgres");
+    const client = postgres(ENV.databaseUrl, { max: 1 });
+
+    // Criar enum card_brand se não existir
+    await client`
+      DO $$ BEGIN
+        CREATE TYPE card_brand AS ENUM ('VISA','MASTERCARD','ELO','AMERICAN_EXPRESS','HIPERCARD','OTHER');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `;
+
+    // Criar enum invoice_status se não existir
+    await client`
+      DO $$ BEGIN
+        CREATE TYPE invoice_status AS ENUM ('OPEN','CLOSED','PAID');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `;
+
+    // Criar tabela credit_cards
+    await client`
+      CREATE TABLE IF NOT EXISTS credit_cards (
+        id SERIAL PRIMARY KEY,
+        "organizationId" integer REFERENCES organizations(id) ON DELETE CASCADE,
+        "userId" integer NOT NULL,
+        "entityId" integer NOT NULL,
+        name varchar(255) NOT NULL,
+        brand card_brand NOT NULL DEFAULT 'OTHER',
+        "lastFourDigits" varchar(4),
+        "creditLimit" integer NOT NULL DEFAULT 0,
+        "closingDay" integer NOT NULL DEFAULT 1,
+        "dueDay" integer NOT NULL DEFAULT 10,
+        color varchar(7) DEFAULT '#7C3AED',
+        "isActive" boolean NOT NULL DEFAULT true,
+        "createdAt" timestamp NOT NULL DEFAULT NOW(),
+        "updatedAt" timestamp NOT NULL DEFAULT NOW()
+      );
+    `;
+
+    // Criar tabela credit_card_invoices
+    await client`
+      CREATE TABLE IF NOT EXISTS credit_card_invoices (
+        id SERIAL PRIMARY KEY,
+        "creditCardId" integer NOT NULL REFERENCES credit_cards(id) ON DELETE CASCADE,
+        month integer NOT NULL,
+        year integer NOT NULL,
+        status invoice_status NOT NULL DEFAULT 'OPEN',
+        "totalAmount" integer NOT NULL DEFAULT 0,
+        "dueDate" timestamp,
+        "paidAt" timestamp,
+        "paidFromAccountId" integer,
+        "createdAt" timestamp NOT NULL DEFAULT NOW(),
+        "updatedAt" timestamp NOT NULL DEFAULT NOW()
+      );
+    `;
+
+    // Adicionar colunas creditCardId e creditCardInvoiceId na tabela transactions
+    await client`
+      ALTER TABLE transactions ADD COLUMN IF NOT EXISTS "creditCardId" integer;
+    `;
+    await client`
+      ALTER TABLE transactions ADD COLUMN IF NOT EXISTS "creditCardInvoiceId" integer;
+    `;
+
+    await client.end();
+    console.log('[db] credit_cards and credit_card_invoices tables ensured');
+  } catch (err: any) {
+    console.warn('[db] Could not ensure credit card tables:', err?.message);
+  }
 }

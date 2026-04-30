@@ -107,6 +107,8 @@ export const categories = pgTable("categories", {
   type: transactionTypeEnum("type").notNull(),
   color: varchar("color", { length: 7 }).default("#6B7280"),
   icon: varchar("icon", { length: 50 }),
+  parentId: integer("parentId"), // Self-reference: null = categoria pai, number = subcategoria
+  isActive: boolean("isActive").default(true).notNull(), // Soft delete — preserva histórico
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -737,3 +739,69 @@ export const ofxTransactions = pgTable("ofx_transactions", {
 export type OfxTransaction = typeof ofxTransactions.$inferSelect;
 export type InsertOfxTransaction = typeof ofxTransactions.$inferInsert;
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MÓDULO DE CARTÃO DE CRÉDITO
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Enum para bandeiras de cartão de crédito
+ */
+export const cardBrandEnum = pgEnum("card_brand", [
+  "VISA",
+  "MASTERCARD",
+  "ELO",
+  "AMERICAN_EXPRESS",
+  "HIPERCARD",
+  "OTHER",
+]);
+
+/**
+ * Enum para status de fatura
+ */
+export const invoiceStatusEnum = pgEnum("invoice_status", [
+  "OPEN",
+  "CLOSED",
+  "PAID",
+]);
+
+/**
+ * Cartões de Crédito — um por entidade/usuário
+ */
+export const creditCards = pgTable("credit_cards", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").references(() => organizations.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull(),
+  entityId: integer("entityId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  brand: cardBrandEnum("brand").default("OTHER").notNull(),
+  lastFourDigits: varchar("lastFourDigits", { length: 4 }),
+  creditLimit: integer("creditLimit").default(0).notNull(),
+  closingDay: integer("closingDay").default(1).notNull(),
+  dueDay: integer("dueDay").default(10).notNull(),
+  color: varchar("color", { length: 7 }).default("#7C3AED"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type CreditCard = typeof creditCards.$inferSelect;
+export type InsertCreditCard = typeof creditCards.$inferInsert;
+
+/**
+ * Faturas de Cartão de Crédito — uma por mês por cartão
+ */
+export const creditCardInvoices = pgTable("credit_card_invoices", {
+  id: serial("id").primaryKey(),
+  creditCardId: integer("creditCardId").notNull().references(() => creditCards.id, { onDelete: "cascade" }),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+  status: invoiceStatusEnum("status").default("OPEN").notNull(),
+  totalAmount: integer("totalAmount").default(0).notNull(),
+  dueDate: timestamp("dueDate"),
+  paidAt: timestamp("paidAt"),
+  paidFromAccountId: integer("paidFromAccountId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type CreditCardInvoice = typeof creditCardInvoices.$inferSelect;
+export type InsertCreditCardInvoice = typeof creditCardInvoices.$inferInsert;

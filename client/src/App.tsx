@@ -28,6 +28,7 @@ const Admin = lazy(() => import("@/pages/Admin"));
 const Planos = lazy(() => import("@/pages/Planos"));
 const BillingSuccess = lazy(() => import("@/pages/BillingSuccess"));
 const BankAccounts = lazy(() => import("@/pages/BankAccounts"));
+const CreditCards = lazy(() => import("@/pages/CreditCards"));
 
 // Loading fallback - minimal spinner
 function PageLoader() {
@@ -53,6 +54,7 @@ function Router() {
         <Route path="/overall-dashboard" component={() => <DashboardLayout><OverallDashboard /></DashboardLayout>} />
         <Route path="/agenda" component={() => <DashboardLayout><Agenda /></DashboardLayout>} />
         <Route path="/bank-accounts" component={() => <DashboardLayout><BankAccounts /></DashboardLayout>} />
+        <Route path="/credit-cards" component={() => <DashboardLayout><CreditCards /></DashboardLayout>} />
         <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
         <Route path="/profile" component={() => <DashboardLayout><UserProfile /></DashboardLayout>} />
         <Route path="/convite/:token" component={AcceptInvite} />
