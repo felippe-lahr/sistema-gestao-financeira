@@ -167,8 +167,13 @@ Regras CRÍTICAS:
 - installment_current: número da parcela atual (ex: se aparecer "2/6", retorne 2). Se não for parcelado, retorne null
 - installment_total: total de parcelas (ex: se aparecer "2/6", retorne 6). Se não for parcelado, retorne null
 - category_hint: sugira uma categoria em português (Alimentação, Transporte, Saúde, Lazer, Compras, Educação, Serviços, Assinaturas, Outros)
-- INCLUA absolutamente tudo: compras, encargos, IOF, juros do rotativo, tarifas, multas e qualquer outro lançamento debitado na fatura
-- Ignore APENAS: pagamentos recebidos/créditos de pagamento da fatura (ex: "Pagamento da fatura", "Crédito de pagamento")
+- INCLUA absolutamente tudo: compras, encargos, IOF de compras internacionais, juros do rotativo, tarifas, multas e qualquer outro lançamento debitado na fatura
+- Ignore os seguintes tipos de lançamentos (NÃO inclua no JSON):
+  1. Pagamentos recebidos/créditos de pagamento (ex: "Pagamento da fatura", "Crédito de pagamento", "Pagamento em DD MMM")
+  2. Parcelamentos de fatura / refinanciamentos de saldo devedor: lançamentos na seção "Pagamentos e Financiamentos" que são parcelas de compras anteriores refinanciadas (ex: "iFood - Parcela 1/2" quando listado como financiamento de fatura, não como compra nova)
+  3. "IOF de volta de X" ou "IOF de estorno de X" — são estornos/devoluções de IOF com valor negativo e devem ser ignorados
+  4. Lançamentos com valor negativo que representam estornos, devoluções ou créditos
+- ATENÇÃO: "IOF de X" (sem "de volta") é uma cobrança real e DEVE ser incluído. Apenas "IOF de volta de X" deve ser ignorado.
 - Para encargos sem data de compra específica, use a data de vencimento da fatura como purchase_date
 - ATENÇÃO: para compras com data apenas de dia/mês (sem ano), infira o ano correto: se o mês da compra for posterior ao mês de vencimento da fatura, o ano é o anterior ao ano de vencimento
 - Inclua TODAS as compras, mesmo as parceladas
@@ -246,9 +251,26 @@ Regras CRÍTICAS:
           }
         }
 
-        // ── Normalizar e marcar duplicatas ─────────────────────────────────────
+        // ── Normalizar e marcar duplicatas ─────────────────────────────────────────────────────
+        // Padrões de descrição que devem ser filtrados (mesmo que a IA inclua por engano)
+        const IGNORE_PATTERNS = [
+          /^iof de volta de/i,          // Estornos de IOF (valor negativo)
+          /^iof de estorno de/i,        // Estornos de IOF (variante)
+          /^pagamento em \d/i,          // Pagamentos recebidos (ex: "Pagamento em 06 ABR")
+          /^pagamento da fatura/i,      // Pagamento da fatura
+          /^crédito de pagamento/i,     // Crédito de pagamento
+        ];
+
         const transactions = (extractedData.transactions as any[])
-          .filter((tx) => tx && tx.description && tx.amount != null)
+          .filter((tx) => {
+            if (!tx || !tx.description || tx.amount == null) return false;
+            const desc = String(tx.description).trim();
+            // Filtrar lançamentos negativos (estornos, devoluções)
+            if (Number(tx.amount) < 0) return false;
+            // Filtrar padrões conhecidos de lançamentos que não são despesas
+            if (IGNORE_PATTERNS.some((p) => p.test(desc))) return false;
+            return true;
+          })
           .map((tx) => {
             const amountCents = Math.abs(Math.round(Number(tx.amount) || 0));
             const purchaseDateNorm = normalizeDate(tx.purchase_date);
