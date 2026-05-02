@@ -162,21 +162,18 @@ Retorne APENAS um JSON válido com o seguinte formato exato (sem markdown, sem e
 Regras CRÍTICAS:
 - invoice_month e invoice_year devem ser o mês e ano do VENCIMENTO da fatura (não a data das compras)
 - invoice_due_date é a data de vencimento da fatura no formato YYYY-MM-DD
-- amount deve ser em CENTAVOS (inteiro), ex: R$ 12,34 = 1234, R$ 1.234,56 = 123456
+- invoice_total deve ser o valor exato do campo "Valor total" ou "Total a pagar" da fatura, em CENTAVOS (inteiro). Ex: R$ 4.549,85 = 454985
+- amount deve ser em CENTAVOS (inteiro) SEMPRE POSITIVO. Ex: R$ 12,34 = 1234, R$ 1.234,56 = 123456
 - purchase_date é a data da compra no formato YYYY-MM-DD (use o ano da fatura se não estiver claro)
 - installment_current: número da parcela atual (ex: se aparecer "2/6", retorne 2). Se não for parcelado, retorne null
 - installment_total: total de parcelas (ex: se aparecer "2/6", retorne 6). Se não for parcelado, retorne null
 - category_hint: sugira uma categoria em português (Alimentação, Transporte, Saúde, Lazer, Compras, Educação, Serviços, Assinaturas, Outros)
-- INCLUA absolutamente tudo: compras, encargos, IOF de compras internacionais, juros do rotativo, tarifas, multas, parcelamentos de fatura e qualquer outro lançamento debitado na fatura
-- IMPORTANTE: parcelamentos de fatura (ex: "iFood - Parcela 1/2" na seção Pagamentos e Financiamentos) SÃO cobranças reais e devem ser incluídos
-- Ignore os seguintes tipos de lançamentos (NÃO inclua no JSON):
-  1. Pagamentos recebidos/créditos de pagamento (ex: "Pagamento da fatura", "Crédito de pagamento", "Pagamento em DD MMM")
-  2. "IOF de volta de X" ou "IOF de estorno de X" — são estornos/devoluções de IOF com valor negativo e devem ser ignorados
-  3. Lançamentos com valor negativo que representam estornos, devoluções ou créditos
-- ATENÇÃO: "IOF de X" (sem "de volta") é uma cobrança real e DEVE ser incluído. Apenas "IOF de volta de X" deve ser ignorado.
+- INCLUA apenas lançamentos com valor POSITIVO (débitos e parcelamentos): compras, IOF, juros, tarifas, multas, parcelamentos de fatura
+- IGNORE completamente lançamentos com valor NEGATIVO (estornos, IOF de volta, devoluções) — não inclua no JSON
+- IGNORE também: pagamentos da fatura anterior ("Pagamento recebido", "Pagamento com saldo", "Crédito de pagamento", "Pagamento da fatura")
 - Para encargos sem data de compra específica, use a data de vencimento da fatura como purchase_date
 - ATENÇÃO: para compras com data apenas de dia/mês (sem ano), infira o ano correto: se o mês da compra for posterior ao mês de vencimento da fatura, o ano é o anterior ao ano de vencimento
-- Inclua TODAS as compras, mesmo as parceladas
+- Inclua TODAS as compras e parcelamentos, mesmo os de fatura anterior refinanciados
 - Se não conseguir ler algum campo, use null
 - Retorne APENAS o JSON, sem texto adicional`;
 
@@ -253,21 +250,22 @@ Regras CRÍTICAS:
 
         // ── Normalizar e marcar duplicatas ─────────────────────────────────────────────────────
         // Padrões de descrição que devem ser filtrados (mesmo que a IA inclua por engano)
+        // Apenas pagamentos de fatura anterior são ignorados — valores negativos já são filtrados pelo amount <= 0
         const IGNORE_PATTERNS = [
-          /^iof de volta de/i,          // Estornos de IOF (valor negativo)
-          /^iof de estorno de/i,        // Estornos de IOF (variante)
-          /^pagamento em \d/i,          // Pagamentos recebidos (ex: "Pagamento em 06 ABR")
-          /^pagamento da fatura/i,      // Pagamento da fatura
-          /^crédito de pagamento/i,     // Crédito de pagamento
+          /^pagamento recebido/i,       // Nubank: "Pagamento recebido"
+          /^pagamento com saldo/i,      // Nubank: "Pagamento com saldo"
+          /^pagamento em \d/i,          // Nubank: "Pagamento em 06 ABR"
+          /^pagamento da fatura/i,      // Genérico
+          /^crédito de pagamento/i,     // Genérico
         ];
 
         const transactions = (extractedData.transactions as any[])
           .filter((tx) => {
             if (!tx || !tx.description || tx.amount == null) return false;
             const desc = String(tx.description).trim();
-            // Filtrar lançamentos negativos (estornos, devoluções)
-            if (Number(tx.amount) < 0) return false;
-            // Filtrar padrões conhecidos de lançamentos que não são despesas
+            // Filtrar valores negativos (estornos, IOF de volta, devoluções)
+            if (Number(tx.amount) <= 0) return false;
+            // Filtrar pagamentos da fatura anterior
             if (IGNORE_PATTERNS.some((p) => p.test(desc))) return false;
             return true;
           })
