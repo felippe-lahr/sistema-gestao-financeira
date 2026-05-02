@@ -167,12 +167,12 @@ Regras CRÍTICAS:
 - installment_current: número da parcela atual (ex: se aparecer "2/6", retorne 2). Se não for parcelado, retorne null
 - installment_total: total de parcelas (ex: se aparecer "2/6", retorne 6). Se não for parcelado, retorne null
 - category_hint: sugira uma categoria em português (Alimentação, Transporte, Saúde, Lazer, Compras, Educação, Serviços, Assinaturas, Outros)
-- INCLUA absolutamente tudo: compras, encargos, IOF de compras internacionais, juros do rotativo, tarifas, multas e qualquer outro lançamento debitado na fatura
+- INCLUA absolutamente tudo: compras, encargos, IOF de compras internacionais, juros do rotativo, tarifas, multas, parcelamentos de fatura e qualquer outro lançamento debitado na fatura
+- IMPORTANTE: parcelamentos de fatura (ex: "iFood - Parcela 1/2" na seção Pagamentos e Financiamentos) SÃO cobranças reais e devem ser incluídos
 - Ignore os seguintes tipos de lançamentos (NÃO inclua no JSON):
   1. Pagamentos recebidos/créditos de pagamento (ex: "Pagamento da fatura", "Crédito de pagamento", "Pagamento em DD MMM")
-  2. Parcelamentos de fatura / refinanciamentos de saldo devedor: lançamentos na seção "Pagamentos e Financiamentos" que são parcelas de compras anteriores refinanciadas (ex: "iFood - Parcela 1/2" quando listado como financiamento de fatura, não como compra nova)
-  3. "IOF de volta de X" ou "IOF de estorno de X" — são estornos/devoluções de IOF com valor negativo e devem ser ignorados
-  4. Lançamentos com valor negativo que representam estornos, devoluções ou créditos
+  2. "IOF de volta de X" ou "IOF de estorno de X" — são estornos/devoluções de IOF com valor negativo e devem ser ignorados
+  3. Lançamentos com valor negativo que representam estornos, devoluções ou créditos
 - ATENÇÃO: "IOF de X" (sem "de volta") é uma cobrança real e DEVE ser incluído. Apenas "IOF de volta de X" deve ser ignorado.
 - Para encargos sem data de compra específica, use a data de vencimento da fatura como purchase_date
 - ATENÇÃO: para compras com data apenas de dia/mês (sem ano), infira o ano correto: se o mês da compra for posterior ao mês de vencimento da fatura, o ano é o anterior ao ano de vencimento
