@@ -167,7 +167,10 @@ Regras CRÍTICAS:
 - installment_current: número da parcela atual (ex: se aparecer "2/6", retorne 2). Se não for parcelado, retorne null
 - installment_total: total de parcelas (ex: se aparecer "2/6", retorne 6). Se não for parcelado, retorne null
 - category_hint: sugira uma categoria em português (Alimentação, Transporte, Saúde, Lazer, Compras, Educação, Serviços, Assinaturas, Outros)
-- Ignore taxas, juros, encargos, IOF, pagamentos anteriores, créditos e ajustes
+- INCLUA absolutamente tudo: compras, encargos, IOF, juros do rotativo, tarifas, multas e qualquer outro lançamento debitado na fatura
+- Ignore APENAS: pagamentos recebidos/créditos de pagamento da fatura (ex: "Pagamento da fatura", "Crédito de pagamento")
+- Para encargos sem data de compra específica, use a data de vencimento da fatura como purchase_date
+- ATENÇÃO: para compras com data apenas de dia/mês (sem ano), infira o ano correto: se o mês da compra for posterior ao mês de vencimento da fatura, o ano é o anterior ao ano de vencimento
 - Inclua TODAS as compras, mesmo as parceladas
 - Se não conseguir ler algum campo, use null
 - Retorne APENAS o JSON, sem texto adicional`;
@@ -213,21 +216,23 @@ Regras CRÍTICAS:
               // Buscar TODAS as transações do cartão (sem filtro de mês)
               // para conciliar por valor + data da compra
               const result = await dbInstance.execute(
-                sqlTag`SELECT amount, "dueDate", notes FROM transactions 
+                sqlTag`SELECT amount, "purchaseDate", "dueDate", notes FROM transactions 
                        WHERE "creditCardId" = ${creditCardId}`
               );
               const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
               for (const row of rows) {
-                // Extrair purchase_date das notes se disponível (formato: "Data da compra: DD/MM/YYYY")
+                // Prioridade: purchaseDate (coluna dedicada) > notes (legado) > dueDate (fallback)
                 let purchaseDateStr = "";
-                if (row.notes) {
+                if (row.purchaseDate) {
+                  purchaseDateStr = normalizeDate(row.purchaseDate);
+                } else if (row.notes) {
                   const match = String(row.notes).match(/Data da compra: (\d{2}\/\d{2}\/\d{4})/);
                   if (match) {
                     const [day, month, year] = match[1].split("/");
                     purchaseDateStr = `${year}-${month}-${day}`;
                   }
                 }
-                // Se não tem purchase_date nas notes, usar dueDate como fallback
+                // Se não tem purchase_date, usar dueDate como fallback
                 if (!purchaseDateStr && row.dueDate) {
                   purchaseDateStr = normalizeDate(row.dueDate);
                 }

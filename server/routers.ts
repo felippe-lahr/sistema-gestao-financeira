@@ -512,6 +512,7 @@ export const appRouter = router({
               description: `${input.description} - Parcela ${i + 1}/${count}`,
               amount: installmentAmount,
               dueDate,
+              purchaseDate: input.purchaseDate || undefined,
               paymentDate: undefined,
               status: "PENDING",
               categoryId: input.categoryId,
@@ -521,7 +522,6 @@ export const appRouter = router({
               recurrencePattern: null,
               parentTransactionId: parentTransactionId,
               notes: input.notes,
-              ...(input.purchaseDate ? { notes: `Data da compra: ${input.purchaseDate.toLocaleDateString('pt-BR')}${input.notes ? ' | ' + input.notes : ''}` } : {}),
             } as any);
 
             // Salvar creditCardId via SQL raw
@@ -603,6 +603,7 @@ export const appRouter = router({
           description: input.description,
           amount: amountInCents,
           dueDate: input.dueDate,
+          purchaseDate: input.purchaseDate || undefined,
           paymentDate: input.paymentDate,
           status: input.status || "PENDING",
           categoryId: input.categoryId,
@@ -610,9 +611,7 @@ export const appRouter = router({
           paymentMethodId: input.paymentMethodId,
           isRecurring: false,
           recurrencePattern: null,
-          notes: input.purchaseDate
-            ? `Data da compra: ${input.purchaseDate.toLocaleDateString('pt-BR')}${input.notes ? ' | ' + input.notes : ''}`
-            : input.notes,
+          notes: input.notes,
           ...(input.creditCardId ? { creditCardId: input.creditCardId } : {}),
         } as any);
 

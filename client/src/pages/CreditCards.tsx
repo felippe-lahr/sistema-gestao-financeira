@@ -327,25 +327,36 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     let importedCount = 0;
     let skippedCount = pdfTransactions.filter(tx => tx.is_duplicate).length;
     try {
-      // Função para calcular dueDate baseado na data da compra e nas configurações do cartão
-      // Regra: compra antes do fechamento → vence no mês seguinte
-      //        compra no dia do fechamento ou depois → vence dois meses à frente
-      const calcDueDate = (purchaseDateStr: string | null): Date => {
+      // Função para calcular dueDate de uma transação importada do PDF.
+      // PRIORIDADE: quando importamos um PDF, já sabemos a qual fatura pertence —
+      // é a fatura cujo vencimento está no PDF (invoiceDueDate). Usamos esse valor
+      // como dueDate para TODAS as transações da fatura importada.
+      // A lógica de calcDueDate por closingDay só é usada como fallback quando
+      // não temos o invoiceDueDate (ex: PDF sem data de vencimento legível).
+      const dueDay = selectedCard.dueDay || 10;
+      // Data de vencimento da fatura importada (fonte primária)
+      const invoiceBaseDueDate = pdfInvoiceDueDate
+        ? new Date(pdfInvoiceDueDate + "T12:00:00")
+        : pdfInvoiceMonth && pdfInvoiceYear
+          ? new Date(pdfInvoiceYear, pdfInvoiceMonth - 1, dueDay, 12, 0, 0)
+          : null;
+
+      const calcDueDate = (_purchaseDateStr: string | null): Date => {
+        // Se temos o vencimento da fatura do PDF, sempre usar ele.
+        // Isso garante que IOF, juros, encargos e compras normais
+        // fiquem na fatura correta, independentemente da data da compra.
+        if (invoiceBaseDueDate) return invoiceBaseDueDate;
+        // Fallback: calcular pelo closingDay do cartão (usado quando o PDF
+        // não tem data de vencimento legível)
         const closingDay = selectedCard.closingDay || 1;
-        const dueDay = selectedCard.dueDay || 10;
-        if (!purchaseDateStr) {
-          // Sem data de compra: usar vencimento da fatura extraído do PDF
-          if (pdfInvoiceDueDate) return new Date(pdfInvoiceDueDate + "T12:00:00");
-          if (pdfInvoiceMonth && pdfInvoiceYear) return new Date(pdfInvoiceYear, pdfInvoiceMonth - 1, dueDay, 12, 0, 0);
-          return new Date();
-        }
-        const purchase = new Date(purchaseDateStr + "T12:00:00");
+        if (!_purchaseDateStr) return new Date();
+        const purchase = new Date(_purchaseDateStr + "T12:00:00");
         let dueMonth = purchase.getMonth();
         let dueYear = purchase.getFullYear();
         if (purchase.getDate() >= closingDay) {
-          dueMonth += 2; // próxima fatura: fecha no mês seguinte, vence no subsequente
+          dueMonth += 2;
         } else {
-          dueMonth += 1; // fatura corrente: vence no mês seguinte
+          dueMonth += 1;
         }
         if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
         if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
@@ -366,13 +377,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           // Para parcelamentos em andamento (ex: parcela 8/12), o dueDate da parcela atual
           // é o mês da fatura importada (não calculado pela data original da compra).
           // As parcelas futuras avançam mês a mês a partir daí.
-          const dueDay = selectedCard.dueDay || 10;
-          const invoiceBaseDueDate = pdfInvoiceDueDate
-            ? new Date(pdfInvoiceDueDate + "T12:00:00")
-            : pdfInvoiceMonth && pdfInvoiceYear
-              ? new Date(pdfInvoiceYear, pdfInvoiceMonth - 1, dueDay, 12, 0, 0)
-              : baseDueDate; // fallback para cálculo pela data da compra
-
+          // Usa invoiceBaseDueDate do escopo externo (vencimento da fatura do PDF).
+          const installBaseDueDate = invoiceBaseDueDate ?? baseDueDate;
           const remainingInstallments = installTotal! - installCurrent!;
           // Parcela atual (do mês da fatura)
           await utils.client.transactions.create.mutate({
@@ -380,7 +386,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             type: "EXPENSE",
             description: `${tx.description} (${installCurrent}/${installTotal})`,
             amount: tx.amount / 100,
-            dueDate: invoiceBaseDueDate,
+            dueDate: installBaseDueDate,
             purchaseDate,
             status: "PENDING",
             categoryId: tx.categoryId ?? undefined,
@@ -390,7 +396,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           importedCount++;
           // Criar apenas as parcelas RESTANTES nos meses seguintes
           for (let i = 1; i <= remainingInstallments; i++) {
-            const futureDate = new Date(invoiceBaseDueDate);
+            const futureDate = new Date(installBaseDueDate);
             futureDate.setMonth(futureDate.getMonth() + i);
             await utils.client.transactions.create.mutate({
               entityId,

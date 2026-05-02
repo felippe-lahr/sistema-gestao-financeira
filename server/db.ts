@@ -307,6 +307,7 @@ export async function getTransactionsByEntityId(
       parentCategoryId: categories.parentId,
       parentCategoryName: parentCats.name,
       parentCategoryColor: parentCats.color,
+      purchaseDate: transactions.purchaseDate,
       importOrigin: transactions.importOrigin,
       bankAccountName: bankAccounts.name,
       bankInstitution: bankAccounts.bank,
