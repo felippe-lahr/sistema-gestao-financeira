@@ -185,6 +185,7 @@ Retorne APENAS um JSON válido com o seguinte formato exato (sem markdown, sem e
     {
       "description": "Nome do estabelecimento/descrição da compra",
       "amount": 1234,
+      "is_negative": false,
       "purchase_date": "2024-03-15",
       "installment_current": 2,
       "installment_total": 6,
@@ -201,14 +202,14 @@ Regras CRÍTICAS:
 - invoice_month e invoice_year devem ser o mês e ano do VENCIMENTO da fatura (não a data das compras)
 - invoice_due_date é a data de vencimento da fatura no formato YYYY-MM-DD
 - invoice_total deve ser o valor exato do campo "Valor total" ou "Total a pagar" da fatura, em CENTAVOS (inteiro). Ex: R$ 4.549,85 = 454985
-- amount deve ser em CENTAVOS (inteiro) SEMPRE POSITIVO. Ex: R$ 12,34 = 1234, R$ 1.234,56 = 123456
+- amount deve ser em CENTAVOS (inteiro) SEMPRE POSITIVO (valor absoluto). Ex: R$ 12,34 = 1234, R$ 1.234,56 = 123456, -R$ 5,00 = 500
+- is_negative: true se o lançamento tem valor negativo na fatura (estornos, IOF de volta, devoluções, créditos). false para débitos normais
 - purchase_date é a data da compra no formato YYYY-MM-DD (use o ano da fatura se não estiver claro)
 - installment_current: número da parcela atual (ex: se aparecer "2/6", retorne 2). Se não for parcelado, retorne null
 - installment_total: total de parcelas (ex: se aparecer "2/6", retorne 6). Se não for parcelado, retorne null
 - category_hint: sugira uma categoria em português (Alimentação, Transporte, Saúde, Lazer, Compras, Educação, Serviços, Assinaturas, Outros)
-- INCLUA apenas lançamentos com valor POSITIVO (débitos e parcelamentos): compras, IOF, juros, tarifas, multas, parcelamentos de fatura
-- IGNORE completamente lançamentos com valor NEGATIVO (estornos, IOF de volta, devoluções) — não inclua no JSON
-- IGNORE também: pagamentos da fatura anterior ("Pagamento recebido", "Pagamento com saldo", "Crédito de pagamento", "Pagamento da fatura")
+- INCLUA todos os lançamentos: débitos (positivos), estornos/IOF de volta/devoluções (negativos com is_negative: true)
+- IGNORE APENAS: pagamentos da fatura anterior ("Pagamento recebido", "Pagamento com saldo", "Crédito de pagamento", "Pagamento da fatura", "Pagamento em DD MMM")
 - Para encargos sem data de compra específica, use a data de vencimento da fatura como purchase_date
 - ATENÇÃO: para compras com data apenas de dia/mês (sem ano), infira o ano correto: se o mês da compra for posterior ao mês de vencimento da fatura, o ano é o anterior ao ano de vencimento
 - Inclua TODAS as compras e parcelamentos, mesmo os de fatura anterior refinanciados
@@ -301,25 +302,23 @@ Regras CRÍTICAS:
           .filter((tx) => {
             if (!tx || !tx.description || tx.amount == null) return false;
             const desc = String(tx.description).trim();
-            // Filtrar valores negativos (estornos, IOF de volta, devoluções)
-            if (Number(tx.amount) <= 0) return false;
-            // Filtrar pagamentos da fatura anterior
+            // Filtrar amount zero
+            if (Number(tx.amount) === 0) return false;
+            // Filtrar pagamentos da fatura anterior (mesmo que a IA inclua por engano)
             if (IGNORE_PATTERNS.some((p) => p.test(desc))) return false;
-            // Filtrar descrições que aparecem com −R$ no PDF (negativas determinísticas)
-            // Comparação EXATA (case-insensitive): a IA retorna a descrição limpa
-            // e o PDF tem a linha completa (ex: "iof de volta de railway").
-            // Usamos comparação exata para evitar falsos positivos (ex: "Railway" ≠ "iof de volta de railway")
-            if (negativeDescriptions.size > 0) {
-              const descLower = desc.toLowerCase();
-              if (negativeDescriptions.has(descLower)) {
-                console.log(`[CreditCardImport] Filtrado por negativo exato: "${desc}"`);
-                return false;
-              }
-            }
             return true;
           })
           .map((tx) => {
             const amountCents = Math.abs(Math.round(Number(tx.amount) || 0));
+            // Determinar se é negativo: pela flag is_negative da IA ou pela detecção determinística do PDF
+            let isNegative = tx.is_negative === true;
+            // Fallback: se a IA não marcou is_negative, verificar pela detecção determinística do PDF
+            if (!isNegative && negativeDescriptions.size > 0) {
+              const descLower = String(tx.description || "").trim().toLowerCase();
+              if (negativeDescriptions.has(descLower)) {
+                isNegative = true;
+              }
+            }
             const purchaseDateNorm = normalizeDate(tx.purchase_date);
             const key = `${amountCents}|${purchaseDateNorm}`;
             const isDuplicate = existingKeys.has(key);
@@ -327,16 +326,15 @@ Regras CRÍTICAS:
             return {
               description: String(tx.description || "").trim(),
               amount: amountCents,
+              is_negative: isNegative,
               purchase_date: tx.purchase_date || null,
               installment_current: tx.installment_current ? Number(tx.installment_current) : null,
               installment_total: tx.installment_total ? Number(tx.installment_total) : null,
-              // Manter campo legado "installment" para compatibilidade com frontend
               installment: (tx.installment_current && tx.installment_total)
                 ? `${tx.installment_current}/${tx.installment_total}`
                 : null,
               category_hint: tx.category_hint || null,
               is_duplicate: isDuplicate,
-              // Parcela que não é a última: pode ter parcelas futuras a criar
               has_future_installments: !isDuplicate &&
                 tx.installment_current != null &&
                 tx.installment_total != null &&
@@ -465,8 +463,18 @@ Regras CRÍTICAS:
           const amountFloat = parseFloat(amountStr);
           if (isNaN(amountFloat)) continue;
 
-          // Ignorar valores negativos (estornos, IOF de volta, pagamentos)
-          if (amountFloat <= 0) continue;
+          // Ignorar pagamentos da fatura anterior (valores negativos muito altos)
+          // Mas manter estornos pequenos (IOF de volta, devoluções) como créditos
+          const PAYMENT_PATTERNS = [
+            /^pagamento recebido/i,
+            /^pagamento com saldo/i,
+            /^pagamento em \d/i,
+            /^pagamento da fatura/i,
+            /^cr[eé]dito de pagamento/i,
+          ];
+          if (amountFloat <= 0 && PAYMENT_PATTERNS.some(p => p.test(titleStr))) continue;
+          // Ignorar zero
+          if (amountFloat === 0) continue;
 
           // Normalizar data: aceita YYYY-MM-DD e DD/MM/YYYY
           let purchaseDateStr = dateStr;
@@ -489,7 +497,8 @@ Regras CRÍTICAS:
 
           rawTransactions.push({
             description: cleanTitle,
-            amount: Math.round(amountFloat * 100),
+            amount: Math.round(Math.abs(amountFloat) * 100),
+            is_negative: amountFloat < 0,
             purchase_date: purchaseDateStr,
             installment_current,
             installment_total,
@@ -565,6 +574,7 @@ Regras CRÍTICAS:
           return {
             description: tx.description,
             amount: tx.amount,
+            is_negative: tx.is_negative || false,
             purchase_date: tx.purchase_date,
             installment_current: tx.installment_current,
             installment_total: tx.installment_total,
@@ -580,7 +590,12 @@ Regras CRÍTICAS:
           };
         });
 
-        console.log(`[CreditCardImport CSV] ${transactions.length} transações, ${transactions.filter(t => t.is_duplicate).length} duplicatas`);
+        // Calcular total líquido da fatura (débitos - créditos)
+        const totalDebits = transactions.filter(t => !t.is_negative).reduce((s, t) => s + t.amount, 0);
+        const totalCredits = transactions.filter(t => t.is_negative).reduce((s, t) => s + t.amount, 0);
+        const invoiceTotal = totalDebits - totalCredits;
+
+        console.log(`[CreditCardImport CSV] ${transactions.length} transações, ${transactions.filter(t => t.is_duplicate).length} duplicatas, total líquido: ${invoiceTotal}`);
 
         return res.json({
           success: true,
@@ -588,7 +603,7 @@ Regras CRÍTICAS:
           invoiceMonth,
           invoiceYear,
           invoiceDueDate,
-          invoiceTotal: null,
+          invoiceTotal,
           cardName,
           source: "csv",
         });

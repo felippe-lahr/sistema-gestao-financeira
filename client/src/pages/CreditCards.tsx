@@ -138,6 +138,7 @@ type PdfImportStep = "upload" | "review" | "done";
 type PdfTransaction = {
   description: string;
   amount: number;
+  is_negative?: boolean;
   purchase_date: string | null;
   date: string | null; // legado
   installment: string | null;
@@ -173,6 +174,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   const [pdfInvoiceMonth, setPdfInvoiceMonth] = useState<number | null>(null);
   const [pdfInvoiceYear, setPdfInvoiceYear] = useState<number | null>(null);
   const [pdfInvoiceDueDate, setPdfInvoiceDueDate] = useState<string | null>(null);
+  const [pdfInvoiceTotal, setPdfInvoiceTotal] = useState<number | null>(null);
   const [pdfImportedCount, setPdfImportedCount] = useState<number>(0);
   const [pdfSkippedCount, setPdfSkippedCount] = useState<number>(0);
   const [pdfIsDragging, setPdfIsDragging] = useState(false);
@@ -311,9 +313,10 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       setPdfInvoiceMonth(data.invoiceMonth);
       setPdfInvoiceYear(data.invoiceYear);
       setPdfInvoiceDueDate(data.invoiceDueDate ?? null);
+      setPdfInvoiceTotal(data.invoiceTotal ?? null);
       setPdfStep("review");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao processar PDF");
+      toast.error(err.message || "Erro ao processar o PDF");
     } finally {
       setPdfParsing(false);
     }
@@ -353,12 +356,11 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
         categoryId: null,
       })));
       setPdfInvoiceMonth(data.invoiceMonth);
-      setPdfInvoiceYear(data.invoiceYear);
-      setPdfInvoiceDueDate(data.invoiceDueDate ?? null);
+      setPdfInvoiceYear(data.invoiceYear);      setPdfInvoiceDueDate(data.invoiceDueDate ?? null);
+      setPdfInvoiceTotal(data.invoiceTotal ?? null);
       setPdfStep("review");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao processar CSV");
-    } finally {
+      toast.error(err.message || "Erro ao processar o CSV");    } finally {
       setPdfParsing(false);
     }
   }
@@ -414,6 +416,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
         const installCurrent = tx.installment_current;
         const installTotal = tx.installment_total;
         const isInstallment = installCurrent != null && installTotal != null;
+        // Transações negativas (estornos, IOF de volta) são salvas como INCOME
+        const txType = tx.is_negative ? "INCOME" : "EXPENSE";
 
         // Data da compra (para registro histórico)
         const purchaseDate = tx.purchase_date ? new Date(tx.purchase_date + "T12:00:00") : undefined;
@@ -430,7 +434,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           // Parcela atual (do mês da fatura)
           await utils.client.transactions.create.mutate({
             entityId,
-            type: "EXPENSE",
+            type: txType,
             description: `${tx.description} (${installCurrent}/${installTotal})`,
             amount: tx.amount / 100,
             dueDate: installBaseDueDate,
@@ -447,7 +451,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             futureDate.setMonth(futureDate.getMonth() + i);
             await utils.client.transactions.create.mutate({
               entityId,
-              type: "EXPENSE",
+              type: txType,
               description: `${tx.description} (${installCurrent! + i}/${installTotal})`,
               amount: tx.amount / 100,
               dueDate: futureDate,
@@ -466,7 +470,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             : tx.description;
           await utils.client.transactions.create.mutate({
             entityId,
-            type: "EXPENSE",
+            type: txType,
             description,
             amount: tx.amount / 100,
             dueDate: baseDueDate,
@@ -502,6 +506,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     setPdfInvoiceMonth(null);
     setPdfInvoiceYear(null);
     setPdfInvoiceDueDate(null);
+    setPdfInvoiceTotal(null);
     setPdfImportedCount(0);
     setPdfSkippedCount(0);
   }
@@ -823,6 +828,26 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                       <span className="text-blue-600 font-medium">↻ {pdfTransactions.filter(t => !t.is_duplicate && t.has_future_installments).length} com parcelas futuras</span>
                     )}
                   </div>
+                  {/* Totais para conferência */}
+                  {(() => {
+                    const selected = pdfTransactions.filter(t => t.selected && !t.is_duplicate);
+                    const totalDebits = selected.filter(t => !t.is_negative).reduce((s, t) => s + t.amount, 0);
+                    const totalCredits = selected.filter(t => t.is_negative).reduce((s, t) => s + t.amount, 0);
+                    const totalNet = totalDebits - totalCredits;
+                    return (
+                      <div className="flex flex-wrap gap-4 text-xs mt-1">
+                        <span>Selecionado: <strong className="text-red-600">{formatCurrency(totalDebits)}</strong> débitos</span>
+                        {totalCredits > 0 && <span>Créditos: <strong className="text-green-600">-{formatCurrency(totalCredits)}</strong></span>}
+                        <span>Líquido: <strong>{formatCurrency(totalNet)}</strong></span>
+                        {pdfInvoiceTotal != null && pdfInvoiceTotal > 0 && (
+                          <span className={Math.abs(totalNet - pdfInvoiceTotal) < 10 ? "text-green-600" : "text-amber-600"}>
+                            Fatura: <strong>{formatCurrency(pdfInvoiceTotal)}</strong>
+                            {Math.abs(totalNet - pdfInvoiceTotal) >= 10 && ` (Δ ${formatCurrency(Math.abs(totalNet - pdfInvoiceTotal))})`}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
@@ -854,7 +879,9 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-medium truncate">{tx.description}</p>
-                            <p className="text-sm font-bold text-red-600 flex-shrink-0">{formatCurrency(tx.amount)}</p>
+                            <p className={`text-sm font-bold flex-shrink-0 ${tx.is_negative ? "text-green-600" : "text-red-600"}`}>
+                              {tx.is_negative ? "-" : ""}{formatCurrency(tx.amount)}
+                            </p>
                           </div>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                             {tx.purchase_date && <span>Compra: {new Date(tx.purchase_date + "T12:00:00").toLocaleDateString("pt-BR")}</span>}
