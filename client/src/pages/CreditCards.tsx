@@ -906,7 +906,13 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
   const usagePercent = summary?.usagePercent ?? 0;
   const usedAmount = summary?.usedAmount ?? 0;
   const availableLimit = summary?.availableLimit ?? card.creditLimit;
-  const dueDate = summary?.dueDate ? new Date(summary.dueDate) : null;
+  // Usar UTC para evitar problema de fuso: new Date(isoString) converte UTC→local
+  // e pode subtrair 1 dia em fusos negativos (ex: GMT-3).
+  // getUTC* garante que lemos o dia/mês/ano exato que o servidor enviou.
+  const dueDate = summary?.dueDate ? (() => {
+    const d = new Date(summary.dueDate);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  })() : null;
   const usageColor = usagePercent >= 90 ? "bg-red-500" : usagePercent >= 70 ? "bg-amber-500" : "bg-green-500";
   function openPaySheet(inv: any) {
     setPaySheet({ open: true, invoice: inv });
@@ -1001,7 +1007,9 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
             {showInvoices && (
               <div className="mt-2 space-y-1.5">
                 {invoices.map((inv: any) => {
-                  const invDue = new Date(inv.dueDate);
+                  // Usar UTC para evitar problema de fuso (GMT-3 subtrairia 1 dia)
+                  const _invDueRaw = new Date(inv.dueDate);
+                  const invDue = new Date(_invDueRaw.getUTCFullYear(), _invDueRaw.getUTCMonth(), _invDueRaw.getUTCDate());
                   const isCurrentMonth = invDue.getMonth() === new Date().getMonth() && invDue.getFullYear() === new Date().getFullYear();
                   const isPaid = inv.isPaid || inv.status === "PAID";
                   return (
