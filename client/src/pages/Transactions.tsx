@@ -1717,7 +1717,9 @@ export default function Transactions() {
                                     {getCategoryHierarchyBadge(transaction)}
                                   </div>
                                   <p className="text-xs text-muted-foreground">
-                                    {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                                    {transaction.purchaseDate
+                                      ? format(new Date(transaction.purchaseDate), "dd/MM/yyyy", { locale: ptBR })
+                                      : format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
                                   </p>
                                 </div>
                               </div>
@@ -1753,7 +1755,9 @@ export default function Transactions() {
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <p className="text-xs text-muted-foreground">
-                                    {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                                    {transaction.purchaseDate
+                                      ? format(new Date(transaction.purchaseDate), "dd/MM/yyyy", { locale: ptBR })
+                                      : format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
                                   </p>
                                   {canWrite && (
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(transaction); }}>
