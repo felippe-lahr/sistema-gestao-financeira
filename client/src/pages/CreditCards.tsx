@@ -159,10 +159,13 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     { id: deleteDialog.cardId! },
     { enabled: deleteDialog.open && !!deleteDialog.cardId }
   );
-  // PDF Import state
+  // PDF/CSV Import state
   const [pdfSheetOpen, setPdfSheetOpen] = useState(false);
+  const [importType, setImportType] = useState<"pdf" | "csv">("pdf");
   const [pdfStep, setPdfStep] = useState<PdfImportStep>("upload");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvIsDragging, setCsvIsDragging] = useState(false);
   const [pdfCardId, setPdfCardId] = useState<string>("");
   const [pdfParsing, setPdfParsing] = useState(false);
   const [pdfImporting, setPdfImporting] = useState(false);
@@ -315,6 +318,50 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       setPdfParsing(false);
     }
   }
+  async function handleCsvFile(file: File) {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      toast.error("Apenas arquivos CSV são aceitos");
+      return;
+    }
+    setCsvFile(file);
+  }
+  async function handleCsvParse() {
+    if (!csvFile || !pdfCardId) {
+      toast.error("Selecione o cartão e o arquivo CSV");
+      return;
+    }
+    const selectedCard = cards?.find((c: any) => String(c.id) === pdfCardId);
+    setPdfParsing(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+      formData.append("cardName", selectedCard?.name || "Cartão de Crédito");
+      if (selectedCard?.id) formData.append("creditCardId", String(selectedCard.id));
+      const res = await fetch("/api/credit-cards/import-csv", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erro ao processar CSV");
+      }
+      const data = await res.json();
+      setPdfTransactions((data.transactions || []).map((tx: any) => ({
+        ...tx,
+        selected: !tx.is_duplicate,
+        categoryId: null,
+      })));
+      setPdfInvoiceMonth(data.invoiceMonth);
+      setPdfInvoiceYear(data.invoiceYear);
+      setPdfInvoiceDueDate(data.invoiceDueDate ?? null);
+      setPdfStep("review");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao processar CSV");
+    } finally {
+      setPdfParsing(false);
+    }
+  }
   async function handlePdfImport() {
     const selectedCard = cards?.find((c: any) => String(c.id) === pdfCardId);
     if (!selectedCard) return;
@@ -448,6 +495,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     setPdfSheetOpen(false);
     setPdfStep("upload");
     setPdfFile(null);
+    setCsvFile(null);
+    setImportType("pdf");
     setPdfCardId("");
     setPdfTransactions([]);
     setPdfInvoiceMonth(null);
@@ -458,7 +507,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   }
   return (
     <>
-      {/* Botão de importar PDF */}
+      {/* Botão de importar fatura */}
       <div className="flex justify-end mb-2">
         <Button
           variant="outline"
@@ -467,7 +516,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           className="flex items-center gap-2"
         >
           <FileUp className="h-4 w-4" />
-          Importar Fatura PDF
+          Importar Fatura
         </Button>
       </div>
       {/* Grid de cartões */}
@@ -610,7 +659,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           <div className="sticky top-0 z-10 border-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-xl font-bold flex items-center gap-2">
               <FileUp className="h-5 w-5" />
-              Importar Fatura PDF
+              Importar Fatura
             </SheetTitle>
             <button onClick={closePdfSheet} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
               <X className="h-5 w-5" />
@@ -638,7 +687,34 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           <div className="flex-1 overflow-y-auto px-8 py-6">
             {pdfStep === "upload" && (
               <div className="space-y-5">
-                <p className="text-sm text-muted-foreground">Selecione o cartão e faça upload da fatura em PDF. A IA irá extrair todas as transações automaticamente.</p>
+                {/* Seletor de tipo: PDF ou CSV */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setImportType("pdf"); setPdfFile(null); setCsvFile(null); }}
+                    className={`flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-medium transition-colors ${
+                      importType === "pdf" ? "border-primary bg-primary/5 text-primary" : "border-muted hover:border-primary/40 text-muted-foreground"
+                    }`}
+                  >
+                    <FileUp className="h-4 w-4" />
+                    PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setImportType("csv"); setPdfFile(null); setCsvFile(null); }}
+                    className={`flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-medium transition-colors ${
+                      importType === "csv" ? "border-primary bg-primary/5 text-primary" : "border-muted hover:border-primary/40 text-muted-foreground"
+                    }`}
+                  >
+                    <FileUp className="h-4 w-4" />
+                    CSV
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {importType === "pdf"
+                    ? "Selecione o cartão e faça upload da fatura em PDF. A IA irá extrair todas as transações automaticamente."
+                    : "Selecione o cartão e faça upload do CSV exportado pelo banco (ex: Nubank). As transações serão importadas diretamente, sem IA."}
+                </p>
                 {/* Seletor de cartão */}
                 <div className="space-y-2">
                   <Label>Cartão de Crédito *</Label>
@@ -658,38 +734,74 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Área de upload */}
-                <div
-                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
-                    pdfIsDragging ? "border-primary bg-primary/5" : pdfFile ? "border-green-500 bg-green-50 dark:bg-green-900/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20"
-                  }`}
-                  onDragOver={(e) => { e.preventDefault(); setPdfIsDragging(true); }}
-                  onDragLeave={() => setPdfIsDragging(false)}
-                  onDrop={(e) => { e.preventDefault(); setPdfIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handlePdfFile(f); }}
-                  onClick={() => document.getElementById("pdf-upload-input")?.click()}
-                >
-                  <input
-                    id="pdf-upload-input"
-                    type="file"
-                    accept=".pdf,application/pdf"
-                    className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfFile(f); }}
-                  />
-                  {pdfFile ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <CheckCircle2 className="h-10 w-10 text-green-500" />
-                      <p className="font-medium text-green-700 dark:text-green-400">{pdfFile.name}</p>
-                      <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024).toFixed(0)} KB</p>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); setPdfFile(null); }} className="text-xs text-red-500 hover:underline">Remover</button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <Upload className="h-10 w-10 text-muted-foreground/50" />
-                      <p className="font-medium">Arraste o PDF aqui ou clique para selecionar</p>
-                      <p className="text-xs text-muted-foreground">Fatura do cartão em formato PDF (máx. 15MB)</p>
-                    </div>
-                  )}
-                </div>
+                {/* Área de upload PDF */}
+                {importType === "pdf" && (
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+                      pdfIsDragging ? "border-primary bg-primary/5" : pdfFile ? "border-green-500 bg-green-50 dark:bg-green-900/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20"
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setPdfIsDragging(true); }}
+                    onDragLeave={() => setPdfIsDragging(false)}
+                    onDrop={(e) => { e.preventDefault(); setPdfIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handlePdfFile(f); }}
+                    onClick={() => document.getElementById("pdf-upload-input")?.click()}
+                  >
+                    <input
+                      id="pdf-upload-input"
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfFile(f); }}
+                    />
+                    {pdfFile ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle2 className="h-10 w-10 text-green-500" />
+                        <p className="font-medium text-green-700 dark:text-green-400">{pdfFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024).toFixed(0)} KB</p>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setPdfFile(null); }} className="text-xs text-red-500 hover:underline">Remover</button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="h-10 w-10 text-muted-foreground/50" />
+                        <p className="font-medium">Arraste o PDF aqui ou clique para selecionar</p>
+                        <p className="text-xs text-muted-foreground">Fatura do cartão em formato PDF (máx. 15MB)</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Área de upload CSV */}
+                {importType === "csv" && (
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+                      csvIsDragging ? "border-primary bg-primary/5" : csvFile ? "border-green-500 bg-green-50 dark:bg-green-900/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20"
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setCsvIsDragging(true); }}
+                    onDragLeave={() => setCsvIsDragging(false)}
+                    onDrop={(e) => { e.preventDefault(); setCsvIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleCsvFile(f); }}
+                    onClick={() => document.getElementById("csv-upload-input")?.click()}
+                  >
+                    <input
+                      id="csv-upload-input"
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCsvFile(f); }}
+                    />
+                    {csvFile ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle2 className="h-10 w-10 text-green-500" />
+                        <p className="font-medium text-green-700 dark:text-green-400">{csvFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(csvFile.size / 1024).toFixed(0)} KB</p>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setCsvFile(null); }} className="text-xs text-red-500 hover:underline">Remover</button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="h-10 w-10 text-muted-foreground/50" />
+                        <p className="font-medium">Arraste o CSV aqui ou clique para selecionar</p>
+                        <p className="text-xs text-muted-foreground">Arquivo CSV exportado pelo banco (máx. 5MB)</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {pdfStep === "review" && (
@@ -805,14 +917,14 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
               </Button>
               {pdfStep === "upload" && (
                 <Button
-                  onClick={handlePdfParse}
-                  disabled={!pdfFile || !pdfCardId || pdfParsing}
+                  onClick={importType === "csv" ? handleCsvParse : handlePdfParse}
+                  disabled={(importType === "pdf" ? !pdfFile : !csvFile) || !pdfCardId || pdfParsing}
                   className="bg-primary hover:bg-primary/90"
                 >
                   {pdfParsing ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processando com IA...</>
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{importType === "csv" ? "Processando CSV..." : "Processando com IA..."}</>
                   ) : (
-                    <><FileUp className="h-4 w-4 mr-2" />Processar PDF</>
+                    <><FileUp className="h-4 w-4 mr-2" />{importType === "csv" ? "Processar CSV" : "Processar PDF"}</>
                   )}
                 </Button>
               )}

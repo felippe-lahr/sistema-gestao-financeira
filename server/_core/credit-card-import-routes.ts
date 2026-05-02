@@ -43,6 +43,24 @@ const pdfUpload = multer({
   },
 });
 
+// Multer configurado para aceitar CSV em memória (max 5MB)
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (
+      file.mimetype === "text/csv" ||
+      file.mimetype === "application/csv" ||
+      file.originalname.toLowerCase().endsWith(".csv")
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Apenas arquivos CSV são aceitos."));
+    }
+  },
+});
+
+
 async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const user = await sdk.authenticateRequest(req);
@@ -136,6 +154,26 @@ export function registerCreditCardImportRoutes(app: Express) {
           return res.status(422).json({
             error: "Não foi possível extrair texto do PDF. Verifique se o arquivo é uma fatura válida e não está protegido por senha.",
           });
+        }
+
+        // ── Extrair descrições negativas do PDF de forma determinística ───────────
+        // O Nubank (e alguns outros bancos) usa U+2212 (−) como sinal de menos.
+        // A IA não reconhece esse caractere como negativo e importa como positivo.
+        // Solucao: extrair as descrições que aparecem com −R$ no PDF e filtrar no pós-processamento.
+        const negativeDescriptions = new Set<string>();
+        // Regex: captura linha inteira com −R$ (U+2212), usando 2+ espaços como separador
+        const negativeLineRegex = /^(.+?)\s{2,}\u2212R\$\s*[\d.,]+\s*$/gm;
+        let negMatch: RegExpExecArray | null;
+        while ((negMatch = negativeLineRegex.exec(pdfText)) !== null) {
+          let rawDesc = negMatch[1].trim();
+          // Remover prefixo de data (ex: "31 MAR ", "06 ABR ") se presente
+          rawDesc = rawDesc.replace(/^\d{2}\s+[A-Z]{3}\s+/i, "").trim();
+          // Normalizar espaços internos múltiplos
+          rawDesc = rawDesc.replace(/\s{2,}/g, " ").toLowerCase();
+          if (rawDesc.length > 2) negativeDescriptions.add(rawDesc);
+        }
+        if (negativeDescriptions.size > 0) {
+          console.log(`[CreditCardImport] ${negativeDescriptions.size} descrições negativas detectadas no PDF:`, [...negativeDescriptions]);
         }
 
         // ── Prompt corrigido: mês da fatura = data de VENCIMENTO ──────────────
@@ -267,6 +305,17 @@ Regras CRÍTICAS:
             if (Number(tx.amount) <= 0) return false;
             // Filtrar pagamentos da fatura anterior
             if (IGNORE_PATTERNS.some((p) => p.test(desc))) return false;
+            // Filtrar descrições que aparecem com −R$ no PDF (negativas determinísticas)
+            // Comparação EXATA (case-insensitive): a IA retorna a descrição limpa
+            // e o PDF tem a linha completa (ex: "iof de volta de railway").
+            // Usamos comparação exata para evitar falsos positivos (ex: "Railway" ≠ "iof de volta de railway")
+            if (negativeDescriptions.size > 0) {
+              const descLower = desc.toLowerCase();
+              if (negativeDescriptions.has(descLower)) {
+                console.log(`[CreditCardImport] Filtrado por negativo exato: "${desc}"`);
+                return false;
+              }
+            }
             return true;
           })
           .map((tx) => {
@@ -314,6 +363,228 @@ Regras CRÍTICAS:
       } catch (error: any) {
         console.error("[CreditCardImport] Unexpected error:", error?.message);
         return res.status(500).json({ error: "Erro interno ao processar a fatura" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/credit-cards/import-csv
+   * Recebe um CSV de fatura (formato Nubank: date,title,amount),
+   * parseia as transações e retorna para revisão no frontend.
+   * Mesma lógica do import-pdf: deduplication, parcelas futuras, etc.
+   */
+  app.post(
+    "/api/credit-cards/import-csv",
+    requireAuth,
+    csvUpload.single("file"),
+    async (req: Request, res: Response) => {
+      try {
+        const user = (req as any).user;
+        if (!user?.id) return res.status(401).json({ error: "Unauthorized" });
+        if (!req.file) return res.status(400).json({ error: "Nenhum arquivo CSV foi enviado" });
+
+        const cardName = req.body?.cardName || "Cartão de Crédito";
+        const creditCardId = req.body?.creditCardId ? Number(req.body.creditCardId) : null;
+        const invoiceDueDateParam: string | null = req.body?.invoiceDueDate || null;
+
+        console.log(`[CreditCardImport] Processando CSV: ${req.file.originalname} (${req.file.size} bytes)`);
+
+        // ── Parse do CSV ──────────────────────────────────────────────────────
+        const csvText = req.file.buffer.toString("utf-8").replace(/^\uFEFF/, ""); // remover BOM
+        const lines = csvText.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) {
+          return res.status(422).json({ error: "CSV inválido ou vazio." });
+        }
+
+        // Detectar separador (vírgula ou ponto-e-vírgula)
+        const header = lines[0].toLowerCase();
+        const sep = header.includes(";") ? ";" : ",";
+        const cols = header.split(sep).map(c => c.trim().replace(/"/g, ""));
+
+        // Mapear colunas por nome (suporta Nubank: date/title/amount e variantes)
+        const colDate = cols.findIndex(c => ["date", "data"].includes(c));
+        const colTitle = cols.findIndex(c => ["title", "descrição", "descricao", "description", "estabelecimento"].includes(c));
+        const colAmount = cols.findIndex(c => ["amount", "valor", "value"].includes(c));
+
+        if (colDate === -1 || colTitle === -1 || colAmount === -1) {
+          return res.status(422).json({
+            error: `Formato de CSV não reconhecido. Colunas encontradas: ${cols.join(", ")}. Esperado: date/title/amount ou data/descrição/valor.`
+          });
+        }
+
+        // ── Extrair transações do CSV ────────────────────────────────────────
+        const rawTransactions: Array<{
+          description: string;
+          amount: number;
+          purchase_date: string;
+          installment_current: number | null;
+          installment_total: number | null;
+        }> = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          // Parse simples de CSV (suporta campos com aspas)
+          const parseCsvLine = (l: string, s: string): string[] => {
+            const result: string[] = [];
+            let current = "";
+            let inQuotes = false;
+            for (let ci = 0; ci < l.length; ci++) {
+              const ch = l[ci];
+              if (ch === '"') { inQuotes = !inQuotes; }
+              else if (ch === s && !inQuotes) { result.push(current.trim()); current = ""; }
+              else { current += ch; }
+            }
+            result.push(current.trim());
+            return result;
+          };
+
+          const parts = parseCsvLine(line, sep);
+          if (parts.length <= Math.max(colDate, colTitle, colAmount)) continue;
+
+          const dateStr = (parts[colDate] || "").replace(/"/g, "").trim();
+          const titleStr = (parts[colTitle] || "").replace(/"/g, "").trim();
+          const amountStr = (parts[colAmount] || "").replace(/"/g, "").trim()
+            .replace(/R\$\s*/g, "")   // remover prefixo R$
+            .replace(/\./g, "")        // remover separador de milhar (pt-BR)
+            .replace(",", ".");         // normalizar decimal
+
+          if (!titleStr || !amountStr) continue;
+
+          const amountFloat = parseFloat(amountStr);
+          if (isNaN(amountFloat)) continue;
+
+          // Ignorar valores negativos (estornos, IOF de volta, pagamentos)
+          if (amountFloat <= 0) continue;
+
+          // Normalizar data: aceita YYYY-MM-DD e DD/MM/YYYY
+          let purchaseDateStr = dateStr;
+          if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+            const [d, m, y] = dateStr.split("/");
+            purchaseDateStr = `${y}-${m}-${d}`;
+          }
+
+          // Extrair parcelamento do título (formato Nubank: "Desc - X/Y" ou "Desc - Parcela X/Y")
+          let installment_current: number | null = null;
+          let installment_total: number | null = null;
+          let cleanTitle = titleStr;
+
+          const installMatch = titleStr.match(/[-\s]+(?:Parcela\s+)?(\d+)\/(\d+)\s*$/i);
+          if (installMatch) {
+            installment_current = parseInt(installMatch[1], 10);
+            installment_total = parseInt(installMatch[2], 10);
+            cleanTitle = titleStr.slice(0, installMatch.index).trim().replace(/[-\s]+$/, "").trim();
+          }
+
+          rawTransactions.push({
+            description: cleanTitle,
+            amount: Math.round(amountFloat * 100),
+            purchase_date: purchaseDateStr,
+            installment_current,
+            installment_total,
+          });
+        }
+
+        if (rawTransactions.length === 0) {
+          return res.status(422).json({ error: "Nenhuma transação válida encontrada no CSV." });
+        }
+
+        // Inferir invoiceMonth/invoiceYear a partir da data de vencimento ou das datas das transações
+        let invoiceMonth: number | null = null;
+        let invoiceYear: number | null = null;
+        let invoiceDueDate: string | null = invoiceDueDateParam;
+
+        if (invoiceDueDateParam) {
+          const d = new Date(invoiceDueDateParam + "T12:00:00");
+          invoiceMonth = d.getMonth() + 1;
+          invoiceYear = d.getFullYear();
+        } else {
+          // Inferir pelo mês mais recente das transações
+          const dates = rawTransactions
+            .map(t => t.purchase_date)
+            .filter(Boolean)
+            .sort()
+            .reverse();
+          if (dates.length > 0) {
+            const latest = new Date(dates[0] + "T12:00:00");
+            // Fatura vence no mês seguinte ao da última compra
+            invoiceMonth = latest.getMonth() + 2 > 12 ? 1 : latest.getMonth() + 2;
+            invoiceYear = latest.getMonth() + 2 > 12 ? latest.getFullYear() + 1 : latest.getFullYear();
+          }
+        }
+
+        // ── Verificar duplicatas no banco ─────────────────────────────────────
+        let existingKeys: Set<string> = new Set();
+        if (creditCardId) {
+          try {
+            const dbInstance = await getDb();
+            if (dbInstance) {
+              const { sql: sqlTag } = await import("drizzle-orm");
+              const result = await dbInstance.execute(
+                sqlTag`SELECT amount, "purchaseDate", "dueDate", notes FROM transactions
+                       WHERE "creditCardId" = ${creditCardId}`
+              );
+              const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+              for (const row of rows) {
+                let purchaseDateStr = "";
+                if (row.purchaseDate) {
+                  purchaseDateStr = normalizeDate(row.purchaseDate);
+                } else if (row.notes) {
+                  const match = String(row.notes).match(/Data da compra: (\d{2}\/\d{2}\/\d{4})/);
+                  if (match) {
+                    const [day, month, year] = match[1].split("/");
+                    purchaseDateStr = `${year}-${month}-${day}`;
+                  }
+                }
+                if (!purchaseDateStr && row.dueDate) {
+                  purchaseDateStr = normalizeDate(row.dueDate);
+                }
+                existingKeys.add(`${row.amount}|${purchaseDateStr}`);
+              }
+            }
+          } catch (dbErr: any) {
+            console.error("[CreditCardImport CSV] Error checking duplicates:", dbErr?.message);
+          }
+        }
+
+        // ── Montar resposta com mesma estrutura do PDF ────────────────────────
+        const transactions = rawTransactions.map((tx) => {
+          const key = `${tx.amount}|${normalizeDate(tx.purchase_date)}`;
+          const isDuplicate = existingKeys.has(key);
+          return {
+            description: tx.description,
+            amount: tx.amount,
+            purchase_date: tx.purchase_date,
+            installment_current: tx.installment_current,
+            installment_total: tx.installment_total,
+            installment: (tx.installment_current && tx.installment_total)
+              ? `${tx.installment_current}/${tx.installment_total}`
+              : null,
+            category_hint: null,
+            is_duplicate: isDuplicate,
+            has_future_installments: !isDuplicate &&
+              tx.installment_current != null &&
+              tx.installment_total != null &&
+              tx.installment_current < tx.installment_total,
+          };
+        });
+
+        console.log(`[CreditCardImport CSV] ${transactions.length} transações, ${transactions.filter(t => t.is_duplicate).length} duplicatas`);
+
+        return res.json({
+          success: true,
+          transactions,
+          invoiceMonth,
+          invoiceYear,
+          invoiceDueDate,
+          invoiceTotal: null,
+          cardName,
+          source: "csv",
+        });
+      } catch (error: any) {
+        console.error("[CreditCardImport CSV] Unexpected error:", error?.message);
+        return res.status(500).json({ error: "Erro interno ao processar o CSV" });
       }
     }
   );
