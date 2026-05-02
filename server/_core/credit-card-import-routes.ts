@@ -445,10 +445,20 @@ Regras CRÍTICAS:
 
           const dateStr = (parts[colDate] || "").replace(/"/g, "").trim();
           const titleStr = (parts[colTitle] || "").replace(/"/g, "").trim();
-          const amountStr = (parts[colAmount] || "").replace(/"/g, "").trim()
-            .replace(/R\$\s*/g, "")   // remover prefixo R$
-            .replace(/\./g, "")        // remover separador de milhar (pt-BR)
-            .replace(",", ".");         // normalizar decimal
+          const rawAmount = (parts[colAmount] || "").replace(/"/g, "").trim()
+            .replace(/R\$\s*/g, "");   // remover prefixo R$
+          // Detectar formato: se tem ponto e vírgula (pt-BR: 1.234,56) ou só ponto (en-US: 1234.56)
+          let amountStr: string;
+          if (/\d\.\d{3},/.test(rawAmount) || (rawAmount.includes(",") && rawAmount.includes("."))) {
+            // Formato pt-BR: 1.234,56 → remover ponto de milhar, trocar vírgula por ponto
+            amountStr = rawAmount.replace(/\./g, "").replace(",", ".");
+          } else if (rawAmount.includes(",") && !rawAmount.includes(".")) {
+            // Formato pt-BR sem milhar: 384,00 → trocar vírgula por ponto
+            amountStr = rawAmount.replace(",", ".");
+          } else {
+            // Formato en-US: 384.00 → usar direto
+            amountStr = rawAmount;
+          }
 
           if (!titleStr || !amountStr) continue;
 
