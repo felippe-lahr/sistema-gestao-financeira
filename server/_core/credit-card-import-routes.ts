@@ -72,13 +72,37 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
- * Extrai texto de um buffer PDF usando pdftotext (poppler-utils).
+ * Verifica se um PDF está protegido por senha.
+ * Retorna true se o PDF requer senha para ser lido.
  */
-function extractPdfText(buffer: Buffer): string {
-  const tmpFile = join(tmpdir(), `pdf-import-${randomUUID()}.pdf`);
+function isPdfPasswordProtected(buffer: Buffer): boolean {
+  const tmpFile = join(tmpdir(), `pdf-check-${randomUUID()}.pdf`);
   try {
     writeFileSync(tmpFile, buffer);
-    const text = execSync(`pdftotext -layout "${tmpFile}" -`, {
+    execSync(`pdftotext "${tmpFile}" /dev/null`, {
+      encoding: "utf-8",
+      timeout: 10000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return false;
+  } catch (err: any) {
+    const msg = (err?.stderr || err?.message || "").toLowerCase();
+    return msg.includes("password") || msg.includes("encrypted") || msg.includes("command error");
+  } finally {
+    try { if (existsSync(tmpFile)) unlinkSync(tmpFile); } catch {}
+  }
+}
+
+/**
+ * Extrai texto de um buffer PDF usando pdftotext (poppler-utils).
+ * Aceita senha opcional para PDFs protegidos.
+ */
+function extractPdfText(buffer: Buffer, password?: string): string {
+  const tmpFile = join(tmpdir(), `pdf-import-${randomUUID()}.pdf`);
+  const pwFlag = password ? `-upw "${password.replace(/"/g, '\\"')}"` : "";
+  try {
+    writeFileSync(tmpFile, buffer);
+    const text = execSync(`pdftotext -layout ${pwFlag} "${tmpFile}" -`, {
       encoding: "utf-8",
       timeout: 30000,
       maxBuffer: 10 * 1024 * 1024,
@@ -87,7 +111,7 @@ function extractPdfText(buffer: Buffer): string {
   } catch (err: any) {
     console.error("[CreditCardImport] pdftotext error:", err?.message);
     try {
-      const text = execSync(`pdftotext "${tmpFile}" -`, {
+      const text = execSync(`pdftotext ${pwFlag} "${tmpFile}" -`, {
         encoding: "utf-8",
         timeout: 30000,
         maxBuffer: 10 * 1024 * 1024,
@@ -144,13 +168,30 @@ export function registerCreditCardImportRoutes(app: Express) {
 
         const cardName = req.body?.cardName || "Cartão de Crédito";
         const creditCardId = req.body?.creditCardId ? Number(req.body.creditCardId) : null;
+        const pdfPassword = req.body?.pdfPassword || undefined;
 
         console.log(`[CreditCardImport] Processando PDF: ${req.file.originalname} (${req.file.size} bytes)`);
 
-        const pdfText = extractPdfText(req.file.buffer);
+        // Detectar se o PDF está protegido por senha
+        if (!pdfPassword && isPdfPasswordProtected(req.file.buffer)) {
+          console.log(`[CreditCardImport] PDF protegido por senha detectado`);
+          return res.status(422).json({
+            error: "PDF protegido por senha",
+            code: "PASSWORD_REQUIRED",
+          });
+        }
+
+        const pdfText = extractPdfText(req.file.buffer, pdfPassword);
         console.log(`[CreditCardImport] Texto extraído: ${pdfText.length} caracteres`);
 
         if (!pdfText || pdfText.trim().length < 30) {
+          // Se tinha senha e o texto ficou vazio, a senha pode estar errada
+          if (pdfPassword) {
+            return res.status(422).json({
+              error: "Senha incorreta ou PDF inválido",
+              code: "WRONG_PASSWORD",
+            });
+          }
           return res.status(422).json({
             error: "Não foi possível extrair texto do PDF. Verifique se o arquivo é uma fatura válida e não está protegido por senha.",
           });

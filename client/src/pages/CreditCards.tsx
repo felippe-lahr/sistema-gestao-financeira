@@ -178,6 +178,9 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   const [pdfImportedCount, setPdfImportedCount] = useState<number>(0);
   const [pdfSkippedCount, setPdfSkippedCount] = useState<number>(0);
   const [pdfIsDragging, setPdfIsDragging] = useState(false);
+  const [pdfPassword, setPdfPassword] = useState<string>("");
+  const [pdfPasswordRequired, setPdfPasswordRequired] = useState(false);
+  const [pdfWrongPassword, setPdfWrongPassword] = useState(false);
   const { data: categories } = trpc.categories.listByEntity.useQuery({ entityId }, { enabled: pdfSheetOpen });
   const [form, setForm] = useState({
     name: "",
@@ -289,11 +292,13 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     }
     const selectedCard = cards?.find((c: any) => String(c.id) === pdfCardId);
     setPdfParsing(true);
+    setPdfWrongPassword(false);
     try {
       const formData = new FormData();
       formData.append("file", pdfFile);
       formData.append("cardName", selectedCard?.name || "Cartão de Crédito");
       if (selectedCard?.id) formData.append("creditCardId", String(selectedCard.id));
+      if (pdfPassword) formData.append("pdfPassword", pdfPassword);
       const res = await fetch("/api/credit-cards/import-pdf", {
         method: "POST",
         body: formData,
@@ -301,6 +306,15 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       });
       if (!res.ok) {
         const err = await res.json();
+        if (err.code === "PASSWORD_REQUIRED") {
+          setPdfPasswordRequired(true);
+          return;
+        }
+        if (err.code === "WRONG_PASSWORD") {
+          setPdfWrongPassword(true);
+          setPdfPasswordRequired(true);
+          return;
+        }
         throw new Error(err.error || "Erro ao processar PDF");
       }
       const data = await res.json();
@@ -509,6 +523,9 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     setPdfInvoiceTotal(null);
     setPdfImportedCount(0);
     setPdfSkippedCount(0);
+    setPdfPassword("");
+    setPdfPasswordRequired(false);
+    setPdfWrongPassword(false);
   }
   return (
     <>
@@ -771,6 +788,35 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                         <p className="text-xs text-muted-foreground">Fatura do cartão em formato PDF (máx. 15MB)</p>
                       </div>
                     )}
+                  </div>
+                )}
+                {/* Campo de senha para PDF protegido */}
+                {importType === "pdf" && pdfPasswordRequired && (
+                  <div className="mt-3 space-y-2">
+                    <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${pdfWrongPassword ? "border-red-400 bg-red-50 dark:bg-red-900/10" : "border-amber-400 bg-amber-50 dark:bg-amber-900/10"}`}>
+                      <span className="text-lg">{pdfWrongPassword ? "❌" : "🔒"}</span>
+                      <span className={pdfWrongPassword ? "text-red-700 dark:text-red-400" : "text-amber-700 dark:text-amber-400"}>
+                        {pdfWrongPassword ? "Senha incorreta. Tente novamente." : "Este PDF está protegido por senha. Digite a senha para continuar."}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="Senha do PDF"
+                        value={pdfPassword}
+                        onChange={(e) => { setPdfPassword(e.target.value); setPdfWrongPassword(false); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" && pdfPassword) handlePdfParse(); }}
+                        className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        autoFocus
+                      />
+                      <Button
+                        onClick={handlePdfParse}
+                        disabled={!pdfPassword || pdfParsing}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        {pdfParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desbloquear"}
+                      </Button>
+                    </div>
                   </div>
                 )}
                 {/* Área de upload CSV */}
