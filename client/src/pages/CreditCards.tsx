@@ -138,6 +138,7 @@ type PdfImportStep = "upload" | "review" | "done";
 type PdfTransaction = {
   description: string;
   amount: number;
+  is_negative?: boolean;
   purchase_date: string | null;
   date: string | null; // legado
   installment: string | null;
@@ -159,10 +160,13 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     { id: deleteDialog.cardId! },
     { enabled: deleteDialog.open && !!deleteDialog.cardId }
   );
-  // PDF Import state
+  // PDF/CSV Import state
   const [pdfSheetOpen, setPdfSheetOpen] = useState(false);
+  const [importType, setImportType] = useState<"pdf" | "csv">("pdf");
   const [pdfStep, setPdfStep] = useState<PdfImportStep>("upload");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvIsDragging, setCsvIsDragging] = useState(false);
   const [pdfCardId, setPdfCardId] = useState<string>("");
   const [pdfParsing, setPdfParsing] = useState(false);
   const [pdfImporting, setPdfImporting] = useState(false);
@@ -170,9 +174,13 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   const [pdfInvoiceMonth, setPdfInvoiceMonth] = useState<number | null>(null);
   const [pdfInvoiceYear, setPdfInvoiceYear] = useState<number | null>(null);
   const [pdfInvoiceDueDate, setPdfInvoiceDueDate] = useState<string | null>(null);
+  const [pdfInvoiceTotal, setPdfInvoiceTotal] = useState<number | null>(null);
   const [pdfImportedCount, setPdfImportedCount] = useState<number>(0);
   const [pdfSkippedCount, setPdfSkippedCount] = useState<number>(0);
   const [pdfIsDragging, setPdfIsDragging] = useState(false);
+  const [pdfPassword, setPdfPassword] = useState<string>("");
+  const [pdfPasswordRequired, setPdfPasswordRequired] = useState(false);
+  const [pdfWrongPassword, setPdfWrongPassword] = useState(false);
   const { data: categories } = trpc.categories.listByEntity.useQuery({ entityId }, { enabled: pdfSheetOpen });
   const [form, setForm] = useState({
     name: "",
@@ -284,11 +292,13 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     }
     const selectedCard = cards?.find((c: any) => String(c.id) === pdfCardId);
     setPdfParsing(true);
+    setPdfWrongPassword(false);
     try {
       const formData = new FormData();
       formData.append("file", pdfFile);
       formData.append("cardName", selectedCard?.name || "Cartão de Crédito");
       if (selectedCard?.id) formData.append("creditCardId", String(selectedCard.id));
+      if (pdfPassword) formData.append("pdfPassword", pdfPassword);
       const res = await fetch("/api/credit-cards/import-pdf", {
         method: "POST",
         body: formData,
@@ -296,6 +306,15 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       });
       if (!res.ok) {
         const err = await res.json();
+        if (err.code === "PASSWORD_REQUIRED") {
+          setPdfPasswordRequired(true);
+          return;
+        }
+        if (err.code === "WRONG_PASSWORD") {
+          setPdfWrongPassword(true);
+          setPdfPasswordRequired(true);
+          return;
+        }
         throw new Error(err.error || "Erro ao processar PDF");
       }
       const data = await res.json();
@@ -308,10 +327,54 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       setPdfInvoiceMonth(data.invoiceMonth);
       setPdfInvoiceYear(data.invoiceYear);
       setPdfInvoiceDueDate(data.invoiceDueDate ?? null);
+      setPdfInvoiceTotal(data.invoiceTotal ?? null);
       setPdfStep("review");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao processar PDF");
+      toast.error(err.message || "Erro ao processar o PDF");
     } finally {
+      setPdfParsing(false);
+    }
+  }
+  async function handleCsvFile(file: File) {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      toast.error("Apenas arquivos CSV são aceitos");
+      return;
+    }
+    setCsvFile(file);
+  }
+  async function handleCsvParse() {
+    if (!csvFile || !pdfCardId) {
+      toast.error("Selecione o cartão e o arquivo CSV");
+      return;
+    }
+    const selectedCard = cards?.find((c: any) => String(c.id) === pdfCardId);
+    setPdfParsing(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+      formData.append("cardName", selectedCard?.name || "Cartão de Crédito");
+      if (selectedCard?.id) formData.append("creditCardId", String(selectedCard.id));
+      const res = await fetch("/api/credit-cards/import-csv", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erro ao processar CSV");
+      }
+      const data = await res.json();
+      setPdfTransactions((data.transactions || []).map((tx: any) => ({
+        ...tx,
+        selected: !tx.is_duplicate,
+        categoryId: null,
+      })));
+      setPdfInvoiceMonth(data.invoiceMonth);
+      setPdfInvoiceYear(data.invoiceYear);      setPdfInvoiceDueDate(data.invoiceDueDate ?? null);
+      setPdfInvoiceTotal(data.invoiceTotal ?? null);
+      setPdfStep("review");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao processar o CSV");    } finally {
       setPdfParsing(false);
     }
   }
@@ -367,6 +430,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
         const installCurrent = tx.installment_current;
         const installTotal = tx.installment_total;
         const isInstallment = installCurrent != null && installTotal != null;
+        // Transações negativas (estornos, IOF de volta) são salvas como INCOME
+        const txType = tx.is_negative ? "INCOME" : "EXPENSE";
 
         // Data da compra (para registro histórico)
         const purchaseDate = tx.purchase_date ? new Date(tx.purchase_date + "T12:00:00") : undefined;
@@ -383,7 +448,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           // Parcela atual (do mês da fatura)
           await utils.client.transactions.create.mutate({
             entityId,
-            type: "EXPENSE",
+            type: txType,
             description: `${tx.description} (${installCurrent}/${installTotal})`,
             amount: tx.amount / 100,
             dueDate: installBaseDueDate,
@@ -400,7 +465,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             futureDate.setMonth(futureDate.getMonth() + i);
             await utils.client.transactions.create.mutate({
               entityId,
-              type: "EXPENSE",
+              type: txType,
               description: `${tx.description} (${installCurrent! + i}/${installTotal})`,
               amount: tx.amount / 100,
               dueDate: futureDate,
@@ -419,7 +484,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
             : tx.description;
           await utils.client.transactions.create.mutate({
             entityId,
-            type: "EXPENSE",
+            type: txType,
             description,
             amount: tx.amount / 100,
             dueDate: baseDueDate,
@@ -448,17 +513,23 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     setPdfSheetOpen(false);
     setPdfStep("upload");
     setPdfFile(null);
+    setCsvFile(null);
+    setImportType("pdf");
     setPdfCardId("");
     setPdfTransactions([]);
     setPdfInvoiceMonth(null);
     setPdfInvoiceYear(null);
     setPdfInvoiceDueDate(null);
+    setPdfInvoiceTotal(null);
     setPdfImportedCount(0);
     setPdfSkippedCount(0);
+    setPdfPassword("");
+    setPdfPasswordRequired(false);
+    setPdfWrongPassword(false);
   }
   return (
     <>
-      {/* Botão de importar PDF */}
+      {/* Botão de importar fatura */}
       <div className="flex justify-end mb-2">
         <Button
           variant="outline"
@@ -467,7 +538,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           className="flex items-center gap-2"
         >
           <FileUp className="h-4 w-4" />
-          Importar Fatura PDF
+          Importar Fatura
         </Button>
       </div>
       {/* Grid de cartões */}
@@ -610,7 +681,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           <div className="sticky top-0 z-10 border-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
             <SheetTitle className="text-xl font-bold flex items-center gap-2">
               <FileUp className="h-5 w-5" />
-              Importar Fatura PDF
+              Importar Fatura
             </SheetTitle>
             <button onClick={closePdfSheet} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
               <X className="h-5 w-5" />
@@ -638,7 +709,34 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           <div className="flex-1 overflow-y-auto px-8 py-6">
             {pdfStep === "upload" && (
               <div className="space-y-5">
-                <p className="text-sm text-muted-foreground">Selecione o cartão e faça upload da fatura em PDF. A IA irá extrair todas as transações automaticamente.</p>
+                {/* Seletor de tipo: PDF ou CSV */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setImportType("pdf"); setPdfFile(null); setCsvFile(null); }}
+                    className={`flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-medium transition-colors ${
+                      importType === "pdf" ? "border-primary bg-primary/5 text-primary" : "border-muted hover:border-primary/40 text-muted-foreground"
+                    }`}
+                  >
+                    <FileUp className="h-4 w-4" />
+                    PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setImportType("csv"); setPdfFile(null); setCsvFile(null); }}
+                    className={`flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-medium transition-colors ${
+                      importType === "csv" ? "border-primary bg-primary/5 text-primary" : "border-muted hover:border-primary/40 text-muted-foreground"
+                    }`}
+                  >
+                    <FileUp className="h-4 w-4" />
+                    CSV
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {importType === "pdf"
+                    ? "Selecione o cartão e faça upload da fatura em PDF. A IA irá extrair todas as transações automaticamente."
+                    : "Selecione o cartão e faça upload do CSV exportado pelo banco (ex: Nubank). As transações serão importadas diretamente, sem IA."}
+                </p>
                 {/* Seletor de cartão */}
                 <div className="space-y-2">
                   <Label>Cartão de Crédito *</Label>
@@ -658,38 +756,103 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Área de upload */}
-                <div
-                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
-                    pdfIsDragging ? "border-primary bg-primary/5" : pdfFile ? "border-green-500 bg-green-50 dark:bg-green-900/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20"
-                  }`}
-                  onDragOver={(e) => { e.preventDefault(); setPdfIsDragging(true); }}
-                  onDragLeave={() => setPdfIsDragging(false)}
-                  onDrop={(e) => { e.preventDefault(); setPdfIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handlePdfFile(f); }}
-                  onClick={() => document.getElementById("pdf-upload-input")?.click()}
-                >
-                  <input
-                    id="pdf-upload-input"
-                    type="file"
-                    accept=".pdf,application/pdf"
-                    className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfFile(f); }}
-                  />
-                  {pdfFile ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <CheckCircle2 className="h-10 w-10 text-green-500" />
-                      <p className="font-medium text-green-700 dark:text-green-400">{pdfFile.name}</p>
-                      <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024).toFixed(0)} KB</p>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); setPdfFile(null); }} className="text-xs text-red-500 hover:underline">Remover</button>
+                {/* Área de upload PDF */}
+                {importType === "pdf" && (
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+                      pdfIsDragging ? "border-primary bg-primary/5" : pdfFile ? "border-green-500 bg-green-50 dark:bg-green-900/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20"
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setPdfIsDragging(true); }}
+                    onDragLeave={() => setPdfIsDragging(false)}
+                    onDrop={(e) => { e.preventDefault(); setPdfIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handlePdfFile(f); }}
+                    onClick={() => document.getElementById("pdf-upload-input")?.click()}
+                  >
+                    <input
+                      id="pdf-upload-input"
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfFile(f); }}
+                    />
+                    {pdfFile ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle2 className="h-10 w-10 text-green-500" />
+                        <p className="font-medium text-green-700 dark:text-green-400">{pdfFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024).toFixed(0)} KB</p>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setPdfFile(null); }} className="text-xs text-red-500 hover:underline">Remover</button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="h-10 w-10 text-muted-foreground/50" />
+                        <p className="font-medium">Arraste o PDF aqui ou clique para selecionar</p>
+                        <p className="text-xs text-muted-foreground">Fatura do cartão em formato PDF (máx. 15MB)</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Campo de senha para PDF protegido */}
+                {importType === "pdf" && pdfPasswordRequired && (
+                  <div className="mt-3 space-y-2">
+                    <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${pdfWrongPassword ? "border-red-400 bg-red-50 dark:bg-red-900/10" : "border-amber-400 bg-amber-50 dark:bg-amber-900/10"}`}>
+                      <span className="text-lg">{pdfWrongPassword ? "❌" : "🔒"}</span>
+                      <span className={pdfWrongPassword ? "text-red-700 dark:text-red-400" : "text-amber-700 dark:text-amber-400"}>
+                        {pdfWrongPassword ? "Senha incorreta. Tente novamente." : "Este PDF está protegido por senha. Digite a senha para continuar."}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <Upload className="h-10 w-10 text-muted-foreground/50" />
-                      <p className="font-medium">Arraste o PDF aqui ou clique para selecionar</p>
-                      <p className="text-xs text-muted-foreground">Fatura do cartão em formato PDF (máx. 15MB)</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="Senha do PDF"
+                        value={pdfPassword}
+                        onChange={(e) => { setPdfPassword(e.target.value); setPdfWrongPassword(false); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" && pdfPassword) handlePdfParse(); }}
+                        className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        autoFocus
+                      />
+                      <Button
+                        onClick={handlePdfParse}
+                        disabled={!pdfPassword || pdfParsing}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        {pdfParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desbloquear"}
+                      </Button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+                {/* Área de upload CSV */}
+                {importType === "csv" && (
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+                      csvIsDragging ? "border-primary bg-primary/5" : csvFile ? "border-green-500 bg-green-50 dark:bg-green-900/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20"
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setCsvIsDragging(true); }}
+                    onDragLeave={() => setCsvIsDragging(false)}
+                    onDrop={(e) => { e.preventDefault(); setCsvIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleCsvFile(f); }}
+                    onClick={() => document.getElementById("csv-upload-input")?.click()}
+                  >
+                    <input
+                      id="csv-upload-input"
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCsvFile(f); }}
+                    />
+                    {csvFile ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle2 className="h-10 w-10 text-green-500" />
+                        <p className="font-medium text-green-700 dark:text-green-400">{csvFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(csvFile.size / 1024).toFixed(0)} KB</p>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setCsvFile(null); }} className="text-xs text-red-500 hover:underline">Remover</button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="h-10 w-10 text-muted-foreground/50" />
+                        <p className="font-medium">Arraste o CSV aqui ou clique para selecionar</p>
+                        <p className="text-xs text-muted-foreground">Arquivo CSV exportado pelo banco (máx. 5MB)</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {pdfStep === "review" && (
@@ -711,6 +874,26 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                       <span className="text-blue-600 font-medium">↻ {pdfTransactions.filter(t => !t.is_duplicate && t.has_future_installments).length} com parcelas futuras</span>
                     )}
                   </div>
+                  {/* Totais para conferência */}
+                  {(() => {
+                    const selected = pdfTransactions.filter(t => t.selected && !t.is_duplicate);
+                    const totalDebits = selected.filter(t => !t.is_negative).reduce((s, t) => s + t.amount, 0);
+                    const totalCredits = selected.filter(t => t.is_negative).reduce((s, t) => s + t.amount, 0);
+                    const totalNet = totalDebits - totalCredits;
+                    return (
+                      <div className="flex flex-wrap gap-4 text-xs mt-1">
+                        <span>Selecionado: <strong className="text-red-600">{formatCurrency(totalDebits)}</strong> débitos</span>
+                        {totalCredits > 0 && <span>Créditos: <strong className="text-green-600">-{formatCurrency(totalCredits)}</strong></span>}
+                        <span>Líquido: <strong>{formatCurrency(totalNet)}</strong></span>
+                        {pdfInvoiceTotal != null && pdfInvoiceTotal > 0 && (
+                          <span className={Math.abs(totalNet - pdfInvoiceTotal) < 10 ? "text-green-600" : "text-amber-600"}>
+                            Fatura: <strong>{formatCurrency(pdfInvoiceTotal)}</strong>
+                            {Math.abs(totalNet - pdfInvoiceTotal) >= 10 && ` (Δ ${formatCurrency(Math.abs(totalNet - pdfInvoiceTotal))})`}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
@@ -742,7 +925,9 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-medium truncate">{tx.description}</p>
-                            <p className="text-sm font-bold text-red-600 flex-shrink-0">{formatCurrency(tx.amount)}</p>
+                            <p className={`text-sm font-bold flex-shrink-0 ${tx.is_negative ? "text-green-600" : "text-red-600"}`}>
+                              {tx.is_negative ? "-" : ""}{formatCurrency(tx.amount)}
+                            </p>
                           </div>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                             {tx.purchase_date && <span>Compra: {new Date(tx.purchase_date + "T12:00:00").toLocaleDateString("pt-BR")}</span>}
@@ -805,14 +990,14 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
               </Button>
               {pdfStep === "upload" && (
                 <Button
-                  onClick={handlePdfParse}
-                  disabled={!pdfFile || !pdfCardId || pdfParsing}
+                  onClick={importType === "csv" ? handleCsvParse : handlePdfParse}
+                  disabled={(importType === "pdf" ? !pdfFile : !csvFile) || !pdfCardId || pdfParsing}
                   className="bg-primary hover:bg-primary/90"
                 >
                   {pdfParsing ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processando com IA...</>
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{importType === "csv" ? "Processando CSV..." : "Processando com IA..."}</>
                   ) : (
-                    <><FileUp className="h-4 w-4 mr-2" />Processar PDF</>
+                    <><FileUp className="h-4 w-4 mr-2" />{importType === "csv" ? "Processar CSV" : "Processar PDF"}</>
                   )}
                 </Button>
               )}
