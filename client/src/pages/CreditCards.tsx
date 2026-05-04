@@ -320,8 +320,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       const data = await res.json();
       setPdfTransactions((data.transactions || []).map((tx: any) => ({
         ...tx,
-        // Marcar duplicatas como desmarcadas por padrão
-        selected: !tx.is_duplicate,
+        // Duplicatas e créditos negativos (IOF de volta, pagamentos antecipados) começam desmarcados
+        selected: !tx.is_duplicate && !tx.is_negative,
         categoryId: null,
       })));
       setPdfInvoiceMonth(data.invoiceMonth);
@@ -366,7 +366,8 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       const data = await res.json();
       setPdfTransactions((data.transactions || []).map((tx: any) => ({
         ...tx,
-        selected: !tx.is_duplicate,
+        // Duplicatas e créditos negativos (IOF de volta, pagamentos antecipados) começam desmarcados
+        selected: !tx.is_duplicate && !tx.is_negative,
         categoryId: null,
       })));
       setPdfInvoiceMonth(data.invoiceMonth);
@@ -866,7 +867,10 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                     </p>
                   )}
                   <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    <span className="text-green-600 font-medium">✓ {pdfTransactions.filter(t => !t.is_duplicate).length} para importar</span>
+                    <span className="text-green-600 font-medium">✓ {pdfTransactions.filter(t => !t.is_duplicate && !t.is_negative).length} para importar</span>
+                    {pdfTransactions.filter(t => !t.is_duplicate && t.is_negative).length > 0 && (
+                      <span className="text-green-600 font-medium">↓ {pdfTransactions.filter(t => !t.is_duplicate && t.is_negative).length} crédito{pdfTransactions.filter(t => !t.is_duplicate && t.is_negative).length > 1 ? 's' : ''} (desmarcado{pdfTransactions.filter(t => !t.is_duplicate && t.is_negative).length > 1 ? 's' : ''})</span>
+                    )}
                     {pdfTransactions.filter(t => t.is_duplicate).length > 0 && (
                       <span className="text-amber-600 font-medium">⚠ {pdfTransactions.filter(t => t.is_duplicate).length} já existem (serão ignoradas)</span>
                     )}
@@ -900,7 +904,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                     {pdfTransactions.filter(t => t.selected && !t.is_duplicate).length} selecionadas para importar
                   </p>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setPdfTransactions(t => t.map(tx => ({ ...tx, selected: !tx.is_duplicate })))} className="text-xs text-primary hover:underline">Selecionar novas</button>
+                    <button type="button" onClick={() => setPdfTransactions(t => t.map(tx => ({ ...tx, selected: !tx.is_duplicate && !tx.is_negative })))} className="text-xs text-primary hover:underline">Selecionar novas</button>
                     <span className="text-muted-foreground">·</span>
                     <button type="button" onClick={() => setPdfTransactions(t => t.map(tx => ({ ...tx, selected: false })))} className="text-xs text-muted-foreground hover:underline">Desmarcar todas</button>
                   </div>

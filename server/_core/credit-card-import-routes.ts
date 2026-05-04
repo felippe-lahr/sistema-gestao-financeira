@@ -329,9 +329,8 @@ Regras CRÍTICAS:
         }
 
         // ── Normalizar e marcar duplicatas ─────────────────────────────────────────────────────
-        // Padrões de descrição que devem ser filtrados (mesmo que a IA inclua por engano)
-        // Apenas pagamentos de fatura anterior são ignorados — valores negativos já são filtrados pelo amount <= 0
-        const IGNORE_PATTERNS = [
+        // Padrões de descrição que identificam pagamentos (da fatura anterior ou antecipados)
+        const PAYMENT_PATTERNS_PDF = [
           /^pagamento recebido/i,       // Nubank: "Pagamento recebido"
           /^pagamento com saldo/i,      // Nubank: "Pagamento com saldo"
           /^pagamento em \d/i,          // Nubank: "Pagamento em 06 ABR"
@@ -339,15 +338,28 @@ Regras CRÍTICAS:
           /^crédito de pagamento/i,     // Genérico
         ];
 
-        const transactions = (extractedData.transactions as any[])
+        // Pré-processar: calcular total de débitos para heurística de pagamento anterior
+        const allTxRaw = (extractedData.transactions as any[]).filter(
+          (tx) => tx && tx.description && tx.amount != null && Number(tx.amount) !== 0
+        );
+        const totalDebitsForThresholdPdf = allTxRaw
+          .filter((tx) => !tx.is_negative)
+          .reduce((s: number, tx: any) => s + Math.abs(Math.round(Number(tx.amount) || 0)), 0);
+
+        const transactions = allTxRaw
           .filter((tx) => {
-            if (!tx || !tx.description || tx.amount == null) return false;
             const desc = String(tx.description).trim();
-            // Filtrar amount zero
-            if (Number(tx.amount) === 0) return false;
-            // Filtrar pagamentos da fatura anterior (mesmo que a IA inclua por engano)
-            if (IGNORE_PATTERNS.some((p) => p.test(desc))) return false;
-            return true;
+            const isPayment = PAYMENT_PATTERNS_PDF.some((p) => p.test(desc));
+            if (!isPayment) return true; // manter não-pagamentos
+            // Heurística: pagamento da fatura anterior tem valor alto (> 50% dos débitos)
+            const amtCents = Math.abs(Math.round(Number(tx.amount) || 0));
+            const isLargePrevPayment = amtCents > totalDebitsForThresholdPdf * 0.5;
+            if (isLargePrevPayment) {
+              console.log(`[CreditCardImport PDF] Excluindo pagamento da fatura anterior: "${desc}" R$${(amtCents / 100).toFixed(2)} (${totalDebitsForThresholdPdf > 0 ? ((amtCents / totalDebitsForThresholdPdf) * 100).toFixed(0) : "?"}% do total)`);
+              return false; // excluir — é pagamento da fatura anterior
+            }
+            console.log(`[CreditCardImport PDF] Mantendo pagamento antecipado: "${desc}" R$${(amtCents / 100).toFixed(2)}`);
+            return true; // incluir — é pagamento antecipado (crédito)
           })
           .map((tx) => {
             const amountCents = Math.abs(Math.round(Number(tx.amount) || 0));
@@ -504,8 +516,10 @@ Regras CRÍTICAS:
           const amountFloat = parseFloat(amountStr);
           if (isNaN(amountFloat)) continue;
 
-          // Ignorar pagamentos da fatura anterior (valores negativos muito altos)
-          // Mas manter estornos pequenos (IOF de volta, devoluções) como créditos
+          // Ignorar zero
+          if (amountFloat === 0) continue;
+
+          // Padrões de descrição que identificam pagamentos (da fatura anterior ou antecipados)
           const PAYMENT_PATTERNS = [
             /^pagamento recebido/i,
             /^pagamento com saldo/i,
@@ -513,9 +527,8 @@ Regras CRÍTICAS:
             /^pagamento da fatura/i,
             /^cr[eé]dito de pagamento/i,
           ];
-          if (amountFloat <= 0 && PAYMENT_PATTERNS.some(p => p.test(titleStr))) continue;
-          // Ignorar zero
-          if (amountFloat === 0) continue;
+          // Marcar pagamentos para análise posterior (não filtrar ainda)
+          const isPaymentEntry = amountFloat < 0 && PAYMENT_PATTERNS.some(p => p.test(titleStr));
 
           // Normalizar data: aceita YYYY-MM-DD e DD/MM/YYYY
           let purchaseDateStr = dateStr;
@@ -540,6 +553,7 @@ Regras CRÍTICAS:
             description: cleanTitle,
             amount: Math.round(Math.abs(amountFloat) * 100),
             is_negative: amountFloat < 0,
+            is_payment_entry: isPaymentEntry,
             purchase_date: purchaseDateStr,
             installment_current,
             installment_total,
@@ -549,6 +563,25 @@ Regras CRÍTICAS:
         if (rawTransactions.length === 0) {
           return res.status(422).json({ error: "Nenhuma transação válida encontrada no CSV." });
         }
+
+        // ── Heurística: distinguir pagamento da fatura anterior vs pagamento antecipado ──
+        // Calcular total dos débitos (positivos) para usar como referência
+        const totalDebitsForThreshold = rawTransactions
+          .filter(t => !t.is_negative)
+          .reduce((s, t) => s + t.amount, 0);
+        // Threshold: se o pagamento for > 50% do total de débitos, é pagamento da fatura anterior
+        // Caso contrário, é pagamento antecipado e deve aparecer na revisão como crédito desmarcado
+        const PREV_INVOICE_THRESHOLD = 0.5;
+        const filteredTransactions = rawTransactions.filter(t => {
+          if (!t.is_payment_entry) return true; // manter todas as não-pagamentos
+          const isLargePrevPayment = t.amount > totalDebitsForThreshold * PREV_INVOICE_THRESHOLD;
+          if (isLargePrevPayment) {
+            console.log(`[CreditCardImport CSV] Excluindo pagamento da fatura anterior: "${t.description}" R$${(t.amount / 100).toFixed(2)} (${((t.amount / totalDebitsForThreshold) * 100).toFixed(0)}% do total)`);
+            return false; // excluir — é pagamento da fatura anterior
+          }
+          console.log(`[CreditCardImport CSV] Mantendo pagamento antecipado: "${t.description}" R$${(t.amount / 100).toFixed(2)} (${((t.amount / totalDebitsForThreshold) * 100).toFixed(0)}% do total)`);
+          return true; // incluir — é pagamento antecipado
+        });
 
         // Inferir invoiceMonth/invoiceYear a partir da data de vencimento ou das datas das transações
         let invoiceMonth: number | null = null;
@@ -609,7 +642,7 @@ Regras CRÍTICAS:
         }
 
         // ── Montar resposta com mesma estrutura do PDF ────────────────────────
-        const transactions = rawTransactions.map((tx) => {
+        const transactions = filteredTransactions.map((tx) => {
           const key = `${tx.amount}|${normalizeDate(tx.purchase_date)}`;
           const isDuplicate = existingKeys.has(key);
           return {
@@ -632,6 +665,7 @@ Regras CRÍTICAS:
         });
 
         // Calcular total líquido da fatura (débitos - créditos)
+        // Nota: pagamentos antecipados (is_negative) são créditos e reduzem o líquido
         const totalDebits = transactions.filter(t => !t.is_negative).reduce((s, t) => s + t.amount, 0);
         const totalCredits = transactions.filter(t => t.is_negative).reduce((s, t) => s + t.amount, 0);
         const invoiceTotal = totalDebits - totalCredits;
