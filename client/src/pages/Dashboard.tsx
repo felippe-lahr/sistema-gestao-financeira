@@ -180,7 +180,7 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
+            <CardTitle className="text-sm font-medium">Créditos do Mês</CardTitle>
             <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
@@ -199,7 +199,7 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
+            <CardTitle className="text-sm font-medium">Débitos do Mês</CardTitle>
             <TrendingDown className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
@@ -218,7 +218,7 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Despesas a Vencer</CardTitle>
+            <CardTitle className="text-sm font-medium">Débitos a Vencer</CardTitle>
             <Clock className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
@@ -241,7 +241,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Fluxo de Caixa</CardTitle>
-            <CardDescription>Receitas e despesas dos últimos 6 meses</CardDescription>
+            <CardDescription>Créditos e débitos dos últimos 6 meses</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -259,14 +259,14 @@ export default function Dashboard() {
                   dataKey="receitas"
                   stroke="#10b981"
                   strokeWidth={2}
-                  name="Receitas"
+                  name="Créditos"
                 />
                 <Line
                   type="monotone"
                   dataKey="despesas"
                   stroke="#ef4444"
                   strokeWidth={2}
-                  name="Despesas"
+                  name="Débitos"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -276,7 +276,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Distribuição por Categoria</CardTitle>
-            <CardDescription>Despesas do mês atual</CardDescription>
+            <CardDescription>Débitos do mês atual</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>

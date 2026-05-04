@@ -57,7 +57,7 @@ export async function generateTransactionsExcel(data: {
     const row = transactionsSheet.addRow({
       date: transaction.createdAt ? format(new Date(transaction.createdAt), "dd/MM/yyyy") : "",
       description: transaction.description,
-      type: transaction.type === "INCOME" ? "Receita" : "Despesa",
+      type: transaction.type === "INCOME" ? "Crédito" : "Débito",
       category: transaction.categoryName || "",
       bankAccount: transaction.bankAccountName || "",
       origin: transaction.importOrigin === "OFX" ? "OFX" : "Manual",
@@ -138,8 +138,8 @@ export async function generateTransactionsExcel(data: {
   summarySheet.addRow(["Métrica", "Valor"]);
   summarySheet.getRow(4).font = { bold: true };
   
-  summarySheet.addRow(["Total de Receitas", data.summary.totalIncome / 100]);
-  summarySheet.addRow(["Total de Despesas", data.summary.totalExpenses / 100]);
+  summarySheet.addRow(["Total de Créditos", data.summary.totalIncome / 100]);
+  summarySheet.addRow(["Total de Débitos", data.summary.totalExpenses / 100]);
   summarySheet.addRow(["Saldo", (data.summary.totalIncome - data.summary.totalExpenses) / 100]);
 
   summarySheet.getColumn(2).numFmt = 'R$ #,##0.00';
@@ -368,8 +368,8 @@ export function generateTransactionsPDF(data: {
     const CARD_W = Math.floor((CW - 16) / 5);
     const CARD_H = 64;
     const cards = [
-      { label: "TOTAL RECEITAS", val: formatBRL(totInc / 100), color: "#16A34A", bg: "#F0FDF4", bdr: "#16A34A", sub: `${incomes.length} lançamentos` },
-      { label: "TOTAL DESPESAS", val: formatBRL(totExp / 100), color: "#DC2626", bg: "#FEF2F2", bdr: "#DC2626", sub: `${expenses.length} lançamentos` },
+      { label: "TOTAL CRÉDITOS", val: formatBRL(totInc / 100), color: "#16A34A", bg: "#F0FDF4", bdr: "#16A34A", sub: `${incomes.length} lançamentos` },
+      { label: "TOTAL DÉBITOS", val: formatBRL(totExp / 100), color: "#DC2626", bg: "#FEF2F2", bdr: "#DC2626", sub: `${expenses.length} lançamentos` },
       { label: "SALDO LÍQUIDO",  val: `${saldo >= 0 ? "+" : ""}${formatBRL(saldo / 100)}`,
         color: saldo >= 0 ? "#2563EB" : "#D97706",
         bg:    saldo >= 0 ? "#EFF6FF" : "#FFFBEB",
@@ -445,8 +445,8 @@ export function generateTransactionsPDF(data: {
       doc.y += 28;
     };
 
-    drawCatTable("Receitas por Categoria e Status", incCatList, "#16A34A");
-    drawCatTable("Despesas por Categoria e Status", expCatList, "#2563EB");
+    drawCatTable("Créditos por Categoria e Status", incCatList, "#16A34A");
+    drawCatTable("Débitos por Categoria e Status", expCatList, "#2563EB");
 
     // ─── TABELA DE TRANSAÇÕES ────────────────────────────────────────────────
     // CW = 515.28
@@ -482,7 +482,7 @@ export function generateTransactionsPDF(data: {
           t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy") : "—",
           (t.description || "").substring(0, 42),
           (t.categoryName || "Sem cat.").substring(0, 18),
-          isInc ? "Receita" : "Despesa",
+          isInc ? "Crédito" : "Débito",
           formatBRL(t.amount / 100),
           stLabel(t.status),
         ],
@@ -495,11 +495,11 @@ export function generateTransactionsPDF(data: {
 
     doc.y += 32;
 
-    // ─── DRE ────────────────────────────────────────────────────────────────
+    // ─── Resumo Financeiro ────────────────────────────────────────────────────────────────
 
     need(60);
     doc.fontSize(13).font("Helvetica-Bold").fillColor("#1E293B")
-      .text("DRE — Demonstração do Resultado do Exercício", M, doc.y, { lineBreak: false });
+      .text("Resumo Financeiro do Período", M, doc.y, { lineBreak: false });
     doc.y += 18;
     doc.fontSize(8.5).font("Helvetica").fillColor("#64748B")
       .text(`Período: ${periodText}`, M, doc.y, { lineBreak: false });
@@ -510,7 +510,7 @@ export function generateTransactionsPDF(data: {
     const DRH = 22;
     const DSH = 18;
 
-    // Cabeçalho DRE
+    // Cabeçalho Resumo Financeiro
     need(DRH);
     let dy = doc.y;
     doc.rect(M, dy, DC1, DRH).fillAndStroke("#1E293B", "#1E293B");
@@ -546,24 +546,24 @@ export function generateTransactionsPDF(data: {
       doc.y = dy + DRH;
     };
 
-    // Receitas
-    dreSection("RECEITAS", "#F0FDF4");
+    // Créditos
+    dreSection("CRÉDITOS", "#F0FDF4");
     if (incCatList.length > 0) {
       incCatList.forEach(c => dreRow(c.n, c.tot, 12, false, "#FFFFFF", "#16A34A"));
     } else {
-      dreRow("Sem receitas no período", 0, 12, false, "#FFFFFF", "#94A3B8");
+      dreRow("Sem créditos no período", 0, 12, false, "#FFFFFF", "#94A3B8");
     }
-    dreRow("(+) Total de Receitas", totInc, 0, true, "#F0FDF4", "#16A34A");
+    dreRow("(+) Total de Créditos", totInc, 0, true, "#F0FDF4", "#16A34A");
     doc.y += 6;
 
-    // Despesas
-    dreSection("DESPESAS", "#FEF2F2");
+    // Débitos
+    dreSection("DÉBITOS", "#FEF2F2");
     if (expCatList.length > 0) {
       expCatList.forEach(c => dreRow(`(-) ${c.n}`, c.tot, 12, false, "#FFFFFF", "#DC2626"));
     } else {
-      dreRow("Sem despesas no período", 0, 12, false, "#FFFFFF", "#94A3B8");
+      dreRow("Sem débitos no período", 0, 12, false, "#FFFFFF", "#94A3B8");
     }
-    dreRow("(-) Total de Despesas", totExp, 0, true, "#FEF2F2", "#DC2626");
+    dreRow("(-) Total de Débitos", totExp, 0, true, "#FEF2F2", "#DC2626");
     doc.y += 10;
 
     // Resultado Líquido

@@ -174,19 +174,19 @@ export default function EntityDashboard() {
   const getPeriodDescription = () => {
     // Usar as datas calculadas pelo getFilterDates para garantir consistência
     if (startDate && endDate) {
-      return `Receitas e despesas de ${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}`;
+      return `Créditos e débitos de ${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}`;
     }
     
     switch (filterPeriod) {
       case "month":
-        return "Receitas e despesas do mês atual";
+        return "Créditos e débitos do mês atual";
       case "quarter":
-        return "Receitas e despesas dos últimos 3 meses";
+        return "Créditos e débitos dos últimos 3 meses";
       case "year":
-        return "Receitas e despesas do ano atual";
+        return "Créditos e débitos do ano atual";
       case "all":
       default:
-        return "Receitas e despesas de todos os períodos";
+        return "Créditos e débitos de todos os períodos";
     }
   };
 
@@ -602,10 +602,10 @@ export default function EntityDashboard() {
             </CardContent>
           </Card>
 
-          {/* Receitas do Mês */}
+          {/* Créditos do Mês */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
+              <CardTitle className="text-sm font-medium">Créditos do Mês</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -614,10 +614,10 @@ export default function EntityDashboard() {
             </CardContent>
           </Card>
 
-          {/* Despesas do Mês */}
+          {/* Débitos do Mês */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
+              <CardTitle className="text-sm font-medium">Débitos do Mês</CardTitle>
               <TrendingDown className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -626,10 +626,10 @@ export default function EntityDashboard() {
             </CardContent>
           </Card>
 
-          {/* Despesas a Vencer (Todo Período) */}
+          {/* Débitos a Vencer (Todo Período) */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas a Vencer (Total)</CardTitle>
+              <CardTitle className="text-sm font-medium">Débitos a Vencer (Total)</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -638,10 +638,10 @@ export default function EntityDashboard() {
             </CardContent>
           </Card>
 
-          {/* Despesas a Vencer (Período) */}
+          {/* Débitos a Vencer (Período) */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas a Vencer (Período)</CardTitle>
+              <CardTitle className="text-sm font-medium">Débitos a Vencer (Período)</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -680,7 +680,7 @@ export default function EntityDashboard() {
                     stackId="1"
                     stroke="#10B981"
                     fill="#10B981"
-                    name="Receitas"
+                    name="Créditos"
                   />
                   <Area
                     type="monotone"
@@ -688,7 +688,7 @@ export default function EntityDashboard() {
                     stackId="2"
                     stroke="#EF4444"
                     fill="#EF4444"
-                    name="Despesas"
+                    name="Débitos"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -705,7 +705,7 @@ export default function EntityDashboard() {
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Distribuição por Categoria</CardTitle>
-            <CardDescription>Despesas do mês atual</CardDescription>
+            <CardDescription>Débitos do mês atual</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 w-full p-4">
             <div className="h-full w-full">
@@ -766,9 +766,9 @@ export default function EntityDashboard() {
               <CardTitle>Gastos Mensais por Categoria</CardTitle>
               <CardDescription>
                 {monthlyChartPeriod === "year" 
-                  ? `Despesas pagas em ${new Date().getFullYear()}`
+                  ? `Débitos pagas em ${new Date().getFullYear()}`
                   : monthlyChartStartDate && monthlyChartEndDate
-                    ? `Despesas pagas de ${format(new Date(monthlyChartStartDate), "dd/MM/yyyy")} a ${format(new Date(monthlyChartEndDate), "dd/MM/yyyy")}`
+                    ? `Débitos pagas de ${format(new Date(monthlyChartStartDate), "dd/MM/yyyy")} a ${format(new Date(monthlyChartEndDate), "dd/MM/yyyy")}`
                     : "Selecione um período"}
               </CardDescription>
             </div>
@@ -887,10 +887,10 @@ export default function EntityDashboard() {
         </CardContent>
       </Card>
 
-      {/* Despesas por Categoria e Status */}
+      {/* Débitos por Categoria e Status */}
       <Card>
         <CardHeader>
-          <CardTitle>Despesas por Categoria</CardTitle>
+          <CardTitle>Débitos por Categoria</CardTitle>
           <CardDescription>Valores pagos, pendentes e vencidos por categoria</CardDescription>
         </CardHeader>
         <CardContent>
@@ -1040,7 +1040,7 @@ export default function EntityDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-500" />
-              Receitas a Receber
+              Créditos a Receber
             </CardTitle>
             <CardDescription>Próximos 7 dias</CardDescription>
           </CardHeader>
@@ -1206,13 +1206,13 @@ export default function EntityDashboard() {
                     <h3 className="font-semibold mb-3">Resumo do Cálculo</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Receitas Pagas</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Créditos Pagos</p>
                         <p className="text-lg font-bold text-green-600">
                           {balanceDiagnostic.summary.totalIncomeCount} transações = {formatCurrency(balanceDiagnostic.summary.totalIncomeAmount)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Despesas Pagas</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Débitos Pagas</p>
                         <p className="text-lg font-bold text-red-600">
                           {balanceDiagnostic.summary.totalExpenseCount} transações = {formatCurrency(balanceDiagnostic.summary.totalExpenseAmount)}
                         </p>
@@ -1226,14 +1226,14 @@ export default function EntityDashboard() {
                     </div>
                     <div className="mt-4 pt-4 border dark:border-gray-700-t">
                       <p className="text-sm">
-                        <strong>Fórmula:</strong> Receitas Pagas ({formatCurrency(balanceDiagnostic.summary.totalIncomeAmount)}) - Despesas Pagas ({formatCurrency(balanceDiagnostic.summary.totalExpenseAmount)}) = <strong>{formatCurrency(balanceDiagnostic.summary.calculatedBalance)}</strong>
+                        <strong>Fórmula:</strong> Créditos Pagos ({formatCurrency(balanceDiagnostic.summary.totalIncomeAmount)}) - Débitos Pagas ({formatCurrency(balanceDiagnostic.summary.totalExpenseAmount)}) = <strong>{formatCurrency(balanceDiagnostic.summary.calculatedBalance)}</strong>
                       </p>
                     </div>
                   </div>
 
-                  {/* Lista de Receitas Pagas */}
+                  {/* Lista de Créditos Pagos */}
                   <div>
-                    <h3 className="font-semibold mb-2 text-green-700">Receitas Pagas ({balanceDiagnostic.paidIncomeTransactions.length})</h3>
+                    <h3 className="font-semibold mb-2 text-green-700">Créditos Pagos ({balanceDiagnostic.paidIncomeTransactions.length})</h3>
                     <div className="max-h-60 overflow-y-auto border dark:border-gray-700 rounded">
                       <table className="w-full text-sm">
                         <thead className="bg-green-50 sticky top-0">
@@ -1258,9 +1258,9 @@ export default function EntityDashboard() {
                     </div>
                   </div>
 
-                  {/* Lista de Despesas Pagas */}
+                  {/* Lista de Débitos Pagas */}
                   <div>
-                    <h3 className="font-semibold mb-2 text-red-700">Despesas Pagas ({balanceDiagnostic.paidExpenseTransactions.length})</h3>
+                    <h3 className="font-semibold mb-2 text-red-700">Débitos Pagas ({balanceDiagnostic.paidExpenseTransactions.length})</h3>
                     <div className="max-h-60 overflow-y-auto border dark:border-gray-700 rounded">
                       <table className="w-full text-sm">
                         <thead className="bg-red-50 dark:bg-red-900/20 sticky top-0">

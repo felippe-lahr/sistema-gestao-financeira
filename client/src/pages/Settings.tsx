@@ -283,8 +283,8 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="EXPENSE">Despesas (meios que você paga)</SelectItem>
-                      <SelectItem value="INCOME">Receitas (meios que recebe)</SelectItem>
+                      <SelectItem value="EXPENSE">Débitos (meios que você paga)</SelectItem>
+                      <SelectItem value="INCOME">Créditos (meios que recebe)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -408,8 +408,8 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="EXPENSE">Despesas (meios que você paga)</SelectItem>
-                    <SelectItem value="INCOME">Receitas (meios que recebe)</SelectItem>
+                    <SelectItem value="EXPENSE">Débitos (meios que você paga)</SelectItem>
+                    <SelectItem value="INCOME">Créditos (meios que recebe)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -746,11 +746,11 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Receitas */}
+        {/* Créditos */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 pb-1 border-b">
             <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-            <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Receitas</h3>
+            <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Créditos</h3>
             <span className="ml-auto text-xs text-muted-foreground">{incomeParents.length}</span>
           </div>
           {incomeParents.length === 0 ? (
@@ -767,11 +767,11 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
             <div className="space-y-3">{incomeParents.map(renderCategoryCard)}</div>
           )}
         </div>
-        {/* Despesas */}
+        {/* Débitos */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 pb-1 border-b">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-            <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Despesas</h3>
+            <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Débitos</h3>
             <span className="ml-auto text-xs text-muted-foreground">{expenseParents.length}</span>
           </div>
           {expenseParents.length === 0 ? (
@@ -838,7 +838,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
                           : "border-border text-muted-foreground hover:border-gray-400"
                       }`}
                     >
-                      {t === "INCOME" ? "Receita" : "Despesa"}
+                      {t === "INCOME" ? "Crédito" : "Débito"}
                     </button>
                   ))}
                 </div>
@@ -900,7 +900,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
             <div>
               <SheetTitle className="text-xl font-bold">Editar Categoria</SheetTitle>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {editingCategory?.parentId ? "Subcategoria" : "Categoria principal"} • {formData.type === "INCOME" ? "Receita" : "Despesa"}
+                {editingCategory?.parentId ? "Subcategoria" : "Categoria principal"} • {formData.type === "INCOME" ? "Crédito" : "Débito"}
               </p>
             </div>
             <button onClick={() => { setEditingCategory(null); resetForm(); setIsEditOpen(false); }} className="text-muted-foreground hover:text-foreground">

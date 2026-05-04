@@ -175,7 +175,7 @@ export function OnboardingTour() {
         popover: {
           title: "📊 Relatórios PDF",
           description: `
-            <p>Gere <strong>relatórios financeiros completos</strong> em PDF com um clique — incluindo análise por categoria, evolução mensal e DRE (Demonstração do Resultado do Exercício).</p>
+            <p>Gere <strong>relatórios financeiros completos</strong> em PDF com um clique — incluindo análise por categoria, evolução mensal e Resumo Financeiro do Período.</p>
             <p style="margin-top:8px;font-size:13px;opacity:0.65;">Acesse os relatórios pelo painel de cada entidade.</p>
           `,
         },

@@ -263,7 +263,7 @@ export function Reports() {
     const totalPending = txAll.filter(t => t.status === 'PENDING').reduce((s, t) => s + t.amount / 100, 0);
     const totalOverdue = txAll.filter(t => t.status === 'OVERDUE').reduce((s, t) => s + t.amount / 100, 0);
 
-    // Receitas por categoria
+    // Créditos por categoria
     const incomeByCat: Record<string, { total: number; count: number; color: string }> = {};
     incomes.forEach(t => {
       const cat = t.categoryName || 'Sem categoria';
@@ -272,7 +272,7 @@ export function Reports() {
       incomeByCat[cat].count++;
     });
 
-    // Despesas por categoria
+    // Débitos por categoria
     const expenseByCat: Record<string, { total: number; count: number; color: string }> = {};
     expenses.forEach(t => {
       const cat = t.categoryName || 'Sem categoria';
@@ -281,11 +281,11 @@ export function Reports() {
       expenseByCat[cat].count++;
     });
 
-    // Receitas por status
+    // Créditos por status
     const incomeByStatus: Record<string, number> = {};
     incomes.forEach(t => { incomeByStatus[t.status] = (incomeByStatus[t.status] || 0) + t.amount / 100; });
 
-    // Despesas por status
+    // Débitos por status
     const expenseByStatus: Record<string, number> = {};
     expenses.forEach(t => { expenseByStatus[t.status] = (expenseByStatus[t.status] || 0) + t.amount / 100; });
 
@@ -391,12 +391,12 @@ export function Reports() {
             <div class="section-title"><span class="dot" style="background:#3b82f6"></span>Resumo Executivo</div>
             <div class="summary-grid">
               <div class="summary-card income">
-                <div class="label">Total Receitas</div>
+                <div class="label">Total Créditos</div>
                 <div class="value" style="color:#16a34a">R$ ${fmt(totalIncome)}</div>
                 <div style="font-size:11px;color:#64748b;margin-top:4px">${incomes.length} lançamentos</div>
               </div>
               <div class="summary-card expense">
-                <div class="label">Total Despesas</div>
+                <div class="label">Total Débitos</div>
                 <div class="value" style="color:#dc2626">R$ ${fmt(totalExpense)}</div>
                 <div style="font-size:11px;color:#64748b;margin-top:4px">${expenses.length} lançamentos</div>
               </div>
@@ -421,9 +421,9 @@ export function Reports() {
           <div class="section">
             <div class="section-title"><span class="dot" style="background:#8b5cf6"></span>Análise por Categoria e Status</div>
             <div class="cat-grid">
-              <!-- Receitas por categoria -->
+              <!-- Créditos por categoria -->
               <div>
-                <div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:10px">✅ Receitas por Categoria</div>
+                <div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:10px">✅ Créditos por Categoria</div>
                 <table class="cat-table">
                   <thead><tr><th>Categoria</th><th style="text-align:right">Total</th><th style="text-align:center">Qtd</th><th style="text-align:right">%</th></tr></thead>
                   <tbody>
@@ -438,7 +438,7 @@ export function Reports() {
                     ${incomes.length === 0 ? '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">Nenhuma receita no período</td></tr>' : ''}
                   </tbody>
                 </table>
-                <!-- Receitas por status -->
+                <!-- Créditos por status -->
                 <div style="margin-top:14px;font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px">Por Status</div>
                 <table class="cat-table">
                   <thead><tr><th>Status</th><th style="text-align:right">Total</th><th style="text-align:right">%</th></tr></thead>
@@ -454,9 +454,9 @@ export function Reports() {
                   </tbody>
                 </table>
               </div>
-              <!-- Despesas por categoria -->
+              <!-- Débitos por categoria -->
               <div>
-                <div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">❌ Despesas por Categoria</div>
+                <div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">❌ Débitos por Categoria</div>
                 <table class="cat-table">
                   <thead><tr><th>Categoria</th><th style="text-align:right">Total</th><th style="text-align:center">Qtd</th><th style="text-align:right">%</th></tr></thead>
                   <tbody>
@@ -471,7 +471,7 @@ export function Reports() {
                     ${expenses.length === 0 ? '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">Nenhuma despesa no período</td></tr>' : ''}
                   </tbody>
                 </table>
-                <!-- Despesas por status -->
+                <!-- Débitos por status -->
                 <div style="margin-top:14px;font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px">Por Status</div>
                 <table class="cat-table">
                   <thead><tr><th>Status</th><th style="text-align:right">Total</th><th style="text-align:right">%</th></tr></thead>
@@ -498,8 +498,8 @@ export function Reports() {
               <thead>
                 <tr>
                   <th style="text-align:left">Mês</th>
-                  <th style="color:#16a34a">Receitas</th>
-                  <th style="color:#dc2626">Despesas</th>
+                  <th style="color:#16a34a">Créditos</th>
+                  <th style="color:#dc2626">Débitos</th>
                   <th>Saldo</th>
                 </tr>
               </thead>
@@ -553,7 +553,7 @@ export function Reports() {
           <!-- TABELA DE DESPESAS -->
           ${expenses.length > 0 ? `
           <div class="section">
-            <div class="section-title"><span class="dot" style="background:#dc2626"></span>Despesas (${expenses.length})</div>
+            <div class="section-title"><span class="dot" style="background:#dc2626"></span>Débitos (${expenses.length})</div>
             <table>
               <thead>
                 <tr>
@@ -891,7 +891,7 @@ export function Reports() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Receita Total</CardTitle>
+                <CardTitle className="text-sm">Crédito Total</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">
@@ -901,7 +901,7 @@ export function Reports() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Receita Média</CardTitle>
+                <CardTitle className="text-sm">Crédito Médio</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">
@@ -933,7 +933,7 @@ export function Reports() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Receita por Fonte</CardTitle>
+              <CardTitle>Crédito por Fonte</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -1010,7 +1010,7 @@ export function Reports() {
                   <Tooltip />
                   <Legend />
                   <Bar yAxisId="left" dataKey="count" fill="#3b82f6" name="Quantidade de Reservas" />
-                  <Bar yAxisId="right" dataKey="revenue" fill="#10b981" name="Receita (R$)" />
+                  <Bar yAxisId="right" dataKey="revenue" fill="#10b981" name="Crédito (R$)" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -1028,7 +1028,7 @@ export function Reports() {
                     <span className="float-right font-semibold">{source.count}</span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">Receita:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Crédito:</span>
                     <span className="float-right font-semibold">
                       R$ {source.revenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
@@ -1058,7 +1058,7 @@ export function Reports() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Receita Prevista</CardTitle>
+                <CardTitle className="text-sm">Crédito Previsto</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">
@@ -1100,7 +1100,7 @@ export function Reports() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Receita Total</CardTitle>
+                <CardTitle className="text-sm">Crédito Total</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">
