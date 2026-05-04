@@ -130,7 +130,7 @@ export default function OverallDashboard() {
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [allTransactions]);
 
-  // Receitas a receber nos próximos 7 dias
+  // Créditos a receber nos próximos 7 dias
   const upcomingIncome = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -307,7 +307,7 @@ export default function OverallDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Receita</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Crédito</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
@@ -321,7 +321,7 @@ export default function OverallDashboard() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Despesa</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Débito</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
@@ -362,7 +362,7 @@ export default function OverallDashboard() {
         </Card>
       </div>
 
-      {/* Contas a Vencer, Receitas a Receber e Vencidas */}
+      {/* Contas a Vencer, Créditos a Receber e Vencidas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="pb-3">
@@ -407,9 +407,9 @@ export default function OverallDashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-500" />
-              Receitas a Receber (Próximos 7 dias)
+              Créditos a Receber (Próximos 7 dias)
             </CardTitle>
-            <CardDescription>Receitas pendentes nos próximos 7 dias</CardDescription>
+            <CardDescription>Créditos pendentes nos próximos 7 dias</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-80 overflow-y-auto">

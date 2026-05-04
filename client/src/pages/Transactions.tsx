@@ -1471,7 +1471,7 @@ export default function Transactions() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Receitas</span>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Créditos</span>
                   <ArrowUpRight className="h-4 w-4 text-green-600" />
                 </div>
                 <p className="text-2xl font-bold text-green-600">
@@ -1498,7 +1498,7 @@ export default function Transactions() {
               </div>
               <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Despesas</span>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Débitos</span>
                   <ArrowDownRight className="h-4 w-4 text-red-600" />
                 </div>
                 <p className="text-2xl font-bold text-red-600">
@@ -1536,7 +1536,7 @@ export default function Transactions() {
           ) : activeTab === "income" ? (
             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Receitas</span>
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Créditos</span>
                 <ArrowUpRight className="h-5 w-5 text-green-600" />
               </div>
               <p className="text-3xl font-bold text-green-600">
@@ -1564,7 +1564,7 @@ export default function Transactions() {
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Despesas</span>
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Débitos</span>
                 <ArrowDownRight className="h-5 w-5 text-red-600" />
               </div>
               <p className="text-3xl font-bold text-red-600">
@@ -1620,8 +1620,8 @@ export default function Transactions() {
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
         <TabsList>
           <TabsTrigger value="all">Todas</TabsTrigger>
-          <TabsTrigger value="income">Receitas</TabsTrigger>
-          <TabsTrigger value="expense">Despesas</TabsTrigger>
+          <TabsTrigger value="income">Créditos</TabsTrigger>
+          <TabsTrigger value="expense">Débitos</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-4">
@@ -2269,8 +2269,8 @@ function TransactionForm({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="INCOME">Receita</SelectItem>
-            <SelectItem value="EXPENSE">Despesa</SelectItem>
+            <SelectItem value="INCOME">Crédito</SelectItem>
+            <SelectItem value="EXPENSE">Débito</SelectItem>
           </SelectContent>
         </Select>
       </div>

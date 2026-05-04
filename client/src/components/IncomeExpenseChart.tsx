@@ -14,7 +14,7 @@ interface IncomeExpenseChartProps {
 
 export function IncomeExpenseChart({
   data,
-  title = "Receitas vs Despesas",
+  title = "Créditos vs Débitos",
   description = "Comparação mensal de receitas e despesas",
 }: IncomeExpenseChartProps) {
   return (
@@ -43,8 +43,8 @@ export function IncomeExpenseChart({
               }
             />
             <Legend />
-            <Bar dataKey="income" fill="var(--chart-2)" name="Receitas" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="expense" fill="var(--chart-4)" name="Despesas" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="income" fill="var(--chart-2)" name="Créditos" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="expense" fill="var(--chart-4)" name="Débitos" radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
