@@ -267,7 +267,8 @@ const normalizeResponseFormat = ({
 };
 
 // Models to try in order: primary, then fallbacks
-const MODEL_CHAIN = ["gemini-2.5-flash", "gpt-4.1-mini", "gpt-4.1-nano"];
+// Todos os modelos devem ser compatíveis com a API configurada (forge.manus.im = Google/Gemini)
+const MODEL_CHAIN = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 const MAX_RETRIES = 2; // retries per model
 const RETRY_DELAY_MS = 2000; // 2 seconds between retries
 
