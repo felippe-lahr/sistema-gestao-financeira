@@ -723,7 +723,8 @@ export default function Transactions() {
         }
         const g = groups.get(key)!;
         g.transactions.push(t);
-        g.total += t.amount;
+        // Débitos (EXPENSE) somam, créditos (INCOME: estornos, pagamentos antecipados) subtraem
+        g.total += t.type === 'INCOME' ? -t.amount : t.amount;
       } else {
         nonCard.push(t);
       }
@@ -766,7 +767,8 @@ export default function Transactions() {
       toast.info("Todas as transações desta fatura já estão pagas");
       return;
     }
-    const pendingTotal = pendingTxs.reduce((sum: number, t: any) => sum + t.amount, 0);
+    // Débitos (EXPENSE) somam, créditos (INCOME) subtraem
+    const pendingTotal = pendingTxs.reduce((sum: number, t: any) => sum + (t.type === 'INCOME' ? -t.amount : t.amount), 0);
     setPayInvoiceSheet({ open: true, cardName: group.cardName, cardId: Number(cardId), total: pendingTotal, pendingCount: pendingTxs.length });
     if (bankAccounts && bankAccounts.length > 0) {
       setPayInvoiceBankAccountId(String(bankAccounts[0].id));
