@@ -191,13 +191,13 @@ export default function Entities() {
   };
 
   const colorOptions = [
-    { value: "#2563EB", label: "Azul" },
-    { value: "#10B981", label: "Verde" },
-    { value: "#F59E0B", label: "Amarelo" },
-    { value: "#EF4444", label: "Vermelho" },
-    { value: "#8B5CF6", label: "Roxo" },
-    { value: "#EC4899", label: "Rosa" },
-    { value: "#6B7280", label: "Cinza" },
+    { value: "#93C5FD", label: "Azul" },
+    { value: "#6EE7B7", label: "Verde" },
+    { value: "#FDE047", label: "Amarelo" },
+    { value: "#FCA5A5", label: "Vermelho" },
+    { value: "#C4B5FD", label: "Roxo" },
+    { value: "#FBCFE8", label: "Rosa" },
+    { value: "#CBD5E1", label: "Cinza" },
   ];
 
   if (isLoading) {

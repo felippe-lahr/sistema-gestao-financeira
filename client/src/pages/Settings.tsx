@@ -459,26 +459,26 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
 // ========== CATEGORIES TAB ==========
 // ===== PALETA DE CORES (30 cores profissionais) =====
 const COLOR_PALETTE = [
-  // Vermelhos
-  "#EF4444", "#DC2626", "#B91C1C",
-  // Laranjas
-  "#F97316", "#EA580C", "#C2410C",
-  // Âmbares / Amarelos
-  "#F59E0B", "#D97706", "#B45309",
-  // Verdes
-  "#22C55E", "#16A34A", "#15803D",
-  // Esmeraldas / Teal
-  "#10B981", "#059669", "#0D9488",
-  // Cianos / Azuis claros
-  "#06B6D4", "#0891B2", "#0284C7",
-  // Azuis
-  "#3B82F6", "#2563EB", "#1D4ED8",
-  // Índigos / Violetas
-  "#6366F1", "#4F46E5", "#7C3AED",
-  // Roxos / Rosas
-  "#A855F7", "#9333EA", "#EC4899",
-  // Neutros
-  "#64748B", "#475569", "#334155",
+  // Vermelhos pastéis
+  "#FECACA", "#FCA5A5", "#F87171",
+  // Laranjas pastéis
+  "#FED7AA", "#FDBA74", "#FB923C",
+  // Âmbares / Amarelos pastéis
+  "#FEF08A", "#FDE047", "#FACC15",
+  // Verdes pastéis
+  "#BBF7D0", "#86EFAC", "#4ADE80",
+  // Esmeraldas / Teal pastéis
+  "#A7F3D0", "#6EE7B7", "#99F6E4",
+  // Cianos / Azuis claros pastéis
+  "#A5F3FC", "#67E8F9", "#BAE6FD",
+  // Azuis pastéis
+  "#BFDBFE", "#93C5FD", "#60A5FA",
+  // Índigos / Violetas pastéis
+  "#C7D2FE", "#A5B4FC", "#DDD6FE",
+  // Roxos / Rosas pastéis
+  "#E9D5FF", "#D8B4FE", "#FBCFE8",
+  // Neutros pastéis
+  "#E2E8F0", "#CBD5E1", "#F1F5F9",
 ];
 
 // Gera tonalidade mais clara de uma cor hex para subcategorias
@@ -498,7 +498,7 @@ function getContrastColor(hex: string): string {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.55 ? "#1e293b" : "#ffffff";
+  return luminance > 0.40 ? "#1e293b" : "#ffffff";
 }
 
 function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entityId: number; canWrite?: boolean; canDelete?: boolean }) {

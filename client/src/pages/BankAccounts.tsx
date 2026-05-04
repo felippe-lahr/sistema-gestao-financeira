@@ -52,8 +52,8 @@ const formatCurrency = (cents: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 
 const BANK_COLORS = [
-  "#2563EB", "#10B981", "#F59E0B", "#EF4444",
-  "#8B5CF6", "#EC4899", "#06B6D4", "#84CC16",
+  "#93C5FD", "#6EE7B7", "#FDE047", "#FCA5A5",
+  "#C4B5FD", "#FBCFE8", "#A5F3FC", "#D9F99D",
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────

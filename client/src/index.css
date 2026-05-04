@@ -50,12 +50,12 @@
   --sidebar-primary: #1E40AF;
   --sidebar-primary-foreground: #F0F9FF;
   
-  /* Chart Colors - Vibrant palette */
-  --chart-1: #3B82F6;  /* Blue */
-  --chart-2: #10B981;  /* Emerald */
-  --chart-3: #F59E0B;  /* Amber */
-  --chart-4: #EF4444;  /* Red */
-  --chart-5: #8B5CF6;  /* Violet */
+  /* Chart Colors - Pastel palette */
+  --chart-1: #93C5FD;  /* Blue pastel */
+  --chart-2: #6EE7B7;  /* Emerald pastel */
+  --chart-3: #FDE047;  /* Amber pastel */
+  --chart-4: #FCA5A5;  /* Red pastel */
+  --chart-5: #C4B5FD;  /* Violet pastel */
   
   /* Status Colors */
   --success: #10B981;
@@ -114,11 +114,11 @@
   --border: #334155;
   --input: #1E293B;
   --ring: #60A5FA;
-  --chart-1: #60A5FA;
-  --chart-2: #34D399;
-  --chart-3: #FBBF24;
-  --chart-4: #F87171;
-  --chart-5: #A78BFA;
+  --chart-1: #93C5FD;
+  --chart-2: #6EE7B7;
+  --chart-3: #FDE047;
+  --chart-4: #FCA5A5;
+  --chart-5: #C4B5FD;
   --sidebar: #1E293B;
   --sidebar-foreground: #F1F5F9;
   --sidebar-accent: #334155;
