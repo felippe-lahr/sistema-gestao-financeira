@@ -2615,11 +2615,17 @@ export const appRouter = router({
         }
         // Usar SQL raw porque creditCardId não está no schema Drizzle
         // Conta apenas transações PENDING (faturas pagas liberam o limite)
+        // Débitos (EXPENSE) somam, créditos (INCOME: estornos, pagamentos antecipados) subtraem
         const result = await dbInstance.execute(
-          sqlTag`SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE "creditCardId" = ${input.cardId} AND status != 'PAID'`
+          sqlTag`SELECT
+            COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) as total_debits,
+            COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) as total_credits
+          FROM transactions WHERE "creditCardId" = ${input.cardId} AND status != 'PAID'`
         );
         const resultRows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
-        const usedAmount = Number(resultRows[0]?.total ?? 0);
+        const totalDebits = Number(resultRows[0]?.total_debits ?? 0);
+        const totalCredits = Number(resultRows[0]?.total_credits ?? 0);
+        const usedAmount = Math.max(0, totalDebits - totalCredits);
         const availableLimit = card.creditLimit - usedAmount;
         const dueDate = new Date(invoiceYear, invoiceMonth - 1, card.dueDay);
         return {
@@ -2646,12 +2652,14 @@ export const appRouter = router({
         const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
         if (!card) return [];
         // Buscar todas as transações do cartão agrupadas por mês/ano do dueDate
+        // Total líquido: débitos (EXPENSE) - créditos (INCOME: estornos, pagamentos antecipados)
         const rows = await dbInstance.execute(
           sqlTag`
             SELECT
               EXTRACT(YEAR FROM "dueDate") as year,
               EXTRACT(MONTH FROM "dueDate") as month,
-              SUM(amount) as total,
+              COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) -
+              COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) as total,
               COUNT(*) as count
             FROM transactions
             WHERE "creditCardId" = ${input.cardId}
@@ -2709,13 +2717,16 @@ export const appRouter = router({
         const startDate = new Date(input.year, input.month - 1, 1).toISOString();
         const endDate = new Date(input.year, input.month, 0, 23, 59, 59).toISOString();
         const txRows = await dbInstance.execute(
-          sqlTag`SELECT id, amount FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status = 'PENDING'`
+          sqlTag`SELECT id, amount, type FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status = 'PENDING'`
         );
         const pendingTxs = (Array.isArray(txRows) ? txRows : ((txRows as any).rows ?? [])) as any[];
         if (pendingTxs.length === 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Não há transações pendentes nesta fatura" });
         }
-        const totalAmount = pendingTxs.reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
+        // Total líquido: débitos (EXPENSE) - créditos (INCOME: estornos, pagamentos antecipados)
+        const totalDebitsInvoice = pendingTxs.filter((tx: any) => tx.type === 'EXPENSE').reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
+        const totalCreditsInvoice = pendingTxs.filter((tx: any) => tx.type === 'INCOME').reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
+        const totalAmount = Math.max(0, totalDebitsInvoice - totalCreditsInvoice);
         const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
         // Criar transação de despesa na conta bancária
         const paymentDescription = `Pagamento Fatura ${card.name} - ${MONTH_NAMES[input.month - 1]}/${input.year}`;

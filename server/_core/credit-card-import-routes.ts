@@ -463,10 +463,12 @@ Regras CRÍTICAS:
           });
         }
 
-        // ── Extrair transações do CSV ────────────────────────────────────────
+        // ── Extrair transações do CSV ──────────────────────────────────────
         const rawTransactions: Array<{
           description: string;
           amount: number;
+          is_negative: boolean;
+          is_payment_entry: boolean;
           purchase_date: string;
           installment_current: number | null;
           installment_total: number | null;
