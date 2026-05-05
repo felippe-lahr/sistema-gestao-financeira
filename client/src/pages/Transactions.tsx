@@ -1695,7 +1695,7 @@ export default function Transactions() {
                           return (
                             <>
                               {allPaid ? (
-                                <Badge variant="default" className="bg-green-600 text-xs">Pago</Badge>
+                                <Badge variant="default" className="text-xs">Pago</Badge>
                               ) : (
                                 <Badge variant="secondary" className="text-xs">{pendingCount} pendente{pendingCount > 1 ? 's' : ''}</Badge>
                               )}
