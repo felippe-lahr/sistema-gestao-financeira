@@ -2727,7 +2727,15 @@ export const appRouter = router({
         // Total líquido: débitos (EXPENSE) - créditos (INCOME: estornos, pagamentos antecipados)
         const totalDebitsInvoice = pendingTxs.filter((tx: any) => tx.type === 'EXPENSE').reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
         const totalCreditsInvoice = pendingTxs.filter((tx: any) => tx.type === 'INCOME').reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
-        const totalAmount = Math.max(0, totalDebitsInvoice - totalCreditsInvoice);
+        const calculatedTotal = Math.max(0, totalDebitsInvoice - totalCreditsInvoice);
+        // Usar invoiceTotal salvo (valor real da fatura do PDF/CSV) se disponível
+        const existingInvoiceForTotal = await dbInstance
+          .select({ invoiceTotal: creditCardInvoices.invoiceTotal })
+          .from(creditCardInvoices)
+          .where(and(eq(creditCardInvoices.creditCardId, input.cardId), eq(creditCardInvoices.month, input.month), eq(creditCardInvoices.year, input.year)))
+          .limit(1);
+        const savedInvoiceTotal = existingInvoiceForTotal[0]?.invoiceTotal;
+        const totalAmount = savedInvoiceTotal != null ? savedInvoiceTotal : calculatedTotal;
         const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
         // Criar transação de despesa na conta bancária
         const paymentDescription = `Pagamento Fatura ${card.name} - ${MONTH_NAMES[input.month - 1]}/${input.year}`;

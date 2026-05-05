@@ -66,7 +66,7 @@ export default function Transactions() {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   
   // Estado para pagamento de fatura de cartão
-  const [payInvoiceSheet, setPayInvoiceSheet] = useState<{ open: boolean; cardName: string; cardId: number | null; total: number; pendingCount: number }>({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0 });
+  const [payInvoiceSheet, setPayInvoiceSheet] = useState<{ open: boolean; cardName: string; cardId: number | null; total: number; pendingCount: number; invoiceTotal: number | null }>({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0, invoiceTotal: null });
   const [payInvoiceBankAccountId, setPayInvoiceBankAccountId] = useState<string>("");
   
   // Resetar mês e ano para o atual ao abrir a página
@@ -769,7 +769,7 @@ export default function Transactions() {
   const payInvoiceMutation = trpc.creditCards.payInvoice.useMutation({
     onSuccess: (data) => {
       toast.success(`Fatura paga com sucesso! ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(data.totalAmount / 100)} debitados da conta.`);
-      setPayInvoiceSheet({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0 });
+      setPayInvoiceSheet({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0, invoiceTotal: null });
       setPayInvoiceBankAccountId("");
       utils.transactions.listByEntity.invalidate();
       utils.transactions.summary.invalidate();
@@ -793,7 +793,7 @@ export default function Transactions() {
     }
     // Débitos (EXPENSE) somam, créditos (INCOME) subtraem
     const pendingTotal = pendingTxs.reduce((sum: number, t: any) => sum + (t.type === 'INCOME' ? -t.amount : t.amount), 0);
-    setPayInvoiceSheet({ open: true, cardName: group.cardName, cardId: Number(cardId), total: pendingTotal, pendingCount: pendingTxs.length });
+    setPayInvoiceSheet({ open: true, cardName: group.cardName, cardId: Number(cardId), total: pendingTotal, pendingCount: pendingTxs.length, invoiceTotal: group.invoiceTotal ?? null });
     if (bankAccounts && bankAccounts.length > 0) {
       setPayInvoiceBankAccountId(String(bankAccounts[0].id));
     }
@@ -1096,7 +1096,7 @@ export default function Transactions() {
       </Sheet>
 
       {/* Pay Invoice Sheet */}
-      <Sheet open={payInvoiceSheet.open} onOpenChange={(open) => { if (!open) { setPayInvoiceSheet({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0 }); setPayInvoiceBankAccountId(""); } }}>
+      <Sheet open={payInvoiceSheet.open} onOpenChange={(open) => { if (!open) { setPayInvoiceSheet({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0, invoiceTotal: null }); setPayInvoiceBankAccountId(""); } }}>
         <SheetContent side="right" className="w-full sm:w-[420px] flex flex-col">
           <SheetHeader>
             <SheetTitle className="text-xl font-bold">Pagar Fatura</SheetTitle>
@@ -1113,7 +1113,14 @@ export default function Transactions() {
               </div>
               <div className="bg-muted/50 rounded-lg p-4">
                 <p className="text-sm text-muted-foreground">Valor total</p>
-                <p className="font-semibold text-lg text-red-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(payInvoiceSheet.total) / 100)}</p>
+                <p className="font-semibold text-lg text-red-600">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(payInvoiceSheet.invoiceTotal ?? payInvoiceSheet.total) / 100)}
+                </p>
+                {payInvoiceSheet.invoiceTotal != null && Math.abs(payInvoiceSheet.invoiceTotal - payInvoiceSheet.total) >= 10 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Soma das transações: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(payInvoiceSheet.total) / 100)}
+                  </p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
