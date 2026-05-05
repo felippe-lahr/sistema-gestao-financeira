@@ -799,6 +799,7 @@ export const creditCardInvoices = pgTable("credit_card_invoices", {
   year: integer("year").notNull(),
   status: invoiceStatusEnum("status").default("OPEN").notNull(),
   totalAmount: integer("totalAmount").default(0).notNull(),
+  invoiceTotal: integer("invoiceTotal"),
   dueDate: timestamp("dueDate"),
   paidAt: timestamp("paidAt"),
   paidFromAccountId: integer("paidFromAccountId"),
