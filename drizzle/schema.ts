@@ -812,7 +812,7 @@ export type InsertCreditCardInvoice = typeof creditCardInvoices.$inferInsert;
 /**
  * Invoice Attachment Type Enum
  */
-export const invoiceAttachmentTypeEnum = pgEnum("invoice_attachment_type", ["FATURA_PDF", "COMPROVANTE_PAGAMENTO", "OUTROS"]);
+export const invoiceAttachmentTypeEnum = pgEnum("invoice_attachment_type", ["NOTA_FISCAL", "DOCUMENTOS", "BOLETO", "COMPROVANTE_PAGAMENTO"]);
 
 /**
  * Credit Card Invoice Attachments - Comprovantes e faturas PDF vinculados a uma fatura de cartão
@@ -824,7 +824,7 @@ export const creditCardInvoiceAttachments = pgTable("credit_card_invoice_attachm
   blobUrl: text("blobUrl").notNull(),
   fileSize: integer("fileSize").notNull(),
   mimeType: varchar("mimeType", { length: 127 }).notNull(),
-  type: invoiceAttachmentTypeEnum("type").default("OUTROS").notNull(),
+  type: invoiceAttachmentTypeEnum("type").default("DOCUMENTOS").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type CreditCardInvoiceAttachment = typeof creditCardInvoiceAttachments.$inferSelect;

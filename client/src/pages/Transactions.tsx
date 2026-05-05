@@ -197,6 +197,10 @@ export default function Transactions() {
     onSuccess: () => { refetchInvoiceAttach(); toast.success("Anexo removido"); },
     onError: () => toast.error("Erro ao remover anexo"),
   });
+  const updateInvoiceAttachTypeMutation = trpc.invoiceAttachments.updateType.useMutation({
+    onSuccess: () => refetchInvoiceAttach(),
+    onError: () => toast.error("Erro ao atualizar tipo"),
+  });
 
   // Buscar invoiceTotals salvos (valor real da fatura do PDF/CSV) para exibir no card do cartão
   const { data: invoiceTotals } = trpc.creditCards.getInvoiceTotals.useQuery(
@@ -1168,7 +1172,7 @@ export default function Transactions() {
 
       {/* Invoice Attachments Sheet */}
       <Sheet open={invoiceAttachSheet.open} onOpenChange={(open) => { if (!open) setInvoiceAttachSheet(s => ({ ...s, open: false })); }}>
-        <SheetContent side="right" className="w-full sm:w-[480px] flex flex-col">
+        <SheetContent side="right" className="w-full sm:w-[520px] flex flex-col">
           <SheetHeader>
             <SheetTitle className="text-xl font-bold flex items-center gap-2">
               <Paperclip className="h-5 w-5" />
@@ -1179,99 +1183,137 @@ export default function Transactions() {
             </p>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Upload area */}
+            {/* Área de Upload — drag-and-drop */}
             <div
-              className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
-              onClick={() => invoiceAttachFileRef.current?.click()}
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                invoiceAttachUploading ? 'border-primary bg-primary/5' : 'border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30'
+              }`}
+              onClick={() => !invoiceAttachUploading && invoiceAttachFileRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); }}
+              onDrop={async (e) => {
+                e.preventDefault();
+                const files = Array.from(e.dataTransfer.files);
+                if (!files.length) return;
+                const invoiceId = invoiceAttachData?.invoiceId;
+                if (!invoiceId) { toast.error("Erro ao identificar a fatura"); return; }
+                setInvoiceAttachUploading(true);
+                for (const file of files) {
+                  const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+                  if (!allowed.includes(file.type)) { toast.error(`Tipo não suportado: ${file.name}`); continue; }
+                  if (file.size > 10 * 1024 * 1024) { toast.error(`Arquivo muito grande: ${file.name}`); continue; }
+                  try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('invoiceId', String(invoiceId));
+                    formData.append('type', 'DOCUMENTOS');
+                    const res = await fetch('/api/invoice-attachments/upload', { method: 'POST', body: formData, credentials: 'include' });
+                    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Erro no upload'); }
+                  } catch (err: any) { toast.error(`Erro ao enviar ${file.name}: ${err.message}`); }
+                }
+                await refetchInvoiceAttach();
+                setInvoiceAttachUploading(false);
+              }}
             >
-              <FileUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm font-medium">Clique para selecionar ou arraste um arquivo</p>
-              <p className="text-xs text-muted-foreground mt-1">PDF, imagens (máx. 10MB)</p>
-              {invoiceAttachUploading && <p className="text-xs text-primary mt-2">Enviando...</p>}
+              <FileUp className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-base font-medium">
+                {invoiceAttachUploading ? 'Enviando...' : 'Arraste arquivos aqui ou clique para selecionar'}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">PDF, JPEG, PNG • Máximo 10MB por arquivo</p>
             </div>
             <input
               ref={invoiceAttachFileRef}
               type="file"
+              multiple
               className="hidden"
               accept=".pdf,.png,.jpg,.jpeg,.webp"
               onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                if (file.size > 10 * 1024 * 1024) { toast.error("Arquivo muito grande. Máximo: 10MB"); return; }
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                const invoiceId = invoiceAttachData?.invoiceId;
+                if (!invoiceId) { toast.error("Erro ao identificar a fatura"); return; }
                 setInvoiceAttachUploading(true);
-                try {
-                  // Determinar tipo pelo nome/extensão
-                  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-                  const attachType = isPdf ? 'FATURA_PDF' : 'COMPROVANTE_PAGAMENTO';
-                  // Garantir que temos o invoiceId
-                  let invoiceId = invoiceAttachData?.invoiceId;
-                  if (!invoiceId) { toast.error("Erro ao identificar a fatura"); return; }
-                  const formData = new FormData();
-                  formData.append('file', file);
-                  formData.append('invoiceId', String(invoiceId));
-                  formData.append('type', attachType);
-                  const res = await fetch('/api/invoice-attachments/upload', {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'include',
-                  });
-                  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Erro no upload'); }
-                  await refetchInvoiceAttach();
-                  toast.success('Arquivo enviado com sucesso!');
-                } catch (err: any) {
-                  toast.error('Erro ao enviar arquivo: ' + (err.message || String(err)));
-                } finally {
-                  setInvoiceAttachUploading(false);
-                  if (invoiceAttachFileRef.current) invoiceAttachFileRef.current.value = '';
+                for (const file of files) {
+                  const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+                  if (!allowed.includes(file.type)) { toast.error(`Tipo não suportado: ${file.name}`); continue; }
+                  if (file.size > 10 * 1024 * 1024) { toast.error(`Arquivo muito grande: ${file.name}`); continue; }
+                  try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('invoiceId', String(invoiceId));
+                    formData.append('type', 'DOCUMENTOS');
+                    const res = await fetch('/api/invoice-attachments/upload', { method: 'POST', body: formData, credentials: 'include' });
+                    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Erro no upload'); }
+                  } catch (err: any) { toast.error(`Erro ao enviar ${file.name}: ${err.message}`); }
                 }
+                await refetchInvoiceAttach();
+                setInvoiceAttachUploading(false);
+                if (invoiceAttachFileRef.current) invoiceAttachFileRef.current.value = '';
               }}
             />
             {/* Lista de anexos */}
             {!invoiceAttachData ? (
               <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
             ) : invoiceAttachData.attachments.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhum anexo ainda. Envie a fatura PDF ou comprovante de pagamento.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhum anexo ainda.</p>
             ) : (
               <div className="space-y-2">
+                <h3 className="font-medium text-sm text-muted-foreground">Documentos Anexados ({invoiceAttachData.attachments.length})</h3>
                 {invoiceAttachData.attachments.map((att: any) => (
-                  <div key={att.id} className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg border">
-                    <div className="p-2 rounded-full bg-primary/10">
-                      <Paperclip className="h-4 w-4 text-primary" />
+                  <div key={att.id} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                    <div className="p-2 rounded-full bg-primary/10 flex-shrink-0 mt-0.5">
+                      {att.mimeType === 'application/pdf'
+                        ? <FileArchive className="h-4 w-4 text-red-500" />
+                        : <Paperclip className="h-4 w-4 text-primary" />}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 space-y-1.5">
                       <p className="text-sm font-medium truncate">{att.filename}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {att.type === 'FATURA_PDF' ? 'Fatura PDF' : att.type === 'COMPROVANTE_PAGAMENTO' ? 'Comprovante de Pagamento' : 'Outros'}
-                        {' • '}{(att.fileSize / 1024).toFixed(0)} KB
-                      </p>
+                      <p className="text-xs text-muted-foreground">{(att.fileSize / 1024).toFixed(0)} KB</p>
+                      {/* Seleção de tipo */}
+                      <select
+                        value={att.type}
+                        onChange={(e) => updateInvoiceAttachTypeMutation.mutate({ id: att.id, type: e.target.value as any })}
+                        className="text-xs border rounded px-2 py-1 w-full max-w-[200px] bg-background"
+                      >
+                        <option value="NOTA_FISCAL">Nota Fiscal</option>
+                        <option value="DOCUMENTOS">Documentos</option>
+                        <option value="BOLETO">Boleto</option>
+                        <option value="COMPROVANTE_PAGAMENTO">Comprovante de Pagamento</option>
+                      </select>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 flex-shrink-0">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7"
+                        className="h-8 w-8"
                         title="Visualizar"
-                        onClick={() => window.open(`/api/invoice-attachments/${att.id}/preview`, '_blank')}
+                        onClick={() => window.open(`/api/invoice-attachments/${att.id}/preview`, '_blank', 'noopener,noreferrer')}
                       >
-                        <Eye className="h-3.5 w-3.5" />
+                        <Eye className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7"
+                        className="h-8 w-8"
                         title="Baixar"
-                        onClick={() => window.open(`/api/invoice-attachments/${att.id}/download`, '_blank')}
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = `/api/invoice-attachments/${att.id}/download`;
+                          a.download = att.filename;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }}
                       >
-                        <Download className="h-3.5 w-3.5" />
+                        <Download className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-red-500 hover:text-red-600"
+                        className="h-8 w-8 text-red-500 hover:text-red-600"
                         title="Remover"
-                        onClick={() => deleteInvoiceAttachMutation.mutate({ id: att.id })}
+                        onClick={() => { if (confirm('Remover este anexo?')) deleteInvoiceAttachMutation.mutate({ id: att.id }); }}
                       >
-                        <Trash className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>

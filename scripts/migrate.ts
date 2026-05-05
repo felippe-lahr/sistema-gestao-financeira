@@ -26,7 +26,7 @@ const migrations: { name: string; sql: string }[] = [
   {
     name: "create_invoice_attachment_type_enum",
     sql: `DO $$ BEGIN
-      CREATE TYPE invoice_attachment_type AS ENUM ('FATURA_PDF', 'COMPROVANTE_PAGAMENTO', 'OUTROS');
+      CREATE TYPE invoice_attachment_type AS ENUM ('NOTA_FISCAL', 'DOCUMENTOS', 'BOLETO', 'COMPROVANTE_PAGAMENTO');
     EXCEPTION WHEN duplicate_object THEN NULL;
     END $$`,
   },
@@ -39,9 +39,19 @@ const migrations: { name: string; sql: string }[] = [
       "blobUrl" TEXT NOT NULL,
       "fileSize" INTEGER NOT NULL,
       "mimeType" VARCHAR(127) NOT NULL,
-      type invoice_attachment_type NOT NULL DEFAULT 'OUTROS',
+      type invoice_attachment_type NOT NULL DEFAULT 'DOCUMENTOS',
       "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL
     )`,
+  },
+  {
+    name: "update_invoice_attachment_type_enum_add_values",
+    sql: `DO $$ BEGIN
+      ALTER TYPE invoice_attachment_type ADD VALUE IF NOT EXISTS 'NOTA_FISCAL';
+      ALTER TYPE invoice_attachment_type ADD VALUE IF NOT EXISTS 'DOCUMENTOS';
+      ALTER TYPE invoice_attachment_type ADD VALUE IF NOT EXISTS 'BOLETO';
+      ALTER TYPE invoice_attachment_type ADD VALUE IF NOT EXISTS 'COMPROVANTE_PAGAMENTO';
+    EXCEPTION WHEN others THEN NULL;
+    END $$`,
   },
 ];
 
