@@ -3016,5 +3016,85 @@ export const appRouter = router({
         return invoices.filter(inv => cardIds.includes(inv.creditCardId));
       }),
   }),
+
+  invoiceAttachments: router({
+    // Busca ou cria o registro de fatura e retorna os anexos
+    listByInvoice: protectedProcedure
+      .input(z.object({
+        creditCardId: z.number(),
+        month: z.number().min(1).max(12),
+        year: z.number().min(2000).max(2100),
+      }))
+      .query(async ({ input, ctx }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards, creditCardInvoices, creditCardInvoiceAttachments } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        // Verificar acesso ao cartão
+        const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.creditCardId));
+        if (!card) throw new TRPCError({ code: "NOT_FOUND", message: "Cartão não encontrado" });
+        await requireEntityAccess(card.entityId, ctx.user.id, "VIEWER");
+        // Buscar ou criar registro de fatura
+        let [invoice] = await dbInstance
+          .select()
+          .from(creditCardInvoices)
+          .where(and(
+            eq(creditCardInvoices.creditCardId, input.creditCardId),
+            eq(creditCardInvoices.month, input.month),
+            eq(creditCardInvoices.year, input.year),
+          ))
+          .limit(1);
+        if (!invoice) {
+          const [newInvoice] = await dbInstance.insert(creditCardInvoices).values({
+            creditCardId: input.creditCardId,
+            month: input.month,
+            year: input.year,
+            status: "OPEN",
+            totalAmount: 0,
+            dueDate: new Date(input.year, input.month - 1, card.dueDay ?? 10),
+          }).returning();
+          invoice = newInvoice;
+        }
+        const attachmentsList = await dbInstance
+          .select()
+          .from(creditCardInvoiceAttachments)
+          .where(eq(creditCardInvoiceAttachments.invoiceId, invoice.id));
+        return { invoiceId: invoice.id, attachments: attachmentsList };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCardInvoiceAttachments, creditCardInvoices, creditCards } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const [attachment] = await dbInstance
+          .select()
+          .from(creditCardInvoiceAttachments)
+          .where(eq(creditCardInvoiceAttachments.id, input.id));
+        if (!attachment) throw new TRPCError({ code: "NOT_FOUND", message: "Anexo não encontrado" });
+        const [invoice] = await dbInstance
+          .select()
+          .from(creditCardInvoices)
+          .where(eq(creditCardInvoices.id, attachment.invoiceId));
+        if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
+        const [card] = await dbInstance
+          .select()
+          .from(creditCards)
+          .where(eq(creditCards.id, invoice.creditCardId));
+        if (!card) throw new TRPCError({ code: "NOT_FOUND" });
+        await requireEntityAccess(card.entityId, ctx.user.id, "EDITOR");
+        // Deletar do S3
+        try {
+          const { deleteFile } = await import("./_core/upload");
+          await deleteFile(attachment.blobUrl);
+        } catch (e) {
+          console.warn("[invoiceAttachments] S3 delete failed:", e);
+        }
+        await dbInstance.delete(creditCardInvoiceAttachments).where(eq(creditCardInvoiceAttachments.id, input.id));
+        return { success: true };
+      }),
+  }),
 });
 export type AppRouter = typeof appRouter;
