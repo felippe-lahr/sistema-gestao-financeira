@@ -23,6 +23,26 @@ const migrations: { name: string; sql: string }[] = [
     name: "add_invoiceTotal_to_credit_card_invoices",
     sql: `ALTER TABLE credit_card_invoices ADD COLUMN IF NOT EXISTS "invoiceTotal" integer`,
   },
+  {
+    name: "create_invoice_attachment_type_enum",
+    sql: `DO $$ BEGIN
+      CREATE TYPE invoice_attachment_type AS ENUM ('FATURA_PDF', 'COMPROVANTE_PAGAMENTO', 'OUTROS');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$`,
+  },
+  {
+    name: "create_credit_card_invoice_attachments_table",
+    sql: `CREATE TABLE IF NOT EXISTS credit_card_invoice_attachments (
+      id SERIAL PRIMARY KEY,
+      "invoiceId" INTEGER NOT NULL REFERENCES credit_card_invoices(id) ON DELETE CASCADE,
+      filename VARCHAR(255) NOT NULL,
+      "blobUrl" TEXT NOT NULL,
+      "fileSize" INTEGER NOT NULL,
+      "mimeType" VARCHAR(127) NOT NULL,
+      type invoice_attachment_type NOT NULL DEFAULT 'OUTROS',
+      "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL
+    )`,
+  },
 ];
 
 async function runMigrations() {

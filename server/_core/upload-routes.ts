@@ -331,6 +331,115 @@ export function registerUploadRoutes(app: Express) {
     }
   }
 
+  // ========== INVOICE ATTACHMENTS (Cartão de Crédito) ==========
+
+  async function verifyInvoiceAccess(invoiceId: number, userId: number): Promise<{ allowed: boolean; entityId?: number }> {
+    try {
+      const db = await getDb();
+      if (!db) return { allowed: false };
+      const { creditCardInvoices, creditCards } = await import("../../drizzle/schema");
+      const [invoice] = await db.select().from(creditCardInvoices).where(eq(creditCardInvoices.id, invoiceId));
+      if (!invoice) return { allowed: false };
+      const [card] = await db.select().from(creditCards).where(eq(creditCards.id, invoice.creditCardId));
+      if (!card) return { allowed: false };
+      const entity = await getEntityById(card.entityId);
+      return { allowed: entity?.userId === userId, entityId: card.entityId };
+    } catch (e) {
+      return { allowed: false };
+    }
+  }
+
+  // POST /api/invoice-attachments/upload
+  app.post(
+    "/api/invoice-attachments/upload",
+    requireAuth,
+    upload.single("file"),
+    async (req: Request, res: Response) => {
+      try {
+        if (!req.file) return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+        const { invoiceId, type } = req.body;
+        const userId = (req as any)?.user?.id as number;
+        if (!userId) return res.status(401).json({ error: "Unauthorized" });
+        if (!invoiceId) return res.status(400).json({ error: "invoiceId é obrigatório" });
+        const { allowed } = await verifyInvoiceAccess(parseInt(invoiceId), userId);
+        if (!allowed) return res.status(403).json({ error: "Access denied" });
+        const s3Url = await uploadFile(req.file, `users/${userId}/invoice-attachments`);
+        const db = await getDb();
+        if (!db) { await deleteFile(s3Url); return res.status(500).json({ error: "Database not available" }); }
+        const { creditCardInvoiceAttachments } = await import("../../drizzle/schema");
+        const [result] = await db.insert(creditCardInvoiceAttachments).values({
+          invoiceId: parseInt(invoiceId),
+          filename: req.file.originalname,
+          blobUrl: s3Url,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype,
+          type: (type as any) || "OUTROS",
+        }).returning();
+        return res.json({ success: true, attachment: result });
+      } catch (error) {
+        console.error("[Upload] Invoice attachment upload error:", error);
+        return res.status(500).json({ error: "Erro ao fazer upload" });
+      }
+    }
+  );
+
+  // GET /api/invoice-attachments/:id/download
+  app.get("/api/invoice-attachments/:id/download", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const attachmentId = parseInt(req.params.id);
+      const userId = (req as any)?.user?.id as number;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (isNaN(attachmentId)) return res.status(400).json({ error: "ID inválido" });
+      const db = await getDb();
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { creditCardInvoiceAttachments } = await import("../../drizzle/schema");
+      const [attachment] = await db.select().from(creditCardInvoiceAttachments).where(eq(creditCardInvoiceAttachments.id, attachmentId));
+      if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
+      const { allowed } = await verifyInvoiceAccess(attachment.invoiceId, userId);
+      if (!allowed) return res.status(403).json({ error: "Access denied" });
+      const encodedFilename = encodeURIComponent(attachment.filename);
+      res.setHeader("Content-Disposition", `attachment; filename="${attachment.filename}"; filename*=UTF-8''${encodedFilename}`);
+      res.setHeader("Content-Type", attachment.mimeType || "application/octet-stream");
+      if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
+        const { stream, contentLength } = await getS3Stream(attachment.blobUrl);
+        if (contentLength) res.setHeader("Content-Length", contentLength);
+        (stream as any).pipe(res);
+      } else {
+        const fileRes = await fetch(attachment.blobUrl);
+        if (!fileRes.ok) return res.status(502).json({ error: "Erro ao buscar arquivo" });
+        const buffer = await fileRes.arrayBuffer();
+        res.send(Buffer.from(buffer));
+      }
+    } catch (error) {
+      console.error("[Upload] Invoice attachment download error:", error);
+      if (!res.headersSent) return res.status(500).json({ error: "Erro ao baixar arquivo" });
+    }
+  });
+
+  // GET /api/invoice-attachments/:id/preview
+  app.get("/api/invoice-attachments/:id/preview", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const attachmentId = parseInt(req.params.id);
+      const userId = (req as any)?.user?.id as number;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const db = await getDb();
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { creditCardInvoiceAttachments } = await import("../../drizzle/schema");
+      const [attachment] = await db.select().from(creditCardInvoiceAttachments).where(eq(creditCardInvoiceAttachments.id, attachmentId));
+      if (!attachment) return res.status(404).json({ error: "Arquivo não encontrado" });
+      const { allowed } = await verifyInvoiceAccess(attachment.invoiceId, userId);
+      if (!allowed) return res.status(403).json({ error: "Access denied" });
+      if (attachment.blobUrl && attachment.blobUrl.includes("amazonaws.com")) {
+        const presignedUrl = await getPresignedUrl(attachment.blobUrl, 3600);
+        return res.redirect(presignedUrl);
+      }
+      return res.redirect(attachment.blobUrl);
+    } catch (error) {
+      console.error("[Upload] Invoice attachment preview error:", error);
+      return res.status(500).json({ error: "Erro ao visualizar arquivo" });
+    }
+  });
+
   // POST /api/rental-attachments/upload - Upload de arquivo para reserva
   app.post(
     "/api/rental-attachments/upload",

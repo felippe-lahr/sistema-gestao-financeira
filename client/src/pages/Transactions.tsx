@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight, FileUp, Eye, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -65,6 +65,15 @@ export default function Transactions() {
   // Estado para agrupamento de cartões de crédito (expandir/colapsar)
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   
+  // Estado para anexos da fatura do cartão
+  const [invoiceAttachSheet, setInvoiceAttachSheet] = useState<{ open: boolean; cardId: number | null; cardName: string; month: number; year: number; invoiceId: number | null }>({
+    open: false, cardId: null, cardName: "", month: new Date().getMonth() + 1, year: new Date().getFullYear(), invoiceId: null
+  });
+  const [invoiceAttachments, setInvoiceAttachments] = useState<any[]>([]);
+  const [invoiceAttachUploading, setInvoiceAttachUploading] = useState(false);
+  const [invoiceAttachPreview, setInvoiceAttachPreview] = useState<any | null>(null);
+  const invoiceAttachFileRef = useRef<HTMLInputElement>(null);
+
   // Estado para pagamento de fatura de cartão
   const [payInvoiceSheet, setPayInvoiceSheet] = useState<{ open: boolean; cardName: string; cardId: number | null; total: number; pendingCount: number; invoiceTotal: number | null }>({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0, invoiceTotal: null });
   const [payInvoiceBankAccountId, setPayInvoiceBankAccountId] = useState<string>("");
@@ -179,6 +188,16 @@ export default function Transactions() {
     { entityId: selectedEntityId! },
     { enabled: !!selectedEntityId }
   );
+  // Buscar anexos da fatura quando o sheet estiver aberto
+  const { data: invoiceAttachData, refetch: refetchInvoiceAttach } = trpc.invoiceAttachments.listByInvoice.useQuery(
+    { creditCardId: invoiceAttachSheet.cardId!, month: invoiceAttachSheet.month, year: invoiceAttachSheet.year },
+    { enabled: invoiceAttachSheet.open && !!invoiceAttachSheet.cardId }
+  );
+  const deleteInvoiceAttachMutation = trpc.invoiceAttachments.delete.useMutation({
+    onSuccess: () => { refetchInvoiceAttach(); toast.success("Anexo removido"); },
+    onError: () => toast.error("Erro ao remover anexo"),
+  });
+
   // Buscar invoiceTotals salvos (valor real da fatura do PDF/CSV) para exibir no card do cartão
   const { data: invoiceTotals } = trpc.creditCards.getInvoiceTotals.useQuery(
     { entityId: selectedEntityId! },
@@ -1147,6 +1166,122 @@ export default function Transactions() {
         </SheetContent>
       </Sheet>
 
+      {/* Invoice Attachments Sheet */}
+      <Sheet open={invoiceAttachSheet.open} onOpenChange={(open) => { if (!open) setInvoiceAttachSheet(s => ({ ...s, open: false })); }}>
+        <SheetContent side="right" className="w-full sm:w-[480px] flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-xl font-bold flex items-center gap-2">
+              <Paperclip className="h-5 w-5" />
+              Anexos da Fatura
+            </SheetTitle>
+            <p className="text-sm text-muted-foreground">
+              {invoiceAttachSheet.cardName} — {String(invoiceAttachSheet.month).padStart(2, '0')}/{invoiceAttachSheet.year}
+            </p>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Upload area */}
+            <div
+              className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+              onClick={() => invoiceAttachFileRef.current?.click()}
+            >
+              <FileUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm font-medium">Clique para selecionar ou arraste um arquivo</p>
+              <p className="text-xs text-muted-foreground mt-1">PDF, imagens (máx. 10MB)</p>
+              {invoiceAttachUploading && <p className="text-xs text-primary mt-2">Enviando...</p>}
+            </div>
+            <input
+              ref={invoiceAttachFileRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.png,.jpg,.jpeg,.webp"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 10 * 1024 * 1024) { toast.error("Arquivo muito grande. Máximo: 10MB"); return; }
+                setInvoiceAttachUploading(true);
+                try {
+                  // Determinar tipo pelo nome/extensão
+                  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+                  const attachType = isPdf ? 'FATURA_PDF' : 'COMPROVANTE_PAGAMENTO';
+                  // Garantir que temos o invoiceId
+                  let invoiceId = invoiceAttachData?.invoiceId;
+                  if (!invoiceId) { toast.error("Erro ao identificar a fatura"); return; }
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  formData.append('invoiceId', String(invoiceId));
+                  formData.append('type', attachType);
+                  const res = await fetch('/api/invoice-attachments/upload', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include',
+                  });
+                  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Erro no upload'); }
+                  await refetchInvoiceAttach();
+                  toast.success('Arquivo enviado com sucesso!');
+                } catch (err: any) {
+                  toast.error('Erro ao enviar arquivo: ' + (err.message || String(err)));
+                } finally {
+                  setInvoiceAttachUploading(false);
+                  if (invoiceAttachFileRef.current) invoiceAttachFileRef.current.value = '';
+                }
+              }}
+            />
+            {/* Lista de anexos */}
+            {!invoiceAttachData ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
+            ) : invoiceAttachData.attachments.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum anexo ainda. Envie a fatura PDF ou comprovante de pagamento.</p>
+            ) : (
+              <div className="space-y-2">
+                {invoiceAttachData.attachments.map((att: any) => (
+                  <div key={att.id} className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg border">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <Paperclip className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{att.filename}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {att.type === 'FATURA_PDF' ? 'Fatura PDF' : att.type === 'COMPROVANTE_PAGAMENTO' ? 'Comprovante de Pagamento' : 'Outros'}
+                        {' • '}{(att.fileSize / 1024).toFixed(0)} KB
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Visualizar"
+                        onClick={() => window.open(`/api/invoice-attachments/${att.id}/preview`, '_blank')}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Baixar"
+                        onClick={() => window.open(`/api/invoice-attachments/${att.id}/download`, '_blank')}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-500 hover:text-red-600"
+                        title="Remover"
+                        onClick={() => deleteInvoiceAttachMutation.mutate({ id: att.id })}
+                      >
+                        <Trash className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* Filtros */}
       {/* Mobile: Drawer de Filtros */}
       <div className="flex gap-2 items-center flex-wrap md:hidden">
@@ -1480,7 +1615,7 @@ export default function Transactions() {
           variant="outline"
           size="sm"
           onClick={() => {
-            setSelectedEntityId(undefined);
+            setSelectedEntityId(null);
             setFilterPeriod("all");
             setFilterMonth(new Date().getMonth() + 1);
             setFilterYear(new Date().getFullYear());
@@ -1712,6 +1847,21 @@ export default function Transactions() {
                             </p>
                           )}
                         </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hidden md:flex text-muted-foreground hover:text-foreground"
+                            title="Anexos da fatura"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
+                              if (matchedCard) {
+                                setInvoiceAttachSheet({ open: true, cardId: Number(matchedCard.id), cardName: group.cardName, month: filterMonth, year: filterYear, invoiceId: null });
+                              }
+                            }}
+                          >
+                            <Paperclip className="h-3.5 w-3.5" />
+                          </Button>
                         {canWrite && (
                           <Button
                             variant="outline"
@@ -1728,13 +1878,28 @@ export default function Transactions() {
                     </div>
                     {expandedCards.has(group.cardName) && (
                       <div className="border-t divide-y">
-                        {/* Mobile: Pagar Fatura button */}
-                        {canWrite && (
-                          <div className="md:hidden p-3 bg-muted/30">
+                        {/* Mobile: botões de ação */}
+                        <div className="md:hidden p-3 bg-muted/30 flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
+                              if (matchedCard) {
+                                setInvoiceAttachSheet({ open: true, cardId: Number(matchedCard.id), cardName: group.cardName, month: filterMonth, year: filterYear, invoiceId: null });
+                              }
+                            }}
+                          >
+                            <Paperclip className="h-3.5 w-3.5 mr-1" />
+                            Anexos
+                          </Button>
+                          {canWrite && (
                             <Button
                               variant="outline"
                               size="sm"
-                              className="w-full text-xs"
+                              className="flex-1 text-xs"
                               disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
                               onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
                             >
@@ -1743,8 +1908,8 @@ export default function Transactions() {
                                 ? `Pagar Fatura (${group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length} pendentes)`
                                 : "Fatura Paga"}
                             </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                         {group.transactions.map((transaction: any) => (
                           <div key={transaction.id} className="p-3 pl-12 hover:bg-muted/30 transition-colors">
                             {/* Desktop */}
