@@ -2718,7 +2718,7 @@ export const appRouter = router({
         const startDate = new Date(input.year, input.month - 1, 1).toISOString();
         const endDate = new Date(input.year, input.month, 0, 23, 59, 59).toISOString();
         const txRows = await dbInstance.execute(
-          sqlTag`SELECT id, amount, type FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status = 'PENDING'`
+          sqlTag`SELECT id, amount, type FROM transactions WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status IN ('PENDING', 'OVERDUE')`
         );
         const pendingTxs = (Array.isArray(txRows) ? txRows : ((txRows as any).rows ?? [])) as any[];
         if (pendingTxs.length === 0) {
@@ -2756,7 +2756,7 @@ export const appRouter = router({
         });
         // Marcar todas as transações do cartão naquele mês como PAID
         await dbInstance.execute(
-          sqlTag`UPDATE transactions SET status = 'PAID', "paymentDate" = NOW(), "updatedAt" = NOW() WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status = 'PENDING'`
+          sqlTag`UPDATE transactions SET status = 'PAID', "paymentDate" = NOW(), "updatedAt" = NOW() WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status IN ('PENDING', 'OVERDUE')`
         );
         // Upsert na tabela credit_card_invoices
         const existingInvoice = await dbInstance
