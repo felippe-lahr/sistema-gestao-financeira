@@ -269,10 +269,25 @@ const normalizeResponseFormat = ({
 // Models to try in order: primary, then fallbacks
 // API: https://generativelanguage.googleapis.com/v1beta/openai (Google Gemini via OpenAI compat)
 const MODEL_CHAIN = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
-const MAX_RETRIES = 1; // 1 retry por modelo (rate limit é por minuto, retry rápido não adianta)
-const RETRY_DELAY_MS = 5000; // 5 segundos entre retries (respeitar rate limit do Google)
+const MAX_RETRIES = 2; // 2 retries por modelo respeitando o retryDelay da API
+const DEFAULT_RETRY_DELAY_MS = 60000; // 60 segundos de fallback se a API não informar o delay
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Extrai o retryDelay em ms da resposta 429 do Google (ex: "45s" -> 45000)
+function extractRetryDelay(errorText: string): number {
+  try {
+    const parsed = JSON.parse(errorText);
+    const details = parsed?.error?.details ?? parsed?.details ?? [];
+    for (const detail of details) {
+      if (detail?.retryDelay) {
+        const match = String(detail.retryDelay).match(/(\d+)s/);
+        if (match) return (parseInt(match[1]) + 5) * 1000; // +5s de margem
+      }
+    }
+  } catch {}
+  return DEFAULT_RETRY_DELAY_MS;
+}
 
 async function invokeLLMSingle(
   params: InvokeParams,
@@ -340,7 +355,6 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       try {
         if (attempt > 0) {
           console.log(`[LLM] Retry ${attempt}/${MAX_RETRIES} for model ${model}...`);
-          await sleep(RETRY_DELAY_MS * attempt);
         }
 
         const response = await invokeLLMSingle(params, model);
@@ -363,7 +377,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
           break; // Try next model
         }
 
-        console.warn(`[LLM] Retryable error (${response.status}) with model ${model}, attempt ${attempt + 1}`);
+        // Para 429, respeitar o retryDelay dinâmico da API do Google
+        const retryDelay = response.status === 429 ? extractRetryDelay(errorText) : 5000;
+        console.warn(`[LLM] Retryable error (${response.status}) with model ${model}, attempt ${attempt + 1}. Aguardando ${retryDelay / 1000}s...`);
+        if (attempt < MAX_RETRIES) await sleep(retryDelay);
       } catch (fetchErr: any) {
         lastError = fetchErr;
         console.warn(`[LLM] Network error with model ${model}: ${fetchErr?.message}`);
