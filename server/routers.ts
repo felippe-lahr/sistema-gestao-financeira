@@ -3095,6 +3095,28 @@ export const appRouter = router({
         await dbInstance.delete(creditCardInvoiceAttachments).where(eq(creditCardInvoiceAttachments.id, input.id));
         return { success: true };
       }),
+    updateType: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        type: z.enum(["NOTA_FISCAL", "DOCUMENTOS", "BOLETO", "COMPROVANTE_PAGAMENTO"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCardInvoiceAttachments, creditCardInvoices, creditCards } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const [attachment] = await dbInstance.select().from(creditCardInvoiceAttachments).where(eq(creditCardInvoiceAttachments.id, input.id));
+        if (!attachment) throw new TRPCError({ code: "NOT_FOUND", message: "Anexo não encontrado" });
+        const [invoice] = await dbInstance.select().from(creditCardInvoices).where(eq(creditCardInvoices.id, attachment.invoiceId));
+        if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
+        const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, invoice.creditCardId));
+        if (!card) throw new TRPCError({ code: "NOT_FOUND" });
+        await requireEntityAccess(card.entityId, ctx.user.id, "EDITOR");
+        await dbInstance.update(creditCardInvoiceAttachments)
+          .set({ type: input.type })
+          .where(eq(creditCardInvoiceAttachments.id, input.id));
+        return { success: true };
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;
