@@ -259,7 +259,7 @@ Regras CRÍTICAS:
 
         let extractedData: any = null;
         try {
-          const truncatedText = pdfText.substring(0, 15000); // 15k chars suficiente para faturas (~10 páginas)
+          const truncatedText = pdfText.substring(0, 30000); // 30k chars para garantir leitura completa da fatura
           const llmResult = await invokeLLM({
             messages: [
               { role: "system", content: systemPrompt },
