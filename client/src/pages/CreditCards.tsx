@@ -500,6 +500,21 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       }
       setPdfImportedCount(importedCount);
       setPdfSkippedCount(skippedCount);
+      // Salvar invoiceTotal na fatura para exibição correta no card do cartão
+      if (pdfInvoiceTotal != null && pdfInvoiceMonth != null && pdfInvoiceYear != null) {
+        try {
+          await utils.client.creditCards.setInvoiceTotal.mutate({
+            cardId: selectedCard.id,
+            month: pdfInvoiceMonth,
+            year: pdfInvoiceYear,
+            invoiceTotal: pdfInvoiceTotal,
+            dueDate: pdfInvoiceDueDate ? new Date(pdfInvoiceDueDate + "T12:00:00") : undefined,
+          });
+        } catch (e) {
+          // Não bloqueia o fluxo se falhar
+          console.warn("[setInvoiceTotal] falhou:", e);
+        }
+      }
       setPdfStep("done");
       utils.creditCards.getSummary.invalidate({ cardId: selectedCard.id });
       utils.creditCards.getInvoicesByMonth.invalidate({ cardId: selectedCard.id });

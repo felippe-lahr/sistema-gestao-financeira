@@ -2693,6 +2693,7 @@ export const appRouter = router({
             status,
             invoiceId: invoiceRecord?.id ?? null,
             paidFromAccountId: invoiceRecord?.paidFromAccountId ?? null,
+            invoiceTotal: invoiceRecord?.invoiceTotal ?? null, // valor real da fatura do PDF/CSV
           };
         });
       }),
@@ -2942,6 +2943,69 @@ export const appRouter = router({
           sqlTag`SELECT * FROM transactions WHERE "creditCardId" = ${input.cardId} ORDER BY "dueDate" ASC`
         );
         return (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+      }),
+    // Salva o invoiceTotal (valor real da fatura conforme PDF/CSV) na tabela credit_card_invoices
+    setInvoiceTotal: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        month: z.number(),
+        year: z.number(),
+        invoiceTotal: z.number(), // em centavos
+        dueDate: z.date().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { creditCardInvoices } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const existing = await dbInstance
+          .select()
+          .from(creditCardInvoices)
+          .where(and(eq(creditCardInvoices.creditCardId, input.cardId), eq(creditCardInvoices.month, input.month), eq(creditCardInvoices.year, input.year)))
+          .limit(1);
+        if (existing.length > 0) {
+          await dbInstance.update(creditCardInvoices)
+            .set({ invoiceTotal: input.invoiceTotal, updatedAt: new Date() })
+            .where(eq(creditCardInvoices.id, existing[0].id));
+        } else {
+          await dbInstance.insert(creditCardInvoices).values({
+            creditCardId: input.cardId,
+            month: input.month,
+            year: input.year,
+            status: "OPEN",
+            totalAmount: 0,
+            invoiceTotal: input.invoiceTotal,
+            dueDate: input.dueDate ?? null,
+          });
+        }
+        return { success: true };
+      }),
+    // Retorna os invoiceTotals salvos para todos os cartões de uma entidade
+    getInvoiceTotals: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) return [];
+        const { creditCards: creditCardsTable, creditCardInvoices } = await import("../drizzle/schema");
+        const { eq, and, isNotNull } = await import("drizzle-orm");
+        // Buscar todos os cartões da entidade
+        const cards = await dbInstance
+          .select({ id: creditCardsTable.id })
+          .from(creditCardsTable)
+          .where(and(eq(creditCardsTable.entityId, input.entityId), eq(creditCardsTable.isActive, true)));
+        if (cards.length === 0) return [];
+        const cardIds = cards.map(c => c.id);
+        // Buscar invoices com invoiceTotal preenchido
+        const invoices = await dbInstance
+          .select({
+            creditCardId: creditCardInvoices.creditCardId,
+            month: creditCardInvoices.month,
+            year: creditCardInvoices.year,
+            invoiceTotal: creditCardInvoices.invoiceTotal,
+          })
+          .from(creditCardInvoices)
+          .where(isNotNull(creditCardInvoices.invoiceTotal));
+        return invoices.filter(inv => cardIds.includes(inv.creditCardId));
       }),
   }),
 });

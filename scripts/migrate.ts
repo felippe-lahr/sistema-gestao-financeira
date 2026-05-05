@@ -19,6 +19,10 @@ const migrations: { name: string; sql: string }[] = [
     name: "add_purchaseDate_to_transactions",
     sql: `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS "purchaseDate" date`,
   },
+  {
+    name: "add_invoiceTotal_to_credit_card_invoices",
+    sql: `ALTER TABLE credit_card_invoices ADD COLUMN IF NOT EXISTS "invoiceTotal" integer`,
+  },
 ];
 
 async function runMigrations() {

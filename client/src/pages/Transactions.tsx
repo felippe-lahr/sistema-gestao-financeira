@@ -179,6 +179,11 @@ export default function Transactions() {
     { entityId: selectedEntityId! },
     { enabled: !!selectedEntityId }
   );
+  // Buscar invoiceTotals salvos (valor real da fatura do PDF/CSV) para exibir no card do cartão
+  const { data: invoiceTotals } = trpc.creditCards.getInvoiceTotals.useQuery(
+    { entityId: selectedEntityId! },
+    { enabled: !!selectedEntityId }
+  );
   
   // Fetch transaction summary
   const { data: summary, isLoading: summaryLoading } = trpc.transactions.summary.useQuery(
@@ -713,13 +718,15 @@ export default function Transactions() {
   // Agrupar transações de cartão de crédito por nome do cartão
   const { cardGroups, nonCardTransactions } = (() => {
     if (!filteredTransactions) return { cardGroups: [] as any[], nonCardTransactions: [] as any[] };
-    const groups = new Map<string, { cardName: string; cardColor: string; transactions: any[]; total: number }>();
+    const groups = new Map<string, { cardName: string; cardColor: string; transactions: any[]; total: number; cardId?: number }>();
     const nonCard: any[] = [];
     for (const t of filteredTransactions) {
       if (t.creditCardName) {
         const key = t.creditCardName;
         if (!groups.has(key)) {
-          groups.set(key, { cardName: t.creditCardName, cardColor: t.creditCardColor || '#7C3AED', transactions: [], total: 0 });
+          // Buscar cardId pelo nome do cartão
+          const matchedCard = creditCards?.find((c: any) => c.name === t.creditCardName);
+          groups.set(key, { cardName: t.creditCardName, cardColor: t.creditCardColor || '#7C3AED', transactions: [], total: 0, cardId: matchedCard?.id });
         }
         const g = groups.get(key)!;
         g.transactions.push(t);
@@ -729,7 +736,24 @@ export default function Transactions() {
         nonCard.push(t);
       }
     }
-    return { cardGroups: Array.from(groups.values()), nonCardTransactions: nonCard };
+    // Enriquecer grupos com invoiceTotal salvo (valor real da fatura do PDF/CSV)
+    const invoiceTotalsMap = new Map<string, number>();
+    if (invoiceTotals) {
+      for (const inv of invoiceTotals) {
+        invoiceTotalsMap.set(`${inv.creditCardId}-${inv.year}-${inv.month}`, inv.invoiceTotal ?? 0);
+      }
+    }
+    const enrichedGroups = Array.from(groups.values()).map((g) => {
+      if (g.cardId && startDate && endDate) {
+        // Determinar mês/ano do filtro atual
+        const filterMonth = startDate.getMonth() + 1;
+        const filterYear = startDate.getFullYear();
+        const savedTotal = invoiceTotalsMap.get(`${g.cardId}-${filterYear}-${filterMonth}`);
+        return { ...g, invoiceTotal: savedTotal ?? null };
+      }
+      return { ...g, invoiceTotal: null };
+    });
+    return { cardGroups: enrichedGroups, nonCardTransactions: nonCard };
   })();
 
   function toggleCardExpand(cardName: string) {
@@ -1671,9 +1695,16 @@ export default function Transactions() {
                             </>
                           );
                         })()}
-                        <p className="text-base font-bold text-red-600">
-                          -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(group.total / 100)}
-                        </p>
+                        <div className="flex flex-col items-end">
+                          <p className="text-base font-bold text-red-600">
+                            -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format((group.invoiceTotal != null ? group.invoiceTotal : group.total) / 100)}
+                          </p>
+                          {group.invoiceTotal != null && Math.abs(group.invoiceTotal - group.total) >= 10 && (
+                            <p className="text-xs text-muted-foreground">
+                              ({new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(group.total / 100)} calculado)
+                            </p>
+                          )}
+                        </div>
                         {canWrite && (
                           <Button
                             variant="outline"
