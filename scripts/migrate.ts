@@ -60,6 +60,26 @@ const migrations: { name: string; sql: string }[] = [
     name: "fix_purchaseDate_type_date_to_timestamp",
     sql: `ALTER TABLE transactions ALTER COLUMN "purchaseDate" TYPE timestamp USING "purchaseDate"::timestamp`,
   },
+  {
+    // Adiciona colunas necessárias para integração com Google Calendar na tabela users.
+    // Sem essas colunas o refresh_token nunca é salvo e a integração nunca persiste.
+    name: "add_google_calendar_columns_to_users",
+    sql: `
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='googleCalendarRefreshToken') THEN
+          ALTER TABLE users ADD COLUMN "googleCalendarRefreshToken" text;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='googleCalendarConnectedAt') THEN
+          ALTER TABLE users ADD COLUMN "googleCalendarConnectedAt" timestamp;
+        END IF;
+      END $$
+    `,
+  },
+  {
+    // Adiciona coluna googleCalendarEventId na tabela tasks para rastrear eventos sincronizados.
+    name: "add_google_calendar_event_id_to_tasks",
+    sql: `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS "googleCalendarEventId" varchar(255)`,
+  },
 ];
 
 async function runMigrations() {
