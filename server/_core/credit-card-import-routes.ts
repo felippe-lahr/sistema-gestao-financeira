@@ -380,7 +380,9 @@ Regras CRÍTICAS:
               description: String(tx.description || "").trim(),
               amount: amountCents,
               is_negative: isNegative,
-              purchase_date: tx.purchase_date || null,
+              // Fallback: se o LLM não extraiu a data da compra, usar a data de vencimento da fatura
+              // Isso afeta APENAS a exibição da data na lista de transações — não altera dueDate nem somas
+              purchase_date: tx.purchase_date || extractedData.invoice_due_date || null,
               installment_current: tx.installment_current ? Number(tx.installment_current) : null,
               installment_total: tx.installment_total ? Number(tx.installment_total) : null,
               installment: (tx.installment_current && tx.installment_total)
@@ -651,7 +653,9 @@ Regras CRÍTICAS:
             description: tx.description,
             amount: tx.amount,
             is_negative: tx.is_negative || false,
-            purchase_date: tx.purchase_date,
+            // Fallback: se a data da compra não foi extraída, usar a data de vencimento da fatura
+            // Isso afeta APENAS a exibição da data na lista de transações — não altera dueDate nem somas
+            purchase_date: tx.purchase_date || invoiceDueDateParam || null,
             installment_current: tx.installment_current,
             installment_total: tx.installment_total,
             installment: (tx.installment_current && tx.installment_total)
