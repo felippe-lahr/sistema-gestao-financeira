@@ -758,12 +758,12 @@ export default function EntityDashboard() {
         </Card>
       </div>
 
-      {/* Gastos Mensais por Categoria */}
+      {/* Débitos Mensais por Categoria */}
       <Card className="flex flex-col">
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <CardTitle>Gastos Mensais por Categoria</CardTitle>
+              <CardTitle>Débitos Mensais por Categoria</CardTitle>
               <CardDescription>
                 {monthlyChartPeriod === "year" 
                   ? `Débitos pagas em ${new Date().getFullYear()}`
