@@ -53,6 +53,13 @@ const migrations: { name: string; sql: string }[] = [
     EXCEPTION WHEN others THEN NULL;
     END $$`,
   },
+  {
+    // Corrige incompatibilidade de tipo: o schema Drizzle usa timestamp() mas a coluna foi criada como date.
+    // O Drizzle serializa Date objects como ISO string completa ('2026-04-15T16:00:00.000Z'),
+    // que o PostgreSQL rejeita em colunas do tipo date. Convertendo para timestamp resolve o bug.
+    name: "fix_purchaseDate_type_date_to_timestamp",
+    sql: `ALTER TABLE transactions ALTER COLUMN "purchaseDate" TYPE timestamp USING "purchaseDate"::timestamp`,
+  },
 ];
 
 async function runMigrations() {
