@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, AlertCircle, TrendingUp, TrendingDown, Wallet, Filter, ChevronDown, Calendar } from "lucide-react";
+import { ChevronLeft, AlertCircle, TrendingUp, TrendingDown, Wallet, Filter, ChevronDown, Calendar, CreditCard } from "lucide-react";
 import { useLocation } from "wouter";
 import { format, startOfMonth, endOfMonth, addDays, isBefore, isAfter, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -113,21 +113,50 @@ export default function OverallDashboard() {
   }, [filteredTransactions]);
 
   // Contas a vencer nos próximos 7 dias
+  // Helper: agrupa transações de cartão e mistura com transações normais
+  const groupCreditCardTransactions = (transactions: any[]) => {
+    const normal: any[] = [];
+    const cardMap = new Map<number, any>();
+    for (const t of transactions) {
+      if (t.creditCardId) {
+        if (!cardMap.has(t.creditCardId)) {
+          cardMap.set(t.creditCardId, {
+            _isCardGroup: true,
+            id: `card-${t.creditCardId}`,
+            creditCardId: t.creditCardId,
+            description: t.creditCardName || `Cartão ${t.creditCardId}`,
+            amount: 0,
+            dueDate: t.dueDate,
+            entityName: t.entityName,
+            entityColor: t.entityColor,
+          });
+        }
+        const group = cardMap.get(t.creditCardId)!;
+        group.amount += t.amount;
+        // Usar a data de vencimento mais próxima do grupo
+        if (new Date(t.dueDate) < new Date(group.dueDate)) group.dueDate = t.dueDate;
+      } else {
+        normal.push(t);
+      }
+    }
+    return [...normal, ...Array.from(cardMap.values())]
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  };
+
   const upcomingBills = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const sevenDaysFromNow = addDays(today, 7);
     
-    return allTransactions
-      .filter(t => {
+    const filtered = allTransactions.filter(t => {
         const dueDate = new Date(t.dueDate);
         dueDate.setHours(0, 0, 0, 0);
         return t.status === 'PENDING' && 
                t.type === 'EXPENSE' &&
                dueDate >= today && 
                dueDate <= sevenDaysFromNow;
-      })
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      });
+    return groupCreditCardTransactions(filtered);
   }, [allTransactions]);
 
   // Créditos a receber nos próximos 7 dias
@@ -148,20 +177,19 @@ export default function OverallDashboard() {
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [allTransactions]);
 
-  // Contas vencidas
+  // Débitos vencidos
   const overdueBills = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    return allTransactions
-      .filter(t => {
+    const filtered = allTransactions.filter(t => {
         const dueDate = new Date(t.dueDate);
         dueDate.setHours(0, 0, 0, 0);
         return (t.status === 'PENDING' || t.status === 'OVERDUE') && 
                t.type === 'EXPENSE' &&
                dueDate < today;
-      })
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      });
+    return groupCreditCardTransactions(filtered);
   }, [allTransactions]);
 
   const formatCurrency = (value: number) => {
@@ -366,17 +394,18 @@ export default function OverallDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Contas a Vencer (Próximos 7 dias)</CardTitle>
-            <CardDescription>Transações pendentes nos próximos 7 dias</CardDescription>
+            <CardTitle className="text-lg">Débitos a Vencer (Próximos 7 dias)</CardTitle>
+            <CardDescription>Débitos pendentes nos próximos 7 dias</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-80 overflow-y-auto">
               {upcomingBills.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">Nenhuma conta a vencer nos próximos 7 dias</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">Nenhum débito a vencer nos próximos 7 dias</p>
               ) : (
                 upcomingBills.map((bill) => (
                   <div key={bill.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border dark:border dark:border-gray-700-gray-600">
-                    <div className="mb-2">
+                    <div className="mb-2 flex items-center gap-2">
+                      {bill._isCardGroup && <CreditCard className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
                       <span className="font-medium text-sm">{bill.description}</span>
                     </div>
                     <div className="mb-2">
@@ -390,7 +419,7 @@ export default function OverallDashboard() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Vence em {format(new Date(bill.dueDate), "dd/MM/yyyy")}
+                        {bill._isCardGroup ? 'Fatura — vence em' : 'Vence em'} {format(new Date(bill.dueDate), "dd/MM/yyyy")}
                       </div>
                       <div className="font-semibold text-orange-600">
                         {formatCurrency(bill.amount)}
@@ -447,17 +476,18 @@ export default function OverallDashboard() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Contas Vencidas</CardTitle>
-            <CardDescription>Transações com vencimento passado</CardDescription>
+            <CardTitle className="text-lg">Débitos Vencidos</CardTitle>
+            <CardDescription>Débitos com vencimento passado</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-80 overflow-y-auto">
               {overdueBills.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">Nenhuma conta vencida</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">Nenhum débito vencido</p>
               ) : (
                 overdueBills.map((bill) => (
                   <div key={bill.id} className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border dark:border-gray-700-red-100 dark:border dark:border-gray-700-red-800">
-                    <div className="mb-2">
+                    <div className="mb-2 flex items-center gap-2">
+                      {bill._isCardGroup && <CreditCard className="h-3.5 w-3.5 text-red-400 flex-shrink-0" />}
                       <span className="font-medium text-sm">{bill.description}</span>
                     </div>
                     <div className="mb-2">
@@ -471,7 +501,7 @@ export default function OverallDashboard() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-red-600">
-                        Venceu em {format(new Date(bill.dueDate), "dd/MM/yyyy")}
+                        {bill._isCardGroup ? 'Fatura — venceu em' : 'Venceu em'} {format(new Date(bill.dueDate), "dd/MM/yyyy")}
                       </div>
                       <div className="font-semibold text-red-600">
                         {formatCurrency(bill.amount)}
