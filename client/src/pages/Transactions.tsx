@@ -1862,7 +1862,12 @@ export default function Transactions() {
                         </div>
                         <div>
                           <h3 className="font-semibold text-sm">{group.cardName}</h3>
-                          <p className="text-xs text-muted-foreground">{group.transactions.length} transaç{group.transactions.length === 1 ? 'ão' : 'ões'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {group.transactions.length} transaç{group.transactions.length === 1 ? 'ão' : 'ões'}
+                            {group.transactions[0]?.dueDate && (
+                              <> · <span className="font-medium">Vence: {format(new Date(group.transactions[0].dueDate), "dd/MM/yyyy", { locale: ptBR })}</span></>
+                            )}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1963,16 +1968,11 @@ export default function Transactions() {
                                     {transaction.attachmentCount > 0 && <Paperclip className="h-3 w-3 text-muted-foreground" />}
                                     {getCategoryHierarchyBadge(transaction)}
                                   </div>
-                                  <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                                    {transaction.purchaseDate && (
-                                      <p className="text-xs text-muted-foreground">
-                                        <span className="font-medium">Compra:</span> {format(new Date(transaction.purchaseDate), "dd/MM/yyyy", { locale: ptBR })}
-                                      </p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">
-                                      <span className="font-medium">Vence:</span> {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
-                                    </p>
-                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {transaction.purchaseDate
+                                      ? <><span className="font-medium">Compra:</span> {format(new Date(transaction.purchaseDate), "dd/MM/yyyy", { locale: ptBR })}</>
+                                      : <><span className="font-medium">Vence:</span> {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}</>}
+                                  </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
@@ -2006,16 +2006,11 @@ export default function Transactions() {
                                   {getStatusBadge(transaction.status)}
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <div className="flex flex-col items-end gap-0.5">
-                                    {transaction.purchaseDate && (
-                                      <p className="text-xs text-muted-foreground">
-                                        <span className="font-medium">Compra:</span> {format(new Date(transaction.purchaseDate), "dd/MM/yyyy", { locale: ptBR })}
-                                      </p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">
-                                      <span className="font-medium">Vence:</span> {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
-                                    </p>
-                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {transaction.purchaseDate
+                                      ? <><span className="font-medium">Compra:</span> {format(new Date(transaction.purchaseDate), "dd/MM/yyyy", { locale: ptBR })}</>
+                                      : <><span className="font-medium">Vence:</span> {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}</>}
+                                  </p>
                                   {canWrite && (
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(transaction); }}>
                                       <Edit2 className="h-3.5 w-3.5" />
