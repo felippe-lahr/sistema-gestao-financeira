@@ -2171,6 +2171,12 @@ export const appRouter = router({
         });
         return { url: authUrl };
       }),
+    // Desconecta o Google Calendar do usuário
+    disconnectGoogleCalendar: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        await db.removeGoogleCalendarToken(ctx.user.id);
+        return { success: true };
+      }),
   }),
 
   // ========== ORGANIZATIONS ==========

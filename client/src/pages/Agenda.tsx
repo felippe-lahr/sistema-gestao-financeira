@@ -87,6 +87,16 @@ export default function Agenda() {
     },
   });
 
+  const disconnectGoogleCalendar = trpc.tasks.disconnectGoogleCalendar.useMutation({
+    onSuccess: () => {
+      toast.success("Google Agenda desconectado.");
+      refetchUser();
+    },
+    onError: (error) => {
+      toast.error("Erro ao desconectar Google Agenda: " + error.message);
+    },
+  });
+
   const calendarConnected = !!(currentUser as any)?.googleCalendarRefreshToken;
 
   // Detectar retorno do OAuth do Google Calendar via query params
@@ -422,19 +432,34 @@ export default function Agenda() {
           </div>
           <div className="flex gap-2">
             {calendarConnected ? (
-              <Button
-                variant="outline"
-                onClick={() => syncGoogleCalendar.mutate()}
-                disabled={syncGoogleCalendar.isPending}
-                className="border-green-500 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-400 dark:hover:bg-green-950"
-              >
-                {syncGoogleCalendar.isPending ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                )}
-                Google Agenda
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => syncGoogleCalendar.mutate()}
+                  disabled={syncGoogleCalendar.isPending}
+                  className="border-green-500 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-400 dark:hover:bg-green-950"
+                >
+                  {syncGoogleCalendar.isPending ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                  )}
+                  Google Agenda
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => disconnectGoogleCalendar.mutate()}
+                  disabled={disconnectGoogleCalendar.isPending}
+                  className="border-red-400 text-red-600 hover:bg-red-50 dark:border-red-500 dark:text-red-400 dark:hover:bg-red-950"
+                >
+                  {disconnectGoogleCalendar.isPending ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <X className="h-4 w-4 mr-2" />
+                  )}
+                  Desconectar
+                </Button>
+              </>
             ) : (
               <Button
                 variant="outline"
