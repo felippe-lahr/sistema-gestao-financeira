@@ -626,27 +626,27 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
     const subs = getSubcategories(category.id);
     const isInactive = !category.isActive;
     const bgColor = category.color || COLOR_PALETTE[0];
-    const textColor = getContrastColor(bgColor);
     return (
-      <div key={category.id} className={`rounded-xl overflow-hidden border ${isInactive ? "opacity-40" : "shadow-sm"}`}>
-        {/* Cabeçalho da categoria pai — fundo colorido */}
-        <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: bgColor }}>
+      <div key={category.id} className={`rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 ${isInactive ? "opacity-40" : "shadow-sm"}`}>
+        {/* Cabeçalho da categoria pai — fundo neutro com etiqueta colorida */}
+        <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
-              <Tag className="h-3.5 w-3.5" style={{ color: textColor }} />
+            {/* Etiqueta colorida */}
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ backgroundColor: bgColor }}>
+              <Tag className="h-3.5 w-3.5 text-white" />
             </div>
             <div>
-              <p className="font-semibold text-sm leading-tight" style={{ color: textColor }}>{category.name}</p>
+              <p className="font-semibold text-sm leading-tight text-gray-900 dark:text-gray-100">{category.name}</p>
               {subs.length > 0 && (
-                <p className="text-xs opacity-70" style={{ color: textColor }}>{subs.length} subcategoria{subs.length > 1 ? "s" : ""}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{subs.length} subcategoria{subs.length > 1 ? "s" : ""}</p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-1">
             {isInactive ? (
               canDelete && (
-                <button title="Reativar" onClick={() => reactivateMutation.mutate({ id: category.id })} className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-colors">
-                  <RotateCcw className="h-3.5 w-3.5" style={{ color: textColor }} />
+                <button title="Reativar" onClick={() => reactivateMutation.mutate({ id: category.id })} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                  <RotateCcw className="h-3.5 w-3.5 text-gray-500" />
                 </button>
               )
             ) : (
@@ -656,18 +656,18 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
                     <button
                       title="Nova subcategoria"
                       onClick={() => { setCreatingSubFor(category); setFormData({ name: "", type: category.type, color: bgColor, parentId: category.id.toString() }); setIsCreateOpen(true); }}
-                      className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     >
-                      <Plus className="h-3.5 w-3.5" style={{ color: textColor }} />
+                      <Plus className="h-3.5 w-3.5 text-gray-500" />
                     </button>
-                    <button title="Editar" onClick={() => handleEdit(category)} className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-colors">
-                      <Pencil className="h-3.5 w-3.5" style={{ color: textColor }} />
+                    <button title="Editar" onClick={() => handleEdit(category)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                      <Pencil className="h-3.5 w-3.5 text-gray-500" />
                     </button>
                   </>
                 )}
                 {canDelete && (
-                  <button title="Desativar" onClick={() => deleteMutation.mutate({ id: category.id })} className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-colors">
-                    <EyeOff className="h-3.5 w-3.5" style={{ color: textColor }} />
+                  <button title="Desativar" onClick={() => deleteMutation.mutate({ id: category.id })} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <EyeOff className="h-3.5 w-3.5 text-gray-500" />
                   </button>
                 )}
               </>
