@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight, ChevronRight, RotateCcw, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight, ChevronRight, RotateCcw, EyeOff, QrCode, Barcode, ArrowLeftRight, Banknote } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -234,6 +234,22 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
     return labels[type] || type;
   };
 
+  const getMethodIcon = (type: string) => {
+    switch (type) {
+      case "CREDIT_CARD":
+      case "DEBIT_CARD":
+        return <CreditCard className="h-5 w-5" />;
+      case "PIX":
+        return <QrCode className="h-5 w-5" />;
+      case "CASH":
+        return <Banknote className="h-5 w-5" />;
+      case "BANK_TRANSFER":
+        return <ArrowLeftRight className="h-5 w-5" />;
+      default:
+        return <Barcode className="h-5 w-5" />; // Usado para "OTHER" ou boletos
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -254,7 +270,7 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
           className="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
           style={{ background: `linear-gradient(135deg, ${method.color || "#10B981"}dd, ${method.color || "#10B981"}88)` }}
         >
-          <CreditCard className="h-5 w-5" />
+          {getMethodIcon(method.type)}
         </div>
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{method.name}</h3>
@@ -416,7 +432,7 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
                       className="w-10 h-10 rounded-lg flex items-center justify-center text-white shadow-md"
                       style={{ background: `linear-gradient(135deg, ${formData.color}dd, ${formData.color}88)` }}
                     >
-                      <CreditCard className="h-6 w-6" />
+                      {getMethodIcon(formData.type)}
                     </div>
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Pré-visualização</p>
