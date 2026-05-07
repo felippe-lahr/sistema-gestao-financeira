@@ -244,210 +244,200 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
     );
   }
 
+  const incomeMethods = methods?.filter((m) => m.transactionType === "INCOME") || [];
+  const expenseMethods = methods?.filter((m) => m.transactionType === "EXPENSE") || [];
+
+  const MethodCard = ({ method }: { method: any }) => (
+    <div className="group relative flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all">
+      <div className="flex items-center gap-3">
+        <div 
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
+          style={{ background: `linear-gradient(135deg, ${method.color || "#10B981"}dd, ${method.color || "#10B981"}88)` }}
+        >
+          <CreditCard className="h-5 w-5" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{method.name}</h3>
+          <p className="text-[11px] text-gray-500 dark:text-gray-400">{getTypeLabel(method.type)}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {canWrite && (
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(method)}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {canDelete && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => deleteMutation.mutate({ id: method.id })}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
           {methods?.length || 0} meio(s) de pagamento cadastrado(s)
         </p>
         {canWrite && (
-        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Meio de Pagamento
-        </Button>
+          <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Meio de Pagamento
+          </Button>
         )}
-
-        <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-            <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
-              <SheetTitle className="text-2xl font-bold">Novo Meio de Pagamento</SheetTitle>
-              <button onClick={() => setIsCreateOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-8 py-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome *</Label>
-                  <Input
-                    id="name"
-                    placeholder="Ex: Cartão Itaú, Pix Bradesco"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="transactionType">Usar para *</Label>
-                  <Select value={formData.transactionType} onValueChange={(value: any) => setFormData({ ...formData, transactionType: value })}>
-                    <SelectTrigger id="transactionType">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="EXPENSE">Débitos (meios que você paga)</SelectItem>
-                      <SelectItem value="INCOME">Créditos (meios que recebe)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Tipo *</Label>
-                    <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                      <SelectTrigger id="type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
-                        <SelectItem value="DEBIT_CARD">Cartão de Débito</SelectItem>
-                        <SelectItem value="PIX">PIX</SelectItem>
-                        <SelectItem value="CASH">Dinheiro</SelectItem>
-                        <SelectItem value="BANK_TRANSFER">Transferência Bancária</SelectItem>
-                        <SelectItem value="OTHER">Outro</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="color">Cor</Label>
-                    <Input
-                      id="color"
-                      type="color"
-                      value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
-                {createMutation.isPending ? "Criando..." : "Criar"}
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
 
-      {!methods || methods.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Nenhum meio de pagamento cadastrado
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {methods.map((method) => (
-            <Card key={method.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: method.color || "#10B981" }}
-                    >
-                      <CreditCard className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">{method.name}</h3>
-                      <p className="text-sm text-muted-foreground">{getTypeLabel(method.type)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {canWrite && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(method)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    )}
-                    {canDelete && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteMutation.mutate({ id: method.id })}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* COLUNA CRÉDITOS */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <h2 className="text-sm font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">Créditos</h2>
+            </div>
+            <span className="text-xs font-medium text-gray-400">{incomeMethods.length}</span>
+          </div>
+          <div className="space-y-2">
+            {incomeMethods.map((method) => (
+              <MethodCard key={method.id} method={method} />
+            ))}
+            {incomeMethods.length === 0 && (
+              <p className="text-sm text-center py-8 text-muted-foreground border border-dashed rounded-xl">Nenhum meio de crédito</p>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* Edit Sheet */}
-      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col">
-          <div className="sticky top-0 z-10 border dark:border-gray-700-b bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
-            <SheetTitle className="text-2xl font-bold">Editar Meio de Pagamento</SheetTitle>
-            <button onClick={() => setIsEditOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
+        {/* COLUNA DÉBITOS */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <h2 className="text-sm font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">Débitos</h2>
+            </div>
+            <span className="text-xs font-medium text-gray-400">{expenseMethods.length}</span>
+          </div>
+          <div className="space-y-2">
+            {expenseMethods.map((method) => (
+              <MethodCard key={method.id} method={method} />
+            ))}
+            {expenseMethods.length === 0 && (
+              <p className="text-sm text-center py-8 text-muted-foreground border border-dashed rounded-xl">Nenhum meio de débito</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Create/Edit Sheet */}
+      <Sheet open={isCreateOpen || isEditOpen} onOpenChange={(open) => { if (!open) { setIsCreateOpen(false); setIsEditOpen(false); resetForm(); } }}>
+        <SheetContent side="right" className="w-full sm:w-[600px] flex flex-col p-0">
+          <div className="sticky top-0 z-10 border-b dark:border-gray-700 bg-white dark:bg-gray-800 px-8 py-4 flex items-center justify-between">
+            <SheetTitle className="text-2xl font-bold">{isEditOpen ? "Editar Meio de Pagamento" : "Novo Meio de Pagamento"}</SheetTitle>
+            <button onClick={() => { setIsCreateOpen(false); setIsEditOpen(false); resetForm(); }} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300">
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-8 py-6">
-            <div className="space-y-4">
+
+          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8">
+            <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="edit-name">Nome *</Label>
+                <Label htmlFor="name" className="text-sm font-bold">Nome *</Label>
                 <Input
-                  id="edit-name"
-                  placeholder="Ex: Cartão Itaú"
+                  id="name"
+                  placeholder="Ex: Cartão Itaú, Pix Bradesco"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="h-11"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="edit-transactionType">Usar para *</Label>
-                <Select value={formData.transactionType} onValueChange={(value: any) => setFormData({ ...formData, transactionType: value })}>
-                  <SelectTrigger id="edit-transactionType">
+                <Label className="text-sm font-bold">Tipo *</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={formData.transactionType === "INCOME" ? "default" : "outline"}
+                    className={`h-11 ${formData.transactionType === "INCOME" ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100" : ""}`}
+                    onClick={() => setFormData({ ...formData, transactionType: "INCOME" })}
+                  >
+                    Crédito
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.transactionType === "EXPENSE" ? "default" : "outline"}
+                    className={`h-11 ${formData.transactionType === "EXPENSE" ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100" : ""}`}
+                    onClick={() => setFormData({ ...formData, transactionType: "EXPENSE" })}
+                  >
+                    Débito
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="type" className="text-sm font-bold">Categoria do Meio *</Label>
+                <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
+                  <SelectTrigger id="type" className="h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="EXPENSE">Débitos (meios que você paga)</SelectItem>
-                    <SelectItem value="INCOME">Créditos (meios que recebe)</SelectItem>
+                    <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                    <SelectItem value="DEBIT_CARD">Cartão de Débito</SelectItem>
+                    <SelectItem value="PIX">PIX</SelectItem>
+                    <SelectItem value="CASH">Dinheiro</SelectItem>
+                    <SelectItem value="BANK_TRANSFER">Transferência Bancária</SelectItem>
+                    <SelectItem value="OTHER">Outro</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-type">Tipo</Label>
-                  <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                    <SelectTrigger id="edit-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
-                      <SelectItem value="DEBIT_CARD">Cartão de Débito</SelectItem>
-                      <SelectItem value="PIX">PIX</SelectItem>
-                      <SelectItem value="CASH">Dinheiro</SelectItem>
-                      <SelectItem value="BANK_TRANSFER">Transferência Bancária</SelectItem>
-                      <SelectItem value="OTHER">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+              <div className="space-y-3">
+                <Label className="text-sm font-bold">Cor do Meio</Label>
+                <div className="grid grid-cols-6 sm:grid-cols-10 gap-2">
+                  {COLOR_PALETTE.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`w-9 h-9 rounded-full transition-all transform hover:scale-110 flex items-center justify-center ${formData.color === color ? "ring-2 ring-offset-2 ring-gray-900 dark:ring-gray-100 scale-110" : ""}`}
+                      style={{ background: `linear-gradient(135deg, ${color}dd, ${color}88)` }}
+                      onClick={() => setFormData({ ...formData, color })}
+                    >
+                      {formData.color === color && <div className="w-2 h-2 rounded-full bg-white shadow-sm" />}
+                    </button>
+                  ))}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-color">Cor</Label>
-                  <Input
-                    id="edit-color"
-                    type="color"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  />
+              </div>
+
+              <div className="pt-4">
+                <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white shadow-md"
+                      style={{ background: `linear-gradient(135deg, ${formData.color}dd, ${formData.color}88)` }}
+                    >
+                      <CreditCard className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Pré-visualização</p>
+                      <p className="font-bold text-gray-900 dark:text-gray-100">{formData.name || "Nome do Meio"}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-8 py-4 flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+
+          <div className="sticky bottom-0 z-10 border-t dark:border-gray-700 bg-white dark:bg-gray-800 px-8 py-4 flex gap-3 justify-end">
+            <Button variant="outline" className="h-11 px-6" onClick={() => { setIsCreateOpen(false); setIsEditOpen(false); resetForm(); }}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
-              {updateMutation.isPending ? "Atualizando..." : "Atualizar"}
+            <Button 
+              onClick={isEditOpen ? handleUpdate : handleCreate} 
+              disabled={createMutation.isPending || updateMutation.isPending} 
+              className="h-11 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold"
+            >
+              {createMutation.isPending || updateMutation.isPending ? "Salvando..." : (isEditOpen ? "Salvar Alterações" : "Criar Meio")}
             </Button>
           </div>
         </SheetContent>
@@ -459,26 +449,11 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
 // ========== CATEGORIES TAB ==========
 // ===== PALETA DE CORES (30 cores profissionais) =====
 const COLOR_PALETTE = [
-  // Vermelhos pastéis
-  "#FECACA", "#FCA5A5", "#F87171",
-  // Laranjas pastéis
-  "#FED7AA", "#FDBA74", "#FB923C",
-  // Âmbares / Amarelos pastéis
-  "#FEF08A", "#FDE047", "#FACC15",
-  // Verdes pastéis
-  "#BBF7D0", "#86EFAC", "#4ADE80",
-  // Esmeraldas / Teal pastéis
-  "#A7F3D0", "#6EE7B7", "#99F6E4",
-  // Cianos / Azuis claros pastéis
-  "#A5F3FC", "#67E8F9", "#BAE6FD",
-  // Azuis pastéis
-  "#BFDBFE", "#93C5FD", "#60A5FA",
-  // Índigos / Violetas pastéis
-  "#C7D2FE", "#A5B4FC", "#DDD6FE",
-  // Roxos / Rosas pastéis
-  "#E9D5FF", "#D8B4FE", "#FBCFE8",
-  // Neutros pastéis
-  "#E2E8F0", "#CBD5E1", "#F1F5F9",
+  "#EF4444","#F97316","#F59E0B","#EAB308","#84CC16","#22C55E",
+  "#10B981","#14B8A6","#06B6D4","#3B82F6","#6366F1","#8B5CF6",
+  "#A855F7","#D946EF","#EC4899","#F43F5E","#64748B","#374151",
+  "#92400E","#065F46","#1E3A5F","#4C1D95","#831843","#7F1D1D",
+  "#1F2937","#0F172A","#134E4A","#1E40AF","#5B21B6","#9D174D",
 ];
 
 // Gera tonalidade mais clara de uma cor hex para subcategorias

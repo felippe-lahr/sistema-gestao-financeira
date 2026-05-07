@@ -848,7 +848,7 @@ export default function Transactions() {
     const color = categoryColor || categories?.find((c) => c.id === categoryId)?.color || "#6B7280";
     if (!name) return null;
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shadow-sm">
+      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         <div 
           className="w-3 h-3 rounded-full flex-shrink-0" 
           style={{ background: `linear-gradient(135deg, ${color}dd, ${color}88)` }}
@@ -871,7 +871,7 @@ export default function Transactions() {
     if (parentName) {
       // É uma subcategoria: mostrar pai > filho com visual moderno
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shadow-sm">
+        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
           <div className="flex items-center gap-1">
             <div 
               className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
@@ -892,7 +892,7 @@ export default function Transactions() {
     }
     
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shadow-sm">
+      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         <div 
           className="w-3 h-3 rounded-full flex-shrink-0" 
           style={{ background: `linear-gradient(135deg, ${catColor}dd, ${catColor}88)` }}
