@@ -845,12 +845,16 @@ export default function Transactions() {
     if (!categoryId) return null;
     // Prioriza os dados que já vêm na transação via JOIN (categoryName, categoryColor)
     const name = categoryName || categories?.find((c) => c.id === categoryId)?.name;
-    const color = categoryColor || categories?.find((c) => c.id === categoryId)?.color;
+    const color = categoryColor || categories?.find((c) => c.id === categoryId)?.color || "#6B7280";
     if (!name) return null;
     return (
-      <Badge style={{ backgroundColor: color || "#6B7280", color: "#fff" }} className="font-normal">
-        {name}
-      </Badge>
+      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shadow-sm">
+        <div 
+          className="w-3 h-3 rounded-full flex-shrink-0" 
+          style={{ background: `linear-gradient(135deg, ${color}dd, ${color}88)` }}
+        />
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{name}</span>
+      </span>
     );
   };
 
@@ -863,19 +867,38 @@ export default function Transactions() {
     const parentName = transaction.parentCategoryName;
     const parentColor = transaction.parentCategoryColor || catColor;
     if (!catName) return null;
+    
     if (parentName) {
-      // É uma subcategoria: mostrar pai > filho
+      // É uma subcategoria: mostrar pai > filho com visual moderno
       return (
-        <span className="inline-flex items-center gap-0.5 rounded-full overflow-hidden text-xs font-medium border" style={{ borderColor: parentColor + '55' }}>
-          <span className="px-2 py-0.5" style={{ backgroundColor: parentColor + '22', color: parentColor }}>{ parentName }</span>
-          <span className="px-2 py-0.5 text-white" style={{ backgroundColor: catColor }}>{ catName }</span>
+        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shadow-sm">
+          <div className="flex items-center gap-1">
+            <div 
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+              style={{ background: `linear-gradient(135deg, ${parentColor}dd, ${parentColor}88)` }}
+            />
+            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{parentName}</span>
+          </div>
+          <div className="w-px h-3 bg-gray-300 dark:bg-gray-600" />
+          <div className="flex items-center gap-1">
+            <div 
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+              style={{ background: `linear-gradient(135deg, ${catColor}dd, ${catColor}88)` }}
+            />
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{catName}</span>
+          </div>
         </span>
       );
     }
+    
     return (
-      <Badge style={{ backgroundColor: catColor, color: "#fff" }} className="font-normal">
-        {catName}
-      </Badge>
+      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shadow-sm">
+        <div 
+          className="w-3 h-3 rounded-full flex-shrink-0" 
+          style={{ background: `linear-gradient(135deg, ${catColor}dd, ${catColor}88)` }}
+        />
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{catName}</span>
+      </span>
     );
   };
 

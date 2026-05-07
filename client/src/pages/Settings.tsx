@@ -631,8 +631,11 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
         {/* Cabeçalho da categoria pai — fundo neutro com etiqueta colorida */}
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            {/* Etiqueta colorida */}
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ backgroundColor: bgColor }}>
+            {/* Etiqueta colorida com degradê */}
+            <div 
+              className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0 shadow-sm" 
+              style={{ background: `linear-gradient(135deg, ${bgColor}dd, ${bgColor}88)` }}
+            >
               <Tag className="h-3.5 w-3.5 text-white" />
             </div>
             <div>
@@ -848,13 +851,14 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
             {!creatingSubFor && (
               <div className="space-y-2">
                 <Label>Cor da categoria</Label>
-                <div className="grid grid-cols-6 gap-3">
+                <div className="grid grid-cols-10 gap-1.5">
                   {COLOR_PALETTE.map((color) => (
                     <button
                       key={color}
+                      type="button"
                       onClick={() => setFormData({ ...formData, color })}
-                      className={`w-9 h-9 rounded-full transition-all mx-auto block ${
-                        formData.color === color ? "ring-2 ring-offset-2 ring-gray-900 dark:ring-white scale-110" : "hover:scale-105"
+                      className={`h-7 w-7 rounded-full transition-all hover:scale-110 ${
+                        formData.color === color ? "ring-2 ring-offset-2 ring-gray-900 dark:ring-white scale-110" : ""
                       }`}
                       style={{ backgroundColor: color }}
                       title={color}
@@ -863,7 +867,10 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
                 </div>
                 {/* Preview */}
                 <div className="mt-3 rounded-lg px-4 py-3 flex items-center gap-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: formData.color }}>
+                  <div 
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm" 
+                    style={{ background: `linear-gradient(135deg, ${formData.color}dd, ${formData.color}88)` }}
+                  >
                     <Tag className="h-3.5 w-3.5 text-white" />
                   </div>
                   <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -923,13 +930,14 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
             {/* Cor — paleta de 30 cores */}
             <div className="space-y-2">
               <Label>Cor</Label>
-              <div className="grid grid-cols-6 gap-3">
+              <div className="grid grid-cols-10 gap-1.5">
                 {COLOR_PALETTE.map((color) => (
                   <button
                     key={color}
+                    type="button"
                     onClick={() => setFormData({ ...formData, color })}
-                    className={`w-9 h-9 rounded-full transition-all mx-auto block ${
-                      formData.color === color ? "ring-2 ring-offset-2 ring-gray-900 dark:ring-white scale-110" : "hover:scale-105"
+                    className={`h-7 w-7 rounded-full transition-all hover:scale-110 ${
+                      formData.color === color ? "ring-2 ring-offset-2 ring-gray-900 dark:ring-white scale-110" : ""
                     }`}
                     style={{ backgroundColor: color }}
                     title={color}
@@ -938,7 +946,10 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
               </div>
               {/* Preview */}
               <div className="mt-3 rounded-lg px-4 py-3 flex items-center gap-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: formData.color }}>
+                <div 
+                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm" 
+                  style={{ background: `linear-gradient(135deg, ${formData.color}dd, ${formData.color}88)` }}
+                >
                   <Tag className="h-3.5 w-3.5 text-white" />
                 </div>
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{formData.name || "Pré-visualização"}</span>
