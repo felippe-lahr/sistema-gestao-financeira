@@ -308,8 +308,27 @@ export function registerGoogleAuthRoutes(app: Express) {
       const { tokens } = await calendarClient.getToken(code);
 
       if (!tokens.refresh_token) {
-        console.error("[Google Calendar] refresh_token não retornado pelo Google");
-        res.redirect("/agenda?calendar_error=no_refresh_token");
+        // O Google só retorna refresh_token na PRIMEIRA autorização.
+        // Se não veio, significa que o acesso já foi concedido antes.
+        // Precisamos revogar o access_token atual para forçar nova autorização completa.
+        console.warn("[Google Calendar] refresh_token não retornado — revogando acesso e solicitando nova autorização");
+        if (tokens.access_token) {
+          try {
+            await calendarClient.revokeToken(tokens.access_token);
+            console.log("[Google Calendar] Access token revogado com sucesso");
+          } catch (revokeErr) {
+            console.warn("[Google Calendar] Falha ao revogar token:", revokeErr);
+          }
+        }
+        // Redirecionar de volta para o fluxo OAuth com prompt=consent para forçar novo refresh_token
+        const retryState = Buffer.from(JSON.stringify({ openId, nonce: randomBytes(16).toString("hex") })).toString("base64url");
+        const retryUrl = calendarClient.generateAuthUrl({
+          access_type: "offline",
+          scope: ["https://www.googleapis.com/auth/calendar"],
+          state: retryState,
+          prompt: "consent",
+        });
+        res.redirect(302, retryUrl);
         return;
       }
 
