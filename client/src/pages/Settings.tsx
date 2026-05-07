@@ -848,12 +848,12 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
             {!creatingSubFor && (
               <div className="space-y-2">
                 <Label>Cor da categoria</Label>
-                <div className="grid grid-cols-6 gap-2">
+                <div className="grid grid-cols-6 gap-3">
                   {COLOR_PALETTE.map((color) => (
                     <button
                       key={color}
                       onClick={() => setFormData({ ...formData, color })}
-                      className={`w-full aspect-square rounded-lg transition-all ${
+                      className={`w-9 h-9 rounded-full transition-all mx-auto block ${
                         formData.color === color ? "ring-2 ring-offset-2 ring-gray-900 dark:ring-white scale-110" : "hover:scale-105"
                       }`}
                       style={{ backgroundColor: color }}
@@ -862,9 +862,11 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
                   ))}
                 </div>
                 {/* Preview */}
-                <div className="mt-3 rounded-lg px-4 py-3 flex items-center gap-3" style={{ backgroundColor: formData.color }}>
-                  <Tag className="h-4 w-4 flex-shrink-0" style={{ color: getContrastColor(formData.color) }} />
-                  <span className="text-sm font-medium" style={{ color: getContrastColor(formData.color) }}>
+                <div className="mt-3 rounded-lg px-4 py-3 flex items-center gap-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: formData.color }}>
+                    <Tag className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {formData.name || "Pré-visualização"}
                   </span>
                 </div>
@@ -921,12 +923,12 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
             {/* Cor — paleta de 30 cores */}
             <div className="space-y-2">
               <Label>Cor</Label>
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-6 gap-3">
                 {COLOR_PALETTE.map((color) => (
                   <button
                     key={color}
                     onClick={() => setFormData({ ...formData, color })}
-                    className={`w-full aspect-square rounded-lg transition-all ${
+                    className={`w-9 h-9 rounded-full transition-all mx-auto block ${
                       formData.color === color ? "ring-2 ring-offset-2 ring-gray-900 dark:ring-white scale-110" : "hover:scale-105"
                     }`}
                     style={{ backgroundColor: color }}
@@ -935,9 +937,11 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
                 ))}
               </div>
               {/* Preview */}
-              <div className="mt-3 rounded-lg px-4 py-3 flex items-center gap-3" style={{ backgroundColor: formData.color }}>
-                <Tag className="h-4 w-4 flex-shrink-0" style={{ color: getContrastColor(formData.color) }} />
-                <span className="text-sm font-medium" style={{ color: getContrastColor(formData.color) }}>{formData.name || "Pré-visualização"}</span>
+              <div className="mt-3 rounded-lg px-4 py-3 flex items-center gap-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: formData.color }}>
+                  <Tag className="h-3.5 w-3.5 text-white" />
+                </div>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{formData.name || "Pré-visualização"}</span>
               </div>
             </div>
           </div>
