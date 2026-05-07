@@ -618,7 +618,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
     const isInactive = !category.isActive;
     const bgColor = category.color || COLOR_PALETTE[0];
     return (
-      <div key={category.id} className={`rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 ${isInactive ? "opacity-40" : ""}`}>
+      <div key={category.id} className={`rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${isInactive ? "opacity-40" : ""}`}>
         {/* Cabeçalho da categoria pai — fundo neutro com etiqueta colorida */}
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
@@ -670,7 +670,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
         </div>
         {/* Subcategorias — fundo branco/cinza */}
         {subs.length > 0 && (
-          <div className="divide-y dark:divide-gray-700 bg-white dark:bg-gray-900">
+          <div className="divide-y dark:divide-gray-700 bg-white dark:bg-gray-800">
             {subs.map((sub) => {
               const subColor = sub.color || lightenColor(bgColor, 0.35);
               return (
