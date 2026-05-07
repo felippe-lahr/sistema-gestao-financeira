@@ -2147,6 +2147,30 @@ export const appRouter = router({
         const result = await syncAllTasksToGoogleCalendar(ctx.user.id, user.googleCalendarRefreshToken);
         return result;
       }),
+    // Gera a URL de autorização do Google Calendar server-side (evita problema de cookie no redirect)
+    getGoogleCalendarAuthUrl: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        const { OAuth2Client } = await import("google-auth-library");
+        const { randomBytes } = await import("crypto");
+        const { ENV } = await import("./_core/env");
+        if (!ENV.googleClientId || !ENV.googleClientSecret) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Google Calendar não configurado" });
+        }
+        const nonce = randomBytes(16).toString("hex");
+        const state = Buffer.from(JSON.stringify({ openId: ctx.user.openId, nonce })).toString("base64url");
+        const calendarClient = new OAuth2Client({
+          clientId: ENV.googleClientId,
+          clientSecret: ENV.googleClientSecret,
+          redirectUri: `${ENV.appUrl}/api/auth/google/calendar/callback`,
+        });
+        const authUrl = calendarClient.generateAuthUrl({
+          access_type: "offline",
+          scope: ["https://www.googleapis.com/auth/calendar"],
+          state,
+          prompt: "consent",
+        });
+        return { url: authUrl };
+      }),
   }),
 
   // ========== ORGANIZATIONS ==========

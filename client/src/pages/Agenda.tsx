@@ -78,6 +78,15 @@ export default function Agenda() {
     },
   });
 
+  const getGoogleCalendarAuthUrl = trpc.tasks.getGoogleCalendarAuthUrl.useMutation({
+    onSuccess: (result) => {
+      window.location.href = result.url;
+    },
+    onError: (error) => {
+      toast.error("Erro ao iniciar conexão com Google Agenda: " + error.message);
+    },
+  });
+
   const calendarConnected = !!(currentUser as any)?.googleCalendarRefreshToken;
 
   // Detectar retorno do OAuth do Google Calendar via query params
@@ -429,9 +438,14 @@ export default function Agenda() {
             ) : (
               <Button
                 variant="outline"
-                onClick={() => window.location.href = "/api/auth/google/calendar"}
+                onClick={() => getGoogleCalendarAuthUrl.mutate()}
+                disabled={getGoogleCalendarAuthUrl.isPending}
               >
-                <Calendar className="h-4 w-4 mr-2" />
+                {getGoogleCalendarAuthUrl.isPending ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Calendar className="h-4 w-4 mr-2" />
+                )}
                 Conectar Google Agenda
               </Button>
             )}
