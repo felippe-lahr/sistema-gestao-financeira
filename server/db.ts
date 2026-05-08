@@ -1112,9 +1112,11 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
     categoryName: row.categoryName || "Sem Categoria",
     categoryColor: row.categoryColor || "#6B7280",
     daysUntilDue: Math.floor((new Date(row.dueDate!).getTime() - localDate.getTime()) / (1000 * 60 * 60 * 24)),
+    isCreditCardInvoice: (row as any).isCreditCardInvoice || false,
+    creditCardId: (row as any).creditCardId || null,
+    creditCardName: (row as any).creditCardName || null,
+    creditCardColor: (row as any).creditCardColor || null,
   }));
-
-  return mapped;
 }
 
 // Buscar receitas a receber nos próximos X dias
@@ -1177,7 +1179,22 @@ export async function getUpcomingIncomeTransactions(entityId: number, daysAhead:
     daysUntilDue: Math.floor((new Date(row.dueDate!).getTime() - localDate.getTime()) / (1000 * 60 * 60 * 24)),
   }));
 
-  return mapped;
+  return consolidatedTransactions.map((row) => ({
+    id: row.id,
+    description: row.description,
+    amount: row.amount,
+    dueDate: row.dueDate,
+    status: row.status,
+    type: row.type,
+    categoryId: row.categoryId,
+    categoryName: row.categoryName || "Sem Categoria",
+    categoryColor: row.categoryColor || "#6B7280",
+    daysUntilDue: Math.floor((new Date(row.dueDate!).getTime() - localDate.getTime()) / (1000 * 60 * 60 * 24)),
+    isCreditCardInvoice: (row as any).isCreditCardInvoice || false,
+    creditCardId: (row as any).creditCardId || null,
+    creditCardName: (row as any).creditCardName || null,
+    creditCardColor: (row as any).creditCardColor || null,
+  }));
 }
 
 export async function getAttachmentsByEntityWithFilters(
