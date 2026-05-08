@@ -5,21 +5,30 @@
  *   GET  /api/auth/2fa/status        — Retorna se o 2FA está ativo para o usuário logado
  *   POST /api/auth/2fa/setup         — Inicia a configuração: gera chave secreta e QR Code
  *   POST /api/auth/2fa/activate      — Confirma a ativação com um código TOTP válido
- *   POST /api/auth/2fa/deactivate    — Desativa o 2FA (requer código TOTP ou senha)
+ *   POST /api/auth/2fa/deactivate    — Desativa o 2FA (requer código TOTP)
  *   POST /api/auth/2fa/verify        — Verifica um código TOTP durante o login (etapa 2)
  */
 import { type Express, type Request, type Response } from "express";
-import { authenticator } from "otplib";
+import { generateSecret, generateURI, verifySync } from "otplib";
 import QRCode from "qrcode";
 import * as db from "../db";
 import { COOKIE_NAME } from "@shared/const";
 
-// Configurar o authenticator para compatibilidade com Google Authenticator
-authenticator.options = {
-  window: 1, // Aceita 1 passo antes/depois para tolerância de clock skew (~30s)
-};
-
 const APP_NAME = "UnifiquePro";
+
+/**
+ * Verifica um código TOTP contra uma chave secreta.
+ * Usa window=1 para tolerar até ~30s de diferença de clock.
+ * O verifySync do otplib v13 retorna { valid: boolean }, não um booleano direto.
+ */
+function verifyTotpCode(token: string, secret: string): boolean {
+  const result = verifySync({ token, secret, strategy: "totp" });
+  // otplib v13 retorna { valid: boolean } ou boolean dependendo da versão
+  if (typeof result === "object" && result !== null && "valid" in result) {
+    return (result as { valid: boolean }).valid;
+  }
+  return !!result;
+}
 
 /**
  * Extrai o userId da sessão atual da requisição.
@@ -51,7 +60,6 @@ async function getUserIdFromSession(req: Request): Promise<{ userId: number; ope
 
 export function registerTotpRoutes(app: Express) {
   // ─── GET /api/auth/2fa/status ────────────────────────────────────────────────
-  // Retorna o status do 2FA para o usuário logado
   app.get("/api/auth/2fa/status", async (req: Request, res: Response) => {
     try {
       const session = await getUserIdFromSession(req);
@@ -72,7 +80,6 @@ export function registerTotpRoutes(app: Express) {
   });
 
   // ─── POST /api/auth/2fa/setup ────────────────────────────────────────────────
-  // Inicia a configuração do 2FA: gera uma nova chave secreta e retorna o QR Code
   app.post("/api/auth/2fa/setup", async (req: Request, res: Response) => {
     try {
       const session = await getUserIdFromSession(req);
@@ -81,29 +88,32 @@ export function registerTotpRoutes(app: Express) {
         return;
       }
 
-      // Buscar o e-mail do usuário para o QR Code
       const user = await db.getUserByOpenId(session.openId);
       if (!user) {
         res.status(404).json({ error: "Usuário não encontrado" });
         return;
       }
 
-      // Verificar se o 2FA já está ativo
       const totpData = await db.getUserTotpData(session.userId);
       if (totpData?.totpEnabled) {
         res.status(400).json({ error: "O 2FA já está ativo. Desative-o primeiro para reconfigurar." });
         return;
       }
 
-      // Gerar nova chave secreta
-      const secret = authenticator.generateSecret();
+      // Gerar nova chave secreta (otplib v13 API)
+      const secret = generateSecret({});
 
       // Salvar como chave pendente (ainda não ativa)
       await db.saveTotpPendingSecret(session.userId, secret);
 
       // Gerar a URL TOTP (padrão otpauth://)
       const accountName = user.email || user.name || `user_${user.id}`;
-      const otpauthUrl = authenticator.keyuri(accountName, APP_NAME, secret);
+      const otpauthUrl = generateURI({
+        issuer: APP_NAME,
+        label: accountName,
+        secret,
+        strategy: "totp",
+      });
 
       // Gerar o QR Code como Data URL (base64 PNG)
       const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl, {
@@ -115,11 +125,7 @@ export function registerTotpRoutes(app: Express) {
         },
       });
 
-      res.json({
-        secret,
-        qrCodeDataUrl,
-        otpauthUrl,
-      });
+      res.json({ secret, qrCodeDataUrl, otpauthUrl });
     } catch (error) {
       console.error("[2FA] Error setting up:", error);
       res.status(500).json({ error: "Erro ao configurar o 2FA" });
@@ -127,7 +133,6 @@ export function registerTotpRoutes(app: Express) {
   });
 
   // ─── POST /api/auth/2fa/activate ─────────────────────────────────────────────
-  // Confirma a ativação do 2FA com um código TOTP válido
   app.post("/api/auth/2fa/activate", async (req: Request, res: Response) => {
     try {
       const session = await getUserIdFromSession(req);
@@ -142,25 +147,19 @@ export function registerTotpRoutes(app: Express) {
         return;
       }
 
-      // Buscar a chave pendente
       const totpData = await db.getUserTotpData(session.userId);
       if (!totpData?.totpPendingSecret) {
         res.status(400).json({ error: "Nenhuma configuração de 2FA pendente. Inicie o processo novamente." });
         return;
       }
 
-      // Validar o código com a chave pendente
-      const isValid = authenticator.verify({
-        token: code,
-        secret: totpData.totpPendingSecret,
-      });
+      const isValid = verifyTotpCode(code, totpData.totpPendingSecret);
 
       if (!isValid) {
         res.status(400).json({ error: "Código incorreto. Verifique o aplicativo e tente novamente." });
         return;
       }
 
-      // Ativar o 2FA (move pending → active)
       await db.activateTotp(session.userId);
 
       console.log(`[2FA] Activated for userId: ${session.userId}`);
@@ -172,7 +171,6 @@ export function registerTotpRoutes(app: Express) {
   });
 
   // ─── POST /api/auth/2fa/deactivate ───────────────────────────────────────────
-  // Desativa o 2FA (requer código TOTP atual para confirmar)
   app.post("/api/auth/2fa/deactivate", async (req: Request, res: Response) => {
     try {
       const session = await getUserIdFromSession(req);
@@ -187,25 +185,19 @@ export function registerTotpRoutes(app: Express) {
         return;
       }
 
-      // Buscar a chave ativa
       const totpData = await db.getUserTotpData(session.userId);
       if (!totpData?.totpEnabled || !totpData.totpSecret) {
         res.status(400).json({ error: "O 2FA não está ativo para este usuário." });
         return;
       }
 
-      // Validar o código com a chave ativa
-      const isValid = authenticator.verify({
-        token: code,
-        secret: totpData.totpSecret,
-      });
+      const isValid = verifyTotpCode(code, totpData.totpSecret);
 
       if (!isValid) {
         res.status(400).json({ error: "Código incorreto. Verifique o aplicativo e tente novamente." });
         return;
       }
 
-      // Desativar o 2FA
       await db.deactivateTotp(session.userId);
 
       console.log(`[2FA] Deactivated for userId: ${session.userId}`);
@@ -218,11 +210,6 @@ export function registerTotpRoutes(app: Express) {
 
   // ─── POST /api/auth/2fa/verify ───────────────────────────────────────────────
   // Verifica o código TOTP durante o fluxo de login (etapa 2)
-  // Recebe: { openId, code }
-  // Retorna: { success: true } ou erro
-  // NOTA: Este endpoint é chamado ANTES da criação da sessão definitiva.
-  //       O frontend deve chamar /api/auth/login primeiro, receber { requiresTwoFactor: true, openId },
-  //       e então chamar este endpoint com o código. Após verificação bem-sucedida, a sessão é criada.
   app.post("/api/auth/2fa/verify", async (req: Request, res: Response) => {
     try {
       const { openId, code, rememberMe } = req.body;
@@ -237,18 +224,13 @@ export function registerTotpRoutes(app: Express) {
         return;
       }
 
-      // Buscar dados TOTP pelo openId
       const totpData = await db.getUserTotpDataByOpenId(openId);
       if (!totpData || !totpData.totpEnabled || !totpData.totpSecret) {
         res.status(400).json({ error: "2FA não está ativo para este usuário." });
         return;
       }
 
-      // Validar o código
-      const isValid = authenticator.verify({
-        token: code,
-        secret: totpData.totpSecret,
-      });
+      const isValid = verifyTotpCode(code, totpData.totpSecret);
 
       if (!isValid) {
         res.status(401).json({ error: "Código incorreto. Verifique o aplicativo e tente novamente." });
