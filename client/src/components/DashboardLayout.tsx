@@ -212,6 +212,13 @@ function LoginForm() {
         </div>
         {/* Painel direito */}
         <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex-col items-center justify-center p-12">
+          {/* Ilustração financeira decorativa */}
+          <img
+            src="/login-bg.svg"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none select-none"
+            aria-hidden="true"
+          />
           <div className="relative z-10 text-center text-white max-w-md">
             <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '260px' }} className="h-auto object-contain mx-auto mb-8 brightness-0 invert" />
             <h2 className="text-3xl font-bold mb-4">Segurança em primeiro lugar</h2>
@@ -360,11 +367,13 @@ function LoginForm() {
 
       {/* Painel direito — gradiente (oculto no mobile) */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex-col items-center justify-center p-12">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 right-0 w-80 h-80 bg-white rounded-full translate-x-1/3 translate-y-1/3" />
-          <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
-        </div>
+        {/* Ilustração financeira decorativa */}
+        <img
+          src="/login-bg.svg"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none select-none"
+          aria-hidden="true"
+        />
         <div className="relative z-10 text-center text-white max-w-md">
           <img
             src="/logo-unifique-pro-dark.png"

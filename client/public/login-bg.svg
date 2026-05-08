@@ -1,0 +1,239 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1600" width="900" height="1600">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb"/>
+      <stop offset="50%" style="stop-color:#1d4ed8"/>
+      <stop offset="100%" style="stop-color:#4338ca"/>
+    </linearGradient>
+    <linearGradient id="cardGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.18)"/>
+      <stop offset="100%" style="stop-color:rgba(255,255,255,0.06)"/>
+    </linearGradient>
+    <linearGradient id="cardGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.14)"/>
+      <stop offset="100%" style="stop-color:rgba(255,255,255,0.04)"/>
+    </linearGradient>
+    <linearGradient id="lineChart" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.3)"/>
+      <stop offset="100%" style="stop-color:rgba(255,255,255,0.0)"/>
+    </linearGradient>
+    <linearGradient id="lineChart2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(134,239,172,0.4)"/>
+      <stop offset="100%" style="stop-color:rgba(134,239,172,0.0)"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softBlur">
+      <feGaussianBlur stdDeviation="1.5"/>
+    </filter>
+    <clipPath id="card1clip">
+      <rect x="40" y="80" width="340" height="200" rx="20"/>
+    </clipPath>
+    <clipPath id="card2clip">
+      <rect x="520" y="200" width="340" height="190" rx="20"/>
+    </clipPath>
+    <clipPath id="card3clip">
+      <rect x="60" y="900" width="300" height="180" rx="20"/>
+    </clipPath>
+    <clipPath id="card4clip">
+      <rect x="540" y="1050" width="320" height="200" rx="20"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="1600" fill="url(#bg)"/>
+
+  <!-- Decorative blurred circles -->
+  <circle cx="100" cy="120" r="180" fill="rgba(255,255,255,0.06)"/>
+  <circle cx="820" cy="1480" r="200" fill="rgba(255,255,255,0.05)"/>
+  <circle cx="750" cy="400" r="120" fill="rgba(255,255,255,0.04)"/>
+  <circle cx="150" cy="1300" r="140" fill="rgba(255,255,255,0.04)"/>
+  <circle cx="450" cy="800" r="300" fill="rgba(255,255,255,0.025)"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- CARD 1 — Dashboard KPI (topo esquerdo) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="40" y="80" width="340" height="200" rx="20" fill="url(#cardGrad1)" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <!-- mini label bar -->
+  <rect x="60" y="105" width="80" height="8" rx="4" fill="rgba(255,255,255,0.25)"/>
+  <!-- big number -->
+  <rect x="60" y="125" width="140" height="22" rx="5" fill="rgba(255,255,255,0.35)"/>
+  <!-- sub label -->
+  <rect x="60" y="158" width="100" height="8" rx="4" fill="rgba(255,255,255,0.18)"/>
+  <!-- trend badge -->
+  <rect x="60" y="178" width="60" height="20" rx="10" fill="rgba(134,239,172,0.3)" stroke="rgba(134,239,172,0.5)" stroke-width="1"/>
+  <polygon points="72,191 78,183 84,191" fill="rgba(134,239,172,0.9)"/>
+  <!-- mini area chart -->
+  <polyline points="200,240 225,215 250,225 275,195 300,205 330,175 355,185" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon points="200,240 225,215 250,225 275,195 300,205 330,175 355,185 355,260 200,260" fill="url(#lineChart)" opacity="0.6"/>
+  <!-- icon circle -->
+  <circle cx="340" cy="115" r="22" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+  <path d="M330,115 L340,105 L350,115 M340,105 L340,125" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- CARD 2 — Gráfico de barras (topo direito) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="520" y="200" width="340" height="190" rx="20" fill="url(#cardGrad2)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <rect x="540" y="220" width="90" height="8" rx="4" fill="rgba(255,255,255,0.25)"/>
+  <!-- bar chart -->
+  <rect x="545" y="320" width="28" height="50" rx="5" fill="rgba(255,255,255,0.2)"/>
+  <rect x="583" y="295" width="28" height="75" rx="5" fill="rgba(255,255,255,0.3)"/>
+  <rect x="621" y="310" width="28" height="60" rx="5" fill="rgba(255,255,255,0.2)"/>
+  <rect x="659" y="275" width="28" height="95" rx="5" fill="rgba(134,239,172,0.5)"/>
+  <rect x="697" y="290" width="28" height="80" rx="5" fill="rgba(255,255,255,0.25)"/>
+  <rect x="735" y="265" width="28" height="105" rx="5" fill="rgba(255,255,255,0.35)"/>
+  <rect x="773" y="280" width="28" height="90" rx="5" fill="rgba(255,255,255,0.2)"/>
+  <!-- baseline -->
+  <line x1="540" y1="375" x2="840" y2="375" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- CARTÃO DE CRÉDITO flutuante -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g transform="rotate(-8, 450, 550)">
+    <rect x="100" y="450" width="320" height="190" rx="18" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+    <!-- chip -->
+    <rect x="130" y="490" width="45" height="35" rx="6" fill="rgba(255,220,100,0.4)" stroke="rgba(255,220,100,0.6)" stroke-width="1"/>
+    <line x1="130" y1="507" x2="175" y2="507" stroke="rgba(255,220,100,0.5)" stroke-width="1"/>
+    <line x1="152" y1="490" x2="152" y2="525" stroke="rgba(255,220,100,0.5)" stroke-width="1"/>
+    <!-- card number dots -->
+    <circle cx="135" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="148" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="161" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="174" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="195" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="208" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="221" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="234" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="255" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="268" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="281" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="294" cy="560" r="4" fill="rgba(255,255,255,0.5)"/>
+    <!-- name bar -->
+    <rect x="130" y="595" width="120" height="10" rx="5" fill="rgba(255,255,255,0.3)"/>
+    <!-- logo circles -->
+    <circle cx="370" cy="480" r="22" fill="rgba(255,100,100,0.35)"/>
+    <circle cx="390" cy="480" r="22" fill="rgba(255,180,50,0.35)"/>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- DONUT CHART (centro direito) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g transform="translate(700, 680)">
+    <circle cx="0" cy="0" r="75" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="22"/>
+    <circle cx="0" cy="0" r="75" fill="none" stroke="rgba(134,239,172,0.55)" stroke-width="22" stroke-dasharray="188 283" stroke-dashoffset="0" stroke-linecap="round"/>
+    <circle cx="0" cy="0" r="75" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="22" stroke-dasharray="113 283" stroke-dashoffset="-188" stroke-linecap="round"/>
+    <circle cx="0" cy="0" r="75" fill="none" stroke="rgba(255,200,100,0.4)" stroke-width="22" stroke-dasharray="70 283" stroke-dashoffset="-301" stroke-linecap="round"/>
+    <!-- center -->
+    <circle cx="0" cy="0" r="50" fill="rgba(255,255,255,0.06)"/>
+    <rect x="-30" y="-8" width="60" height="12" rx="6" fill="rgba(255,255,255,0.3)"/>
+    <rect x="-20" y="8" width="40" height="8" rx="4" fill="rgba(255,255,255,0.18)"/>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- CARD 3 — Transações (esquerda baixo) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="30" y="860" width="310" height="220" rx="20" fill="url(#cardGrad1)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <rect x="55" y="885" width="100" height="9" rx="4" fill="rgba(255,255,255,0.25)"/>
+  <!-- transaction rows -->
+  <circle cx="75" cy="930" r="14" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <rect x="100" y="922" width="110" height="8" rx="4" fill="rgba(255,255,255,0.3)"/>
+  <rect x="100" y="936" width="70" height="6" rx="3" fill="rgba(255,255,255,0.15)"/>
+  <rect x="255" y="924" width="65" height="10" rx="5" fill="rgba(255,120,120,0.4)"/>
+
+  <circle cx="75" cy="975" r="14" fill="rgba(134,239,172,0.2)" stroke="rgba(134,239,172,0.3)" stroke-width="1"/>
+  <rect x="100" y="967" width="120" height="8" rx="4" fill="rgba(255,255,255,0.3)"/>
+  <rect x="100" y="981" width="80" height="6" rx="3" fill="rgba(255,255,255,0.15)"/>
+  <rect x="255" y="969" width="65" height="10" rx="5" fill="rgba(134,239,172,0.45)"/>
+
+  <circle cx="75" cy="1020" r="14" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <rect x="100" y="1012" width="95" height="8" rx="4" fill="rgba(255,255,255,0.3)"/>
+  <rect x="100" y="1026" width="60" height="6" rx="3" fill="rgba(255,255,255,0.15)"/>
+  <rect x="255" y="1014" width="65" height="10" rx="5" fill="rgba(255,120,120,0.4)"/>
+
+  <!-- dividers -->
+  <line x1="55" y1="950" x2="320" y2="950" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <line x1="55" y1="995" x2="320" y2="995" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- LINE CHART CARD (centro baixo) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="200" y="1120" width="500" height="220" rx="20" fill="url(#cardGrad2)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <rect x="225" y="1145" width="120" height="9" rx="4" fill="rgba(255,255,255,0.25)"/>
+  <!-- grid lines -->
+  <line x1="225" y1="1200" x2="675" y2="1200" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <line x1="225" y1="1230" x2="675" y2="1230" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <line x1="225" y1="1260" x2="675" y2="1260" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <!-- area chart green (créditos) -->
+  <polyline points="225,1290 300,1250 360,1265 420,1220 480,1235 540,1190 600,1205 660,1175" fill="none" stroke="rgba(134,239,172,0.7)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon points="225,1290 300,1250 360,1265 420,1220 480,1235 540,1190 600,1205 660,1175 660,1320 225,1320" fill="url(#lineChart2)" opacity="0.5"/>
+  <!-- area chart white (débitos) -->
+  <polyline points="225,1310 300,1295 360,1305 420,1280 480,1295 540,1270 600,1285 660,1260" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6,3"/>
+  <!-- dots on green line -->
+  <circle cx="420" cy="1220" r="5" fill="rgba(134,239,172,0.9)" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+  <circle cx="540" cy="1190" r="5" fill="rgba(134,239,172,0.9)" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+  <circle cx="660" cy="1175" r="5" fill="rgba(134,239,172,0.9)" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MINI KPI CARDS (direita baixo) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="560" y="880" width="150" height="90" rx="16" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <rect x="580" y="900" width="70" height="8" rx="4" fill="rgba(255,255,255,0.25)"/>
+  <rect x="580" y="918" width="100" height="16" rx="5" fill="rgba(255,255,255,0.35)"/>
+  <rect x="580" y="944" width="50" height="14" rx="7" fill="rgba(134,239,172,0.3)" stroke="rgba(134,239,172,0.5)" stroke-width="1"/>
+
+  <rect x="730" y="920" width="150" height="90" rx="16" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <rect x="750" y="940" width="70" height="8" rx="4" fill="rgba(255,255,255,0.2)"/>
+  <rect x="750" y="958" width="100" height="16" rx="5" fill="rgba(255,255,255,0.3)"/>
+  <rect x="750" y="984" width="50" height="14" rx="7" fill="rgba(255,120,120,0.3)" stroke="rgba(255,120,120,0.5)" stroke-width="1"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- FLOATING COINS (decorativos) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <circle cx="480" cy="420" r="28" fill="rgba(255,220,80,0.2)" stroke="rgba(255,220,80,0.4)" stroke-width="2"/>
+  <circle cx="480" cy="420" r="20" fill="none" stroke="rgba(255,220,80,0.25)" stroke-width="1.5"/>
+  <text x="480" y="426" text-anchor="middle" font-size="18" fill="rgba(255,220,80,0.6)" font-family="serif" font-weight="bold">R$</text>
+
+  <circle cx="820" cy="1200" r="22" fill="rgba(255,220,80,0.15)" stroke="rgba(255,220,80,0.3)" stroke-width="1.5"/>
+  <circle cx="820" cy="1200" r="15" fill="none" stroke="rgba(255,220,80,0.2)" stroke-width="1"/>
+  <text x="820" y="1205" text-anchor="middle" font-size="13" fill="rgba(255,220,80,0.5)" font-family="serif" font-weight="bold">R$</text>
+
+  <circle cx="80" cy="1400" r="18" fill="rgba(255,220,80,0.12)" stroke="rgba(255,220,80,0.25)" stroke-width="1.5"/>
+  <text x="80" y="1406" text-anchor="middle" font-size="11" fill="rgba(255,220,80,0.45)" font-family="serif" font-weight="bold">R$</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SETA DE TENDÊNCIA (decorativa) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g transform="translate(460, 1070)" opacity="0.35">
+    <polyline points="0,60 30,35 60,45 90,15 120,25 150,0" fill="none" stroke="rgba(134,239,172,0.8)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polygon points="140,0 155,-5 160,10" fill="rgba(134,239,172,0.8)"/>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- ÍCONE DE CADEADO 2FA (canto inferior) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g transform="translate(800, 1380)" opacity="0.3">
+    <rect x="-22" y="-10" width="44" height="36" rx="8" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+    <path d="M-12,-10 L-12,-22 Q0,-34 12,-22 L12,-10" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="0" cy="10" r="6" fill="rgba(255,255,255,0.4)"/>
+    <line x1="0" y1="10" x2="0" y2="20" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- CONNECTING DOTS (rede de dados) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g opacity="0.12">
+    <line x1="200" y1="750" x2="400" y2="820" stroke="white" stroke-width="1"/>
+    <line x1="400" y1="820" x2="600" y2="760" stroke="white" stroke-width="1"/>
+    <line x1="600" y1="760" x2="750" y2="830" stroke="white" stroke-width="1"/>
+    <line x1="200" y1="750" x2="350" y2="700" stroke="white" stroke-width="1"/>
+    <line x1="350" y1="700" x2="600" y2="760" stroke="white" stroke-width="1"/>
+    <circle cx="200" cy="750" r="4" fill="white"/>
+    <circle cx="400" cy="820" r="4" fill="white"/>
+    <circle cx="600" cy="760" r="4" fill="white"/>
+    <circle cx="750" cy="830" r="4" fill="white"/>
+    <circle cx="350" cy="700" r="4" fill="white"/>
+  </g>
+
+</svg>
