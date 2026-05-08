@@ -23,7 +23,7 @@ const DEFAULT_COLORS = [
 export function CategoryPieChart({
   data,
   title = "Distribuição por Categoria",
-  description = "Proporção de despesas por categoria",
+  description = "Proporção de débitos por categoria",
   colors = DEFAULT_COLORS,
 }: CategoryPieChartProps) {
   // Ordenar dados em ordem decrescente

@@ -923,7 +923,7 @@ export default function Transactions() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Transações</h1>
-          <p className="text-muted-foreground">Gerencie receitas e despesas</p>
+          <p className="text-muted-foreground">Gerencie créditos e débitos</p>
         </div>
         <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
           <Button variant="outline" className="w-full md:w-auto" onClick={() => setIsExportAttachmentsOpen(true)}>
@@ -2668,12 +2668,10 @@ function TransactionForm({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Data da Compra</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formData.purchaseDate}
-                    onChange={(e) => {
-                      const newPurchaseDate = e.target.value;
-                      const card = creditCards.find((c) => c.id.toString() === formData.creditCardId);
+                    onChange={(newPurchaseDate) => {
+                      const card = creditCards?.find((c) => c.id.toString() === formData.creditCardId);
                       let newDueDate = formData.dueDate;
                       if (card && newPurchaseDate) {
                         const purchase = new Date(newPurchaseDate + "T12:00:00");

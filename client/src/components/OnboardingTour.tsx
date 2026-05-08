@@ -111,7 +111,7 @@ export function OnboardingTour() {
         popover: {
           title: iconTitle(ICONS.home, "Início — Dashboard Geral"),
           description: `
-            <p>O <strong>Dashboard Geral</strong> exibe uma visão consolidada de todas as suas entidades — receitas, despesas, saldo e indicadores financeiros em um só lugar.</p>
+            <p>O <strong>Dashboard Geral</strong> exibe uma visão consolidada de todas as suas entidades — créditos, débitos, saldo e indicadores financeiros em um só lugar.</p>
             <p style="margin-top:8px;font-size:13px;opacity:0.65;">Cada entidade também tem seu próprio dashboard com dados específicos.</p>
           `,
           side: isMobile ? "bottom" : "right",
@@ -125,7 +125,7 @@ export function OnboardingTour() {
           title: iconTitle(ICONS.building, "Entidades"),
           description: `
             <p>Cada <strong>Entidade</strong> é um centro de custo independente — pode ser uma empresa, fazenda, projeto ou qualquer unidade financeira.</p>
-            <p style="margin-top:8px;font-size:13px;opacity:0.65;">Comece criando sua primeira entidade para organizar receitas e despesas separadamente.</p>
+            <p style="margin-top:8px;font-size:13px;opacity:0.65;">Comece criando sua primeira entidade para organizar créditos e débitos separadamente.</p>
           `,
           side: isMobile ? "bottom" : "right",
           align: "start",
@@ -137,7 +137,7 @@ export function OnboardingTour() {
         popover: {
           title: iconTitle(ICONS.receipt, "Transações"),
           description: `
-            <p>Registre <strong>receitas</strong> e <strong>despesas</strong> de forma simples. Categorize, adicione anexos e acompanhe o status de cada lançamento.</p>
+            <p>Registre <strong>créditos</strong> e <strong>débitos</strong> de forma simples. Categorize, adicione anexos e acompanhe o status de cada lançamento.</p>
             <p style="margin-top:8px;font-size:13px;opacity:0.65;">Cada transação pode ter categoria, conta bancária, meio de pagamento e documentos anexados.</p>
           `,
           side: isMobile ? "bottom" : "right",

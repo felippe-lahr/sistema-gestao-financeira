@@ -76,12 +76,12 @@ export default function Dashboard() {
   // Chart data (mock for now, will be replaced with real data)
   const cashFlowData = useMemo(() => {
     return [
-      { month: "Jan", receitas: 12000, despesas: 8000 },
-      { month: "Fev", receitas: 15000, despesas: 9000 },
-      { month: "Mar", receitas: 18000, despesas: 11000 },
-      { month: "Abr", receitas: 16000, despesas: 10000 },
-      { month: "Mai", receitas: 20000, despesas: 12000 },
-      { month: "Jun", receitas: 22000, despesas: 13000 },
+      { month: "Jan", creditos: 12000, debitos: 8000 },
+      { month: "Fev", creditos: 15000, debitos: 9000 },
+      { month: "Mar", creditos: 18000, debitos: 11000 },
+      { month: "Abr", creditos: 16000, debitos: 10000 },
+      { month: "Mai", creditos: 20000, debitos: 12000 },
+      { month: "Jun", creditos: 22000, debitos: 13000 },
     ];
   }, []);
 
@@ -256,14 +256,14 @@ export default function Dashboard() {
                 <Legend />
                 <Line
                   type="monotone"
-                  dataKey="receitas"
+                  dataKey="creditos"
                   stroke="#10b981"
                   strokeWidth={2}
                   name="Créditos"
                 />
                 <Line
                   type="monotone"
-                  dataKey="despesas"
+                  dataKey="debitos"
                   stroke="#ef4444"
                   strokeWidth={2}
                   name="Débitos"

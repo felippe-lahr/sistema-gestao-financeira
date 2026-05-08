@@ -524,10 +524,10 @@ export function Reports() {
             </table>
           </div>` : ''}
 
-          <!-- TABELA DE RECEITAS -->
+          <!-- TABELA DE CRÉDITOS -->
           ${incomes.length > 0 ? `
           <div class="section">
-            <div class="section-title"><span class="dot" style="background:#16a34a"></span>Receitas (${incomes.length})</div>
+            <div class="section-title"><span class="dot" style="background:#16a34a"></span>Créditos (${incomes.length})</div>
             <table>
               <thead>
                 <tr>
@@ -542,7 +542,7 @@ export function Reports() {
               <tbody>${renderTransactionRows(incomes)}</tbody>
               <tfoot>
                 <tr style="background:#f0fdf4;font-weight:700;border-top:2px solid #bbf7d0">
-                  <td colspan="3" style="padding:8px 10px">TOTAL RECEITAS</td>
+                  <td colspan="3" style="padding:8px 10px">TOTAL CRÉDITOS</td>
                   <td style="text-align:right;color:#16a34a;padding:8px 10px">R$ ${fmt(totalIncome)}</td>
                   <td colspan="2"></td>
                 </tr>
@@ -550,7 +550,7 @@ export function Reports() {
             </table>
           </div>` : ''}
 
-          <!-- TABELA DE DESPESAS -->
+          <!-- TABELA DE DÉBITOS -->
           ${expenses.length > 0 ? `
           <div class="section">
             <div class="section-title"><span class="dot" style="background:#dc2626"></span>Débitos (${expenses.length})</div>
@@ -568,7 +568,7 @@ export function Reports() {
               <tbody>${renderTransactionRows(expenses)}</tbody>
               <tfoot>
                 <tr style="background:#fef2f2;font-weight:700;border-top:2px solid #fecaca">
-                  <td colspan="3" style="padding:8px 10px">TOTAL DESPESAS</td>
+                  <td colspan="3" style="padding:8px 10px">TOTAL DÉBITOS</td>
                   <td style="text-align:right;color:#dc2626;padding:8px 10px">R$ ${fmt(totalExpense)}</td>
                   <td colspan="2"></td>
                 </tr>

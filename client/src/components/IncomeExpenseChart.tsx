@@ -15,7 +15,7 @@ interface IncomeExpenseChartProps {
 export function IncomeExpenseChart({
   data,
   title = "Créditos vs Débitos",
-  description = "Comparação mensal de receitas e despesas",
+  description = "Comparação mensal de créditos e débitos",
 }: IncomeExpenseChartProps) {
   return (
     <Card className="card-hover">

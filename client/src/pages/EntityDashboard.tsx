@@ -55,13 +55,13 @@ export default function EntityDashboard() {
     { enabled: !!entityId && showDiagnostic }
   );
 
-  // Query para transações a vencer (despesas)
+  // Query para transações a vencer (débitos)
   const { data: upcomingTransactions, isLoading: upcomingLoading } = trpc.dashboard.upcomingTransactions.useQuery(
     { entityId: entityId!, daysAhead: 7 },
     { enabled: !!entityId }
   );
 
-  // Query para receitas a receber
+  // Query para créditos a receber
   const { data: upcomingIncomeTransactions, isLoading: upcomingIncomeLoading } = trpc.dashboard.upcomingIncomeTransactions.useQuery(
     { entityId: entityId!, daysAhead: 7 },
     { enabled: !!entityId }
@@ -119,7 +119,7 @@ export default function EntityDashboard() {
     { enabled: !!entityId }
   );
   
-  // Query para gastos mensais por categoria
+  // Query para débitos mensais por categoria
   const getMonthlyChartDates = () => {
     const now = new Date();
     if (monthlyChartPeriod === "year") {
@@ -766,9 +766,9 @@ export default function EntityDashboard() {
               <CardTitle>Débitos Mensais por Categoria</CardTitle>
               <CardDescription>
                 {monthlyChartPeriod === "year" 
-                  ? `Débitos pagas em ${new Date().getFullYear()}`
+                  ? `Débitos pagos em ${new Date().getFullYear()}`
                   : monthlyChartStartDate && monthlyChartEndDate
-                    ? `Débitos pagas de ${format(new Date(monthlyChartStartDate), "dd/MM/yyyy")} a ${format(new Date(monthlyChartEndDate), "dd/MM/yyyy")}`
+                    ? `Débitos pagos de ${format(new Date(monthlyChartStartDate), "dd/MM/yyyy")} a ${format(new Date(monthlyChartEndDate), "dd/MM/yyyy")}`
                     : "Selecione um período"}
               </CardDescription>
             </div>
