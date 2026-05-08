@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark, CreditCard } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark, CreditCard, Smartphone } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -32,6 +32,7 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 import { OnboardingTour } from './OnboardingTour';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "./ui/input-otp";
 
 // Componente de Login
 function LoginForm() {
@@ -44,6 +45,41 @@ function LoginForm() {
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  // ─── Estado do 2FA no login ─────────────────────────────────────────────────────────────────────────────
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [twoFactorOpenId, setTwoFactorOpenId] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
+
+  const handleVerify2FA = async () => {
+    if (totpCode.length !== 6) {
+      toast.error("Digite o código de 6 dígitos do aplicativo");
+      return;
+    }
+    setTwoFaLoading(true);
+    try {
+      const response = await fetch("/api/auth/2fa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ openId: twoFactorOpenId, code: totpCode, rememberMe }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("Login realizado com sucesso!");
+        localStorage.setItem('showFinancialValues', JSON.stringify(false));
+        localStorage.setItem('rememberMe', JSON.stringify(rememberMe));
+        window.location.href = '/';
+      } else {
+        toast.error(data.error || "Código incorreto. Tente novamente.");
+        setTotpCode("");
+      }
+    } catch {
+      toast.error("Erro ao verificar código 2FA");
+    } finally {
+      setTwoFaLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +97,14 @@ function LoginForm() {
       });
       const data = await response.json();
       if (response.ok) {
+        // Verificar se o 2FA é necessário
+        if (data.requiresTwoFactor) {
+          setTwoFactorOpenId(data.openId);
+          setRequiresTwoFactor(true);
+          setTotpCode("");
+          setIsLoading(false);
+          return;
+        }
         toast.success("Login realizado com sucesso!");
         // Definir valores como ocultos por padrão
         localStorage.setItem('showFinancialValues', JSON.stringify(false));
@@ -109,6 +153,74 @@ function LoginForm() {
       setResendLoading(false);
     }
   };
+
+  // Se o 2FA for necessário, exibir a tela de verificação
+  if (requiresTwoFactor) {
+    return (
+      <div className="flex min-h-screen">
+        <div className="flex-1 flex items-center justify-center p-6 sm:p-10 bg-white dark:bg-gray-950 min-h-screen">
+          <div className="w-full max-w-md">
+            <div className="flex justify-center mb-8 lg:hidden">
+              <img src="/logo-unifique-pro.png" alt="UnifiquePro" style={{ width: '220px' }} className="h-auto object-contain dark:hidden" />
+              <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '220px' }} className="h-auto object-contain hidden dark:block" />
+            </div>
+            <div className="mb-8 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                  <Smartphone className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Verificação em dois fatores</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                Abra o <strong>Google Authenticator</strong> e insira o código de 6 dígitos gerado para o <strong>UnifiquePro</strong>.
+              </p>
+            </div>
+            <div className="space-y-6">
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={(value) => setTotpCode(value)}
+                  onComplete={handleVerify2FA}
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+              <Button
+                onClick={handleVerify2FA}
+                className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm hover:shadow-md"
+                disabled={twoFaLoading || totpCode.length !== 6}
+              >
+                {twoFaLoading ? "Verificando..." : "Verificar e Entrar"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => { setRequiresTwoFactor(false); setTotpCode(""); }}
+                className="w-full text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                ← Voltar ao login
+              </button>
+            </div>
+          </div>
+        </div>
+        {/* Painel direito */}
+        <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex-col items-center justify-center p-12">
+          <div className="relative z-10 text-center text-white max-w-md">
+            <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '260px' }} className="mx-auto mb-8" />
+            <h2 className="text-3xl font-bold mb-4">Segurança em primeiro lugar</h2>
+            <p className="text-blue-100 text-lg">Seu acesso está protegido com autenticação de dois fatores.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">

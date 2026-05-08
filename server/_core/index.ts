@@ -15,6 +15,7 @@ import { registerUploadRoutes } from "./upload-routes";
 import { registerStripeRoutes } from "./stripe-routes";
 import { registerOfxRoutes } from "./ofx-routes";
 import { registerCreditCardImportRoutes } from "./credit-card-import-routes";
+import { registerTotpRoutes } from "./totp-auth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
@@ -141,6 +142,8 @@ async function startServer() {
   registerOfxRoutes(app);
   // Credit card PDF import routes
   registerCreditCardImportRoutes(app);
+  // TOTP 2FA routes (Google Authenticator)
+  registerTotpRoutes(app);
   // Stripe billing routes (webhook must come before json body parser)
   registerStripeRoutes(app);
 

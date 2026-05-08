@@ -52,6 +52,20 @@ export function registerPasswordAuthRoutes(app: Express) {
         }
       }
 
+      // Verificar se o usuário tem 2FA ativo
+      const totpData = await db.getUserTotpData(user.id);
+      if (totpData?.totpEnabled) {
+        // 2FA ativo: não criar sessão ainda.
+        // Retornar flag para o frontend solicitar o código TOTP.
+        // O openId é necessário para /api/auth/2fa/verify criar a sessão após validação.
+        console.log("[Password Auth] Login - 2FA required for userId:", user.id);
+        res.json({
+          requiresTwoFactor: true,
+          openId: user.openId,
+        });
+        return;
+      }
+
       // Atualizar ultimo login
       await db.upsertUser({
         openId: user.openId,

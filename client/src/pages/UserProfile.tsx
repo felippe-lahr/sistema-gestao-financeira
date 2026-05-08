@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { User, Lock, Mail, Eye, EyeOff, KeyRound, PlayCircle } from "lucide-react";
+import { User, Lock, Mail, Eye, EyeOff, KeyRound, PlayCircle, ShieldCheck, ShieldOff, Smartphone } from "lucide-react";
 import { RestartOnboardingButton } from "@/components/OnboardingTour";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 export default function UserProfile() {
   const { user } = useAuth();
@@ -23,12 +24,28 @@ export default function UserProfile() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // ─── Estado do 2FA ────────────────────────────────────────────────────────────────────────────────
+  const [twoFaEnabled, setTwoFaEnabled] = useState<boolean | null>(null);
+  const [twoFaStep, setTwoFaStep] = useState<"idle" | "setup" | "deactivate">("idle");
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [totpSecret, setTotpSecret] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState("");
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
+
   // Verificar se o usuário tem senha cadastrada
   useEffect(() => {
     fetch("/api/auth/has-password", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => setHasPassword(data.hasPassword ?? false))
       .catch(() => setHasPassword(false));
+  }, []);
+
+  // Verificar status do 2FA
+  useEffect(() => {
+    fetch("/api/auth/2fa/status", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setTwoFaEnabled(data.enabled ?? false))
+      .catch(() => setTwoFaEnabled(false));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,6 +106,100 @@ export default function UserProfile() {
     setShowCurrentPassword(false);
     setShowNewPassword(false);
     setShowConfirmPassword(false);
+  };
+
+  // ─── Handlers do 2FA ─────────────────────────────────────────────────────────────────────────────
+
+  const handleSetup2FA = async () => {
+    setTwoFaLoading(true);
+    try {
+      const response = await fetch("/api/auth/2fa/setup", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setQrCodeDataUrl(data.qrCodeDataUrl);
+        setTotpSecret(data.secret);
+        setTotpCode("");
+        setTwoFaStep("setup");
+      } else {
+        toast.error(data.error || "Erro ao iniciar configuração do 2FA");
+      }
+    } catch {
+      toast.error("Erro de conexão ao configurar 2FA");
+    } finally {
+      setTwoFaLoading(false);
+    }
+  };
+
+  const handleActivate2FA = async () => {
+    if (totpCode.length !== 6) {
+      toast.error("Digite o código de 6 dígitos do aplicativo");
+      return;
+    }
+    setTwoFaLoading(true);
+    try {
+      const response = await fetch("/api/auth/2fa/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code: totpCode }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("Autenticação de dois fatores ativada com sucesso!");
+        setTwoFaEnabled(true);
+        setTwoFaStep("idle");
+        setQrCodeDataUrl(null);
+        setTotpSecret(null);
+        setTotpCode("");
+      } else {
+        toast.error(data.error || "Código incorreto. Tente novamente.");
+        setTotpCode("");
+      }
+    } catch {
+      toast.error("Erro de conexão ao ativar 2FA");
+    } finally {
+      setTwoFaLoading(false);
+    }
+  };
+
+  const handleDeactivate2FA = async () => {
+    if (totpCode.length !== 6) {
+      toast.error("Digite o código de 6 dígitos do aplicativo para confirmar");
+      return;
+    }
+    setTwoFaLoading(true);
+    try {
+      const response = await fetch("/api/auth/2fa/deactivate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code: totpCode }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("Autenticação de dois fatores desativada.");
+        setTwoFaEnabled(false);
+        setTwoFaStep("idle");
+        setTotpCode("");
+      } else {
+        toast.error(data.error || "Código incorreto. Tente novamente.");
+        setTotpCode("");
+      }
+    } catch {
+      toast.error("Erro de conexão ao desativar 2FA");
+    } finally {
+      setTwoFaLoading(false);
+    }
+  };
+
+  const handleCancel2FA = () => {
+    setTwoFaStep("idle");
+    setQrCodeDataUrl(null);
+    setTotpSecret(null);
+    setTotpCode("");
   };
 
   return (
@@ -235,6 +346,149 @@ export default function UserProfile() {
                 {hasPassword ? "Alterar Senha" : "Definir Senha"}
               </Button>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Autenticação de Dois Fatores (2FA) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Smartphone className="h-5 w-5" />
+              Autenticação de Dois Fatores (2FA)
+            </CardTitle>
+            <CardDescription>
+              Adicione uma camada extra de segurança usando o Google Authenticator ou outro aplicativo TOTP.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {twoFaEnabled === null ? (
+              <Skeleton className="h-10 w-48" />
+            ) : twoFaStep === "idle" ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {twoFaEnabled ? (
+                    <>
+                      <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                        <ShieldCheck className="h-5 w-5" />
+                        <span className="font-medium text-sm">Ativo</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Seu login está protegido com 2FA</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <ShieldOff className="h-5 w-5" />
+                        <span className="font-medium text-sm">Inativo</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Recomendamos ativar para maior segurança</span>
+                    </>
+                  )}
+                </div>
+                <Button
+                  variant={twoFaEnabled ? "destructive" : "default"}
+                  size="sm"
+                  onClick={() => {
+                    if (twoFaEnabled) {
+                      setTwoFaStep("deactivate");
+                      setTotpCode("");
+                    } else {
+                      handleSetup2FA();
+                    }
+                  }}
+                  disabled={twoFaLoading}
+                >
+                  {twoFaLoading ? "Aguarde..." : twoFaEnabled ? "Desativar 2FA" : "Ativar 2FA"}
+                </Button>
+              </div>
+            ) : twoFaStep === "setup" ? (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Passo 1 — Escaneie o QR Code</p>
+                  <p className="text-sm text-muted-foreground">
+                    Abra o <strong>Google Authenticator</strong>, <strong>Authy</strong> ou qualquer aplicativo TOTP e escaneie o código abaixo.
+                  </p>
+                  {qrCodeDataUrl && (
+                    <div className="flex justify-center py-2">
+                      <div className="p-3 bg-white rounded-lg border">
+                        <img src={qrCodeDataUrl} alt="QR Code 2FA" className="w-48 h-48" />
+                      </div>
+                    </div>
+                  )}
+                  {totpSecret && (
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Não consegue escanear? Digite a chave manualmente no aplicativo:
+                      </p>
+                      <code className="block text-xs font-mono bg-muted px-3 py-2 rounded-md break-all select-all">
+                        {totpSecret}
+                      </code>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">Passo 2 — Confirme com o código</p>
+                  <p className="text-sm text-muted-foreground">
+                    Digite o código de 6 dígitos gerado pelo aplicativo para confirmar a ativação.
+                  </p>
+                  <div className="flex justify-center">
+                    <InputOTP maxLength={6} value={totpCode} onChange={(value) => setTotpCode(value)}>
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleActivate2FA} disabled={twoFaLoading || totpCode.length !== 6}>
+                    {twoFaLoading ? "Verificando..." : "Ativar 2FA"}
+                  </Button>
+                  <Button variant="outline" onClick={handleCancel2FA} disabled={twoFaLoading}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : twoFaStep === "deactivate" ? (
+              <div className="space-y-4">
+                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                  <p className="text-sm text-destructive font-medium">Atenção: Você está prestes a desativar o 2FA</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Após desativar, seu login não exigirá mais o código do aplicativo. Para confirmar, informe o código atual.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Código do aplicativo (6 dígitos)</Label>
+                  <div className="flex justify-center">
+                    <InputOTP maxLength={6} value={totpCode} onChange={(value) => setTotpCode(value)}>
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeactivate2FA}
+                    disabled={twoFaLoading || totpCode.length !== 6}
+                  >
+                    {twoFaLoading ? "Desativando..." : "Confirmar Desativação"}
+                  </Button>
+                  <Button variant="outline" onClick={handleCancel2FA} disabled={twoFaLoading}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 

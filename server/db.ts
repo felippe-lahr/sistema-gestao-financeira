@@ -2738,3 +2738,110 @@ export async function ensureCreditCardTables(): Promise<void> {
     console.warn('[db] Could not ensure credit card tables:', err?.message);
   }
 }
+
+// ============================================================
+// TOTP / 2FA FUNCTIONS
+// ============================================================
+
+/**
+ * Salva a chave secreta pendente (durante o processo de ativação do 2FA).
+ * A chave só se torna ativa após o usuário confirmar com um código válido.
+ */
+export async function saveTotpPendingSecret(userId: number, secret: string): Promise<void> {
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    await client`UPDATE users SET "totpPendingSecret" = ${secret} WHERE id = ${userId}`;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Ativa o 2FA para o usuário: move a chave pendente para ativa e marca totpEnabled = true.
+ */
+export async function activateTotp(userId: number): Promise<void> {
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    await client`
+      UPDATE users
+      SET "totpSecret" = "totpPendingSecret",
+          "totpPendingSecret" = NULL,
+          "totpEnabled" = true
+      WHERE id = ${userId}
+    `;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Desativa o 2FA para o usuário: limpa as chaves e marca totpEnabled = false.
+ */
+export async function deactivateTotp(userId: number): Promise<void> {
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    await client`
+      UPDATE users
+      SET "totpSecret" = NULL,
+          "totpPendingSecret" = NULL,
+          "totpEnabled" = false
+      WHERE id = ${userId}
+    `;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Busca os dados TOTP de um usuário (secret ativa, secret pendente e flag de habilitado).
+ */
+export async function getUserTotpData(userId: number): Promise<{
+  totpSecret: string | null;
+  totpEnabled: boolean;
+  totpPendingSecret: string | null;
+} | null> {
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const result = await client`
+      SELECT "totpSecret", "totpEnabled", "totpPendingSecret"
+      FROM users
+      WHERE id = ${userId}
+      LIMIT 1
+    `;
+    if (result.length === 0) return null;
+    return {
+      totpSecret: result[0].totpSecret ?? null,
+      totpEnabled: result[0].totpEnabled ?? false,
+      totpPendingSecret: result[0].totpPendingSecret ?? null,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Busca os dados TOTP de um usuário pelo openId (usado no fluxo de login).
+ */
+export async function getUserTotpDataByOpenId(openId: string): Promise<{
+  id: number;
+  totpSecret: string | null;
+  totpEnabled: boolean;
+} | null> {
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const result = await client`
+      SELECT id, "totpSecret", "totpEnabled"
+      FROM users
+      WHERE "openId" = ${openId}
+      LIMIT 1
+    `;
+    if (result.length === 0) return null;
+    return {
+      id: result[0].id,
+      totpSecret: result[0].totpSecret ?? null,
+      totpEnabled: result[0].totpEnabled ?? false,
+    };
+  } finally {
+    await client.end();
+  }
+}

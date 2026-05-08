@@ -80,6 +80,18 @@ const migrations: { name: string; sql: string }[] = [
     name: "add_google_calendar_event_id_to_tasks",
     sql: `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS "googleCalendarEventId" varchar(255)`,
   },
+  {
+    // Adiciona colunas para autenticação de dois fatores (2FA) via TOTP (Google Authenticator).
+    // totpSecret: chave secreta ativa (quando 2FA está habilitado)
+    // totpEnabled: flag indicando se o 2FA está ativo para o usuário
+    // totpPendingSecret: chave temporária durante o processo de ativação (antes da confirmação)
+    name: "add_totp_2fa_columns_to_users",
+    sql: `
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "totpSecret" varchar(64);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "totpEnabled" boolean NOT NULL DEFAULT false;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "totpPendingSecret" varchar(64);
+    `,
+  },
 ];
 
 async function runMigrations() {
