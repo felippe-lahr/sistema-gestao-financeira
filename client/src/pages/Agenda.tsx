@@ -442,7 +442,7 @@ export default function Agenda() {
                   {syncGoogleCalendar.isPending ? (
                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    <img src="/google-calendar-logo.png" alt="Google Agenda" className="h-4 w-4 mr-2" />
                   )}
                   Google Agenda
                 </Button>
@@ -469,7 +469,7 @@ export default function Agenda() {
                 {getGoogleCalendarAuthUrl.isPending ? (
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
-                  <Calendar className="h-4 w-4 mr-2" />
+                  <img src="/google-calendar-logo.png" alt="Google Agenda" className="h-4 w-4 mr-2" />
                 )}
                 Conectar Google Agenda
               </Button>

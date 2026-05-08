@@ -355,6 +355,12 @@ export default function UserProfile() {
             <CardTitle className="flex items-center gap-2">
               <Smartphone className="h-5 w-5" />
               Autenticação de Dois Fatores (2FA)
+              <img
+                src="/google-authenticator-logo.png"
+                alt="Google Authenticator"
+                className="h-5 w-5 ml-1 rounded-sm"
+                title="Compatível com Google Authenticator"
+              />
             </CardTitle>
             <CardDescription>
               Adicione uma camada extra de segurança usando o Google Authenticator ou outro aplicativo TOTP.
