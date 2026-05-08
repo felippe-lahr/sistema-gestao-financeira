@@ -291,7 +291,7 @@ function Step2({
         <p className="text-sm font-medium text-blue-800 dark:text-blue-300">O que você terá acesso:</p>
         <ul className="space-y-1.5">
           {[
-            "Gestão de transações (receitas e despesas)",
+            "Gestão de transações (créditos e débitos)",
             "Controle de contas bancárias e categorias",
             "Módulo de agenda e vencimentos",
             "Relatórios financeiros",

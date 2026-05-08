@@ -2601,7 +2601,7 @@ function TransactionForm({
       {/* Helper: calcula data de vencimento com base no cartão e data da compra */}
       {/* (definido inline para ter acesso a creditCards e formData) */}
 
-      {/* Cartão de Crédito (apenas para despesas) */}
+      {/* Cartão de Crédito (apenas para débitos) */}
       {formData.type === "EXPENSE" && creditCards.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
