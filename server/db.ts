@@ -1058,7 +1058,7 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
       const cardName = row.creditCardName || `Cartão ${row.creditCardId}`;
       const cardColor = row.creditCardColor || "#6B7280"; // Cor padrão
 
-      const key = `${row.creditCardId}-${row.dueDate.toISOString().split(\'T\')[0]}`;
+      const key = `${row.creditCardId}-${row.dueDate.toISOString().split('T')[0]}`;
       if (!creditCardInvoices.has(key)) {
         creditCardInvoices.set(key, {
           amount: 0,
