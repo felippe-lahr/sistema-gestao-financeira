@@ -1028,9 +1028,13 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
       categoryId: transactions.categoryId,
       categoryName: categories.name,
       categoryColor: categories.color,
+      creditCardId: transactions.creditCardId,
+      creditCardName: creditCards.name,
+      creditCardColor: creditCards.color,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .leftJoin(creditCards, eq(transactions.creditCardId, creditCards.id))
     .where(
       and(
         eq(transactions.entityId, entityId),
@@ -1045,7 +1049,59 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
     )
     .orderBy(asc(transactions.dueDate));
 
-  const mapped = result.map((row) => ({
+  // Consolidar transações de cartão de crédito
+  const consolidatedTransactions: any[] = [];
+  const creditCardInvoices = new Map<string, { amount: number; description: string; dueDate: Date; creditCardId: number; creditCardName: string; creditCardColor: string; }>();
+
+  result.forEach(row => {
+    if (row.creditCardId && row.creditCardName && row.creditCardColor) {
+      const key = `${row.creditCardId}-${row.dueDate.toISOString().split('T')[0]}`;
+      if (!creditCardInvoices.has(key)) {
+        creditCardInvoices.set(key, {
+          amount: 0,
+          description: `Fatura ${row.creditCardName}`,
+          dueDate: row.dueDate,
+          creditCardId: row.creditCardId,
+          creditCardName: row.creditCardName,
+          creditCardColor: row.creditCardColor,
+        });
+      }
+      const invoice = creditCardInvoices.get(key)!;
+      invoice.amount += row.amount;
+    } else {
+      consolidatedTransactions.push({
+        id: row.id,
+        description: row.description,
+        amount: row.amount,
+        dueDate: row.dueDate,
+        status: row.status,
+        type: row.type,
+        categoryId: row.categoryId,
+        categoryName: row.categoryName,
+        categoryColor: row.categoryColor,
+      });
+    }
+  });
+
+  creditCardInvoices.forEach(invoice => {
+    consolidatedTransactions.push({
+      id: `cc-invoice-${invoice.creditCardId}-${invoice.dueDate.toISOString().split('T')[0]}`,
+      description: invoice.description,
+      amount: invoice.amount,
+      dueDate: invoice.dueDate,
+      status: "PENDING", // Assumimos PENDING para faturas a vencer
+      type: "EXPENSE",
+      categoryId: null, // Fatura não tem categoria específica
+      categoryName: invoice.creditCardName,
+      categoryColor: invoice.creditCardColor,
+      isCreditCardInvoice: true, // Flag para identificar no frontend
+    });
+  });
+
+  // Ordenar novamente por data de vencimento
+  consolidatedTransactions.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+
+  return consolidatedTransactions.map((row) => ({
     id: row.id,
     description: row.description,
     amount: row.amount,

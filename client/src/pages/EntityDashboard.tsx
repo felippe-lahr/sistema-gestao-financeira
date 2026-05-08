@@ -998,15 +998,23 @@ export default function EntityDashboard() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-sm truncate">{transaction.description}</p>
-                            <span 
-                              className="inline-block w-3 h-3 rounded-full flex-shrink-0" 
-                              style={{ backgroundColor: transaction.categoryColor }}
-                              title={transaction.categoryName}
-                            />
+                            {transaction.isCreditCardInvoice ? (
+                              <span 
+                                className="inline-block w-3 h-3 rounded-full flex-shrink-0" 
+                                style={{ backgroundColor: transaction.creditCardColor }}
+                                title={transaction.creditCardName}
+                              />
+                            ) : (
+                              <span 
+                                className="inline-block w-3 h-3 rounded-full flex-shrink-0" 
+                                style={{ backgroundColor: transaction.categoryColor }}
+                                title={transaction.categoryName}
+                              />
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             <p className="text-xs text-muted-foreground">
-                              {transaction.categoryName}
+                              {transaction.isCreditCardInvoice ? transaction.creditCardName : transaction.categoryName}
                             </p>
                             <span className="text-xs text-muted-foreground">•</span>
                             <p className="text-xs text-muted-foreground">
