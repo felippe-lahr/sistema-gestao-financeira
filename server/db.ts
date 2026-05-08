@@ -1017,6 +1017,8 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
   futureDateObj.setUTCDate(futureDateObj.getUTCDate() + daysAhead);
   const futureDateString = futureDateObj.toISOString().split('T')[0];
 
+  // creditCardId não está no schema Drizzle da tabela transactions,
+  // por isso usamos sql<> raw, igual ao padrão em getTransactionsByEntityId
   const result = await db
     .select({
       id: transactions.id,
@@ -1028,13 +1030,12 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
       categoryId: transactions.categoryId,
       categoryName: categories.name,
       categoryColor: categories.color,
-      creditCardId: transactions.creditCardId,
-      creditCardName: creditCards.name,
-      creditCardColor: creditCards.color,
+      creditCardId: sql<number | null>`transactions."creditCardId"`,
+      creditCardName: sql<string | null>`(SELECT name FROM credit_cards WHERE id = transactions."creditCardId")`,
+      creditCardColor: sql<string | null>`(SELECT color FROM credit_cards WHERE id = transactions."creditCardId")`,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .leftJoin(creditCards, eq(transactions.creditCardId, creditCards.id))
     .where(
       and(
         eq(transactions.entityId, entityId),
@@ -1049,15 +1050,21 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
     )
     .orderBy(asc(transactions.dueDate));
 
-  // Consolidar transações de cartão de crédito
+  // Consolidar transações de cartão de crédito por cartão/vencimento
   const consolidatedTransactions: any[] = [];
-  const creditCardInvoices = new Map<string, { amount: number; description: string; dueDate: Date; creditCardId: number; creditCardName: string; creditCardColor: string; }>();
+  const creditCardInvoices = new Map<string, {
+    amount: number;
+    description: string;
+    dueDate: Date;
+    creditCardId: number;
+    creditCardName: string;
+    creditCardColor: string;
+  }>();
 
   result.forEach(row => {
     if (row.creditCardId) {
       const cardName = row.creditCardName || `Cartão ${row.creditCardId}`;
-      const cardColor = row.creditCardColor || "#6B7280"; // Cor padrão
-
+      const cardColor = row.creditCardColor || "#6B7280";
       const key = `${row.creditCardId}-${row.dueDate.toISOString().split('T')[0]}`;
       if (!creditCardInvoices.has(key)) {
         creditCardInvoices.set(key, {
@@ -1072,6 +1079,7 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
       const invoice = creditCardInvoices.get(key)!;
       invoice.amount += row.amount;
     } else {
+      // Transações que não são de cartão de crédito
       consolidatedTransactions.push({
         id: row.id,
         description: row.description,
@@ -1082,26 +1090,34 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
         categoryId: row.categoryId,
         categoryName: row.categoryName,
         categoryColor: row.categoryColor,
+        isCreditCardInvoice: false,
+        creditCardId: null,
+        creditCardName: null,
+        creditCardColor: null,
       });
     }
   });
 
+  // Adicionar faturas consolidadas de cartão
   creditCardInvoices.forEach(invoice => {
     consolidatedTransactions.push({
       id: `cc-invoice-${invoice.creditCardId}-${invoice.dueDate.toISOString().split('T')[0]}`,
       description: invoice.description,
       amount: invoice.amount,
       dueDate: invoice.dueDate,
-      status: "PENDING", // Assumimos PENDING para faturas a vencer
+      status: "PENDING",
       type: "EXPENSE",
-      categoryId: null, // Fatura não tem categoria específica
+      categoryId: null,
       categoryName: invoice.creditCardName,
       categoryColor: invoice.creditCardColor,
-      isCreditCardInvoice: true, // Flag para identificar no frontend
+      isCreditCardInvoice: true,
+      creditCardId: invoice.creditCardId,
+      creditCardName: invoice.creditCardName,
+      creditCardColor: invoice.creditCardColor,
     });
   });
 
-  // Ordenar novamente por data de vencimento
+  // Ordenar por data de vencimento
   consolidatedTransactions.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
 
   return consolidatedTransactions.map((row) => ({
@@ -1115,14 +1131,13 @@ export async function getUpcomingTransactions(entityId: number, daysAhead: numbe
     categoryName: row.categoryName || "Sem Categoria",
     categoryColor: row.categoryColor || "#6B7280",
     daysUntilDue: Math.floor((new Date(row.dueDate!).getTime() - localDate.getTime()) / (1000 * 60 * 60 * 24)),
-    isCreditCardInvoice: (row as any).isCreditCardInvoice || false,
-    creditCardId: (row as any).creditCardId || null,
-    creditCardName: (row as any).creditCardName || null,
-    creditCardColor: (row as any).creditCardColor || null,
+    isCreditCardInvoice: row.isCreditCardInvoice || false,
+    creditCardId: row.creditCardId || null,
+    creditCardName: row.creditCardName || null,
+    creditCardColor: row.creditCardColor || null,
   }));
 }
 
-// Buscar receitas a receber nos próximos X dias
 export async function getUpcomingIncomeTransactions(entityId: number, daysAhead: number = 7) {
   const db = await getDb();
   if (!db) return [];
