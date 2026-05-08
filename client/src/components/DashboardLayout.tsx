@@ -213,7 +213,7 @@ function LoginForm() {
         {/* Painel direito */}
         <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex-col items-center justify-center p-12">
           <div className="relative z-10 text-center text-white max-w-md">
-            <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '260px' }} className="mx-auto mb-8" />
+            <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '260px' }} className="h-auto object-contain mx-auto mb-8 brightness-0 invert" />
             <h2 className="text-3xl font-bold mb-4">Segurança em primeiro lugar</h2>
             <p className="text-blue-100 text-lg">Seu acesso está protegido com autenticação de dois fatores.</p>
           </div>
