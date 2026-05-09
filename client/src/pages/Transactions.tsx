@@ -2632,17 +2632,14 @@ function TransactionForm({
                     const purchase = new Date(purchaseDateStr + "T12:00:00");
                     const closingDay = card.closingDay || 1;
                     const dueDay = card.dueDay || 10;
-                    // Regra: compra antes do fechamento → vence no mês seguinte
-                    //        compra no dia do fechamento ou depois → vence dois meses à frente
-                    let dueMonth = purchase.getMonth();
+                    // REGRA CORRETA de fatura:
+                    // O vencimento é sempre no mês seguinte ao da compra.
+                    // Ex: fechamento=2, vencimento=9, compra=09/05 → vence 09/06 (não 09/07)
+                    // Ex: fechamento=2, vencimento=9, compra=01/05 → vence 09/06
+                    // Ex: fechamento=2, vencimento=9, compra=03/06 → vence 09/07
+                    let dueMonth = purchase.getMonth() + 1;
                     let dueYear = purchase.getFullYear();
-                    if (purchase.getDate() >= closingDay) {
-                      dueMonth += 2; // próxima fatura (fecha no mês seguinte, vence no subsequente)
-                    } else {
-                      dueMonth += 1; // fatura do mês corrente, vence no mês seguinte
-                    }
                     if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
-                    if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; } // caso +2 ultrapasse
                     const dueDate = new Date(dueYear, dueMonth, dueDay);
                     newDueDate = format(dueDate, "yyyy-MM-dd");
                   }
@@ -2677,16 +2674,11 @@ function TransactionForm({
                         const purchase = new Date(newPurchaseDate + "T12:00:00");
                         const closingDay = card.closingDay || 1;
                         const dueDay = card.dueDay || 10;
-                        // Regra: compra antes do fechamento → vence no mês seguinte
-                        //        compra no dia do fechamento ou depois → vence dois meses à frente
-                        let dueMonth = purchase.getMonth();
+                        // REGRA CORRETA de fatura:
+                        // O vencimento é sempre no mês seguinte ao da compra.
+                        // Ex: fechamento=2, vencimento=9, compra=09/05 → vence 09/06 (não 09/07)
+                        let dueMonth = purchase.getMonth() + 1;
                         let dueYear = purchase.getFullYear();
-                        if (purchase.getDate() >= closingDay) {
-                          dueMonth += 2;
-                        } else {
-                          dueMonth += 1;
-                        }
-                        if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
                         if (dueMonth > 11) { dueMonth = dueMonth - 12; dueYear += 1; }
                         const dueDate = new Date(dueYear, dueMonth, dueDay);
                         newDueDate = format(dueDate, "yyyy-MM-dd");
