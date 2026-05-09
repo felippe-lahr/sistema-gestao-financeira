@@ -91,7 +91,7 @@
   <!-- ═══════════════════════════════════════════ -->
   <!-- CARTÃO DE CRÉDITO flutuante -->
   <!-- ═══════════════════════════════════════════ -->
-  <g transform="rotate(-8, 450, 550)">
+  <g>
     <rect x="100" y="450" width="320" height="190" rx="18" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
     <!-- chip -->
     <rect x="130" y="490" width="45" height="35" rx="6" fill="rgba(255,220,100,0.4)" stroke="rgba(255,220,100,0.6)" stroke-width="1"/>
