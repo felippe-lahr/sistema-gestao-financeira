@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { User, Lock, Mail, Eye, EyeOff, KeyRound, PlayCircle, ShieldCheck, ShieldOff, Smartphone } from "lucide-react";
+import { User, Lock, Mail, Eye, EyeOff, KeyRound, PlayCircle, ShieldCheck, ShieldOff, Smartphone, MessageCircle, CheckCircle2, XCircle, Loader2, Link2, Unlink } from "lucide-react";
 import { RestartOnboardingButton } from "@/components/OnboardingTour";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
@@ -23,6 +23,14 @@ export default function UserProfile() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // ─── Estado do WhatsApp Bot ──────────────────────────────────────────────────────────────────────
+  const [waLinked, setWaLinked] = useState<boolean | null>(null);
+  const [waPhone, setWaPhone] = useState<string | null>(null);
+  const [waStep, setWaStep] = useState<"idle" | "link" | "verify">("idle");
+  const [waPhoneInput, setWaPhoneInput] = useState("");
+  const [waCodeInput, setWaCodeInput] = useState("");
+  const [waLoading, setWaLoading] = useState(false);
 
   // ─── Estado do 2FA ────────────────────────────────────────────────────────────────────────────────
   const [twoFaEnabled, setTwoFaEnabled] = useState<boolean | null>(null);
@@ -47,6 +55,102 @@ export default function UserProfile() {
       .then((data) => setTwoFaEnabled(data.enabled ?? false))
       .catch(() => setTwoFaEnabled(false));
   }, []);
+
+  // Verificar status do WhatsApp Bot
+  useEffect(() => {
+    fetch("/api/whatsapp/status", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        setWaLinked(data.linked ?? false);
+        setWaPhone(data.phone ?? null);
+      })
+      .catch(() => setWaLinked(false));
+  }, []);
+
+  // ─── Handlers do WhatsApp Bot ──────────────────────────────────────────────────────────────────
+
+  const handleWaSendCode = async () => {
+    const normalized = waPhoneInput.replace(/\D/g, "");
+    if (normalized.length < 10) {
+      toast.error("Digite um número de telefone válido com DDD (ex: 11999999999)");
+      return;
+    }
+    setWaLoading(true);
+    try {
+      const response = await fetch("/api/whatsapp/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ phone: normalized }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("Código enviado! Verifique seu WhatsApp.");
+        setWaStep("verify");
+      } else {
+        toast.error(data.error || "Erro ao enviar código");
+      }
+    } catch {
+      toast.error("Erro de conexão");
+    } finally {
+      setWaLoading(false);
+    }
+  };
+
+  const handleWaVerify = async () => {
+    if (waCodeInput.length !== 6) {
+      toast.error("Digite o código de 6 dígitos recebido no WhatsApp");
+      return;
+    }
+    const normalized = waPhoneInput.replace(/\D/g, "");
+    setWaLoading(true);
+    try {
+      const response = await fetch("/api/whatsapp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ phone: normalized, code: waCodeInput }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("WhatsApp vinculado com sucesso!");
+        setWaLinked(true);
+        setWaPhone(`+${normalized.slice(0, 2)} (${normalized.slice(2, 4)}) ${normalized.slice(4, 9)}-${normalized.slice(9)}`);
+        setWaStep("idle");
+        setWaPhoneInput("");
+        setWaCodeInput("");
+      } else {
+        toast.error(data.error || "Código inválido");
+      }
+    } catch {
+      toast.error("Erro de conexão");
+    } finally {
+      setWaLoading(false);
+    }
+  };
+
+  const handleWaUnlink = async () => {
+    setWaLoading(true);
+    try {
+      const response = await fetch("/api/whatsapp/unlink", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("WhatsApp desvinculado.");
+        setWaLinked(false);
+        setWaPhone(null);
+        setWaStep("idle");
+      } else {
+        toast.error(data.error || "Erro ao desvincular");
+      }
+    } catch {
+      toast.error("Erro de conexão");
+    } finally {
+      setWaLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -490,6 +594,123 @@ export default function UserProfile() {
                     {twoFaLoading ? "Desativando..." : "Confirmar Desativação"}
                   </Button>
                   <Button variant="outline" onClick={handleCancel2FA} disabled={twoFaLoading}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* WhatsApp Bot */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-green-600" />
+              WhatsApp Bot
+            </CardTitle>
+            <CardDescription>
+              Vincule seu WhatsApp para cadastrar transações por mensagem de voz, texto ou comprovante.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {waLinked === null ? (
+              <Skeleton className="h-10 w-48" />
+            ) : waLinked ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">Número vinculado</p>
+                    <p className="text-sm text-green-700 dark:text-green-400">{waPhone}</p>
+                  </div>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-sm space-y-1">
+                  <p className="font-medium">Como usar:</p>
+                  <p>🎙️ <strong>Voz:</strong> "Paguei 150 reais de mercado hoje"</p>
+                  <p>💬 <strong>Texto:</strong> "Recebi 2000 de aluguel"</p>
+                  <p>🖼️ <strong>Comprovante:</strong> Envie uma foto do comprovante</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleWaUnlink}
+                  disabled={waLoading}
+                  className="text-destructive hover:text-destructive"
+                >
+                  {waLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Unlink className="mr-2 h-4 w-4" />
+                  )}
+                  Desvincular WhatsApp
+                </Button>
+              </div>
+            ) : waStep === "idle" ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-muted border rounded-lg">
+                  <XCircle className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <p className="text-sm text-muted-foreground">Nenhum número vinculado</p>
+                </div>
+                <Button onClick={() => setWaStep("link")}>
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Vincular WhatsApp
+                </Button>
+              </div>
+            ) : waStep === "link" ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="waPhone">Número do WhatsApp</Label>
+                  <p className="text-xs text-muted-foreground">Digite com DDD, sem espaços ou traços. Ex: 11999999999</p>
+                  <Input
+                    id="waPhone"
+                    type="tel"
+                    placeholder="11999999999"
+                    value={waPhoneInput}
+                    onChange={(e) => setWaPhoneInput(e.target.value.replace(/\D/g, ""))}
+                    maxLength={13}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleWaSendCode} disabled={waLoading || waPhoneInput.replace(/\D/g, "").length < 10}>
+                    {waLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
+                    Enviar Código
+                  </Button>
+                  <Button variant="outline" onClick={() => { setWaStep("idle"); setWaPhoneInput(""); }} disabled={waLoading}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : waStep === "verify" ? (
+              <div className="space-y-4">
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Código enviado!</p>
+                  <p className="text-sm text-blue-700 dark:text-blue-400">
+                    Verifique o WhatsApp do número <strong>{waPhoneInput}</strong> e insira o código de 6 dígitos abaixo.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="waCode">Código de Verificação (6 dígitos)</Label>
+                  <Input
+                    id="waCode"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="123456"
+                    value={waCodeInput}
+                    onChange={(e) => setWaCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    maxLength={6}
+                    className="tracking-widest text-center text-lg font-mono"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleWaVerify} disabled={waLoading || waCodeInput.length !== 6}>
+                    {waLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                    Verificar e Vincular
+                  </Button>
+                  <Button variant="outline" onClick={() => setWaStep("link")} disabled={waLoading}>
+                    Reenviar Código
+                  </Button>
+                  <Button variant="ghost" onClick={() => { setWaStep("idle"); setWaPhoneInput(""); setWaCodeInput(""); }} disabled={waLoading}>
                     Cancelar
                   </Button>
                 </div>

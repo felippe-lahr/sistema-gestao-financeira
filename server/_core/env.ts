@@ -17,4 +17,8 @@ export const ENV = {
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   stripePriceProMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY ?? "",
   stripePriceProYearly: process.env.STRIPE_PRICE_PRO_YEARLY ?? "",
+  // Evolution API (WhatsApp Bot)
+  evolutionApiUrl: process.env.EVOLUTION_API_URL ?? "",
+  evolutionApiKey: process.env.EVOLUTION_API_KEY ?? "",
+  evolutionInstanceName: process.env.EVOLUTION_INSTANCE_NAME ?? "sgf-bot",
 };

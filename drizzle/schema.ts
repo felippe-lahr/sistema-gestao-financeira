@@ -31,6 +31,10 @@ export const users = pgTable("users", {
   googleCalendarRefreshToken: text("googleCalendarRefreshToken"), // Token para sync com Google Calendar
   googleCalendarConnectedAt: timestamp("googleCalendarConnectedAt"), // Quando conectou
   onboardingCompleted: boolean("onboardingCompleted").default(false).notNull(), // Tour de onboarding concluído
+  whatsappPhone: varchar("whatsappPhone", { length: 30 }), // Número vinculado ao bot WhatsApp (formato: 5511999999999)
+  whatsappVerified: boolean("whatsappVerified").default(false).notNull(), // Número verificado
+  whatsappVerifyCode: varchar("whatsappVerifyCode", { length: 10 }), // Código de verificação temporário
+  whatsappVerifyExpires: timestamp("whatsappVerifyExpires"), // Expiração do código
 });
 
 export type User = typeof users.$inferSelect;

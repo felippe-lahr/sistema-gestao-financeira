@@ -16,6 +16,7 @@ import { registerStripeRoutes } from "./stripe-routes";
 import { registerOfxRoutes } from "./ofx-routes";
 import { registerCreditCardImportRoutes } from "./credit-card-import-routes";
 import { registerTotpRoutes } from "./totp-auth";
+import { registerWhatsAppBotRoutes } from "./whatsapp-bot";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startCronJobs } from "../cron";
@@ -146,6 +147,8 @@ async function startServer() {
   registerTotpRoutes(app);
   // Stripe billing routes (webhook must come before json body parser)
   registerStripeRoutes(app);
+  // WhatsApp Bot routes (Evolution API integration)
+  registerWhatsAppBotRoutes(app);
 
   // tRPC API with rate limiting
   app.use(

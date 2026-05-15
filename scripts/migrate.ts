@@ -92,6 +92,20 @@ const migrations: { name: string; sql: string }[] = [
       ALTER TABLE users ADD COLUMN IF NOT EXISTS "totpPendingSecret" varchar(64);
     `,
   },
+  {
+    // Adiciona colunas para integração multi-tenant com WhatsApp Bot.
+    // whatsappPhone: número vinculado ao bot (formato internacional: 5511999999999)
+    // whatsappVerified: indica se o número foi verificado via código de confirmação
+    // whatsappVerifyCode: código temporário de 6 dígitos enviado via WhatsApp
+    // whatsappVerifyExpires: data/hora de expiração do código (10 minutos)
+    name: "add_whatsapp_columns_to_users",
+    sql: `
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "whatsappPhone" varchar(30);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "whatsappVerified" boolean NOT NULL DEFAULT false;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "whatsappVerifyCode" varchar(10);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "whatsappVerifyExpires" timestamp;
+    `,
+  },
 ];
 
 async function runMigrations() {
