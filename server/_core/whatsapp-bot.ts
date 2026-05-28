@@ -897,9 +897,14 @@ export function registerWhatsAppBotRoutes(app: Express): void {
 
   // ── POST /api/whatsapp/link — Inicia vinculação enviando código ───────────────
   app.post("/api/whatsapp/link", async (req: Request, res: Response) => {
+    console.log("[WhatsApp Bot] POST /api/whatsapp/link chamado - body:", JSON.stringify(req.body));
     try {
       const user = await sdk.authenticateRequest(req).catch(() => null);
-      if (!user) return res.status(401).json({ error: "Não autenticado" });
+      if (!user) {
+        console.log("[WhatsApp Bot] /link - usuário não autenticado");
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+      console.log("[WhatsApp Bot] /link - usuário autenticado, id:", user.id);
 
       const { phone } = req.body as { phone?: string };
       if (!phone) return res.status(400).json({ error: "Número de telefone obrigatório" });
