@@ -281,9 +281,9 @@ Retorne APENAS o JSON, sem texto adicional.`,
     if (!content || typeof content !== "string") return null;
 
     const cleaned = content.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
-    const parsed = JSON.parse(cleaned) as ExtractedTransaction;
+    const parsed = JSON.parse(cleaned) as ExtractedTransaction | null;
 
-    if (!parsed.amount || !parsed.description) return null;
+    if (!parsed || !parsed.amount || !parsed.description) return null;
     return parsed;
   } catch (error) {
     console.error("[WhatsApp Bot] Erro ao extrair transação:", error);
@@ -569,10 +569,11 @@ async function processIncomingMessage(
 
   const user = userResult[0];
 
-  // LID: manter o replyJid original (@lid) para envio — Evolution API v2.2.3 suporta
-  // Substituir pelo telefone causava entrega silenciosa sem chegar ao destinatário
-  if (isLid) {
-    console.log(`[WhatsApp Bot] LID detectado, respondendo diretamente ao JID: ${replyJid}`);
+  // LID: @lid é rejeitado (400/exists:false), número puro entrega silenciosa sem chegar.
+  // Tentativa: usar JID completo com @s.whatsapp.net para forçar roteamento pelo Baileys.
+  if (isLid && user.whatsappPhone) {
+    replyJid = `${user.whatsappPhone}@s.whatsapp.net`;
+    console.log(`[WhatsApp Bot] LID detectado, usando JID explícito: ${replyJid}`);
   }
 
   // 2. Verificar se é uma resposta de confirmação pendente
