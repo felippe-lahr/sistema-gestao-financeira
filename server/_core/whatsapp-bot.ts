@@ -869,7 +869,10 @@ export function registerWhatsAppBotRoutes(app: Express): void {
       const payload = req.body as EvolutionWebhookPayload;
 
       // Processar apenas mensagens recebidas (não enviadas pelo bot)
-      if (payload.event !== "messages.upsert") return;
+      // A Evolution API v2 envia eventos em maiúsculas (MESSAGES_UPSERT)
+      // enquanto versões anteriores usavam minúsculas (messages.upsert)
+      const eventNorm = (payload.event ?? "").toLowerCase().replace(/_/g, ".");
+      if (eventNorm !== "messages.upsert") return;
       if (payload.data?.key?.fromMe === true) return;
 
       const remoteJid = payload.data?.key?.remoteJid ?? "";
