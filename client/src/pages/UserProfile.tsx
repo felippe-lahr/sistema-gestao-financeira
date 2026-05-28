@@ -661,15 +661,19 @@ export default function UserProfile() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="waPhone">Número do WhatsApp</Label>
-                  <p className="text-xs text-muted-foreground">Digite com DDD, sem espaços ou traços. Ex: 11999999999</p>
-                  <Input
-                    id="waPhone"
-                    type="tel"
-                    placeholder="11999999999"
-                    value={waPhoneInput}
-                    onChange={(e) => setWaPhoneInput(e.target.value.replace(/\D/g, ""))}
-                    maxLength={13}
-                  />
+                  <p className="text-xs text-muted-foreground">Digite o DDD + número. Ex: 11999999999</p>
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center px-3 h-10 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground select-none">🇧🇷 +55</span>
+                    <Input
+                      id="waPhone"
+                      type="tel"
+                      placeholder="11999999999"
+                      value={waPhoneInput}
+                      onChange={(e) => setWaPhoneInput(e.target.value.replace(/\D/g, ""))}
+                      maxLength={11}
+                      className="flex-1"
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={handleWaSendCode} disabled={waLoading || waPhoneInput.replace(/\D/g, "").length < 10}>
