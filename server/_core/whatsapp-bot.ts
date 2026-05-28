@@ -498,7 +498,7 @@ async function processIncomingMessage(
 
   let userResult: any[] = [];
 
-  // Primeiro tenta buscar pelo LID (se for mensagem com LID)
+  // Primeiro tenta buscar pelo LID salvo (se for mensagem com LID)
   if (isLid) {
     userResult = await dbInstance
       .select()
@@ -514,47 +514,71 @@ async function processIncomingMessage(
       .from(users)
       .where(eq(users.whatsappPhone, fromPhone))
       .limit(1);
-
-    // Se encontrou pelo número mas não tem LID salvo, salvar o LID
-    if (userResult.length > 0 && isLid && !userResult[0].whatsappLid) {
-      console.log(`[WhatsApp Bot] Auto-vinculando LID ${replyJid} ao usuário ${userResult[0].id}`);
-      await dbInstance
-        .update(users)
-        .set({ whatsappLid: replyJid, updatedAt: new Date() })
-        .where(eq(users.id, userResult[0].id));
-    }
   }
 
-  // Se ainda não encontrou, tentar buscar todos os usuários verificados e comparar
-  // (para o caso de o número ter sido salvo com formato diferente)
+  // Se ainda não encontrou, tentar com/sem o 55
   if (userResult.length === 0) {
-    // Tentar com/sem o 55
     const altPhone = fromPhone.startsWith("55") ? fromPhone.slice(2) : "55" + fromPhone;
     userResult = await dbInstance
       .select()
       .from(users)
       .where(eq(users.whatsappPhone, altPhone))
       .limit(1);
+  }
 
-    if (userResult.length > 0 && isLid && !userResult[0].whatsappLid) {
-      console.log(`[WhatsApp Bot] Auto-vinculando LID ${replyJid} ao usuário ${userResult[0].id} (alt phone)`);
+  // Se for LID e encontrou usuário, mas não tem LID salvo, auto-vincular
+  if (userResult.length > 0 && isLid && !userResult[0].whatsappLid) {
+    console.log(`[WhatsApp Bot] Auto-vinculando LID ${replyJid} ao usuário ${userResult[0].id}`);
+    await dbInstance
+      .update(users)
+      .set({ whatsappLid: replyJid, updatedAt: new Date() })
+      .where(eq(users.id, userResult[0].id));
+  }
+
+  // Se for LID e não encontrou por nenhum método, buscar QUALQUER usuário com whatsappPhone preenchido
+  // (workaround para quando o LID não corresponde ao número)
+  if (userResult.length === 0 && isLid) {
+    const { isNotNull } = await import("drizzle-orm");
+    userResult = await dbInstance
+      .select()
+      .from(users)
+      .where(isNotNull(users.whatsappPhone))
+      .limit(10);
+    
+    // Se só tem um usuário com WhatsApp vinculado, usar esse
+    if (userResult.length === 1) {
+      console.log(`[WhatsApp Bot] Único usuário com WhatsApp vinculado: ${userResult[0].id}, auto-vinculando LID`);
       await dbInstance
         .update(users)
         .set({ whatsappLid: replyJid, updatedAt: new Date() })
         .where(eq(users.id, userResult[0].id));
+    } else {
+      // Múltiplos usuários - não consegue determinar qual é
+      userResult = [];
     }
   }
 
   if (userResult.length === 0) {
     console.log(`[WhatsApp Bot] Usuário não encontrado para fromPhone=${fromPhone}, replyJid=${replyJid}`);
-    await sendWhatsAppMessage(
-      replyJid,
-      `⚠️ Seu número não está vinculado ao SGF.\n\nPara vincular, acesse *Perfil → WhatsApp Bot* no sistema e siga as instruções.`
-    );
+    // Enviar para o número do próprio bot como fallback (não vai funcionar para LID)
+    // Não enviar nada se for LID pois vai dar erro
+    if (!isLid) {
+      await sendWhatsAppMessage(
+        replyJid,
+        `⚠️ Seu número não está vinculado ao SGF.\n\nPara vincular, acesse *Perfil → WhatsApp Bot* no sistema e siga as instruções.`
+      );
+    }
     return;
   }
 
   const user = userResult[0];
+
+  // IMPORTANTE: Se for LID, usar o número real do usuário para responder
+  // A Evolution API não suporta envio para @lid, apenas para números reais
+  if (isLid && user.whatsappPhone) {
+    replyJid = user.whatsappPhone;
+    console.log(`[WhatsApp Bot] LID detectado, usando número real para resposta: ${replyJid}`);
+  }
 
   // 2. Verificar se é uma resposta de confirmação pendente
   const text = payload.data.message?.conversation ||
