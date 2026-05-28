@@ -569,11 +569,10 @@ async function processIncomingMessage(
 
   const user = userResult[0];
 
-  // IMPORTANTE: Se for LID, usar o número real do usuário para responder
-  // A Evolution API não suporta envio para @lid, apenas para números reais
-  if (isLid && user.whatsappPhone) {
-    replyJid = user.whatsappPhone;
-    console.log(`[WhatsApp Bot] LID detectado, usando número real para resposta: ${replyJid}`);
+  // LID: manter o replyJid original (@lid) para envio — Evolution API v2.2.3 suporta
+  // Substituir pelo telefone causava entrega silenciosa sem chegar ao destinatário
+  if (isLid) {
+    console.log(`[WhatsApp Bot] LID detectado, respondendo diretamente ao JID: ${replyJid}`);
   }
 
   // 2. Verificar se é uma resposta de confirmação pendente
