@@ -275,7 +275,6 @@ Retorne APENAS o JSON, sem texto adicional.`,
         },
       ],
       responseFormat: { type: "json_object" },
-      model: "gpt-4.1-mini",
     });
 
     const content = result.choices?.[0]?.message?.content;
