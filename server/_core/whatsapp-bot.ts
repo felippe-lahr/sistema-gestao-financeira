@@ -905,8 +905,12 @@ export function registerWhatsAppBotRoutes(app: Express): void {
       if (!phone) return res.status(400).json({ error: "Número de telefone obrigatório" });
 
       // Normalizar número (remover tudo que não é dígito)
-      const normalized = phone.replace(/\D/g, "");
-      if (normalized.length < 10 || normalized.length > 15) {
+      let normalized = phone.replace(/\D/g, "");
+      // Adicionar código do Brasil (55) automaticamente se não estiver presente
+      if (normalized.length === 10 || normalized.length === 11) {
+        normalized = "55" + normalized;
+      }
+      if (normalized.length < 12 || normalized.length > 15) {
         return res.status(400).json({ error: "Número de telefone inválido. Use o formato: 5511999999999" });
       }
 
