@@ -120,7 +120,11 @@ const pendingConfirmations = new Map<string, {
  * Ex: "5511947728157@s.whatsapp.net" → "5511947728157"
  */
 function normalizePhone(jid: string): string {
-  return jid.replace(/@s\.whatsapp\.net$/, "").replace(/@.*$/, "").replace(/\D/g, "");
+  // Remove sufixo @s.whatsapp.net/@lid/etc
+  const withoutSuffix = jid.replace(/@.*$/, "");
+  // Remove device ID do formato multi-device (ex: "5511947728157:15" → "5511947728157")
+  const withoutDevice = withoutSuffix.split(":")[0];
+  return withoutDevice.replace(/\D/g, "");
 }
 
 /**
@@ -168,14 +172,7 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
 
-    // Se o "to" contém @lid ou @s.whatsapp.net, usar como remoteJid direto
-    // Caso contrário, usar como número normal
-    const isJid = to.includes("@");
-    const payload = isJid
-      ? { number: to, text, delay: 500 }
-      : { number: to, text, delay: 500 };
-
-    console.log(`[WhatsApp Bot] Enviando mensagem para: ${to} (isJid: ${isJid})`);
+    console.log(`[WhatsApp Bot] Enviando mensagem para: ${to}`);
 
     const response = await fetch(url, {
       method: "POST",
@@ -183,17 +180,17 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
         "Content-Type": "application/json",
         "apikey": evolutionKey,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ number: to, text }),
     });
 
     if (!response.ok) {
       const err = await response.text().catch(() => "");
-      console.error(`[WhatsApp Bot] Erro ao enviar mensagem: ${response.status} ${err}`);
+      console.error(`[WhatsApp Bot] Falha ao enviar para ${to} — HTTP ${response.status}: ${err}`);
     } else {
       console.log(`[WhatsApp Bot] Mensagem enviada com sucesso para: ${to}`);
     }
   } catch (error) {
-    console.error("[WhatsApp Bot] Erro ao enviar mensagem:", error);
+    console.error(`[WhatsApp Bot] Exceção ao enviar para ${to}:`, error);
   }
 }
 
