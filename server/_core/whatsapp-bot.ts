@@ -124,6 +124,15 @@ function normalizePhone(jid: string): string {
 }
 
 /**
+ * Extrai o JID para resposta — mantém o remoteJid original para suporte a LID
+ * WhatsApp Business usa @lid em vez de @s.whatsapp.net
+ */
+function getReplyJid(remoteJid: string): string {
+  // Se for LID ou s.whatsapp.net, retorna o JID completo para resposta
+  return remoteJid;
+}
+
+/**
  * Formata valor em centavos para BRL
  */
 function formatCurrency(cents: number): string {
@@ -144,6 +153,7 @@ function formatDate(dateStr: string): string {
 
 /**
  * Envia mensagem de texto via Evolution API
+ * Suporta envio via número (5511999999999) ou via remoteJid completo (xxx@lid ou xxx@s.whatsapp.net)
  */
 async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   const evolutionUrl = process.env.EVOLUTION_API_URL;
@@ -157,22 +167,30 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
 
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
+
+    // Se o "to" contém @lid ou @s.whatsapp.net, usar como remoteJid direto
+    // Caso contrário, usar como número normal
+    const isJid = to.includes("@");
+    const payload = isJid
+      ? { number: to, text, delay: 500 }
+      : { number: to, text, delay: 500 };
+
+    console.log(`[WhatsApp Bot] Enviando mensagem para: ${to} (isJid: ${isJid})`);
+
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "apikey": evolutionKey,
       },
-      body: JSON.stringify({
-        number: to,
-        text,
-        delay: 500,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
       const err = await response.text().catch(() => "");
       console.error(`[WhatsApp Bot] Erro ao enviar mensagem: ${response.status} ${err}`);
+    } else {
+      console.log(`[WhatsApp Bot] Mensagem enviada com sucesso para: ${to}`);
     }
   } catch (error) {
     console.error("[WhatsApp Bot] Erro ao enviar mensagem:", error);
@@ -463,63 +481,74 @@ Responda:
  */
 async function processIncomingMessage(
   fromPhone: string,
+  replyJid: string,
   messageId: string,
   messageType: string,
   payload: EvolutionWebhookPayload
 ): Promise<void> {
-  // 1. Buscar usuário pelo número de WhatsApp
+  // 1. Buscar usuário pelo número de WhatsApp ou pelo LID
   const dbInstance = await getDb();
   if (!dbInstance) {
     console.error("[WhatsApp Bot] Database não disponível");
     return;
   }
 
-  const userResult = await dbInstance
-    .select()
-    .from(users)
-    .where(eq(users.whatsappPhone, fromPhone))
-    .limit(1);
+  const isLid = replyJid.includes("@lid");
+  console.log(`[WhatsApp Bot] Buscando usuário - fromPhone: ${fromPhone}, replyJid: ${replyJid}, isLid: ${isLid}`);
+
+  let userResult: any[] = [];
+
+  // Primeiro tenta buscar pelo LID (se for mensagem com LID)
+  if (isLid) {
+    userResult = await dbInstance
+      .select()
+      .from(users)
+      .where(eq(users.whatsappLid, replyJid))
+      .limit(1);
+  }
+
+  // Se não encontrou pelo LID, busca pelo número
+  if (userResult.length === 0) {
+    userResult = await dbInstance
+      .select()
+      .from(users)
+      .where(eq(users.whatsappPhone, fromPhone))
+      .limit(1);
+
+    // Se encontrou pelo número mas não tem LID salvo, salvar o LID
+    if (userResult.length > 0 && isLid && !userResult[0].whatsappLid) {
+      console.log(`[WhatsApp Bot] Auto-vinculando LID ${replyJid} ao usuário ${userResult[0].id}`);
+      await dbInstance
+        .update(users)
+        .set({ whatsappLid: replyJid, updatedAt: new Date() })
+        .where(eq(users.id, userResult[0].id));
+    }
+  }
+
+  // Se ainda não encontrou, tentar buscar todos os usuários verificados e comparar
+  // (para o caso de o número ter sido salvo com formato diferente)
+  if (userResult.length === 0) {
+    // Tentar com/sem o 55
+    const altPhone = fromPhone.startsWith("55") ? fromPhone.slice(2) : "55" + fromPhone;
+    userResult = await dbInstance
+      .select()
+      .from(users)
+      .where(eq(users.whatsappPhone, altPhone))
+      .limit(1);
+
+    if (userResult.length > 0 && isLid && !userResult[0].whatsappLid) {
+      console.log(`[WhatsApp Bot] Auto-vinculando LID ${replyJid} ao usuário ${userResult[0].id} (alt phone)`);
+      await dbInstance
+        .update(users)
+        .set({ whatsappLid: replyJid, updatedAt: new Date() })
+        .where(eq(users.id, userResult[0].id));
+    }
+  }
 
   if (userResult.length === 0) {
-    // Número não vinculado — verificar se é um código de verificação
-    const text = payload.data.message?.conversation ||
-      payload.data.message?.extendedTextMessage?.text || "";
-
-    if (/^\d{6}$/.test(text.trim())) {
-      // Pode ser um código de verificação — verificar na tabela
-      const pendingUser = await dbInstance
-        .select()
-        .from(users)
-        .where(eq(users.whatsappVerifyCode, text.trim()))
-        .limit(1);
-
-      if (pendingUser.length > 0) {
-        const user = pendingUser[0];
-        const now = new Date();
-        if (user.whatsappVerifyExpires && user.whatsappVerifyExpires > now) {
-          // Código válido — vincular número
-          await dbInstance
-            .update(users)
-            .set({
-              whatsappPhone: fromPhone,
-              whatsappVerified: true,
-              whatsappVerifyCode: null,
-              whatsappVerifyExpires: null,
-              updatedAt: now,
-            })
-            .where(eq(users.id, user.id));
-
-          await sendWhatsAppMessage(
-            fromPhone,
-            `✅ *Número vinculado com sucesso!*\n\nOlá, ${user.name || "usuário"}! Seu WhatsApp foi vinculado ao SGF.\n\nAgora você pode cadastrar transações enviando:\n• 🎙️ *Mensagem de voz* — "Paguei 150 reais de mercado hoje"\n• 💬 *Texto* — "Recebi 2000 de aluguel"\n• 🖼️ *Comprovante* — Envie uma foto ou PDF\n\nDigite *ajuda* para ver todos os comandos.`
-          );
-          return;
-        }
-      }
-    }
-
+    console.log(`[WhatsApp Bot] Usuário não encontrado para fromPhone=${fromPhone}, replyJid=${replyJid}`);
     await sendWhatsAppMessage(
-      fromPhone,
+      replyJid,
       `⚠️ Seu número não está vinculado ao SGF.\n\nPara vincular, acesse *Perfil → WhatsApp Bot* no sistema e siga as instruções.`
     );
     return;
@@ -531,7 +560,7 @@ async function processIncomingMessage(
   const text = payload.data.message?.conversation ||
     payload.data.message?.extendedTextMessage?.text || "";
 
-  const pending = pendingConfirmations.get(fromPhone);
+  const pending = pendingConfirmations.get(replyJid);
 
   if (pending && Date.now() < pending.expiresAt) {
     const trimmed = text.trim();
@@ -593,13 +622,13 @@ async function processIncomingMessage(
 
         const amountStr = formatCurrency(amountCents);
         await sendWhatsAppMessage(
-          fromPhone,
+          replyJid,
           `✅ *Transação cadastrada com sucesso!*\n\n${extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito"}: *${amountStr}*\n📝 ${extracted.description}\n\nID: #${transactionId}`
         );
       } catch (error) {
         console.error("[WhatsApp Bot] Erro ao criar transação:", error);
         await sendWhatsAppMessage(
-          fromPhone,
+          replyJid,
           `❌ Erro ao cadastrar a transação. Tente novamente ou acesse o sistema.`
         );
       }
@@ -608,14 +637,14 @@ async function processIncomingMessage(
 
     if (trimmed === "2") {
       // Cancelar
-      pendingConfirmations.delete(fromPhone);
+      pendingConfirmations.delete(replyJid);
 
       await dbInstance
         .update(whatsappMessages)
         .set({ status: "REJECTED", updatedAt: new Date() })
         .where(eq(whatsappMessages.messageId, pending.messageId));
 
-      await sendWhatsAppMessage(fromPhone, `❌ Transação cancelada.`);
+      await sendWhatsAppMessage(replyJid, `❌ Transação cancelada.`);
       return;
     }
   }
@@ -625,7 +654,7 @@ async function processIncomingMessage(
 
   if (lowerText === "ajuda" || lowerText === "help" || lowerText === "/ajuda") {
     await sendWhatsAppMessage(
-      fromPhone,
+      replyJid,
       `🤖 *SGF WhatsApp Bot — Ajuda*\n\n*Como cadastrar transações:*\n\n🎙️ *Voz:* Envie um áudio descrevendo a transação\n_"Paguei 150 reais de mercado hoje"_\n\n💬 *Texto:* Digite diretamente\n_"Recebi 2000 de aluguel dia 10"_\n\n🖼️ *Comprovante:* Envie foto ou imagem do comprovante\n\n*Exemplos de texto:*\n• "Despesa de 80 reais no restaurante"\n• "Recebi salário de 5000"\n• "Conta de luz 120 reais vencimento dia 15"\n\n*Comandos:*\n• *ajuda* — Esta mensagem\n• *1* — Confirmar transação pendente\n• *2* — Cancelar transação pendente`
     );
     return;
@@ -637,7 +666,7 @@ async function processIncomingMessage(
 
   if (userEntities.length === 0) {
     await sendWhatsAppMessage(
-      fromPhone,
+      replyJid,
       `⚠️ Você não possui entidades cadastradas no SGF. Acesse o sistema para criar uma entidade primeiro.`
     );
     return;
@@ -657,13 +686,13 @@ async function processIncomingMessage(
 
   // ── Processar áudio ──────────────────────────────────────────────────────────
   if (messageType === "audioMessage" || messageType === "pttMessage") {
-    await sendWhatsAppMessage(fromPhone, `🎙️ Transcrevendo seu áudio...`);
+    await sendWhatsAppMessage(replyJid, `🎙️ Transcrevendo seu áudio...`);
 
     const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
     const mediaData = await downloadEvolutionMedia(messageId, instanceName);
 
     if (!mediaData) {
-      await sendWhatsAppMessage(fromPhone, `❌ Não consegui baixar o áudio. Tente novamente.`);
+      await sendWhatsAppMessage(replyJid, `❌ Não consegui baixar o áudio. Tente novamente.`);
       return;
     }
 
@@ -696,7 +725,7 @@ async function processIncomingMessage(
 
       if ("error" in transcription) {
         console.error("[WhatsApp Bot] Erro na transcrição:", transcription.error);
-        await sendWhatsAppMessage(fromPhone, `❌ Não consegui transcrever o áudio. Tente enviar uma mensagem de texto.`);
+        await sendWhatsAppMessage(replyJid, `❌ Não consegui transcrever o áudio. Tente enviar uma mensagem de texto.`);
         return;
       }
 
@@ -708,20 +737,20 @@ async function processIncomingMessage(
         .set({ audioUrl, transcription: extractedText, status: "TRANSCRIBED", updatedAt: new Date() })
         .where(eq(whatsappMessages.messageId, messageId));
     } else {
-      await sendWhatsAppMessage(fromPhone, `❌ Erro ao processar o áudio. Tente enviar uma mensagem de texto.`);
+      await sendWhatsAppMessage(replyJid, `❌ Erro ao processar o áudio. Tente enviar uma mensagem de texto.`);
       return;
     }
   }
 
   // ── Processar imagem (comprovante) ───────────────────────────────────────────
   else if (messageType === "imageMessage") {
-    await sendWhatsAppMessage(fromPhone, `🖼️ Analisando o comprovante...`);
+    await sendWhatsAppMessage(replyJid, `🖼️ Analisando o comprovante...`);
 
     const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
     const mediaData = await downloadEvolutionMedia(messageId, instanceName);
 
     if (!mediaData) {
-      await sendWhatsAppMessage(fromPhone, `❌ Não consegui baixar a imagem. Tente novamente.`);
+      await sendWhatsAppMessage(replyJid, `❌ Não consegui baixar a imagem. Tente novamente.`);
       return;
     }
 
@@ -752,7 +781,7 @@ async function processIncomingMessage(
 
       if (!extracted) {
         await sendWhatsAppMessage(
-          fromPhone,
+          replyJid,
           `❌ Não consegui identificar uma transação nesta imagem. Tente enviar uma mensagem de texto descrevendo a transação.`
         );
         return;
@@ -760,7 +789,7 @@ async function processIncomingMessage(
 
       const entityId = resolveEntityId(extracted.entityName, userEntities);
       if (!entityId) {
-        await sendWhatsAppMessage(fromPhone, `❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
+        await sendWhatsAppMessage(replyJid, `❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
         return;
       }
 
@@ -777,7 +806,7 @@ async function processIncomingMessage(
         .where(eq(whatsappMessages.messageId, messageId));
 
       // Salvar confirmação pendente
-      pendingConfirmations.set(fromPhone, {
+      pendingConfirmations.set(replyJid, {
         extracted,
         userId: user.id,
         organizationId: org?.id ?? null,
@@ -786,10 +815,10 @@ async function processIncomingMessage(
         expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutos
       });
 
-      await sendWhatsAppMessage(fromPhone, buildConfirmationMessage(extracted, entityName));
+      await sendWhatsAppMessage(replyJid, buildConfirmationMessage(extracted, entityName));
       return;
     } else {
-      await sendWhatsAppMessage(fromPhone, `❌ Erro ao processar a imagem. Tente enviar uma mensagem de texto.`);
+      await sendWhatsAppMessage(replyJid, `❌ Erro ao processar a imagem. Tente enviar uma mensagem de texto.`);
       return;
     }
   }
@@ -803,7 +832,7 @@ async function processIncomingMessage(
   // ── Processar documento (PDF) ────────────────────────────────────────────────
   else if (messageType === "documentMessage") {
     await sendWhatsAppMessage(
-      fromPhone,
+        replyJid,
       `📄 Recebi um documento. Por enquanto, envie o comprovante como *imagem* (foto) para que eu consiga processar automaticamente.`
     );
     return;
@@ -812,13 +841,13 @@ async function processIncomingMessage(
   // ── Extrair transação do texto ───────────────────────────────────────────────
   if (!extractedText) return;
 
-  await sendWhatsAppMessage(fromPhone, `🤔 Processando...`);
+  await sendWhatsAppMessage(replyJid, `🤔 Processando...`);
 
   const extracted = await extractTransactionFromText(extractedText, userEntities);
 
   if (!extracted) {
     await sendWhatsAppMessage(
-      fromPhone,
+      replyJid,
       `❌ Não consegui identificar uma transação na sua mensagem.\n\nTente ser mais específico, por exemplo:\n_"Paguei 150 reais de mercado hoje"_\n_"Recebi 2000 de aluguel"_`
     );
     return;
@@ -826,7 +855,7 @@ async function processIncomingMessage(
 
   const entityId = resolveEntityId(extracted.entityName, userEntities);
   if (!entityId) {
-    await sendWhatsAppMessage(fromPhone, `❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
+    await sendWhatsAppMessage(replyJid, `❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
     return;
   }
 
@@ -844,7 +873,7 @@ async function processIncomingMessage(
     .where(eq(whatsappMessages.messageId, messageId));
 
   // Salvar confirmação pendente
-  pendingConfirmations.set(fromPhone, {
+  pendingConfirmations.set(replyJid, {
     extracted,
     userId: user.id,
     organizationId: org?.id ?? null,
@@ -853,7 +882,7 @@ async function processIncomingMessage(
     expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutos
   });
 
-  await sendWhatsAppMessage(fromPhone, buildConfirmationMessage(extracted, entityName));
+  await sendWhatsAppMessage(replyJid, buildConfirmationMessage(extracted, entityName));
 }
 
 // ─── Registro de Rotas ────────────────────────────────────────────────────────
@@ -882,12 +911,15 @@ export function registerWhatsAppBotRoutes(app: Express): void {
       if (remoteJid.includes("@g.us")) return;
 
       const fromPhone = normalizePhone(remoteJid);
+      const replyJid = getReplyJid(remoteJid);
       const messageType = payload.data?.messageType ?? "conversation";
+
+      console.log(`[WhatsApp Bot] Mensagem recebida - remoteJid: ${remoteJid}, fromPhone: ${fromPhone}, replyJid: ${replyJid}`);
 
       if (!fromPhone || !messageId) return;
 
       // Processar em background para não bloquear
-      processIncomingMessage(fromPhone, messageId, messageType, payload).catch(err => {
+      processIncomingMessage(fromPhone, replyJid, messageId, messageType, payload).catch(err => {
         console.error("[WhatsApp Bot] Erro ao processar mensagem:", err);
       });
     } catch (error) {
@@ -895,7 +927,7 @@ export function registerWhatsAppBotRoutes(app: Express): void {
     }
   });
 
-  // ── POST /api/whatsapp/link — Inicia vinculação enviando código ───────────────
+  // ── POST /api/whatsapp/link — Vincula número diretamente (usuário já autenticado) ─────
   app.post("/api/whatsapp/link", async (req: Request, res: Response) => {
     console.log("[WhatsApp Bot] POST /api/whatsapp/link chamado - body:", JSON.stringify(req.body));
     try {
@@ -933,27 +965,20 @@ export function registerWhatsAppBotRoutes(app: Express): void {
         return res.status(409).json({ error: "Este número já está vinculado a outra conta" });
       }
 
-      // Gerar código de 6 dígitos
-      const code = String(randomInt(100000, 999999));
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
-
-      // Salvar código no banco (sem vincular ainda — aguarda verificação)
+      // Vincular diretamente (usuário já está autenticado no sistema)
       await dbInstance
         .update(users)
         .set({
-          whatsappVerifyCode: code,
-          whatsappVerifyExpires: expiresAt,
+          whatsappPhone: normalized,
+          whatsappVerified: true,
+          whatsappVerifyCode: null,
+          whatsappVerifyExpires: null,
           updatedAt: new Date(),
         })
         .where(eq(users.id, user.id));
 
-      // Enviar código via WhatsApp
-      await sendWhatsAppMessage(
-        normalized,
-        `🔐 *Código de verificação SGF*\n\nSeu código é: *${code}*\n\nEste código expira em 10 minutos.\n\nSe você não solicitou este código, ignore esta mensagem.`
-      );
-
-      return res.json({ success: true, message: "Código enviado via WhatsApp" });
+      console.log(`[WhatsApp Bot] Número ${normalized} vinculado diretamente ao usuário ${user.id}`);
+      return res.json({ success: true, message: "Número vinculado com sucesso!" });
     } catch (error) {
       console.error("[WhatsApp Bot] Erro ao enviar código:", error);
       return res.status(500).json({ error: "Erro ao enviar código de verificação" });

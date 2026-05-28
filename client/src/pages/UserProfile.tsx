@@ -85,10 +85,14 @@ export default function UserProfile() {
       });
       const data = await response.json();
       if (response.ok) {
-        toast.success("Código enviado! Verifique seu WhatsApp.");
-        setWaStep("verify");
+        toast.success("WhatsApp vinculado com sucesso! Envie uma mensagem para o bot para começar.");
+        const fullNumber = normalized.length <= 11 ? "55" + normalized : normalized;
+        setWaLinked(true);
+        setWaPhone(`+${fullNumber.slice(0, 2)} (${fullNumber.slice(2, 4)}) ${fullNumber.slice(4, 9)}-${fullNumber.slice(9)}`);
+        setWaStep("idle");
+        setWaPhoneInput("");
       } else {
-        toast.error(data.error || "Erro ao enviar código");
+        toast.error(data.error || "Erro ao vincular número");
       }
     } catch {
       toast.error("Erro de conexão");
@@ -677,8 +681,8 @@ export default function UserProfile() {
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={handleWaSendCode} disabled={waLoading || waPhoneInput.replace(/\D/g, "").length < 10}>
-                    {waLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
-                    Enviar Código
+                    {waLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
+                    Vincular Número
                   </Button>
                   <Button variant="outline" onClick={() => { setWaStep("idle"); setWaPhoneInput(""); }} disabled={waLoading}>
                     Cancelar

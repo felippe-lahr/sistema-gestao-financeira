@@ -35,6 +35,7 @@ export const users = pgTable("users", {
   whatsappVerified: boolean("whatsappVerified").default(false).notNull(), // Número verificado
   whatsappVerifyCode: varchar("whatsappVerifyCode", { length: 10 }), // Código de verificação temporário
   whatsappVerifyExpires: timestamp("whatsappVerifyExpires"), // Expiração do código
+  whatsappLid: varchar("whatsappLid", { length: 100 }), // Linked ID do WhatsApp Business (formato: 21912939925650@lid)
 });
 
 export type User = typeof users.$inferSelect;
