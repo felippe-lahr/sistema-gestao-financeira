@@ -23,7 +23,7 @@ import { getDb } from "../db";
 import { sdk } from "./sdk";
 import { invokeLLM } from "./llm";
 import { transcribeAudio } from "./voiceTranscription";
-import { uploadToS3, isS3Configured } from "./s3";
+import { uploadToS3, isS3Configured, getPresignedUrl } from "./s3";
 import { eq } from "drizzle-orm";
 import { users, whatsappMessages } from "../../drizzle/schema";
 
@@ -782,8 +782,19 @@ async function processIncomingMessage(
     }
 
     if (audioUrl) {
+      // O bucket S3 não é público (retorna 403 no fetch direto). Geramos uma URL
+      // pré-assinada para o serviço de transcrição conseguir baixar o áudio.
+      let fetchUrl = audioUrl;
+      if (isS3Configured()) {
+        try {
+          fetchUrl = await getPresignedUrl(audioUrl, 600);
+        } catch (presignErr) {
+          console.error("[WhatsApp Bot] Erro ao gerar URL pré-assinada:", presignErr);
+        }
+      }
+
       const transcription = await transcribeAudio({
-        audioUrl,
+        audioUrl: fetchUrl,
         language: "pt",
         prompt: "Transcreva esta mensagem de voz sobre uma transação financeira em português brasileiro.",
       });
