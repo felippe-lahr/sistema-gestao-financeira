@@ -194,10 +194,57 @@ async function sendWhatsAppMessage(
     });
 
     if (!response.ok) {
-      const err = await response.text().catch(() => "");
-      console.error(`[WhatsApp Bot] Falha ao enviar para ${to} — HTTP ${response.status}: ${err}`);
+      const errText = await response.text().catch(() => "");
+      console.error(`[WhatsApp Bot] Falha ao enviar para ${to} — HTTP ${response.status}: ${errText}`);
+
+      // Caso o envio para @s.whatsapp.net falhe (HTTP 400 exists:false), tenta via @lid direto
+      // Funciona em versões mais recentes da Evolution API com suporte a LID
+      if (response.status === 400 && quotedKey?.remoteJid?.includes("@lid")) {
+        console.log(`[WhatsApp Bot] Tentando fallback via LID: ${quotedKey.remoteJid}`);
+        const lidBody: Record<string, unknown> = { number: quotedKey.remoteJid, text };
+        const lidResp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": evolutionKey },
+          body: JSON.stringify(lidBody),
+        });
+        const lidRespText = await lidResp.text().catch(() => "");
+        if (lidResp.ok) {
+          console.log(`[WhatsApp Bot] ✅ Fallback LID funcionou: ${quotedKey.remoteJid}`);
+        } else {
+          console.error(`[WhatsApp Bot] ❌ Fallback LID também falhou (${lidResp.status}): ${lidRespText}`);
+          console.error(`[WhatsApp Bot] ⚠️ CAUSA RAIZ: Evolution API ${instanceName} não suporta envio para contas WhatsApp Business (@lid). SOLUÇÃO: atualize a Evolution API para versão 2.3+ no Railway.`);
+        }
+      }
+      return;
+    }
+
+    // Detectar status PENDING: mensagem aceita pelo servidor mas não entregue
+    // Isso ocorre quando o Baileys tenta rotear para @s.whatsapp.net mas a conta usa @lid (WhatsApp Business)
+    const responseData = await response.json().catch(() => ({})) as { status?: string; key?: { remoteJid?: string } };
+    const msgStatus = responseData.status ?? "OK";
+
+    if (msgStatus === "PENDING") {
+      console.warn(`[WhatsApp Bot] ⚠️ PENDING para ${to} — mensagem NÃO chegará. Causa: conta WhatsApp Business usa JID @lid mas estamos enviando para @s.whatsapp.net.`);
+      console.warn(`[WhatsApp Bot] 💡 SOLUÇÃO: atualize a Evolution API para versão 2.3+ no Railway (suporte nativo a @lid).`);
+
+      // Fallback: tentar envio direto ao @lid (funciona em versões mais recentes)
+      if (quotedKey?.remoteJid?.includes("@lid")) {
+        console.log(`[WhatsApp Bot] Tentando fallback via LID após PENDING: ${quotedKey.remoteJid}`);
+        const lidBody: Record<string, unknown> = { number: quotedKey.remoteJid, text };
+        const lidResp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": evolutionKey },
+          body: JSON.stringify(lidBody),
+        });
+        const lidData = await lidResp.json().catch(() => ({})) as { status?: string };
+        if (lidResp.ok && lidData.status !== "PENDING") {
+          console.log(`[WhatsApp Bot] ✅ Fallback LID entregue: ${quotedKey.remoteJid} — status: ${lidData.status}`);
+        } else {
+          console.error(`[WhatsApp Bot] ❌ Fallback LID também PENDING/falhou (${lidResp.status}) — Evolution API precisa ser atualizada.`);
+        }
+      }
     } else {
-      console.log(`[WhatsApp Bot] Mensagem enviada com sucesso para: ${to}`);
+      console.log(`[WhatsApp Bot] ✅ Mensagem entregue para: ${to} — status: ${msgStatus}`);
     }
   } catch (error) {
     console.error(`[WhatsApp Bot] Exceção ao enviar para ${to}:`, error);
