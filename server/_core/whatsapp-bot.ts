@@ -157,62 +157,10 @@ function formatDate(dateStr: string): string {
 }
 
 /**
- * Resolve o JID correto para envio via Evolution API.
- * Chama /chat/whatsappNumbers para que a própria API resolva o número → @lid ou @s.whatsapp.net.
- * Retorna o JID resolvido, ou null em caso de falha.
- */
-async function resolveJidViaEvolution(phoneNumber: string): Promise<string | null> {
-  const evolutionUrl = process.env.EVOLUTION_API_URL;
-  const evolutionKey = process.env.EVOLUTION_API_KEY;
-  const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-
-  if (!evolutionUrl || !evolutionKey) return null;
-
-  try {
-    const url = `${evolutionUrl.replace(/\/$/, "")}/chat/whatsappNumbers/${instanceName}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": evolutionKey },
-      body: JSON.stringify({ numbers: [phoneNumber] }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => "");
-      console.warn(`[WhatsApp Bot] resolveJid falhou (${response.status}): ${errText}`);
-      return null;
-    }
-
-    const data = await response.json().catch(() => null) as Array<{
-      jid?: string;
-      numberExists?: boolean;
-      exists?: boolean;
-    }> | null;
-
-    if (!Array.isArray(data) || data.length === 0) return null;
-
-    const result = data[0];
-    const exists = result.numberExists ?? result.exists ?? false;
-    if (!exists || !result.jid) return null;
-
-    console.log(`[WhatsApp Bot] JID resolvido para ${phoneNumber}: ${result.jid}`);
-    return result.jid;
-  } catch (error) {
-    console.warn("[WhatsApp Bot] Erro ao resolver JID:", error);
-    return null;
-  }
-}
-
-/**
  * Envia mensagem de texto via Evolution API.
- * Aceita número de telefone ou JID completo (@s.whatsapp.net / @lid).
- * quotedKey: quando fornecido, envia como reply cotado da mensagem original.
- * Isso passa o contexto da mensagem ao Baileys, que pode usar o @lid mapeado internamente.
+ * Responde para o JID/número informado (normalmente o remoteJid da conversa).
  */
-async function sendWhatsAppMessage(
-  to: string,
-  text: string,
-  quotedKey?: { id: string; remoteJid: string; fromMe: boolean }
-): Promise<void> {
+async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   const evolutionUrl = process.env.EVOLUTION_API_URL;
   const evolutionKey = process.env.EVOLUTION_API_KEY;
   const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
@@ -224,28 +172,7 @@ async function sendWhatsAppMessage(
 
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
-
-    // Passa o número/JID direto para a Evolution API.
-    // Número puro (sem @): a Evolution API resolve internamente via OnWhatsappCache,
-    // descobrindo se a conta usa @lid e roteando corretamente via Baileys.
-    // JIDs com @ são passados diretamente.
-    const sendTo = to;
-    console.log(`[WhatsApp Bot] Enviando para: ${sendTo}`);
-
-    console.log(`[WhatsApp Bot] Enviando mensagem para: ${sendTo}${quotedKey ? ` (quoted:${quotedKey.id})` : ""}`);
-
-    const body: Record<string, unknown> = { number: sendTo, text };
-    if (quotedKey) {
-      // Quoted reply: passa a chave da mensagem original ao Baileys.
-      // O Baileys usa o contexto do remetente original (incluindo @lid) para rotear corretamente.
-      body.quoted = {
-        key: {
-          remoteJid: quotedKey.remoteJid,
-          fromMe: quotedKey.fromMe,
-          id: quotedKey.id,
-        },
-      };
-    }
+    console.log(`[WhatsApp Bot] Enviando mensagem para: ${to}`);
 
     const response = await fetch(url, {
       method: "POST",
@@ -253,32 +180,18 @@ async function sendWhatsAppMessage(
         "Content-Type": "application/json",
         "apikey": evolutionKey,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ number: to, text }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      console.error(`[WhatsApp Bot] ❌ Falha ao enviar para ${sendTo} — HTTP ${response.status}: ${errText}`);
-
-      // Se sendTo já é @lid e retornou erro, é limitação da versão atual da Evolution API
-      if (sendTo.includes("@lid")) {
-        console.error(`[WhatsApp Bot] ⚠️ Evolution API não aceitou envio direto para @lid.`);
-        console.error(`[WhatsApp Bot] 💡 Atualize a Evolution API para versão com suporte a @lid no Railway.`);
-      }
+      console.error(`[WhatsApp Bot] ❌ Falha ao enviar para ${to} — HTTP ${response.status}: ${errText}`);
       return;
     }
 
     const responseData = await response.json().catch(() => ({})) as { status?: string };
     const msgStatus = responseData.status ?? "OK";
-
-    if (msgStatus === "PENDING") {
-      console.warn(`[WhatsApp Bot] ⚠️ PENDING para ${sendTo} — mensagem criada localmente mas sem ACK do servidor WhatsApp.`);
-      if (sendTo.includes("@s.whatsapp.net")) {
-        console.warn(`[WhatsApp Bot] 💡 Cache v2.3.7 pode não estar aquecido. Certifique-se de que o usuário enviou uma mensagem recente para acionar o cache (lid=lid).`);
-      }
-    } else {
-      console.log(`[WhatsApp Bot] ✅ Mensagem entregue para: ${sendTo} — status: ${msgStatus}`);
-    }
+    console.log(`[WhatsApp Bot] Resposta do envio para ${to} — status: ${msgStatus}`);
   } catch (error) {
     console.error(`[WhatsApp Bot] Exceção ao enviar para ${to}:`, error);
   }
@@ -673,32 +586,13 @@ async function processIncomingMessage(
 
   const user = userResult[0];
 
-  // Destino de envio:
-  // - @lid (isLid=true): passa o número PURO para a Evolution API resolver internamente.
-  //   Ao receber número sem @, a Evolution API consulta o OnWhatsappCache e descobre
-  //   que a conta usa @lid (lid=lid), usando o JID correto para o envio via Baileys.
-  //   Passar @s.whatsapp.net diretamente pode pular essa consulta ao cache.
-  // - normal: usa número de telefone puro para resolução via Evolution API
-  let sendTarget: string;
-  if (isLid && user.whatsappPhone) {
-    sendTarget = user.whatsappPhone; // número puro, sem @, para resolver via cache interno
-    console.log(`[WhatsApp Bot] LID mode — número puro para resolução interna: ${sendTarget}`);
-  } else if (user.whatsappPhone) {
-    sendTarget = user.whatsappPhone;
-  } else {
-    sendTarget = replyJid;
-  }
+  // Destino de envio: responde para o MESMO remoteJid que a Evolution enviou no webhook.
+  // Esse é o JID canônico da conversa — a Evolution/Baileys já tem a sessão estabelecida
+  // com ele, então a resposta usa exatamente o mesmo caminho da mensagem recebida.
+  const sendTarget = replyJid;
+  console.log(`[WhatsApp Bot] Respondendo para remoteJid da conversa: ${sendTarget}`);
 
-  // Para contas @lid: aguarda a Evolution API popular o OnWhatsappCache (lid=lid) internamente.
-  // O cache é atualizado de forma assíncrona após receber a mensagem — sem esse delay,
-  // a resposta chega antes do cache estar pronto e resulta em PENDING.
-  if (isLid) {
-    await new Promise(resolve => setTimeout(resolve, 1500));
-  }
-
-  // quotedKey: contexto da mensagem recebida — permite que o Baileys resolva @lid corretamente
-  const quotedKey = { id: messageId, remoteJid: replyJid, fromMe: false };
-  const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt, quotedKey);
+  const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt);
 
   // 2. Verificar se é uma resposta de confirmação pendente
   const text = payload.data.message?.conversation ||
