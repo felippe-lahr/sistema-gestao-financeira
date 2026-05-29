@@ -18,6 +18,7 @@
 
 import type { Express, Request, Response } from "express";
 import { randomInt } from "crypto";
+import { spawn } from "child_process";
 import * as db from "../db";
 import { getDb } from "../db";
 import { sdk } from "./sdk";
@@ -384,6 +385,43 @@ Retorne APENAS o JSON, sem texto adicional.`,
 }
 
 /**
+ * Transcodifica áudio (ex: ogg/opus do WhatsApp) para mp3 usando ffmpeg.
+ * O Gemini só aceita wav/mp3 no input_audio, então convertemos antes de enviar.
+ */
+async function transcodeToMp3(input: Buffer): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    const ff = spawn("ffmpeg", [
+      "-i", "pipe:0",
+      "-vn",
+      "-ac", "1",
+      "-ar", "16000",
+      "-f", "mp3",
+      "pipe:1",
+    ], { stdio: ["pipe", "pipe", "pipe"] });
+
+    const chunks: Buffer[] = [];
+    let stderr = "";
+    ff.stdout.on("data", (d: Buffer) => chunks.push(d));
+    ff.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+    ff.on("error", (e) => {
+      console.error("[WhatsApp Bot] Erro ao iniciar ffmpeg:", e);
+      resolve(null);
+    });
+    ff.on("close", (code) => {
+      if (code === 0 && chunks.length > 0) {
+        resolve(Buffer.concat(chunks));
+      } else {
+        console.error(`[WhatsApp Bot] ffmpeg falhou (code ${code}): ${stderr.slice(-400)}`);
+        resolve(null);
+      }
+    });
+    ff.stdin.on("error", () => {}); // evita crash se o processo fechar antes
+    ff.stdin.write(input);
+    ff.stdin.end();
+  });
+}
+
+/**
  * Transcreve áudio usando o Gemini (multimodal nativo via input_audio).
  * O provedor atual (Gemini) não tem endpoint Whisper /v1/audio/transcriptions,
  * então usamos o mesmo caminho de chat que já funciona para texto/imagem.
@@ -392,9 +430,16 @@ async function transcribeAudioWithGemini(
   buffer: Buffer,
   mimeType: string
 ): Promise<string | null> {
-  // Deriva o formato a partir do mimetype: "audio/ogg; codecs=opus" → "ogg"
-  const format = (mimeType.split("/")[1] || "ogg").split(";")[0].trim();
-  const base64 = buffer.toString("base64");
+  // O Gemini só aceita wav/mp3. WhatsApp envia ogg/opus, então transcodificamos.
+  let audioBuffer = buffer;
+  let format = (mimeType.split("/")[1] || "").split(";")[0].trim();
+  if (format !== "mp3" && format !== "wav") {
+    const mp3 = await transcodeToMp3(buffer);
+    if (!mp3) return null;
+    audioBuffer = mp3;
+    format = "mp3";
+  }
+  const base64 = audioBuffer.toString("base64");
 
   try {
     const result = await invokeLLM({
