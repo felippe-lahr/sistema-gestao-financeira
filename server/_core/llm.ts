@@ -23,7 +23,15 @@ export type FileContent = {
   };
 };
 
-export type MessageContent = string | TextContent | ImageContent | FileContent;
+export type InputAudioContent = {
+  type: "input_audio";
+  input_audio: {
+    data: string; // base64 do áudio (sem prefixo data:)
+    format: string; // ex: "mp3", "wav", "ogg"
+  };
+};
+
+export type MessageContent = string | TextContent | ImageContent | FileContent | InputAudioContent;
 
 export type Message = {
   role: Role;
@@ -117,7 +125,7 @@ const ensureArray = (
 
 const normalizeContentPart = (
   part: MessageContent
-): TextContent | ImageContent | FileContent => {
+): TextContent | ImageContent | FileContent | InputAudioContent => {
   if (typeof part === "string") {
     return { type: "text", text: part };
   }
@@ -131,6 +139,10 @@ const normalizeContentPart = (
   }
 
   if (part.type === "file_url") {
+    return part;
+  }
+
+  if (part.type === "input_audio") {
     return part;
   }
 

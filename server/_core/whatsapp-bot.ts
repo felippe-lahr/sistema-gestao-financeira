@@ -22,8 +22,7 @@ import * as db from "../db";
 import { getDb } from "../db";
 import { sdk } from "./sdk";
 import { invokeLLM } from "./llm";
-import { transcribeAudio } from "./voiceTranscription";
-import { uploadToS3, isS3Configured, getPresignedUrl } from "./s3";
+import { uploadToS3, isS3Configured } from "./s3";
 import { eq } from "drizzle-orm";
 import { users, whatsappMessages } from "../../drizzle/schema";
 
@@ -380,6 +379,46 @@ Retorne APENAS o JSON, sem texto adicional.`,
     return parsed;
   } catch (error) {
     console.error("[WhatsApp Bot] Erro ao extrair transação da imagem:", error);
+    return null;
+  }
+}
+
+/**
+ * Transcreve áudio usando o Gemini (multimodal nativo via input_audio).
+ * O provedor atual (Gemini) não tem endpoint Whisper /v1/audio/transcriptions,
+ * então usamos o mesmo caminho de chat que já funciona para texto/imagem.
+ */
+async function transcribeAudioWithGemini(
+  buffer: Buffer,
+  mimeType: string
+): Promise<string | null> {
+  // Deriva o formato a partir do mimetype: "audio/ogg; codecs=opus" → "ogg"
+  const format = (mimeType.split("/")[1] || "ogg").split(";")[0].trim();
+  const base64 = buffer.toString("base64");
+
+  try {
+    const result = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: "Você transcreve áudios em português brasileiro. Responda APENAS com a transcrição literal do áudio, sem comentários, sem aspas, sem texto adicional.",
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Transcreva o áudio a seguir:" },
+            { type: "input_audio", input_audio: { data: base64, format } },
+          ],
+        },
+      ],
+    });
+
+    const content = result.choices?.[0]?.message?.content;
+    if (!content || typeof content !== "string") return null;
+    const transcription = content.trim();
+    return transcription.length > 0 ? transcription : null;
+  } catch (error) {
+    console.error("[WhatsApp Bot] Erro ao transcrever áudio com Gemini:", error);
     return null;
   }
 }
@@ -761,61 +800,34 @@ async function processIncomingMessage(
       return;
     }
 
-    // Upload para S3 para usar com o Whisper
+    // Transcrição via Gemini (multimodal). O provedor atual não tem endpoint
+    // Whisper, então enviamos o áudio direto pro modelo de chat.
+    const transcription = await transcribeAudioWithGemini(mediaData.buffer, mediaData.mimeType);
+
+    if (!transcription) {
+      await sendReply(`❌ Não consegui transcrever o áudio. Tente enviar uma mensagem de texto.`);
+      return;
+    }
+
+    extractedText = transcription;
+    console.log(`[WhatsApp Bot] Áudio transcrito: "${transcription}"`);
+
+    // Upload do áudio para S3 (best-effort, apenas para registro)
     let audioUrl: string | null = null;
     try {
       if (isS3Configured()) {
         const filename = `whatsapp-audio-${Date.now()}.ogg`;
         audioUrl = await uploadToS3(mediaData.buffer, filename, mediaData.mimeType, "whatsapp");
-      } else {
-        // Fallback: usar storagePut
-        const { storagePut } = await import("../storage");
-        const { url } = await storagePut(
-          `whatsapp/audio-${Date.now()}.ogg`,
-          mediaData.buffer,
-          mediaData.mimeType
-        );
-        audioUrl = url;
       }
     } catch (uploadError) {
       console.error("[WhatsApp Bot] Erro ao fazer upload do áudio:", uploadError);
     }
+    mediaUrl = audioUrl;
 
-    if (audioUrl) {
-      // O bucket S3 não é público (retorna 403 no fetch direto). Geramos uma URL
-      // pré-assinada para o serviço de transcrição conseguir baixar o áudio.
-      let fetchUrl = audioUrl;
-      if (isS3Configured()) {
-        try {
-          fetchUrl = await getPresignedUrl(audioUrl, 600);
-        } catch (presignErr) {
-          console.error("[WhatsApp Bot] Erro ao gerar URL pré-assinada:", presignErr);
-        }
-      }
-
-      const transcription = await transcribeAudio({
-        audioUrl: fetchUrl,
-        language: "pt",
-        prompt: "Transcreva esta mensagem de voz sobre uma transação financeira em português brasileiro.",
-      });
-
-      if ("error" in transcription) {
-        console.error(`[WhatsApp Bot] Erro na transcrição — code: ${transcription.code}, error: ${transcription.error}, details: ${transcription.details ?? "n/a"}`);
-        await sendReply(`❌ Não consegui transcrever o áudio. Tente enviar uma mensagem de texto.`);
-        return;
-      }
-
-      extractedText = transcription.text;
-      mediaUrl = audioUrl;
-
-      await dbInstance
-        .update(whatsappMessages)
-        .set({ audioUrl, transcription: extractedText, status: "TRANSCRIBED", updatedAt: new Date() })
-        .where(eq(whatsappMessages.messageId, messageId));
-    } else {
-      await sendReply(`❌ Erro ao processar o áudio. Tente enviar uma mensagem de texto.`);
-      return;
-    }
+    await dbInstance
+      .update(whatsappMessages)
+      .set({ audioUrl, transcription: extractedText, status: "TRANSCRIBED", updatedAt: new Date() })
+      .where(eq(whatsappMessages.messageId, messageId));
   }
 
   // ── Processar imagem (comprovante) ───────────────────────────────────────────
