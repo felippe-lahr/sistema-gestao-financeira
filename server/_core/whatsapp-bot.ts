@@ -205,9 +205,14 @@ async function resolveJidViaEvolution(phoneNumber: string): Promise<string | nul
 /**
  * Envia mensagem de texto via Evolution API.
  * Aceita número de telefone ou JID completo (@s.whatsapp.net / @lid).
- * Quando recebe um número de telefone, chama resolveJidViaEvolution para obter o JID correto.
+ * quotedKey: quando fornecido, envia como reply cotado da mensagem original.
+ * Isso passa o contexto da mensagem ao Baileys, que pode usar o @lid mapeado internamente.
  */
-async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
+async function sendWhatsAppMessage(
+  to: string,
+  text: string,
+  quotedKey?: { id: string; remoteJid: string; fromMe: boolean }
+): Promise<void> {
   const evolutionUrl = process.env.EVOLUTION_API_URL;
   const evolutionKey = process.env.EVOLUTION_API_KEY;
   const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
@@ -240,7 +245,20 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
       }
     }
 
-    console.log(`[WhatsApp Bot] Enviando mensagem para: ${sendTo}`);
+    console.log(`[WhatsApp Bot] Enviando mensagem para: ${sendTo}${quotedKey ? ` (quoted:${quotedKey.id})` : ""}`);
+
+    const body: Record<string, unknown> = { number: sendTo, text };
+    if (quotedKey) {
+      // Quoted reply: passa a chave da mensagem original ao Baileys.
+      // O Baileys usa o contexto do remetente original (incluindo @lid) para rotear corretamente.
+      body.quoted = {
+        key: {
+          remoteJid: quotedKey.remoteJid,
+          fromMe: quotedKey.fromMe,
+          id: quotedKey.id,
+        },
+      };
+    }
 
     const response = await fetch(url, {
       method: "POST",
@@ -248,7 +266,7 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
         "Content-Type": "application/json",
         "apikey": evolutionKey,
       },
-      body: JSON.stringify({ number: sendTo, text }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -688,7 +706,9 @@ async function processIncomingMessage(
     sendTarget = replyJid;
   }
 
-  const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt);
+  // quotedKey: contexto da mensagem recebida — permite que o Baileys resolva @lid corretamente
+  const quotedKey = { id: messageId, remoteJid: replyJid, fromMe: false };
+  const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt, quotedKey);
 
   // 2. Verificar se é uma resposta de confirmação pendente
   const text = payload.data.message?.conversation ||
