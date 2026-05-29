@@ -158,8 +158,13 @@ function formatDate(dateStr: string): string {
 /**
  * Envia mensagem de texto via Evolution API
  * Suporta envio via número (5511999999999) ou via remoteJid completo (xxx@lid ou xxx@s.whatsapp.net)
+ * quotedKey: chave da mensagem original para roteamento LID (WhatsApp Business)
  */
-async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
+async function sendWhatsAppMessage(
+  to: string,
+  text: string,
+  quotedKey?: { id: string; remoteJid: string; fromMe: boolean }
+): Promise<void> {
   const evolutionUrl = process.env.EVOLUTION_API_URL;
   const evolutionKey = process.env.EVOLUTION_API_KEY;
   const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
@@ -172,7 +177,12 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
 
-    console.log(`[WhatsApp Bot] Enviando mensagem para: ${to}`);
+    console.log(`[WhatsApp Bot] Enviando mensagem para: ${to}${quotedKey ? ` (quoted LID: ${quotedKey.remoteJid})` : ""}`);
+
+    const bodyData: Record<string, unknown> = { number: to, text };
+    if (quotedKey) {
+      bodyData.quoted = { key: quotedKey };
+    }
 
     const response = await fetch(url, {
       method: "POST",
@@ -180,7 +190,7 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
         "Content-Type": "application/json",
         "apikey": evolutionKey,
       },
-      body: JSON.stringify({ number: to, text }),
+      body: JSON.stringify(bodyData),
     });
 
     if (!response.ok) {
@@ -570,11 +580,20 @@ async function processIncomingMessage(
   const user = userResult[0];
 
   // LID: @lid é rejeitado (400/exists:false), número puro entrega silenciosa sem chegar.
-  // Tentativa: usar JID completo com @s.whatsapp.net para forçar roteamento pelo Baileys.
+  // Solução: usar @s.whatsapp.net como destino + quoted key com LID original para o Baileys rotear pela sessão existente.
+  const originalLidJid = replyJid; // preserva LID original antes de sobrescrever
   if (isLid && user.whatsappPhone) {
     replyJid = `${user.whatsappPhone}@s.whatsapp.net`;
-    console.log(`[WhatsApp Bot] LID detectado, usando JID explícito: ${replyJid}`);
+    console.log(`[WhatsApp Bot] LID detectado, usando JID explícito: ${replyJid}, LID original: ${originalLidJid}`);
   }
+
+  // Wrapper de envio: inclui quoted key com LID original para forçar roteamento correto pelo Baileys
+  const sendReply = (txt: string) =>
+    sendWhatsAppMessage(
+      replyJid,
+      txt,
+      isLid ? { id: messageId, remoteJid: originalLidJid, fromMe: false } : undefined
+    );
 
   // 2. Verificar se é uma resposta de confirmação pendente
   const text = payload.data.message?.conversation ||
@@ -587,7 +606,7 @@ async function processIncomingMessage(
 
     if (trimmed === "1") {
       // Confirmar transação
-      pendingConfirmations.delete(fromPhone);
+      pendingConfirmations.delete(replyJid);
 
       try {
         const extracted = pending.extracted;
@@ -641,14 +660,12 @@ async function processIncomingMessage(
           .where(eq(whatsappMessages.messageId, pending.messageId));
 
         const amountStr = formatCurrency(amountCents);
-        await sendWhatsAppMessage(
-          replyJid,
+        await sendReply(
           `✅ *Transação cadastrada com sucesso!*\n\n${extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito"}: *${amountStr}*\n📝 ${extracted.description}\n\nID: #${transactionId}`
         );
       } catch (error) {
         console.error("[WhatsApp Bot] Erro ao criar transação:", error);
-        await sendWhatsAppMessage(
-          replyJid,
+        await sendReply(
           `❌ Erro ao cadastrar a transação. Tente novamente ou acesse o sistema.`
         );
       }
@@ -664,7 +681,7 @@ async function processIncomingMessage(
         .set({ status: "REJECTED", updatedAt: new Date() })
         .where(eq(whatsappMessages.messageId, pending.messageId));
 
-      await sendWhatsAppMessage(replyJid, `❌ Transação cancelada.`);
+      await sendReply(`❌ Transação cancelada.`);
       return;
     }
   }
@@ -673,8 +690,7 @@ async function processIncomingMessage(
   const lowerText = text.toLowerCase().trim();
 
   if (lowerText === "ajuda" || lowerText === "help" || lowerText === "/ajuda") {
-    await sendWhatsAppMessage(
-      replyJid,
+    await sendReply(
       `🤖 *SGF WhatsApp Bot — Ajuda*\n\n*Como cadastrar transações:*\n\n🎙️ *Voz:* Envie um áudio descrevendo a transação\n_"Paguei 150 reais de mercado hoje"_\n\n💬 *Texto:* Digite diretamente\n_"Recebi 2000 de aluguel dia 10"_\n\n🖼️ *Comprovante:* Envie foto ou imagem do comprovante\n\n*Exemplos de texto:*\n• "Despesa de 80 reais no restaurante"\n• "Recebi salário de 5000"\n• "Conta de luz 120 reais vencimento dia 15"\n\n*Comandos:*\n• *ajuda* — Esta mensagem\n• *1* — Confirmar transação pendente\n• *2* — Cancelar transação pendente`
     );
     return;
@@ -685,8 +701,7 @@ async function processIncomingMessage(
   const userEntities = await db.getEntitiesByUserId(user.id);
 
   if (userEntities.length === 0) {
-    await sendWhatsAppMessage(
-      replyJid,
+    await sendReply(
       `⚠️ Você não possui entidades cadastradas no SGF. Acesse o sistema para criar uma entidade primeiro.`
     );
     return;
@@ -706,13 +721,13 @@ async function processIncomingMessage(
 
   // ── Processar áudio ──────────────────────────────────────────────────────────
   if (messageType === "audioMessage" || messageType === "pttMessage") {
-    await sendWhatsAppMessage(replyJid, `🎙️ Transcrevendo seu áudio...`);
+    await sendReply(`🎙️ Transcrevendo seu áudio...`);
 
     const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
     const mediaData = await downloadEvolutionMedia(messageId, instanceName);
 
     if (!mediaData) {
-      await sendWhatsAppMessage(replyJid, `❌ Não consegui baixar o áudio. Tente novamente.`);
+      await sendReply(`❌ Não consegui baixar o áudio. Tente novamente.`);
       return;
     }
 
@@ -745,7 +760,7 @@ async function processIncomingMessage(
 
       if ("error" in transcription) {
         console.error("[WhatsApp Bot] Erro na transcrição:", transcription.error);
-        await sendWhatsAppMessage(replyJid, `❌ Não consegui transcrever o áudio. Tente enviar uma mensagem de texto.`);
+        await sendReply(`❌ Não consegui transcrever o áudio. Tente enviar uma mensagem de texto.`);
         return;
       }
 
@@ -757,20 +772,20 @@ async function processIncomingMessage(
         .set({ audioUrl, transcription: extractedText, status: "TRANSCRIBED", updatedAt: new Date() })
         .where(eq(whatsappMessages.messageId, messageId));
     } else {
-      await sendWhatsAppMessage(replyJid, `❌ Erro ao processar o áudio. Tente enviar uma mensagem de texto.`);
+      await sendReply(`❌ Erro ao processar o áudio. Tente enviar uma mensagem de texto.`);
       return;
     }
   }
 
   // ── Processar imagem (comprovante) ───────────────────────────────────────────
   else if (messageType === "imageMessage") {
-    await sendWhatsAppMessage(replyJid, `🖼️ Analisando o comprovante...`);
+    await sendReply(`🖼️ Analisando o comprovante...`);
 
     const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
     const mediaData = await downloadEvolutionMedia(messageId, instanceName);
 
     if (!mediaData) {
-      await sendWhatsAppMessage(replyJid, `❌ Não consegui baixar a imagem. Tente novamente.`);
+      await sendReply(`❌ Não consegui baixar a imagem. Tente novamente.`);
       return;
     }
 
@@ -800,8 +815,7 @@ async function processIncomingMessage(
       const extracted = await extractTransactionFromImage(imageUrl, userEntities);
 
       if (!extracted) {
-        await sendWhatsAppMessage(
-          replyJid,
+        await sendReply(
           `❌ Não consegui identificar uma transação nesta imagem. Tente enviar uma mensagem de texto descrevendo a transação.`
         );
         return;
@@ -809,7 +823,7 @@ async function processIncomingMessage(
 
       const entityId = resolveEntityId(extracted.entityName, userEntities);
       if (!entityId) {
-        await sendWhatsAppMessage(replyJid, `❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
+        await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
         return;
       }
 
@@ -835,10 +849,10 @@ async function processIncomingMessage(
         expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutos
       });
 
-      await sendWhatsAppMessage(replyJid, buildConfirmationMessage(extracted, entityName));
+      await sendReply(buildConfirmationMessage(extracted, entityName));
       return;
     } else {
-      await sendWhatsAppMessage(replyJid, `❌ Erro ao processar a imagem. Tente enviar uma mensagem de texto.`);
+      await sendReply(`❌ Erro ao processar a imagem. Tente enviar uma mensagem de texto.`);
       return;
     }
   }
@@ -861,13 +875,12 @@ async function processIncomingMessage(
   // ── Extrair transação do texto ───────────────────────────────────────────────
   if (!extractedText) return;
 
-  await sendWhatsAppMessage(replyJid, `🤔 Processando...`);
+  await sendReply(`🤔 Processando...`);
 
   const extracted = await extractTransactionFromText(extractedText, userEntities);
 
   if (!extracted) {
-    await sendWhatsAppMessage(
-      replyJid,
+    await sendReply(
       `❌ Não consegui identificar uma transação na sua mensagem.\n\nTente ser mais específico, por exemplo:\n_"Paguei 150 reais de mercado hoje"_\n_"Recebi 2000 de aluguel"_`
     );
     return;
@@ -875,7 +888,7 @@ async function processIncomingMessage(
 
   const entityId = resolveEntityId(extracted.entityName, userEntities);
   if (!entityId) {
-    await sendWhatsAppMessage(replyJid, `❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
+    await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
     return;
   }
 
@@ -902,7 +915,7 @@ async function processIncomingMessage(
     expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutos
   });
 
-  await sendWhatsAppMessage(replyJid, buildConfirmationMessage(extracted, entityName));
+  await sendReply(buildConfirmationMessage(extracted, entityName));
 }
 
 // ─── Registro de Rotas ────────────────────────────────────────────────────────
