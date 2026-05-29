@@ -37,6 +37,7 @@ interface EvolutionWebhookPayload {
       remoteJid?: string;
       fromMe?: boolean;
       id?: string;
+      addressingMode?: string; // "lid" quando a conta usa @lid (v2.3.7+)
     };
     message?: {
       conversation?: string;
@@ -219,18 +220,18 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
 
-    // Resolução de JID: tenta sempre obter o JID correto via Evolution API
+    // Se for @lid, envia direto — v2.3.7 tem bypass de validação para @lid (PR #2544)
+    // Se for número puro, tenta resolver via Evolution API
+    // Se for @s.whatsapp.net, envia direto (pode resultar em PENDING para contas @lid)
     let sendTo = to;
-    const phoneForResolution = to.includes("@") ? to.replace(/@.*$/, "").split(":")[0] : to;
-    const resolved = await resolveJidViaEvolution(phoneForResolution);
-    if (resolved) {
-      sendTo = resolved;
-      console.log(`[WhatsApp Bot] JID resolvido para ${phoneForResolution}: ${sendTo}`);
-    } else {
-      // Se resolução falhou e temos @lid, tenta enviar direto ao @lid
-      if (to.includes("@lid")) {
-        sendTo = to;
-        console.warn(`[WhatsApp Bot] Resolução falhou, tentando @lid direto: ${sendTo}`);
+    if (to.includes("@lid")) {
+      sendTo = to;
+      console.log(`[WhatsApp Bot] Enviando direto para @lid (v2.3.7 bypass): ${sendTo}`);
+    } else if (!to.includes("@")) {
+      const resolved = await resolveJidViaEvolution(to);
+      if (resolved) {
+        sendTo = resolved;
+        console.log(`[WhatsApp Bot] JID resolvido para ${to}: ${sendTo}`);
       } else {
         console.warn(`[WhatsApp Bot] Não foi possível resolver JID para ${to}, usando número puro`);
       }
@@ -582,8 +583,10 @@ async function processIncomingMessage(
     return;
   }
 
-  const isLid = replyJid.includes("@lid");
-  console.log(`[WhatsApp Bot] Buscando usuário - fromPhone: ${fromPhone}, replyJid: ${replyJid}, isLid: ${isLid}`);
+  // v2.3.7 mapeia @lid → @s.whatsapp.net no webhook, mas preserva addressingMode: "lid"
+  const addressingMode = payload.data?.key?.addressingMode;
+  const isLid = replyJid.includes("@lid") || addressingMode === "lid";
+  console.log(`[WhatsApp Bot] Buscando usuário - fromPhone: ${fromPhone}, replyJid: ${replyJid}, isLid: ${isLid}, addressingMode: ${addressingMode}`);
 
   let userResult: any[] = [];
 
@@ -662,17 +665,20 @@ async function processIncomingMessage(
 
   const user = userResult[0];
 
-  // Destino de envio: quando é @lid, usa o JID completo (@lid) diretamente.
-  // Quando é @s.whatsapp.net normal, usa o número de telefone puro para que
-  // resolveJidViaEvolution() possa confirmar o JID antes do envio.
+  // Destino de envio:
+  // - @lid: usa o whatsappLid armazenado no banco (v2.3.7 tem bypass para @lid)
+  // - normal: usa número de telefone puro para resolução via Evolution API
   let sendTarget: string;
-  if (isLid) {
-    // Usa o @lid diretamente — se a Evolution API suportar, entrega direto.
-    // Se retornar 400, a versão da API não suporta @lid e precisa ser atualizada.
-    sendTarget = replyJid; // já é "21912939925650@lid"
-    console.log(`[WhatsApp Bot] LID detectado — enviando diretamente para: ${sendTarget}`);
+  if (isLid && user.whatsappLid) {
+    // v2.3.7 (PR #2544): envia direto ao @lid — bypass de validação onWhatsApp
+    sendTarget = user.whatsappLid;
+    console.log(`[WhatsApp Bot] LID mode — usando @lid armazenado: ${sendTarget}`);
+  } else if (isLid && replyJid.includes("@lid")) {
+    // Fallback: @lid veio direto no remoteJid (versões antigas)
+    sendTarget = replyJid;
+    console.log(`[WhatsApp Bot] LID mode — usando @lid do remoteJid: ${sendTarget}`);
   } else if (user.whatsappPhone) {
-    sendTarget = user.whatsappPhone; // número puro → resolveJid() tentará resolver
+    sendTarget = user.whatsappPhone;
   } else {
     sendTarget = replyJid;
   }
