@@ -626,12 +626,12 @@ async function processIncomingMessage(
 
   const user = userResult[0];
 
-  // LID: @lid é rejeitado (400/exists:false), número puro entrega silenciosa sem chegar.
-  // Solução: usar @s.whatsapp.net como destino + quoted key com LID original para o Baileys rotear pela sessão existente.
+  // LID: enviar só os dígitos (sem @suffix) para que a Evolution API resolva via onWhatsApp()
+  // internamente — versões recentes (homolog) retornam o @lid correto para roteamento automático.
   const originalLidJid = replyJid; // preserva LID original antes de sobrescrever
   if (isLid && user.whatsappPhone) {
-    replyJid = `${user.whatsappPhone}@s.whatsapp.net`;
-    console.log(`[WhatsApp Bot] LID detectado, usando JID explícito: ${replyJid}, LID original: ${originalLidJid}`);
+    replyJid = user.whatsappPhone; // só dígitos, sem @s.whatsapp.net
+    console.log(`[WhatsApp Bot] LID detectado, usando número puro para resolução interna: ${replyJid}, LID original: ${originalLidJid}`);
   }
 
   // Wrapper de envio: inclui quoted key com LID original para forçar roteamento correto pelo Baileys
