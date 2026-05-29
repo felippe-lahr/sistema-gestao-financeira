@@ -1024,6 +1024,44 @@ async function processIncomingMessage(
 
 export function registerWhatsAppBotRoutes(app: Express): void {
 
+  // ── GET /api/whatsapp/test?to=5511... — Testa envio direto via Evolution API ──
+  app.get("/api/whatsapp/test", async (req: Request, res: Response) => {
+    const evolutionUrl = process.env.EVOLUTION_API_URL;
+    const evolutionKey = process.env.EVOLUTION_API_KEY;
+    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
+    const to = (req.query.to as string) || "5511947728157";
+
+    const results: Record<string, unknown> = {};
+
+    // 1. Testa envio de mensagem
+    try {
+      const sendUrl = `${evolutionUrl?.replace(/\/$/, "")}/message/sendText/${instanceName}`;
+      const sendResp = await fetch(sendUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": evolutionKey! },
+        body: JSON.stringify({ number: to, text: "🧪 Teste de envio SGF — " + new Date().toISOString() }),
+      });
+      results.send = { status: sendResp.status, body: await sendResp.json().catch(() => sendResp.text()) };
+    } catch (e) {
+      results.send = { error: String(e) };
+    }
+
+    // 2. Consulta JID do número via whatsappNumbers
+    try {
+      const checkUrl = `${evolutionUrl?.replace(/\/$/, "")}/chat/whatsappNumbers/${instanceName}`;
+      const checkResp = await fetch(checkUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": evolutionKey! },
+        body: JSON.stringify({ numbers: [to] }),
+      });
+      results.whatsappNumbers = { status: checkResp.status, body: await checkResp.json().catch(() => checkResp.text()) };
+    } catch (e) {
+      results.whatsappNumbers = { error: String(e) };
+    }
+
+    return res.json(results);
+  });
+
   // ── POST /api/whatsapp/webhook — Recebe eventos da Evolution API ──────────────
   app.post("/api/whatsapp/webhook", async (req: Request, res: Response) => {
     // Responder imediatamente para não bloquear a Evolution API
