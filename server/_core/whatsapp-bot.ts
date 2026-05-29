@@ -220,11 +220,14 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
 
-    // Se for @lid, envia direto — v2.3.7 tem bypass de validação para @lid (PR #2544)
-    // Se for número puro, tenta resolver via Evolution API
-    // Se for @s.whatsapp.net, envia direto (pode resultar em PENDING para contas @lid)
+    // @s.whatsapp.net → envia direto; v2.3.7 roteia via OnWhatsappCache para @lid internamente
+    // @lid → envia direto (v2.3.7 bypass PR #2544); mas pode resultar em PENDING
+    // número puro → tenta resolver via Evolution API
     let sendTo = to;
-    if (to.includes("@lid")) {
+    if (to.includes("@s.whatsapp.net")) {
+      sendTo = to;
+      console.log(`[WhatsApp Bot] Enviando para @s.whatsapp.net (routing cache v2.3.7): ${sendTo}`);
+    } else if (to.includes("@lid")) {
       sendTo = to;
       console.log(`[WhatsApp Bot] Enviando direto para @lid (v2.3.7 bypass): ${sendTo}`);
     } else if (!to.includes("@")) {
@@ -264,9 +267,9 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
     const msgStatus = responseData.status ?? "OK";
 
     if (msgStatus === "PENDING") {
-      console.warn(`[WhatsApp Bot] ⚠️ PENDING para ${sendTo} — mensagem não entregue.`);
-      if (!sendTo.includes("@lid")) {
-        console.warn(`[WhatsApp Bot] 💡 A conta destino usa @lid mas a Evolution API não resolveu corretamente. Atualize para versão com suporte nativo a @lid.`);
+      console.warn(`[WhatsApp Bot] ⚠️ PENDING para ${sendTo} — mensagem criada localmente mas sem ACK do servidor WhatsApp.`);
+      if (sendTo.includes("@s.whatsapp.net")) {
+        console.warn(`[WhatsApp Bot] 💡 Cache v2.3.7 pode não estar aquecido. Certifique-se de que o usuário enviou uma mensagem recente para acionar o cache (lid=lid).`);
       }
     } else {
       console.log(`[WhatsApp Bot] ✅ Mensagem entregue para: ${sendTo} — status: ${msgStatus}`);
@@ -666,17 +669,19 @@ async function processIncomingMessage(
   const user = userResult[0];
 
   // Destino de envio:
-  // - @lid: usa o whatsappLid armazenado no banco (v2.3.7 tem bypass para @lid)
+  // - @lid (isLid=true): usa @s.whatsapp.net para aproveitar OnWhatsappCache do v2.3.7.
+  //   Quando a Evolution API recebe mensagem de conta @lid, ela popula o cache
+  //   com lid=lid para aquele número. Enviar para @s.whatsapp.net logo depois
+  //   faz o v2.3.7 roteá-la internamente via @lid (confirmado: status 1/SERVER_ACK nos logs).
+  //   Enviar direto ao @lid resulta em PENDING mesmo no v2.3.7.
   // - normal: usa número de telefone puro para resolução via Evolution API
   let sendTarget: string;
-  if (isLid && user.whatsappLid) {
-    // v2.3.7 (PR #2544): envia direto ao @lid — bypass de validação onWhatsApp
-    sendTarget = user.whatsappLid;
-    console.log(`[WhatsApp Bot] LID mode — usando @lid armazenado: ${sendTarget}`);
-  } else if (isLid && replyJid.includes("@lid")) {
-    // Fallback: @lid veio direto no remoteJid (versões antigas)
+  if (isLid && user.whatsappPhone) {
+    sendTarget = `${user.whatsappPhone}@s.whatsapp.net`;
+    console.log(`[WhatsApp Bot] LID mode — enviando para @s.whatsapp.net via cache v2.3.7: ${sendTarget}`);
+  } else if (isLid && replyJid.includes("@s.whatsapp.net")) {
     sendTarget = replyJid;
-    console.log(`[WhatsApp Bot] LID mode — usando @lid do remoteJid: ${sendTarget}`);
+    console.log(`[WhatsApp Bot] LID mode — usando replyJid @s.whatsapp.net: ${sendTarget}`);
   } else if (user.whatsappPhone) {
     sendTarget = user.whatsappPhone;
   } else {
