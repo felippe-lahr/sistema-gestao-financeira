@@ -1070,6 +1070,22 @@ export function registerWhatsAppBotRoutes(app: Express): void {
       results.whatsappNumbers = { error: String(e) };
     }
 
+    // 3. Se o parâmetro 'lid' for passado, testa envio direto ao @lid
+    const lidParam = req.query.lid as string | undefined;
+    if (lidParam) {
+      try {
+        const sendUrl = `${evolutionUrl?.replace(/\/$/, "")}/message/sendText/${instanceName}`;
+        const sendResp = await fetch(sendUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": evolutionKey! },
+          body: JSON.stringify({ number: lidParam, text: "🧪 Teste @lid direto — " + new Date().toISOString() }),
+        });
+        results.sendLid = { number: lidParam, status: sendResp.status, body: await sendResp.json().catch(() => sendResp.text()) };
+      } catch (e) {
+        results.sendLid = { error: String(e) };
+      }
+    }
+
     return res.json(results);
   });
 
