@@ -706,6 +706,13 @@ async function processIncomingMessage(
     sendTarget = replyJid;
   }
 
+  // Para contas @lid: aguarda a Evolution API popular o OnWhatsappCache (lid=lid) internamente.
+  // O cache é atualizado de forma assíncrona após receber a mensagem — sem esse delay,
+  // a resposta chega antes do cache estar pronto e resulta em PENDING.
+  if (isLid) {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+  }
+
   // quotedKey: contexto da mensagem recebida — permite que o Baileys resolva @lid corretamente
   const quotedKey = { id: messageId, remoteJid: replyJid, fromMe: false };
   const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt, quotedKey);
