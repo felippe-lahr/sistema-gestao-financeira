@@ -301,12 +301,16 @@ Retorne APENAS o JSON, sem texto adicional.`,
     });
 
     const content = result.choices?.[0]?.message?.content;
+    console.log(`[WhatsApp Bot] LLM resposta bruta: ${typeof content === "string" ? content.slice(0, 500) : JSON.stringify(content)?.slice(0, 500)}`);
     if (!content || typeof content !== "string") return null;
 
     const cleaned = content.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
     const parsed = JSON.parse(cleaned) as ExtractedTransaction | null;
 
-    if (!parsed || !parsed.amount || !parsed.description) return null;
+    if (!parsed || !parsed.amount || !parsed.description) {
+      console.warn(`[WhatsApp Bot] Extração descartada — amount=${parsed?.amount}, description=${parsed?.description}`);
+      return null;
+    }
     return parsed;
   } catch (error) {
     console.error("[WhatsApp Bot] Erro ao extrair transação:", error);
@@ -785,7 +789,7 @@ async function processIncomingMessage(
       });
 
       if ("error" in transcription) {
-        console.error("[WhatsApp Bot] Erro na transcrição:", transcription.error);
+        console.error(`[WhatsApp Bot] Erro na transcrição — code: ${transcription.code}, error: ${transcription.error}, details: ${transcription.details ?? "n/a"}`);
         await sendReply(`❌ Não consegui transcrever o áudio. Tente enviar uma mensagem de texto.`);
         return;
       }
