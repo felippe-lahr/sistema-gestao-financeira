@@ -1033,6 +1033,17 @@ export function registerWhatsAppBotRoutes(app: Express): void {
 
     const results: Record<string, unknown> = {};
 
+    // 0. Estado real da conexão Baileys
+    try {
+      const stateUrl = `${evolutionUrl?.replace(/\/$/, "")}/instance/connectionState/${instanceName}`;
+      const stateResp = await fetch(stateUrl, {
+        headers: { "apikey": evolutionKey! },
+      });
+      results.connectionState = { status: stateResp.status, body: await stateResp.json().catch(() => stateResp.text()) };
+    } catch (e) {
+      results.connectionState = { error: String(e) };
+    }
+
     // 1. Testa envio de mensagem
     try {
       const sendUrl = `${evolutionUrl?.replace(/\/$/, "")}/message/sendText/${instanceName}`;
