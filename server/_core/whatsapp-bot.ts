@@ -225,25 +225,12 @@ async function sendWhatsAppMessage(
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
 
-    // @s.whatsapp.net → envia direto; v2.3.7 roteia via OnWhatsappCache para @lid internamente
-    // @lid → envia direto (v2.3.7 bypass PR #2544); mas pode resultar em PENDING
-    // número puro → tenta resolver via Evolution API
-    let sendTo = to;
-    if (to.includes("@s.whatsapp.net")) {
-      sendTo = to;
-      console.log(`[WhatsApp Bot] Enviando para @s.whatsapp.net (routing cache v2.3.7): ${sendTo}`);
-    } else if (to.includes("@lid")) {
-      sendTo = to;
-      console.log(`[WhatsApp Bot] Enviando direto para @lid (v2.3.7 bypass): ${sendTo}`);
-    } else if (!to.includes("@")) {
-      const resolved = await resolveJidViaEvolution(to);
-      if (resolved) {
-        sendTo = resolved;
-        console.log(`[WhatsApp Bot] JID resolvido para ${to}: ${sendTo}`);
-      } else {
-        console.warn(`[WhatsApp Bot] Não foi possível resolver JID para ${to}, usando número puro`);
-      }
-    }
+    // Passa o número/JID direto para a Evolution API.
+    // Número puro (sem @): a Evolution API resolve internamente via OnWhatsappCache,
+    // descobrindo se a conta usa @lid e roteando corretamente via Baileys.
+    // JIDs com @ são passados diretamente.
+    const sendTo = to;
+    console.log(`[WhatsApp Bot] Enviando para: ${sendTo}`);
 
     console.log(`[WhatsApp Bot] Enviando mensagem para: ${sendTo}${quotedKey ? ` (quoted:${quotedKey.id})` : ""}`);
 
@@ -687,19 +674,15 @@ async function processIncomingMessage(
   const user = userResult[0];
 
   // Destino de envio:
-  // - @lid (isLid=true): usa @s.whatsapp.net para aproveitar OnWhatsappCache do v2.3.7.
-  //   Quando a Evolution API recebe mensagem de conta @lid, ela popula o cache
-  //   com lid=lid para aquele número. Enviar para @s.whatsapp.net logo depois
-  //   faz o v2.3.7 roteá-la internamente via @lid (confirmado: status 1/SERVER_ACK nos logs).
-  //   Enviar direto ao @lid resulta em PENDING mesmo no v2.3.7.
+  // - @lid (isLid=true): passa o número PURO para a Evolution API resolver internamente.
+  //   Ao receber número sem @, a Evolution API consulta o OnWhatsappCache e descobre
+  //   que a conta usa @lid (lid=lid), usando o JID correto para o envio via Baileys.
+  //   Passar @s.whatsapp.net diretamente pode pular essa consulta ao cache.
   // - normal: usa número de telefone puro para resolução via Evolution API
   let sendTarget: string;
   if (isLid && user.whatsappPhone) {
-    sendTarget = `${user.whatsappPhone}@s.whatsapp.net`;
-    console.log(`[WhatsApp Bot] LID mode — enviando para @s.whatsapp.net via cache v2.3.7: ${sendTarget}`);
-  } else if (isLid && replyJid.includes("@s.whatsapp.net")) {
-    sendTarget = replyJid;
-    console.log(`[WhatsApp Bot] LID mode — usando replyJid @s.whatsapp.net: ${sendTarget}`);
+    sendTarget = user.whatsappPhone; // número puro, sem @, para resolver via cache interno
+    console.log(`[WhatsApp Bot] LID mode — número puro para resolução interna: ${sendTarget}`);
   } else if (user.whatsappPhone) {
     sendTarget = user.whatsappPhone;
   } else {
