@@ -156,15 +156,57 @@ function formatDate(dateStr: string): string {
 }
 
 /**
- * Envia mensagem de texto via Evolution API
- * Suporta envio via número (5511999999999) ou via remoteJid completo (xxx@lid ou xxx@s.whatsapp.net)
- * quotedKey: chave da mensagem original para roteamento LID (WhatsApp Business)
+ * Resolve o JID correto para envio via Evolution API.
+ * Chama /chat/whatsappNumbers para que a própria API resolva o número → @lid ou @s.whatsapp.net.
+ * Retorna o JID resolvido, ou null em caso de falha.
  */
-async function sendWhatsAppMessage(
-  to: string,
-  text: string,
-  quotedKey?: { id: string; remoteJid: string; fromMe: boolean }
-): Promise<void> {
+async function resolveJidViaEvolution(phoneNumber: string): Promise<string | null> {
+  const evolutionUrl = process.env.EVOLUTION_API_URL;
+  const evolutionKey = process.env.EVOLUTION_API_KEY;
+  const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
+
+  if (!evolutionUrl || !evolutionKey) return null;
+
+  try {
+    const url = `${evolutionUrl.replace(/\/$/, "")}/chat/whatsappNumbers/${instanceName}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": evolutionKey },
+      body: JSON.stringify({ numbers: [phoneNumber] }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      console.warn(`[WhatsApp Bot] resolveJid falhou (${response.status}): ${errText}`);
+      return null;
+    }
+
+    const data = await response.json().catch(() => null) as Array<{
+      jid?: string;
+      numberExists?: boolean;
+      exists?: boolean;
+    }> | null;
+
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    const result = data[0];
+    const exists = result.numberExists ?? result.exists ?? false;
+    if (!exists || !result.jid) return null;
+
+    console.log(`[WhatsApp Bot] JID resolvido para ${phoneNumber}: ${result.jid}`);
+    return result.jid;
+  } catch (error) {
+    console.warn("[WhatsApp Bot] Erro ao resolver JID:", error);
+    return null;
+  }
+}
+
+/**
+ * Envia mensagem de texto via Evolution API.
+ * Aceita número de telefone ou JID completo (@s.whatsapp.net / @lid).
+ * Quando recebe um número de telefone, chama resolveJidViaEvolution para obter o JID correto.
+ */
+async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   const evolutionUrl = process.env.EVOLUTION_API_URL;
   const evolutionKey = process.env.EVOLUTION_API_KEY;
   const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
@@ -177,12 +219,19 @@ async function sendWhatsAppMessage(
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
 
-    console.log(`[WhatsApp Bot] Enviando mensagem para: ${to}${quotedKey ? ` (quoted LID: ${quotedKey.remoteJid})` : ""}`);
-
-    const bodyData: Record<string, unknown> = { number: to, text };
-    if (quotedKey) {
-      bodyData.quoted = { key: quotedKey };
+    // Se "to" é um número puro (sem @), tentar resolver o JID via Evolution API
+    let sendTo = to;
+    if (!to.includes("@")) {
+      const resolved = await resolveJidViaEvolution(to);
+      if (resolved) {
+        sendTo = resolved;
+        console.log(`[WhatsApp Bot] Usando JID resolvido: ${sendTo}`);
+      } else {
+        console.warn(`[WhatsApp Bot] Não foi possível resolver JID para ${to}, tentando com número puro`);
+      }
     }
+
+    console.log(`[WhatsApp Bot] Enviando mensagem para: ${sendTo}`);
 
     const response = await fetch(url, {
       method: "POST",
@@ -190,61 +239,31 @@ async function sendWhatsAppMessage(
         "Content-Type": "application/json",
         "apikey": evolutionKey,
       },
-      body: JSON.stringify(bodyData),
+      body: JSON.stringify({ number: sendTo, text }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      console.error(`[WhatsApp Bot] Falha ao enviar para ${to} — HTTP ${response.status}: ${errText}`);
+      console.error(`[WhatsApp Bot] ❌ Falha ao enviar para ${sendTo} — HTTP ${response.status}: ${errText}`);
 
-      // Caso o envio para @s.whatsapp.net falhe (HTTP 400 exists:false), tenta via @lid direto
-      // Funciona em versões mais recentes da Evolution API com suporte a LID
-      if (response.status === 400 && quotedKey?.remoteJid?.includes("@lid")) {
-        console.log(`[WhatsApp Bot] Tentando fallback via LID: ${quotedKey.remoteJid}`);
-        const lidBody: Record<string, unknown> = { number: quotedKey.remoteJid, text };
-        const lidResp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "apikey": evolutionKey },
-          body: JSON.stringify(lidBody),
-        });
-        const lidRespText = await lidResp.text().catch(() => "");
-        if (lidResp.ok) {
-          console.log(`[WhatsApp Bot] ✅ Fallback LID funcionou: ${quotedKey.remoteJid}`);
-        } else {
-          console.error(`[WhatsApp Bot] ❌ Fallback LID também falhou (${lidResp.status}): ${lidRespText}`);
-          console.error(`[WhatsApp Bot] ⚠️ CAUSA RAIZ: Evolution API ${instanceName} não suporta envio para contas WhatsApp Business (@lid). SOLUÇÃO: atualize a Evolution API para versão 2.3+ no Railway.`);
-        }
+      // Se sendTo já é @lid e retornou erro, é limitação da versão atual da Evolution API
+      if (sendTo.includes("@lid")) {
+        console.error(`[WhatsApp Bot] ⚠️ Evolution API não aceitou envio direto para @lid.`);
+        console.error(`[WhatsApp Bot] 💡 Atualize a Evolution API para versão com suporte a @lid no Railway.`);
       }
       return;
     }
 
-    // Detectar status PENDING: mensagem aceita pelo servidor mas não entregue
-    // Isso ocorre quando o Baileys tenta rotear para @s.whatsapp.net mas a conta usa @lid (WhatsApp Business)
-    const responseData = await response.json().catch(() => ({})) as { status?: string; key?: { remoteJid?: string } };
+    const responseData = await response.json().catch(() => ({})) as { status?: string };
     const msgStatus = responseData.status ?? "OK";
 
     if (msgStatus === "PENDING") {
-      console.warn(`[WhatsApp Bot] ⚠️ PENDING para ${to} — mensagem NÃO chegará. Causa: conta WhatsApp Business usa JID @lid mas estamos enviando para @s.whatsapp.net.`);
-      console.warn(`[WhatsApp Bot] 💡 SOLUÇÃO: atualize a Evolution API para versão 2.3+ no Railway (suporte nativo a @lid).`);
-
-      // Fallback: tentar envio direto ao @lid (funciona em versões mais recentes)
-      if (quotedKey?.remoteJid?.includes("@lid")) {
-        console.log(`[WhatsApp Bot] Tentando fallback via LID após PENDING: ${quotedKey.remoteJid}`);
-        const lidBody: Record<string, unknown> = { number: quotedKey.remoteJid, text };
-        const lidResp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "apikey": evolutionKey },
-          body: JSON.stringify(lidBody),
-        });
-        const lidData = await lidResp.json().catch(() => ({})) as { status?: string };
-        if (lidResp.ok && lidData.status !== "PENDING") {
-          console.log(`[WhatsApp Bot] ✅ Fallback LID entregue: ${quotedKey.remoteJid} — status: ${lidData.status}`);
-        } else {
-          console.error(`[WhatsApp Bot] ❌ Fallback LID também PENDING/falhou (${lidResp.status}) — Evolution API precisa ser atualizada.`);
-        }
+      console.warn(`[WhatsApp Bot] ⚠️ PENDING para ${sendTo} — mensagem não entregue.`);
+      if (!sendTo.includes("@lid")) {
+        console.warn(`[WhatsApp Bot] 💡 A conta destino usa @lid mas a Evolution API não resolveu corretamente. Atualize para versão com suporte nativo a @lid.`);
       }
     } else {
-      console.log(`[WhatsApp Bot] ✅ Mensagem entregue para: ${to} — status: ${msgStatus}`);
+      console.log(`[WhatsApp Bot] ✅ Mensagem entregue para: ${sendTo} — status: ${msgStatus}`);
     }
   } catch (error) {
     console.error(`[WhatsApp Bot] Exceção ao enviar para ${to}:`, error);
@@ -626,21 +645,22 @@ async function processIncomingMessage(
 
   const user = userResult[0];
 
-  // LID: enviar só os dígitos (sem @suffix) para que a Evolution API resolva via onWhatsApp()
-  // internamente — versões recentes (homolog) retornam o @lid correto para roteamento automático.
-  const originalLidJid = replyJid; // preserva LID original antes de sobrescrever
-  if (isLid && user.whatsappPhone) {
-    replyJid = user.whatsappPhone; // só dígitos, sem @s.whatsapp.net
-    console.log(`[WhatsApp Bot] LID detectado, usando número puro para resolução interna: ${replyJid}, LID original: ${originalLidJid}`);
+  // Destino de envio: quando é @lid, usa o JID completo (@lid) diretamente.
+  // Quando é @s.whatsapp.net normal, usa o número de telefone puro para que
+  // resolveJidViaEvolution() possa confirmar o JID antes do envio.
+  let sendTarget: string;
+  if (isLid) {
+    // Usa o @lid diretamente — se a Evolution API suportar, entrega direto.
+    // Se retornar 400, a versão da API não suporta @lid e precisa ser atualizada.
+    sendTarget = replyJid; // já é "21912939925650@lid"
+    console.log(`[WhatsApp Bot] LID detectado — enviando diretamente para: ${sendTarget}`);
+  } else if (user.whatsappPhone) {
+    sendTarget = user.whatsappPhone; // número puro → resolveJid() tentará resolver
+  } else {
+    sendTarget = replyJid;
   }
 
-  // Wrapper de envio: inclui quoted key com LID original para forçar roteamento correto pelo Baileys
-  const sendReply = (txt: string) =>
-    sendWhatsAppMessage(
-      replyJid,
-      txt,
-      isLid ? { id: messageId, remoteJid: originalLidJid, fromMe: false } : undefined
-    );
+  const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt);
 
   // 2. Verificar se é uma resposta de confirmação pendente
   const text = payload.data.message?.conversation ||
@@ -912,10 +932,7 @@ async function processIncomingMessage(
 
   // ── Processar documento (PDF) ────────────────────────────────────────────────
   else if (messageType === "documentMessage") {
-    await sendWhatsAppMessage(
-        replyJid,
-      `📄 Recebi um documento. Por enquanto, envie o comprovante como *imagem* (foto) para que eu consiga processar automaticamente.`
-    );
+    await sendReply(`📄 Recebi um documento. Por enquanto, envie o comprovante como *imagem* (foto) para que eu consiga processar automaticamente.`);
     return;
   }
 
