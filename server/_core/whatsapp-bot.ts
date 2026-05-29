@@ -38,6 +38,10 @@ interface EvolutionWebhookPayload {
       fromMe?: boolean;
       id?: string;
       addressingMode?: string; // "lid" quando a conta usa @lid (v2.3.7+)
+      senderLid?: string; // JID @lid do remetente (v2.3.7+ quando addressingMode = "lid")
+      participantLid?: string;
+      remoteJidAlt?: string; // JID alternativo (algumas builds mandam o @lid aqui)
+      senderPn?: string; // Phone number do remetente
     };
     message?: {
       conversation?: string;
@@ -105,6 +109,22 @@ interface ExtractedTransaction {
 // ─── Estado em memória para confirmações pendentes ────────────────────────────
 // Chave: número de telefone (ex: "5511947728157")
 // Valor: dados da transação extraída aguardando confirmação
+// Dedup em memória: a Evolution API às vezes entrega o MESMO messageId duas vezes
+// em milissegundos (uma via @lid, outra via @s.whatsapp.net). O dedup no banco
+// sofre corrida porque o INSERT só acontece após o processamento. Esse lock em
+// memória bloqueia a duplicata no instante do recebimento do webhook.
+const recentlySeenMessageIds = new Map<string, number>(); // messageId → timestamp ms
+function markMessageSeen(messageId: string): boolean {
+  const now = Date.now();
+  // Limpeza: remove entradas com mais de 5 minutos
+  for (const [id, ts] of recentlySeenMessageIds) {
+    if (now - ts > 5 * 60 * 1000) recentlySeenMessageIds.delete(id);
+  }
+  if (recentlySeenMessageIds.has(messageId)) return false; // já visto → duplicata
+  recentlySeenMessageIds.set(messageId, now);
+  return true;
+}
+
 const pendingConfirmations = new Map<string, {
   extracted: ExtractedTransaction;
   userId: number;
@@ -586,11 +606,18 @@ async function processIncomingMessage(
 
   const user = userResult[0];
 
-  // Destino de envio: responde para o MESMO remoteJid que a Evolution enviou no webhook.
-  // Esse é o JID canônico da conversa — a Evolution/Baileys já tem a sessão estabelecida
-  // com ele, então a resposta usa exatamente o mesmo caminho da mensagem recebida.
-  const sendTarget = replyJid;
-  console.log(`[WhatsApp Bot] Respondendo para remoteJid da conversa: ${sendTarget}`);
+  // Destino de envio. Hipótese: quando addressingMode = "lid", a sessão de
+  // criptografia do Baileys está indexada pelo @lid, não pelo @s.whatsapp.net.
+  // Responder ao @s.whatsapp.net deixa a mensagem PENDING para sempre porque
+  // o Baileys não acha a sessão. Então, se a Evolution mandar o @lid real do
+  // remetente no payload, respondemos para ESSE jid.
+  const senderLid = payload.data?.key?.senderLid
+    || payload.data?.key?.participantLid
+    || (payload.data?.key?.remoteJidAlt?.includes("@lid") ? payload.data.key.remoteJidAlt : undefined)
+    || (user.whatsappLid && user.whatsappLid.includes("@lid") ? user.whatsappLid : undefined);
+
+  const sendTarget = (isLid && senderLid) ? senderLid : replyJid;
+  console.log(`[WhatsApp Bot] sendTarget escolhido: ${sendTarget} (isLid=${isLid}, senderLid=${senderLid ?? "n/a"})`);
 
   const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt);
 
@@ -1004,13 +1031,22 @@ export function registerWhatsAppBotRoutes(app: Express): void {
       // Ignorar mensagens de grupos
       if (remoteJid.includes("@g.us")) return;
 
+      // Log do objeto key COMPLETO para descobrir onde vem o @lid real do remetente
+      console.log(`[WhatsApp Bot] key bruto: ${JSON.stringify(payload.data?.key)}`);
+
+      // Dedup atômico em memória ANTES de processar (evita envio duplicado)
+      if (!messageId || !markMessageSeen(messageId)) {
+        if (messageId) console.log(`[WhatsApp Bot] Duplicata ignorada no webhook: ${messageId}`);
+        return;
+      }
+
       const fromPhone = normalizePhone(remoteJid);
       const replyJid = getReplyJid(remoteJid);
       const messageType = payload.data?.messageType ?? "conversation";
 
       console.log(`[WhatsApp Bot] Mensagem recebida - remoteJid: ${remoteJid}, fromPhone: ${fromPhone}, replyJid: ${replyJid}`);
 
-      if (!fromPhone || !messageId) return;
+      if (!fromPhone) return;
 
       // Processar em background para não bloquear
       processIncomingMessage(fromPhone, replyJid, messageId, messageType, payload).catch(err => {
