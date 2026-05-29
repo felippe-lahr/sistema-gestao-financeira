@@ -570,6 +570,18 @@ async function processIncomingMessage(
     return;
   }
 
+  // Deduplicação: a Evolution API às vezes entrega o mesmo messageId duas vezes
+  // (uma via @lid e outra via @s.whatsapp.net). Ignorar se já foi processado.
+  const existing = await dbInstance
+    .select({ id: whatsappMessages.id })
+    .from(whatsappMessages)
+    .where(eq(whatsappMessages.messageId, messageId))
+    .limit(1);
+  if (existing.length > 0) {
+    console.log(`[WhatsApp Bot] Mensagem ${messageId} já processada, ignorando duplicata`);
+    return;
+  }
+
   const isLid = replyJid.includes("@lid");
   console.log(`[WhatsApp Bot] Buscando usuário - fromPhone: ${fromPhone}, replyJid: ${replyJid}, isLid: ${isLid}`);
 
