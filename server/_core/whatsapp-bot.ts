@@ -219,15 +219,20 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
 
-    // Se "to" é um número puro (sem @), tentar resolver o JID via Evolution API
+    // Resolução de JID: tenta sempre obter o JID correto via Evolution API
     let sendTo = to;
-    if (!to.includes("@")) {
-      const resolved = await resolveJidViaEvolution(to);
-      if (resolved) {
-        sendTo = resolved;
-        console.log(`[WhatsApp Bot] Usando JID resolvido: ${sendTo}`);
+    const phoneForResolution = to.includes("@") ? to.replace(/@.*$/, "").split(":")[0] : to;
+    const resolved = await resolveJidViaEvolution(phoneForResolution);
+    if (resolved) {
+      sendTo = resolved;
+      console.log(`[WhatsApp Bot] JID resolvido para ${phoneForResolution}: ${sendTo}`);
+    } else {
+      // Se resolução falhou e temos @lid, tenta enviar direto ao @lid
+      if (to.includes("@lid")) {
+        sendTo = to;
+        console.warn(`[WhatsApp Bot] Resolução falhou, tentando @lid direto: ${sendTo}`);
       } else {
-        console.warn(`[WhatsApp Bot] Não foi possível resolver JID para ${to}, tentando com número puro`);
+        console.warn(`[WhatsApp Bot] Não foi possível resolver JID para ${to}, usando número puro`);
       }
     }
 
