@@ -143,14 +143,9 @@ export async function transcribeAudio(
     formData.append("prompt", prompt);
 
     // Step 4: Call the transcription service
-    const baseUrl = ENV.forgeApiUrl.endsWith("/")
-      ? ENV.forgeApiUrl
-      : `${ENV.forgeApiUrl}/`;
-    
-    const fullUrl = new URL(
-      "v1/audio/transcriptions",
-      baseUrl
-    ).toString();
+    const baseUrl = ENV.forgeApiUrl.replace(/\/$/, "");
+    const fullUrl = `${baseUrl}/v1/audio/transcriptions`;
+    console.log(`[transcribeAudio] URL do serviço: ${fullUrl}`);
 
     const response = await fetch(fullUrl, {
       method: "POST",
