@@ -101,6 +101,8 @@ interface ExtractedTransaction {
   categoryName?: string;
   bankAccountName?: string;
   paymentMethodName?: string;
+  creditCardName?: string;
+  installments?: number;
   isRecurring?: boolean;
   recurrenceFrequency?: "monthly" | "weekly" | "yearly";
   confidence?: number;
@@ -261,10 +263,18 @@ async function downloadEvolutionMedia(
  */
 async function extractTransactionFromText(
   text: string,
-  userEntities: { id: number; name: string }[]
+  userEntities: { id: number; name: string }[],
+  categories: { name: string; type: string }[] = [],
+  creditCardsList: { name: string }[] = []
 ): Promise<ExtractedTransaction | null> {
   const entitiesStr = userEntities.map(e => e.name).join(", ");
   const today = new Date().toISOString().split("T")[0];
+  const categoriesStr = categories.length > 0
+    ? categories.map(c => `${c.name} (${c.type})`).join(", ")
+    : "nenhuma";
+  const creditCardsStr = creditCardsList.length > 0
+    ? creditCardsList.map(c => c.name).join(", ")
+    : "nenhum";
 
   try {
     const result = await invokeLLM({
@@ -275,16 +285,20 @@ async function extractTransactionFromText(
 
 Entidades disponíveis: ${entitiesStr || "nenhuma"}
 Data de hoje: ${today}
+Categorias cadastradas: ${categoriesStr}
+Cartões de crédito cadastrados: ${creditCardsStr}
 
 Retorne um JSON com os campos:
 - entityName: nome da entidade/centro de custo (string ou null)
-- amount: valor em reais como número decimal (ex: 150.50)
+- amount: valor em reais como número decimal (ex: 150.50) — valor TOTAL, não por parcela
 - date: data no formato YYYY-MM-DD (use hoje se não informado)
 - description: descrição curta da transação
 - type: "INCOME" para crédito/receita ou "EXPENSE" para débito/despesa
-- categoryName: categoria sugerida (string ou null)
+- categoryName: escolha EXATAMENTE um nome da lista de categorias cadastradas, ou null se nenhuma for adequada
 - bankAccountName: conta bancária mencionada (string ou null)
 - paymentMethodName: meio de pagamento mencionado (string ou null)
+- creditCardName: se mencionar cartão de crédito (nubank, itaú, etc.), escolha EXATAMENTE um nome da lista de cartões cadastrados, ou null
+- installments: número de parcelas se mencionado ("4x", "em 4 vezes" → 4), ou null/1 se não parcelado
 - isRecurring: true se for recorrente/mensalidade/assinatura
 - recurrenceFrequency: "monthly", "weekly" ou "yearly" (apenas se isRecurring=true)
 - confidence: número de 0 a 1 indicando confiança na extração
@@ -323,10 +337,32 @@ Retorne APENAS o JSON, sem texto adicional.`,
  */
 async function extractTransactionFromImage(
   imageUrl: string,
-  userEntities: { id: number; name: string }[]
+  userEntities: { id: number; name: string }[],
+  categories: { name: string; type: string }[] = [],
+  creditCardsList: { name: string }[] = [],
+  caption?: string
 ): Promise<ExtractedTransaction | null> {
   const entitiesStr = userEntities.map(e => e.name).join(", ");
   const today = new Date().toISOString().split("T")[0];
+  const categoriesStr = categories.length > 0
+    ? categories.map(c => `${c.name} (${c.type})`).join(", ")
+    : "nenhuma";
+  const creditCardsStr = creditCardsList.length > 0
+    ? creditCardsList.map(c => c.name).join(", ")
+    : "nenhum";
+
+  const userContentParts: Array<{ type: string; [key: string]: unknown }> = [
+    {
+      type: "image_url",
+      image_url: { url: imageUrl, detail: "high" },
+    },
+    {
+      type: "text",
+      text: caption
+        ? `Extraia os dados desta transação/comprovante. Contexto adicional fornecido pelo usuário: "${caption}"`
+        : "Extraia os dados desta transação/comprovante.",
+    },
+  ];
 
   try {
     const result = await invokeLLM({
@@ -337,16 +373,20 @@ async function extractTransactionFromImage(
 
 Entidades disponíveis: ${entitiesStr || "nenhuma"}
 Data de hoje: ${today}
+Categorias cadastradas: ${categoriesStr}
+Cartões de crédito cadastrados: ${creditCardsStr}
 
 Retorne um JSON com os campos:
 - entityName: nome da entidade/centro de custo (string ou null)
-- amount: valor em reais como número decimal (ex: 150.50)
+- amount: valor em reais como número decimal (ex: 150.50) — valor TOTAL, não por parcela
 - date: data no formato YYYY-MM-DD (use hoje se não informado)
 - description: descrição curta da transação
 - type: "INCOME" para crédito/receita ou "EXPENSE" para débito/despesa
-- categoryName: categoria sugerida (string ou null)
+- categoryName: escolha EXATAMENTE um nome da lista de categorias cadastradas, ou null se nenhuma for adequada
 - bankAccountName: conta bancária mencionada (string ou null)
 - paymentMethodName: meio de pagamento mencionado (string ou null)
+- creditCardName: se mencionar cartão de crédito, escolha EXATAMENTE um nome da lista de cartões cadastrados, ou null
+- installments: número de parcelas se visível no comprovante, ou null/1 se não parcelado
 - isRecurring: false
 - confidence: número de 0 a 1 indicando confiança na extração
 
@@ -355,16 +395,7 @@ Retorne APENAS o JSON, sem texto adicional.`,
         },
         {
           role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: { url: imageUrl, detail: "high" },
-            },
-            {
-              type: "text",
-              text: "Extraia os dados desta transação/comprovante.",
-            },
-          ],
+          content: userContentParts as any,
         },
       ],
       responseFormat: { type: "json_object" },
@@ -557,6 +588,27 @@ async function resolvePaymentMethodId(
 }
 
 /**
+ * Resolve creditCardId a partir do nome
+ */
+async function resolveCreditCardId(
+  cardName: string | undefined,
+  entityId: number,
+  userId: number
+): Promise<number | null> {
+  if (!cardName) return null;
+  try {
+    const cards = await db.getCreditCardsByEntityId(entityId, userId);
+    const normalized = cardName.toLowerCase().trim();
+    const match = cards.find(c =>
+      c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase())
+    );
+    return match?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Monta o resumo da transação para confirmação
  */
 function buildConfirmationMessage(
@@ -568,7 +620,13 @@ function buildConfirmationMessage(
   const amountStr = formatCurrency(amountCents);
   const dateStr = extracted.date ? formatDate(extracted.date) : "hoje";
   const recurring = extracted.isRecurring
-    ? `\n🔁 Recorrente (${extracted.recurrenceFrequency === "monthly" ? "mensal" : extracted.recurrenceFrequency === "weekly" ? "semanal" : "anual"})`
+    ? `\n🔁 Recorrente (${extracted.recurrenceFrequency === "monthly" ? "mensal" : extracted.recurrenceFrequency === "weekly" ? "semanal" : "anual"}) — serão criados 12 lançamentos`
+    : "";
+  const installments = extracted.installments && extracted.installments > 1
+    ? `\n🔢 Parcelado em ${extracted.installments}x de ${formatCurrency(Math.round(amountCents / extracted.installments))}`
+    : "";
+  const creditCard = extracted.creditCardName
+    ? `\n💳 Cartão: ${extracted.creditCardName}`
     : "";
 
   return `📋 *Confirmar transação?*
@@ -576,7 +634,7 @@ function buildConfirmationMessage(
 ${typeLabel}: *${amountStr}*
 📝 ${extracted.description}
 🏷️ Entidade: ${entityName}
-📅 Data: ${dateStr}${extracted.categoryName ? `\n🗂️ Categoria: ${extracted.categoryName}` : ""}${extracted.bankAccountName ? `\n🏦 Conta: ${extracted.bankAccountName}` : ""}${extracted.paymentMethodName ? `\n💳 Pagamento: ${extracted.paymentMethodName}` : ""}${recurring}
+📅 Data: ${dateStr}${extracted.categoryName ? `\n🗂️ Categoria: ${extracted.categoryName}` : ""}${extracted.bankAccountName ? `\n🏦 Conta: ${extracted.bankAccountName}` : ""}${extracted.paymentMethodName ? `\n💳 Pagamento: ${extracted.paymentMethodName}` : ""}${creditCard}${installments}${recurring}
 
 Responda:
 *1* — Confirmar ✅
@@ -725,7 +783,7 @@ async function processIncomingMessage(
       try {
         const extracted = pending.extracted;
         const amountCents = Math.round((extracted.amount ?? 0) * 100);
-        const dueDate = extracted.date
+        const baseDate = extracted.date
           ? (() => {
               const [y, m, d] = extracted.date!.split("-").map(Number);
               return new Date(y, m - 1, d);
@@ -748,35 +806,107 @@ async function processIncomingMessage(
           pending.entityId,
           user.id
         );
+        const creditCardId = await resolveCreditCardId(
+          extracted.creditCardName,
+          pending.entityId,
+          user.id
+        );
 
-        const transactionId = await db.createTransaction({
+        const installments = (extracted.installments && extracted.installments > 1)
+          ? extracted.installments
+          : 1;
+        const description = extracted.description ?? "Transação via WhatsApp";
+        const basePayload = {
           entityId: pending.entityId,
           type: extracted.type ?? "EXPENSE",
-          description: extracted.description ?? "Transação via WhatsApp",
-          amount: amountCents,
-          dueDate,
-          paymentDate: new Date(),
-          status: "PAID",
+          amount: Math.round(amountCents / installments),
+          status: "PAID" as const,
           categoryId: categoryId ?? undefined,
           bankAccountId: bankAccountId ?? undefined,
           paymentMethodId: paymentMethodId ?? undefined,
-          isRecurring: extracted.isRecurring ?? false,
-          recurrencePattern: extracted.isRecurring && extracted.recurrenceFrequency
-            ? JSON.stringify({ frequency: extracted.recurrenceFrequency, interval: 1 })
-            : undefined,
-          importOrigin: "MANUAL",
-        });
+          importOrigin: "MANUAL" as const,
+        };
+
+        let firstTransactionId: number;
+        const createdIds: number[] = [];
+
+        if (installments > 1) {
+          // Criar N transações parceladas, distribuindo datas mensalmente
+          for (let i = 1; i <= installments; i++) {
+            const dueDate = new Date(baseDate);
+            dueDate.setMonth(dueDate.getMonth() + (i - 1));
+            const tid = await db.createTransaction({
+              ...basePayload,
+              description: `${description} (${i}/${installments})`,
+              dueDate,
+              paymentDate: i === 1 ? new Date() : undefined,
+              isRecurring: false,
+              ...(creditCardId ? { creditCardId } as any : {}),
+            });
+            createdIds.push(tid);
+          }
+          firstTransactionId = createdIds[0];
+        } else {
+          // Transação única
+          firstTransactionId = await db.createTransaction({
+            ...basePayload,
+            description,
+            amount: amountCents,
+            dueDate: baseDate,
+            paymentDate: new Date(),
+            isRecurring: extracted.isRecurring ?? false,
+            recurrencePattern: extracted.isRecurring && extracted.recurrenceFrequency
+              ? JSON.stringify({ frequency: extracted.recurrenceFrequency, interval: 1 })
+              : undefined,
+            ...(creditCardId ? { creditCardId } as any : {}),
+          });
+          createdIds.push(firstTransactionId);
+        }
+
+        // Criar 12 transações recorrentes futuras se isRecurring=true
+        let recurringCount = 0;
+        if (extracted.isRecurring && installments === 1) {
+          const freq = extracted.recurrenceFrequency ?? "monthly";
+          for (let i = 1; i <= 12; i++) {
+            const dueDate = new Date(baseDate);
+            if (freq === "monthly") dueDate.setMonth(dueDate.getMonth() + i);
+            else if (freq === "weekly") dueDate.setDate(dueDate.getDate() + 7 * i);
+            else if (freq === "yearly") dueDate.setFullYear(dueDate.getFullYear() + i);
+            await db.createTransaction({
+              ...basePayload,
+              description,
+              amount: amountCents,
+              dueDate,
+              paymentDate: undefined,
+              status: "PENDING",
+              isRecurring: true,
+              recurrencePattern: JSON.stringify({ frequency: freq, interval: 1 }),
+              parentTransactionId: firstTransactionId,
+              ...(creditCardId ? { creditCardId } as any : {}),
+            });
+            recurringCount++;
+          }
+        }
 
         // Atualizar whatsapp_message com transactionId
         await dbInstance
           .update(whatsappMessages)
-          .set({ status: "CONFIRMED", transactionId, updatedAt: new Date() })
+          .set({ status: "CONFIRMED", transactionId: firstTransactionId, updatedAt: new Date() })
           .where(eq(whatsappMessages.messageId, pending.messageId));
 
         const amountStr = formatCurrency(amountCents);
-        await sendReply(
-          `✅ *Transação cadastrada com sucesso!*\n\n${extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito"}: *${amountStr}*\n📝 ${extracted.description}\n\nID: #${transactionId}`
-        );
+        let successMsg = `✅ *Transação cadastrada com sucesso!*\n\n${extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito"}: *${amountStr}*\n📝 ${description}`;
+        if (installments > 1) {
+          successMsg += `\n🔢 Parcelado em ${installments}x de ${formatCurrency(Math.round(amountCents / installments))}`;
+        }
+        if (creditCardId && extracted.creditCardName) {
+          successMsg += `\n💳 Cartão: ${extracted.creditCardName}`;
+        }
+        if (recurringCount > 0) {
+          successMsg += `\n🔁 Recorrência criada: ${recurringCount} lançamentos futuros`;
+        }
+        successMsg += `\n\nID: #${firstTransactionId}`;
+        await sendReply(successMsg);
       } catch (error) {
         console.error("[WhatsApp Bot] Erro ao criar transação:", error);
         await sendReply(
@@ -820,6 +950,13 @@ async function processIncomingMessage(
     );
     return;
   }
+
+  // Pré-carregar categorias e cartões para a primeira entidade (usados no prompt do LLM)
+  const defaultEntityId = userEntities[0].id;
+  const [categoriesList, creditCardsList] = await Promise.all([
+    db.getCategoriesByEntityId(defaultEntityId, user.id).catch(() => [] as { name: string; type: string }[]),
+    db.getCreditCardsByEntityId(defaultEntityId, user.id).catch(() => [] as { name: string }[]),
+  ]);
 
   // Salvar mensagem recebida no banco
   const savedMessage = await db.createWhatsAppMessage({
@@ -910,7 +1047,8 @@ async function processIncomingMessage(
 
     if (imageUrl) {
       mediaUrl = imageUrl;
-      const extracted = await extractTransactionFromImage(imageUrl, userEntities);
+      const imageCaption = payload.data?.message?.imageMessage?.caption ?? undefined;
+      const extracted = await extractTransactionFromImage(imageUrl, userEntities, categoriesList, creditCardsList, imageCaption);
 
       if (!extracted) {
         await sendReply(
@@ -972,7 +1110,7 @@ async function processIncomingMessage(
 
   await sendReply(`🤔 Processando...`);
 
-  const extracted = await extractTransactionFromText(extractedText, userEntities);
+  const extracted = await extractTransactionFromText(extractedText, userEntities, categoriesList, creditCardsList);
 
   if (!extracted) {
     await sendReply(

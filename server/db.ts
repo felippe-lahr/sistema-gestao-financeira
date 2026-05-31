@@ -841,6 +841,33 @@ export async function deletePaymentMethod(methodId: number) {
   await db.delete(paymentMethods).where(eq(paymentMethods.id, methodId));
 }
 
+// ========== CREDIT CARD OPERATIONS ==========
+
+export async function getCreditCardsByEntityId(entityId: number, userId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Return credit cards that belong to this entity and are active
+  if (userId) {
+    return await db
+      .select()
+      .from(creditCards)
+      .where(
+        and(
+          eq(creditCards.entityId, entityId),
+          eq(creditCards.isActive, true)
+        )
+      )
+      .orderBy(creditCards.name);
+  }
+
+  return await db
+    .select()
+    .from(creditCards)
+    .where(and(eq(creditCards.entityId, entityId), eq(creditCards.isActive, true)))
+    .orderBy(creditCards.name);
+}
+
 // ========== DASHBOARD CHARTS ==========
 
 export async function getCashFlowData(entityId: number, months: number, startDate?: Date, endDate?: Date) {
