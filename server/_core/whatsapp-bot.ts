@@ -598,12 +598,19 @@ async function resolveCreditCardId(
   if (!cardName) return null;
   try {
     const cards = await db.getCreditCardsByEntityId(entityId, userId);
+    console.log(`[WhatsApp Bot] Cartões disponíveis na entidade ${entityId}:`, cards.map(c => c.name));
     const normalized = cardName.toLowerCase().trim();
     const match = cards.find(c =>
       c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase())
     );
-    return match?.id ?? null;
-  } catch {
+    if (match) {
+      console.log(`[WhatsApp Bot] Cartão resolvido: "${cardName}" → id=${match.id} nome="${match.name}"`);
+      return match.id;
+    }
+    console.log(`[WhatsApp Bot] Cartão "${cardName}" não encontrado na entidade ${entityId}`);
+    return null;
+  } catch (err) {
+    console.error("[WhatsApp Bot] Erro ao resolver cartão:", err);
     return null;
   }
 }
@@ -790,6 +797,7 @@ async function processIncomingMessage(
             })()
           : new Date();
 
+        console.log(`[WhatsApp Bot] Confirmando: creditCardName="${extracted.creditCardName}", installments=${extracted.installments}, entityId=${pending.entityId}`);
         const categoryId = await resolveCategoryId(
           extracted.categoryName,
           pending.entityId,
@@ -811,6 +819,8 @@ async function processIncomingMessage(
           pending.entityId,
           user.id
         );
+
+        console.log(`[WhatsApp Bot] creditCardId resolvido: ${creditCardId}`);
 
         const installments = (extracted.installments && extracted.installments > 1)
           ? extracted.installments
