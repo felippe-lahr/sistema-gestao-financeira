@@ -855,11 +855,14 @@ async function processIncomingMessage(
         const firstInstallmentDate = getFirstInstallmentDate(baseDate);
         console.log(`[WhatsApp Bot] baseDate=${baseDate.toISOString()}, closingDay=${creditCard?.closingDay}, firstInstallmentDate=${firstInstallmentDate.toISOString()}`);
 
+        // Compras no cartão de crédito ficam PENDING (serão pagas na fatura)
+        const txStatus = creditCard ? "PENDING" : "PAID";
+
         const basePayload = {
           entityId: pending.entityId,
           type: extracted.type ?? "EXPENSE",
           amount: Math.round(amountCents / installments),
-          status: "PAID" as const,
+          status: txStatus as "PENDING" | "PAID",
           categoryId: categoryId ?? undefined,
           bankAccountId: bankAccountId ?? undefined,
           paymentMethodId: paymentMethodId ?? undefined,
@@ -877,7 +880,7 @@ async function processIncomingMessage(
               ...basePayload,
               description: `${description} (${i}/${installments})`,
               dueDate: installmentDate,
-              paymentDate: i === 1 ? new Date() : undefined,
+              paymentDate: undefined,
               isRecurring: false,
               ...(creditCardId ? { creditCardId } as any : {}),
             });
@@ -890,7 +893,7 @@ async function processIncomingMessage(
             description,
             amount: amountCents,
             dueDate: creditCard ? firstInstallmentDate : baseDate,
-            paymentDate: new Date(),
+            paymentDate: creditCard ? undefined : new Date(),
             isRecurring: extracted.isRecurring ?? false,
             recurrencePattern: extracted.isRecurring && extracted.recurrenceFrequency
               ? JSON.stringify({ frequency: extracted.recurrenceFrequency, interval: 1 })
