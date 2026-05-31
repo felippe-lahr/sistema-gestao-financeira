@@ -850,6 +850,7 @@ async function processIncomingMessage(
         };
 
         const firstInstallmentDate = getFirstInstallmentDate(baseDate);
+        console.log(`[WhatsApp Bot] baseDate=${baseDate.toISOString()}, closingDay=${creditCard?.closingDay}, firstInstallmentDate=${firstInstallmentDate.toISOString()}`);
 
         const basePayload = {
           entityId: pending.entityId,
