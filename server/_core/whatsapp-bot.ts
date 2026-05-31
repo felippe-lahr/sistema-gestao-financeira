@@ -590,11 +590,11 @@ async function resolvePaymentMethodId(
 /**
  * Resolve creditCardId a partir do nome
  */
-async function resolveCreditCardId(
+async function resolveCreditCard(
   cardName: string | undefined,
   entityId: number,
   userId: number
-): Promise<number | null> {
+): Promise<{ id: number; name: string; closingDay: number; dueDay: number } | null> {
   if (!cardName) return null;
   try {
     const cards = await db.getCreditCardsByEntityId(entityId, userId);
@@ -604,8 +604,8 @@ async function resolveCreditCardId(
       c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase())
     );
     if (match) {
-      console.log(`[WhatsApp Bot] Cartão resolvido: "${cardName}" → id=${match.id} nome="${match.name}"`);
-      return match.id;
+      console.log(`[WhatsApp Bot] Cartão resolvido: "${cardName}" → id=${match.id} nome="${match.name}" fechamento=dia${match.closingDay}`);
+      return { id: match.id, name: match.name, closingDay: match.closingDay, dueDay: match.dueDay };
     }
     console.log(`[WhatsApp Bot] Cartão "${cardName}" não encontrado na entidade ${entityId}`);
     return null;
@@ -613,6 +613,15 @@ async function resolveCreditCardId(
     console.error("[WhatsApp Bot] Erro ao resolver cartão:", err);
     return null;
   }
+}
+
+async function resolveCreditCardId(
+  cardName: string | undefined,
+  entityId: number,
+  userId: number
+): Promise<number | null> {
+  const card = await resolveCreditCard(cardName, entityId, userId);
+  return card?.id ?? null;
 }
 
 /**
@@ -814,11 +823,12 @@ async function processIncomingMessage(
           pending.entityId,
           user.id
         );
-        const creditCardId = await resolveCreditCardId(
+        const creditCard = await resolveCreditCard(
           extracted.creditCardName,
           pending.entityId,
           user.id
         );
+        const creditCardId = creditCard?.id ?? null;
 
         console.log(`[WhatsApp Bot] creditCardId resolvido: ${creditCardId}`);
 
@@ -826,6 +836,21 @@ async function processIncomingMessage(
           ? extracted.installments
           : 1;
         const description = extracted.description ?? "Transação via WhatsApp";
+
+        // Quando há cartão de crédito, a data da primeira parcela considera o
+        // closingDay: se hoje >= closingDay, a compra entra na próxima fatura.
+        const getFirstInstallmentDate = (referenceDate: Date): Date => {
+          if (!creditCard) return referenceDate;
+          const today = referenceDate;
+          const closingDay = creditCard.closingDay;
+          // Se hoje já passou do fechamento, primeira parcela é no mês seguinte
+          const monthOffset = today.getDate() >= closingDay ? 1 : 0;
+          const d = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+          return d;
+        };
+
+        const firstInstallmentDate = getFirstInstallmentDate(baseDate);
+
         const basePayload = {
           entityId: pending.entityId,
           type: extracted.type ?? "EXPENSE",
@@ -841,14 +866,13 @@ async function processIncomingMessage(
         const createdIds: number[] = [];
 
         if (installments > 1) {
-          // Criar N transações parceladas, distribuindo datas mensalmente
           for (let i = 1; i <= installments; i++) {
-            const dueDate = new Date(baseDate);
-            dueDate.setMonth(dueDate.getMonth() + (i - 1));
+            const installmentDate = new Date(firstInstallmentDate);
+            installmentDate.setMonth(installmentDate.getMonth() + (i - 1));
             const tid = await db.createTransaction({
               ...basePayload,
               description: `${description} (${i}/${installments})`,
-              dueDate,
+              dueDate: installmentDate,
               paymentDate: i === 1 ? new Date() : undefined,
               isRecurring: false,
               ...(creditCardId ? { creditCardId } as any : {}),
@@ -857,12 +881,11 @@ async function processIncomingMessage(
           }
           firstTransactionId = createdIds[0];
         } else {
-          // Transação única
           firstTransactionId = await db.createTransaction({
             ...basePayload,
             description,
             amount: amountCents,
-            dueDate: baseDate,
+            dueDate: creditCard ? firstInstallmentDate : baseDate,
             paymentDate: new Date(),
             isRecurring: extracted.isRecurring ?? false,
             recurrencePattern: extracted.isRecurring && extracted.recurrenceFrequency
@@ -905,9 +928,11 @@ async function processIncomingMessage(
           .where(eq(whatsappMessages.messageId, pending.messageId));
 
         const amountStr = formatCurrency(amountCents);
+        const firstMonthLabel = firstInstallmentDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
         let successMsg = `✅ *Transação cadastrada com sucesso!*\n\n${extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito"}: *${amountStr}*\n📝 ${description}`;
         if (installments > 1) {
           successMsg += `\n🔢 Parcelado em ${installments}x de ${formatCurrency(Math.round(amountCents / installments))}`;
+          if (creditCard) successMsg += ` — 1ª parcela em ${firstMonthLabel}`;
         }
         if (creditCardId && extracted.creditCardName) {
           successMsg += `\n💳 Cartão: ${extracted.creditCardName}`;
