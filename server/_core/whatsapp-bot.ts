@@ -841,12 +841,15 @@ async function processIncomingMessage(
         // closingDay: se hoje >= closingDay, a compra entra na próxima fatura.
         const getFirstInstallmentDate = (referenceDate: Date): Date => {
           if (!creditCard) return referenceDate;
-          const today = referenceDate;
           const closingDay = creditCard.closingDay;
-          // Se hoje já passou do fechamento, primeira parcela é no mês seguinte
-          const monthOffset = today.getDate() >= closingDay ? 1 : 0;
-          const d = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
-          return d;
+          // Se hoje já passou do fechamento, a fatura do mês atual fechou → próximo mês
+          const monthOffset = referenceDate.getDate() >= closingDay ? 1 : 0;
+          // Usar 15:00 UTC (meio-dia BRT) para evitar que meia-noite UTC = véspera no Brasil
+          return new Date(Date.UTC(
+            referenceDate.getFullYear(),
+            referenceDate.getMonth() + monthOffset,
+            1, 15, 0, 0
+          ));
         };
 
         const firstInstallmentDate = getFirstInstallmentDate(baseDate);
