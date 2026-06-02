@@ -721,13 +721,14 @@ async function processIncomingMessage(
       .limit(1);
   }
 
-  // Se for LID e encontrou usuário, mas não tem LID salvo, auto-vincular
-  if (userResult.length > 0 && isLid && !userResult[0].whatsappLid) {
-    console.log(`[WhatsApp Bot] Auto-vinculando LID ${replyJid} ao usuário ${userResult[0].id}`);
+  // Se for LID e encontrou usuário pelo número, atualizar o LID salvo (pode ter mudado após reconexão)
+  if (userResult.length > 0 && isLid && userResult[0].whatsappLid !== replyJid) {
+    console.log(`[WhatsApp Bot] Atualizando LID: ${userResult[0].whatsappLid ?? "(vazio)"} → ${replyJid} para usuário ${userResult[0].id}`);
     await dbInstance
       .update(users)
       .set({ whatsappLid: replyJid, updatedAt: new Date() })
       .where(eq(users.id, userResult[0].id));
+    userResult[0].whatsappLid = replyJid;
   }
 
   // Se for LID e não encontrou por nenhum método, buscar QUALQUER usuário com whatsappPhone preenchido
