@@ -136,6 +136,24 @@ const pendingConfirmations = new Map<string, {
   expiresAt: number; // timestamp ms
 }>();
 
+// ─── Estado para fluxo de anexos em múltiplos passos ─────────────────────────
+type AttachmentStage =
+  | "awaiting_mode"         // perguntou "nova transação ou existente?"
+  | "awaiting_selection";   // mostrou lista de pendentes, aguarda número
+
+const pendingAttachments = new Map<string, {
+  mediaUrl: string;
+  mimeType: string;
+  filename: string;
+  fileSize: number;
+  stage: AttachmentStage;
+  transactions?: Array<{ id: number; description: string; amount: number; dueDate: string | null }>;
+  userId: number;
+  entityId: number;
+  organizationId: number | null;
+  expiresAt: number;
+}>();
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -851,7 +869,145 @@ async function processIncomingMessage(
 
   const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt);
 
-  // 2. Verificar se é uma resposta de confirmação pendente
+  // 2. Verificar se há fluxo de anexo pendente
+  const pendingAttach = pendingAttachments.get(replyJid);
+  if (pendingAttach && Date.now() < pendingAttach.expiresAt) {
+    const messageType = payload.data?.messageType ?? "conversation";
+    let responseText = payload.data.message?.conversation ||
+      payload.data.message?.extendedTextMessage?.text || "";
+
+    // Transcrever voz se necessário
+    if ((messageType === "audioMessage" || messageType === "pttMessage") && !responseText) {
+      const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
+      const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+      if (mediaData) {
+        const tr = await transcribeAudioWithGemini(mediaData.buffer, mediaData.mimeType);
+        if (tr.ok) responseText = tr.text;
+      }
+    }
+
+    const trimmed = responseText.trim();
+
+    if (pendingAttach.stage === "awaiting_mode") {
+      if (trimmed === "1") {
+        // Nova transação — processar como imagem normalmente
+        pendingAttachments.delete(replyJid);
+        // Re-processar o arquivo como nova transação via extractTransactionFromImage
+        const org = await db.getOrFirstOrganizationForUser(user.id);
+        const userEntities = await db.getEntitiesByUserId(user.id);
+        const defaultEntityId = userEntities[0]?.id;
+        const [categoriesList, creditCardsList] = await Promise.all([
+          db.getCategoriesByEntityId(defaultEntityId, user.id).catch(() => []),
+          db.getCreditCardsByEntityId(defaultEntityId, user.id).catch(() => []),
+        ]);
+        await sendReply(`🤔 Processando...`);
+        const extracted = await extractTransactionFromImage(pendingAttach.mediaUrl, userEntities, categoriesList, creditCardsList);
+        if (!extracted) {
+          await sendReply(`❌ Não consegui extrair dados do documento. Tente descrever a transação por texto ou voz.`);
+          return;
+        }
+        const entityId = resolveEntityId(extracted.entityName, userEntities);
+        if (!entityId) {
+          await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
+          return;
+        }
+        const entityName = userEntities.find(e => e.id === entityId)?.name ?? "Entidade";
+        pendingConfirmations.set(replyJid, {
+          extracted,
+          userId: user.id,
+          organizationId: org?.id ?? null,
+          entityId,
+          messageId,
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        });
+        await sendReply(buildConfirmationMessage(extracted, entityName));
+        return;
+      }
+
+      if (trimmed === "2") {
+        // Anexar a transação existente — buscar pendentes recentes
+        const txList = await db.getTransactionsByEntityId(pendingAttach.entityId, {
+          status: "PENDING",
+          limit: 8,
+        });
+        if (txList.length === 0) {
+          pendingAttachments.delete(replyJid);
+          await sendReply(`⚠️ Não há transações pendentes para esta entidade.`);
+          return;
+        }
+        const listStr = txList.map((t: any, i: number) => {
+          const valor = formatCurrency(t.amount);
+          const venc = t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : "sem vencimento";
+          return `*${i + 1}* — ${t.description} • ${valor} • Vence ${venc}`;
+        }).join("\n");
+
+        pendingAttachments.set(replyJid, {
+          ...pendingAttach,
+          stage: "awaiting_selection",
+          transactions: txList.map((t: any) => ({
+            id: t.id,
+            description: t.description,
+            amount: t.amount,
+            dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
+          })),
+        });
+
+        await sendReply(`📋 *Qual transação deseja anexar o documento?*\n\n${listStr}\n\n*0* — Cancelar`);
+        return;
+      }
+
+      // Cancelar
+      if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
+        pendingAttachments.delete(replyJid);
+        await sendReply(`❌ Operação cancelada.`);
+        return;
+      }
+    }
+
+    if (pendingAttach.stage === "awaiting_selection" && pendingAttach.transactions) {
+      if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
+        pendingAttachments.delete(replyJid);
+        await sendReply(`❌ Operação cancelada.`);
+        return;
+      }
+
+      const idx = parseInt(trimmed, 10) - 1;
+      const chosen = pendingAttach.transactions[idx];
+      if (!chosen) {
+        await sendReply(`❓ Responda com o número da transação ou *0* para cancelar.`);
+        return;
+      }
+
+      pendingAttachments.delete(replyJid);
+
+      // Salvar o anexo e marcar como PAGO
+      try {
+        await db.createAttachment({
+          transactionId: chosen.id,
+          filename: pendingAttach.filename,
+          blobUrl: pendingAttach.mediaUrl,
+          fileSize: pendingAttach.fileSize,
+          mimeType: pendingAttach.mimeType,
+          type: "COMPROVANTE_PAGAMENTO",
+        } as any);
+
+        await db.updateTransaction(chosen.id, {
+          status: "PAID",
+          paymentDate: new Date(),
+        } as any);
+
+        await sendReply(
+          `✅ *Comprovante anexado com sucesso!*\n\n📝 ${chosen.description}\n💰 ${formatCurrency(chosen.amount)}\n📅 Vencimento: ${chosen.dueDate ?? "-"}\n\n🟢 Status atualizado para *PAGO*`
+        );
+      } catch (err) {
+        console.error("[WhatsApp Bot] Erro ao salvar anexo:", err);
+        await sendReply(`❌ Erro ao salvar o anexo. Tente novamente.`);
+      }
+      return;
+    }
+  }
+
+  // 3. Verificar se é uma resposta de confirmação pendente
   const text = payload.data.message?.conversation ||
     payload.data.message?.extendedTextMessage?.text || "";
 
@@ -1135,7 +1291,7 @@ async function processIncomingMessage(
 
   // ── Processar imagem (comprovante) ───────────────────────────────────────────
   else if (messageType === "imageMessage") {
-    await sendReply(`🖼️ Analisando o comprovante...`);
+    await sendReply(`📎 Documento recebido! Fazendo upload...`);
 
     const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
     const mediaData = await downloadEvolutionMedia(messageId, instanceName);
@@ -1147,71 +1303,47 @@ async function processIncomingMessage(
 
     // Upload para S3
     let imageUrl: string | null = null;
+    let uploadedFilename = "";
     try {
       if (isS3Configured()) {
         const ext = mediaData.mimeType.includes("png") ? "png" : "jpg";
-        const filename = `whatsapp-image-${Date.now()}.${ext}`;
-        imageUrl = await uploadToS3(mediaData.buffer, filename, mediaData.mimeType, "whatsapp");
+        uploadedFilename = `whatsapp-image-${Date.now()}.${ext}`;
+        imageUrl = await uploadToS3(mediaData.buffer, uploadedFilename, mediaData.mimeType, "whatsapp");
       } else {
         const { storagePut } = await import("../storage");
         const ext = mediaData.mimeType.includes("png") ? "png" : "jpg";
-        const { url } = await storagePut(
-          `whatsapp/image-${Date.now()}.${ext}`,
-          mediaData.buffer,
-          mediaData.mimeType
-        );
+        uploadedFilename = `whatsapp/image-${Date.now()}.${ext}`;
+        const { url } = await storagePut(uploadedFilename, mediaData.buffer, mediaData.mimeType);
         imageUrl = url;
       }
     } catch (uploadError) {
       console.error("[WhatsApp Bot] Erro ao fazer upload da imagem:", uploadError);
     }
 
-    if (imageUrl) {
-      mediaUrl = imageUrl;
-      const imageCaption = payload.data?.message?.imageMessage?.caption ?? undefined;
-      const extracted = await extractTransactionFromImage(imageUrl, userEntities, categoriesList, creditCardsList, imageCaption);
-
-      if (!extracted) {
-        await sendReply(
-          `❌ Não consegui identificar uma transação nesta imagem. Tente enviar uma mensagem de texto descrevendo a transação.`
-        );
-        return;
-      }
-
-      const entityId = resolveEntityId(extracted.entityName, userEntities);
-      if (!entityId) {
-        await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
-        return;
-      }
-
-      const entityName = userEntities.find(e => e.id === entityId)?.name ?? "Entidade";
-
-      await dbInstance
-        .update(whatsappMessages)
-        .set({
-          audioUrl: imageUrl,
-          extractedData: JSON.stringify(extracted),
-          status: "EXTRACTED",
-          updatedAt: new Date(),
-        })
-        .where(eq(whatsappMessages.messageId, messageId));
-
-      // Salvar confirmação pendente
-      pendingConfirmations.set(replyJid, {
-        extracted,
-        userId: user.id,
-        organizationId: org?.id ?? null,
-        entityId,
-        messageId,
-        expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutos
-      });
-
-      await sendReply(buildConfirmationMessage(extracted, entityName));
-      return;
-    } else {
-      await sendReply(`❌ Erro ao processar a imagem. Tente enviar uma mensagem de texto.`);
+    if (!imageUrl) {
+      await sendReply(`❌ Não consegui fazer o upload da imagem. Tente novamente.`);
       return;
     }
+
+    mediaUrl = imageUrl;
+
+    // Perguntar ao usuário o que deseja fazer com o documento
+    pendingAttachments.set(replyJid, {
+      mediaUrl: imageUrl,
+      mimeType: mediaData.mimeType,
+      filename: uploadedFilename || `imagem-${Date.now()}.jpg`,
+      fileSize: mediaData.buffer.length,
+      stage: "awaiting_mode",
+      userId: user.id,
+      entityId: defaultEntityId,
+      organizationId: org?.id ?? null,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+
+    await sendReply(
+      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (extrair dados do documento)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
+    );
+    return;
   }
 
   // ── Processar texto ──────────────────────────────────────────────────────────
@@ -1222,7 +1354,43 @@ async function processIncomingMessage(
 
   // ── Processar documento (PDF) ────────────────────────────────────────────────
   else if (messageType === "documentMessage") {
-    await sendReply(`📄 Recebi um documento. Por enquanto, envie o comprovante como *imagem* (foto) para que eu consiga processar automaticamente.`);
+    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
+    const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+    if (!mediaData) {
+      await sendReply(`❌ Não consegui baixar o documento. Tente novamente.`);
+      return;
+    }
+    let docUrl: string | null = null;
+    let docFilename = `whatsapp-doc-${Date.now()}.pdf`;
+    try {
+      if (isS3Configured()) {
+        docUrl = await uploadToS3(mediaData.buffer, docFilename, mediaData.mimeType, "whatsapp");
+      } else {
+        const { storagePut } = await import("../storage");
+        const { url } = await storagePut(`whatsapp/${docFilename}`, mediaData.buffer, mediaData.mimeType);
+        docUrl = url;
+      }
+    } catch (uploadError) {
+      console.error("[WhatsApp Bot] Erro ao fazer upload do documento:", uploadError);
+    }
+    if (!docUrl) {
+      await sendReply(`❌ Não consegui fazer o upload do documento. Tente novamente.`);
+      return;
+    }
+    pendingAttachments.set(replyJid, {
+      mediaUrl: docUrl,
+      mimeType: mediaData.mimeType,
+      filename: docFilename,
+      fileSize: mediaData.buffer.length,
+      stage: "awaiting_mode",
+      userId: user.id,
+      entityId: defaultEntityId,
+      organizationId: org?.id ?? null,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+    await sendReply(
+      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (extrair dados do documento)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
+    );
     return;
   }
 
