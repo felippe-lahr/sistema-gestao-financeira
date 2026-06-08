@@ -882,10 +882,11 @@ async function showPendingTransactionsList(
   const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   const monthLabel = `${MONTH_NAMES[month - 1]}/${year}`;
 
-  const allTx = await db.getTransactionsByEntityId(entityId, {
-    status: "PENDING",
-    limit: 200,
-  });
+  const [pendingTx, overdueTx] = await Promise.all([
+    db.getTransactionsByEntityId(entityId, { status: "PENDING", limit: 200 }),
+    db.getTransactionsByEntityId(entityId, { status: "OVERDUE", limit: 200 }),
+  ]);
+  const allTx = [...(pendingTx as any[]), ...(overdueTx as any[])];
 
   // Filtrar pelo mês/ano informado
   const filtered = (allTx as any[]).filter((t: any) => {
@@ -903,9 +904,9 @@ async function showPendingTransactionsList(
 
   const now = new Date();
 
-  // Separar vencidas das futuras e ordenar
-  const overdue = filtered.filter((t: any) => new Date(t.dueDate) < now);
-  const upcoming = filtered.filter((t: any) => new Date(t.dueDate) >= now);
+  // Separar vencidas (status OVERDUE ou dueDate passado) das futuras
+  const overdue = filtered.filter((t: any) => t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now));
+  const upcoming = filtered.filter((t: any) => t.status !== "OVERDUE" && (!t.dueDate || new Date(t.dueDate) >= now));
   overdue.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   upcoming.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
@@ -916,7 +917,7 @@ async function showPendingTransactionsList(
     description: t.description,
     amount: t.amount,
     dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
-    overdue: new Date(t.dueDate) < now,
+    overdue: t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now),
   }));
 
   const listStr = txForList.map((t, i) => {
