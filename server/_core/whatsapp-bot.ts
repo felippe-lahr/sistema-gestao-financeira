@@ -138,9 +138,11 @@ const pendingConfirmations = new Map<string, {
 
 // ─── Estado para fluxo de anexos em múltiplos passos ─────────────────────────
 type AttachmentStage =
-  | "awaiting_mode"         // perguntou "nova transação ou existente?"
-  | "awaiting_selection"    // mostrou lista de pendentes, aguarda número
-  | "awaiting_type";        // perguntou tipo do documento (comprovante/boleto/NF/doc)
+  | "awaiting_mode"          // perguntou "nova transação ou existente?"
+  | "awaiting_entity"        // escolher entidade (quando usuário tem múltiplas)
+  | "awaiting_description"   // descrever a transação por voz/texto para busca semântica
+  | "awaiting_match_confirm" // confirmar transação encontrada pelo LLM
+  | "awaiting_type";         // tipo do documento (comprovante/boleto/NF/doc)
 
 const pendingAttachments = new Map<string, {
   mediaUrl: string;
@@ -148,6 +150,7 @@ const pendingAttachments = new Map<string, {
   filename: string;
   fileSize: number;
   stage: AttachmentStage;
+  entities?: Array<{ id: number; name: string }>;
   transactions?: Array<{ id: number; description: string; amount: number; dueDate: string | null }>;
   selectedTransaction?: { id: number; description: string; amount: number; dueDate: string | null };
   userId: number;
@@ -622,6 +625,57 @@ Regras:
 }
 
 /**
+ * Usa o LLM para encontrar a transação mais adequada dentre uma lista de pendentes.
+ * Retorna a transação que melhor corresponde à descrição do usuário.
+ */
+async function matchTransactionWithLLM(
+  description: string,
+  transactions: Array<{ id: number; description: string; amount: number; dueDate: string | null }>
+): Promise<{ id: number; description: string; amount: number; dueDate: string | null } | null> {
+  if (transactions.length === 0) return null;
+
+  const listStr = transactions.map((t, i) => {
+    const valor = formatCurrency(t.amount);
+    const venc = t.dueDate ?? "sem vencimento";
+    return `${i + 1}. ${t.description} • ${valor} • Vencimento: ${venc}`;
+  }).join("\n");
+
+  try {
+    const result = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: `Você é um assistente de busca financeira. O usuário vai descrever uma transação e você deve encontrar a mais adequada na lista abaixo.
+
+Transações disponíveis:
+${listStr}
+
+Retorne APENAS o número da transação (1, 2, 3...) que melhor corresponde à descrição do usuário.
+Se nenhuma corresponder adequadamente, retorne: null`,
+        },
+        {
+          role: "user",
+          content: description,
+        },
+      ],
+      maxRetries: 0,
+      maxRetryDelayMs: 3000,
+    });
+
+    const content = result.choices?.[0]?.message?.content;
+    if (!content || typeof content !== "string") return null;
+
+    const trimmed = content.trim();
+    if (trimmed.toLowerCase() === "null") return null;
+
+    const idx = parseInt(trimmed, 10) - 1;
+    return transactions[idx] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Resolve categoryId usando classificação por LLM (segunda passagem dedicada).
  * Garante que apenas categorias ATIVAS são consideradas.
  */
@@ -934,34 +988,33 @@ async function processIncomingMessage(
       }
 
       if (trimmed === "2") {
-        // Anexar a transação existente — buscar pendentes recentes
-        const txList = await db.getTransactionsByEntityId(pendingAttach.entityId, {
-          status: "PENDING",
-          limit: 8,
-        });
-        if (txList.length === 0) {
+        // Anexar a transação existente — verificar se há múltiplas entidades
+        const allEntities = await db.getEntitiesByUserId(pendingAttach.userId);
+        if (allEntities.length === 0) {
           pendingAttachments.delete(replyJid);
-          await sendReply(`⚠️ Não há transações pendentes para esta entidade.`);
+          await sendReply(`⚠️ Nenhuma entidade encontrada. Cadastre uma entidade no sistema.`);
           return;
         }
-        const listStr = txList.map((t: any, i: number) => {
-          const valor = formatCurrency(t.amount);
-          const venc = t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : "sem vencimento";
-          return `*${i + 1}* — ${t.description} • ${valor} • Vence ${venc}`;
-        }).join("\n");
 
+        if (allEntities.length > 1) {
+          // Múltiplas entidades: pedir para escolher
+          const listStr = allEntities.map((e: { id: number; name: string }, i: number) => `*${i + 1}* — ${e.name}`).join("\n");
+          pendingAttachments.set(replyJid, {
+            ...pendingAttach,
+            stage: "awaiting_entity",
+            entities: allEntities,
+          });
+          await sendReply(`🏢 *Qual entidade?*\n\n${listStr}\n\n*0* — Cancelar`);
+          return;
+        }
+
+        // Entidade única: pular direto para busca
         pendingAttachments.set(replyJid, {
           ...pendingAttach,
-          stage: "awaiting_selection",
-          transactions: txList.map((t: any) => ({
-            id: t.id,
-            description: t.description,
-            amount: t.amount,
-            dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
-          })),
+          stage: "awaiting_description",
+          entityId: allEntities[0].id,
         });
-
-        await sendReply(`📋 *Qual transação deseja anexar o documento?*\n\n${listStr}\n\n*0* — Cancelar`);
+        await sendReply(`🔍 *Descreva a transação que deseja vincular (texto ou áudio):*\n\nEx: _"Compra de Herbicida de R$ 2180"_`);
         return;
       }
 
@@ -973,7 +1026,7 @@ async function processIncomingMessage(
       }
     }
 
-    if (pendingAttach.stage === "awaiting_selection" && pendingAttach.transactions) {
+    if (pendingAttach.stage === "awaiting_entity" && pendingAttach.entities) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
         pendingAttachments.delete(replyJid);
         await sendReply(`❌ Operação cancelada.`);
@@ -981,22 +1034,107 @@ async function processIncomingMessage(
       }
 
       const idx = parseInt(trimmed, 10) - 1;
-      const chosen = pendingAttach.transactions[idx];
-      if (!chosen) {
-        await sendReply(`❓ Responda com o número da transação ou *0* para cancelar.`);
+      const chosenEntity = pendingAttach.entities[idx];
+      if (!chosenEntity) {
+        await sendReply(`❓ Responda com o número da entidade ou *0* para cancelar.`);
         return;
       }
 
-      // Ir para etapa de escolha do tipo de documento
       pendingAttachments.set(replyJid, {
         ...pendingAttach,
-        stage: "awaiting_type",
-        selectedTransaction: chosen,
+        stage: "awaiting_description",
+        entityId: chosenEntity.id,
+      });
+      await sendReply(`🔍 *Descreva a transação que deseja vincular (texto ou áudio):*\n\nEx: _"Compra de Herbicida de R$ 2180"_`);
+      return;
+    }
+
+    if (pendingAttach.stage === "awaiting_description") {
+      if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
+        pendingAttachments.delete(replyJid);
+        await sendReply(`❌ Operação cancelada.`);
+        return;
+      }
+
+      if (!trimmed) {
+        await sendReply(`❓ Descreva a transação por texto ou áudio, ou *0* para cancelar.`);
+        return;
+      }
+
+      await sendReply(`🔎 Buscando transação...`);
+
+      const txList = await db.getTransactionsByEntityId(pendingAttach.entityId, {
+        status: "PENDING",
+        limit: 20,
+      });
+
+      if (txList.length === 0) {
+        pendingAttachments.delete(replyJid);
+        await sendReply(`⚠️ Não há transações pendentes para esta entidade.`);
+        return;
+      }
+
+      const txForMatch = txList.map((t: any) => ({
+        id: t.id,
+        description: t.description,
+        amount: t.amount,
+        dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
+      }));
+
+      const matched = await matchTransactionWithLLM(trimmed, txForMatch);
+
+      if (!matched) {
+        await sendReply(`❌ Não encontrei uma transação correspondente.\n\nTente descrever de outra forma ou *0* para cancelar.`);
+        return;
+      }
+
+      const valor = formatCurrency(matched.amount);
+      const venc = matched.dueDate ?? "sem vencimento";
+
+      pendingAttachments.set(replyJid, {
+        ...pendingAttach,
+        stage: "awaiting_match_confirm",
+        transactions: txForMatch,
+        selectedTransaction: matched,
       });
 
       await sendReply(
-        `🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
+        `🎯 *Encontrei esta transação:*\n\n📝 ${matched.description}\n💰 ${valor}\n📅 Vencimento: ${venc}\n\n*1* — Confirmar ✅\n*2* — Buscar novamente 🔄\n*0* — Cancelar`
       );
+      return;
+    }
+
+    if (pendingAttach.stage === "awaiting_match_confirm" && pendingAttach.selectedTransaction) {
+      if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
+        pendingAttachments.delete(replyJid);
+        await sendReply(`❌ Operação cancelada.`);
+        return;
+      }
+
+      if (trimmed === "2") {
+        // Buscar novamente
+        pendingAttachments.set(replyJid, {
+          ...pendingAttach,
+          stage: "awaiting_description",
+          selectedTransaction: undefined,
+        });
+        await sendReply(`🔍 *Descreva a transação novamente (texto ou áudio):*`);
+        return;
+      }
+
+      if (trimmed === "1") {
+        // Confirmar — ir para escolha do tipo
+        pendingAttachments.set(replyJid, {
+          ...pendingAttach,
+          stage: "awaiting_type",
+        });
+        await sendReply(
+          `🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
+        );
+        return;
+      }
+
+      await sendReply(`❓ Responda *1* para confirmar, *2* para buscar novamente ou *0* para cancelar.`);
       return;
     }
 
