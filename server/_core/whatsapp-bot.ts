@@ -261,12 +261,16 @@ async function downloadEvolutionMedia(
 /**
  * Extrai dados de transação de um texto usando IA
  */
+type ExtractionResult =
+  | { ok: true; data: ExtractedTransaction }
+  | { ok: false; reason: "no_transaction" | "llm_error" };
+
 async function extractTransactionFromText(
   text: string,
   userEntities: { id: number; name: string }[],
   categories: { name: string; type: string }[] = [],
   creditCardsList: { name: string }[] = []
-): Promise<ExtractedTransaction | null> {
+): Promise<ExtractionResult> {
   const entitiesStr = userEntities.map(e => e.name).join(", ");
   const today = new Date().toISOString().split("T")[0];
   const categoriesStr = categories.length > 0
@@ -312,6 +316,8 @@ Retorne APENAS o JSON, sem texto adicional.`,
         },
       ],
       responseFormat: { type: "json_object" },
+      maxRetries: 0,
+      maxRetryDelayMs: 3000,
     });
 
     const content = result.choices?.[0]?.message?.content;
@@ -323,12 +329,12 @@ Retorne APENAS o JSON, sem texto adicional.`,
 
     if (!parsed || !parsed.amount || !parsed.description) {
       console.warn(`[WhatsApp Bot] Extração descartada — amount=${parsed?.amount}, description=${parsed?.description}`);
-      return null;
+      return { ok: false as const, reason: "no_transaction" as const };
     }
-    return parsed;
+    return { ok: true as const, data: parsed };
   } catch (error) {
     console.error("[WhatsApp Bot] Erro ao extrair transação:", error);
-    return null;
+    return { ok: false as const, reason: "llm_error" as const };
   }
 }
 
@@ -399,6 +405,8 @@ Retorne APENAS o JSON, sem texto adicional.`,
         },
       ],
       responseFormat: { type: "json_object" },
+      maxRetries: 0,
+      maxRetryDelayMs: 3000,
     });
 
     const content = result.choices?.[0]?.message?.content;
@@ -487,6 +495,8 @@ async function transcribeAudioWithGemini(
           ],
         },
       ],
+      maxRetries: 0,
+      maxRetryDelayMs: 3000,
     });
 
     const content = result.choices?.[0]?.message?.content;
@@ -1153,15 +1163,20 @@ async function processIncomingMessage(
 
   await sendReply(`🤔 Processando...`);
 
-  const extracted = await extractTransactionFromText(extractedText, userEntities, categoriesList, creditCardsList);
+  const extractionResult = await extractTransactionFromText(extractedText, userEntities, categoriesList, creditCardsList);
 
-  if (!extracted) {
-    await sendReply(
-      `❌ Não consegui identificar uma transação na sua mensagem.\n\nTente ser mais específico, por exemplo:\n_"Paguei 150 reais de mercado hoje"_\n_"Recebi 2000 de aluguel"_`
-    );
+  if (!extractionResult.ok) {
+    if (extractionResult.reason === "llm_error") {
+      await sendReply(`⏳ Serviço de IA temporariamente indisponível. Aguarde alguns instantes e tente novamente.`);
+    } else {
+      await sendReply(
+        `❌ Não consegui identificar uma transação na sua mensagem.\n\nTente ser mais específico, por exemplo:\n_"Paguei 150 reais de mercado hoje"_\n_"Recebi 2000 de aluguel"_`
+      );
+    }
     return;
   }
 
+  const extracted = extractionResult.data;
   const entityId = resolveEntityId(extracted.entityName, userEntities);
   if (!entityId) {
     await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);

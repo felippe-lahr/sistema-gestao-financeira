@@ -75,6 +75,10 @@ export type InvokeParams = {
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
   model?: string;
+  /** Override max retries per model (default: 2). Use 0 for interactive/latency-sensitive calls. */
+  maxRetries?: number;
+  /** Cap retry delay in ms — use for interactive calls to fail fast on rate limits. */
+  maxRetryDelayMs?: number;
 };
 
 export type ToolCall = {
@@ -360,13 +364,15 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   assertApiKey();
 
   const models = params.model ? [params.model] : MODEL_CHAIN;
+  const maxRetries = params.maxRetries ?? MAX_RETRIES;
+  const maxRetryDelayMs = params.maxRetryDelayMs;
   let lastError: Error | null = null;
 
   for (const model of models) {
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 0) {
-          console.log(`[LLM] Retry ${attempt}/${MAX_RETRIES} for model ${model}...`);
+          console.log(`[LLM] Retry ${attempt}/${maxRetries} for model ${model}...`);
         }
 
         const response = await invokeLLMSingle(params, model);
@@ -390,9 +396,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         }
 
         // Para 429, respeitar o retryDelay dinâmico da API do Google
-        const retryDelay = response.status === 429 ? extractRetryDelay(errorText) : 5000;
+        let retryDelay = response.status === 429 ? extractRetryDelay(errorText) : 5000;
+        if (maxRetryDelayMs !== undefined) retryDelay = Math.min(retryDelay, maxRetryDelayMs);
         console.warn(`[LLM] Retryable error (${response.status}) with model ${model}, attempt ${attempt + 1}. Aguardando ${retryDelay / 1000}s...`);
-        if (attempt < MAX_RETRIES) await sleep(retryDelay);
+        if (attempt < maxRetries) await sleep(retryDelay);
       } catch (fetchErr: any) {
         lastError = fetchErr;
         console.warn(`[LLM] Network error with model ${model}: ${fetchErr?.message}`);
