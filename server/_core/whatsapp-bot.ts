@@ -289,7 +289,6 @@ async function extractTransactionFromText(
 
 Entidades disponíveis: ${entitiesStr || "nenhuma"}
 Data de hoje: ${today}
-Categorias cadastradas: ${categoriesStr}
 Cartões de crédito cadastrados: ${creditCardsStr}
 
 Retorne um JSON com os campos:
@@ -298,7 +297,6 @@ Retorne um JSON com os campos:
 - date: data no formato YYYY-MM-DD (use hoje se não informado)
 - description: descrição curta da transação
 - type: "INCOME" para crédito/receita ou "EXPENSE" para débito/despesa
-- categoryName: escolha EXATAMENTE um nome da lista de categorias cadastradas, ou null se nenhuma for adequada
 - bankAccountName: conta bancária mencionada (string ou null)
 - paymentMethodName: meio de pagamento mencionado (string ou null)
 - creditCardName: se mencionar cartão de crédito (nubank, itaú, etc.), escolha EXATAMENTE um nome da lista de cartões cadastrados, ou null
@@ -379,7 +377,6 @@ async function extractTransactionFromImage(
 
 Entidades disponíveis: ${entitiesStr || "nenhuma"}
 Data de hoje: ${today}
-Categorias cadastradas: ${categoriesStr}
 Cartões de crédito cadastrados: ${creditCardsStr}
 
 Retorne um JSON com os campos:
@@ -388,7 +385,6 @@ Retorne um JSON com os campos:
 - date: data no formato YYYY-MM-DD (use hoje se não informado)
 - description: descrição curta da transação
 - type: "INCOME" para crédito/receita ou "EXPENSE" para débito/despesa
-- categoryName: escolha EXATAMENTE um nome da lista de categorias cadastradas, ou null se nenhuma for adequada
 - bankAccountName: conta bancária mencionada (string ou null)
 - paymentMethodName: meio de pagamento mencionado (string ou null)
 - creditCardName: se mencionar cartão de crédito, escolha EXATAMENTE um nome da lista de cartões cadastrados, ou null
@@ -541,23 +537,76 @@ function resolveEntityId(
 }
 
 /**
- * Resolve categoryId a partir do nome
+ * Usa o LLM para escolher a categoria mais adequada dentre as categorias ATIVAS cadastradas.
+ * Segundo passo dedicado — a lista passada contém apenas categorias ativas, eliminando alucinações.
+ */
+async function classifyCategoryWithLLM(
+  description: string,
+  type: "INCOME" | "EXPENSE",
+  categories: { id: number; name: string; type: string }[]
+): Promise<number | null> {
+  const filtered = categories.filter(c => c.type === type);
+  if (filtered.length === 0) return null;
+
+  const listStr = filtered.map(c => `- ${c.name}`).join("\n");
+
+  try {
+    const result = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: `Você é um classificador financeiro. Escolha a categoria mais adequada para a transação abaixo, dentre as opções disponíveis.
+
+Categorias disponíveis (${type === "EXPENSE" ? "despesas" : "receitas"}):
+${listStr}
+
+Regras:
+- Retorne EXATAMENTE o nome de uma categoria da lista acima, sem alterações
+- Se nenhuma categoria for adequada, retorne apenas a palavra: null
+- Não explique, não adicione texto extra — apenas o nome ou "null"`,
+        },
+        {
+          role: "user",
+          content: `Transação: ${description}`,
+        },
+      ],
+      maxRetries: 0,
+      maxRetryDelayMs: 3000,
+    });
+
+    const content = result.choices?.[0]?.message?.content;
+    if (!content || typeof content !== "string") return null;
+
+    const chosen = content.trim();
+    if (!chosen || chosen.toLowerCase() === "null") return null;
+
+    // Busca exata primeiro, depois fallback para contains
+    const exact = filtered.find(c => c.name.toLowerCase() === chosen.toLowerCase());
+    if (exact) return exact.id;
+
+    const fallback = filtered.find(c =>
+      c.name.toLowerCase().includes(chosen.toLowerCase()) ||
+      chosen.toLowerCase().includes(c.name.toLowerCase())
+    );
+    return fallback?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve categoryId usando classificação por LLM (segunda passagem dedicada).
+ * Garante que apenas categorias ATIVAS são consideradas.
  */
 async function resolveCategoryId(
-  categoryName: string | undefined,
+  description: string,
   entityId: number,
   userId: number,
   type: "INCOME" | "EXPENSE"
 ): Promise<number | null> {
-  if (!categoryName) return null;
   try {
-    const cats = await db.getCategoriesByEntityId(entityId, userId);
-    const filtered = cats.filter(c => c.type === type);
-    const normalized = categoryName.toLowerCase().trim();
-    const match = filtered.find(c =>
-      c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase())
-    );
-    return match?.id ?? null;
+    const cats = await db.getCategoriesByEntityId(entityId, userId); // só ativas por padrão
+    return await classifyCategoryWithLLM(description, type, cats);
   } catch {
     return null;
   }
@@ -827,7 +876,7 @@ async function processIncomingMessage(
 
         console.log(`[WhatsApp Bot] Confirmando: creditCardName="${extracted.creditCardName}", installments=${extracted.installments}, entityId=${pending.entityId}`);
         const categoryId = await resolveCategoryId(
-          extracted.categoryName,
+          extracted.description ?? extracted.categoryName ?? "",
           pending.entityId,
           user.id,
           extracted.type ?? "EXPENSE"
