@@ -140,8 +140,7 @@ const pendingConfirmations = new Map<string, {
 type AttachmentStage =
   | "awaiting_mode"          // perguntou "nova transação ou existente?"
   | "awaiting_entity"        // escolher entidade (quando usuário tem múltiplas)
-  | "awaiting_month"         // escolher mês de vencimento para filtrar pendentes
-  | "awaiting_match_confirm" // confirmar transação encontrada ou escolher da lista
+  | "awaiting_match_confirm" // escolher transação da lista (pendentes + vencidas)
   | "awaiting_type";         // tipo do documento (comprovante/boleto/NF/doc)
 
 const pendingAttachments = new Map<string, {
@@ -866,6 +865,77 @@ Responda:
 /**
  * Processa uma mensagem recebida do WhatsApp
  */
+/**
+ * Busca transações PENDING da entidade, ordena vencidas primeiro, e exibe a lista
+ * numerada no WhatsApp. Avança o stage para awaiting_match_confirm.
+ */
+async function showPendingTransactionsList(
+  replyJid: string,
+  pendingAttach: NonNullable<ReturnType<typeof pendingAttachments.get>>,
+  entityId: number,
+  sendReply: (txt: string) => Promise<void>
+): Promise<void> {
+  const allTx = await db.getTransactionsByEntityId(entityId, {
+    status: "PENDING",
+    limit: 200,
+  });
+
+  if ((allTx as any[]).length === 0) {
+    pendingAttachments.delete(replyJid);
+    await sendReply(`⚠️ Não há transações pendentes ou vencidas para esta entidade.`);
+    return;
+  }
+
+  const now = new Date();
+
+  // Separar vencidas (dueDate < hoje) das pendentes (dueDate >= hoje ou sem dueDate)
+  const overdue: any[] = [];
+  const upcoming: any[] = [];
+  for (const t of allTx as any[]) {
+    if (t.dueDate && new Date(t.dueDate) < now) {
+      overdue.push(t);
+    } else {
+      upcoming.push(t);
+    }
+  }
+
+  // Ordenar vencidas: mais antiga primeiro; upcoming: mais próxima primeiro
+  overdue.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  upcoming.sort((a, b) => {
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+  });
+
+  const combined = [...overdue, ...upcoming].slice(0, 10);
+
+  const txForList = combined.map((t: any) => ({
+    id: t.id,
+    description: t.description,
+    amount: t.amount,
+    dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
+    overdue: t.dueDate ? new Date(t.dueDate) < now : false,
+  }));
+
+  const listStr = txForList.map((t, i) => {
+    const flag = t.overdue ? "🔴" : "🟡";
+    const venc = t.dueDate ? `Vence ${t.dueDate}` : "sem vencimento";
+    return `*${i + 1}* ${flag} ${t.description}\n    ${formatCurrency(t.amount)} • ${venc}`;
+  }).join("\n");
+
+  pendingAttachments.set(replyJid, {
+    ...pendingAttach,
+    stage: "awaiting_match_confirm",
+    entityId,
+    transactions: txForList,
+    selectedTransaction: undefined,
+  });
+
+  await sendReply(
+    `📋 *Selecione a transação:*\n🔴 Vencida  🟡 Pendente\n\n${listStr}\n\n*0* — Cancelar`
+  );
+}
+
 async function processIncomingMessage(
   fromPhone: string,
   replyJid: string,
@@ -1066,13 +1136,8 @@ async function processIncomingMessage(
           return;
         }
 
-        // Entidade única: pular direto para mês
-        pendingAttachments.set(replyJid, {
-          ...pendingAttach,
-          stage: "awaiting_month",
-          entityId: allEntities[0].id,
-        });
-        await sendReply(`📅 *Qual o mês de vencimento da transação?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
+        // Entidade única: mostrar lista direto
+        await showPendingTransactionsList(replyJid, pendingAttach, allEntities[0].id, sendReply);
         return;
       }
 
@@ -1098,94 +1163,10 @@ async function processIncomingMessage(
         return;
       }
 
-      pendingAttachments.set(replyJid, {
-        ...pendingAttach,
-        stage: "awaiting_month",
-        entityId: chosenEntity.id,
-      });
-      await sendReply(`📅 *Qual o mês de vencimento da transação?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
+      await showPendingTransactionsList(replyJid, pendingAttach, chosenEntity.id, sendReply);
       return;
     }
 
-    if (pendingAttach.stage === "awaiting_month") {
-      if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
-        await sendReply(`❌ Operação cancelada.`);
-        return;
-      }
-
-      if (!trimmed) {
-        await sendReply(`❓ Informe o mês de vencimento (ex: _junho_, _07/2026_) ou *0* para cancelar.`);
-        return;
-      }
-
-      const parsed = parseMonthYear(trimmed);
-      if (!parsed) {
-        await sendReply(`❓ Não entendi o mês. Tente: _junho_, _jul/2026_, _07/26_ ou *0* para cancelar.`);
-        return;
-      }
-
-      const { month, year } = parsed;
-      console.log(`[WhatsApp Bot] awaiting_month: mês=${month}/${year}, entityId=${pendingAttach.entityId}`);
-
-      // Buscar todas as PENDING da entidade e filtrar pelo mês
-      const allTx = await db.getTransactionsByEntityId(pendingAttach.entityId, {
-        status: "PENDING",
-        limit: 200,
-      });
-
-      const filtered = (allTx as any[]).filter((t: any) => {
-        if (!t.dueDate) return false;
-        const d = new Date(t.dueDate);
-        return d.getUTCMonth() + 1 === month && d.getUTCFullYear() === year;
-      });
-
-      const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-      const monthLabel = `${MONTH_NAMES[month - 1]}/${year}`;
-
-      if (filtered.length === 0) {
-        await sendReply(`⚠️ Nenhuma transação pendente em *${monthLabel}*.\n\nTente outro mês ou *0* para cancelar.`);
-        return;
-      }
-
-      const txForList = filtered.map((t: any) => ({
-        id: t.id,
-        description: t.description,
-        amount: t.amount,
-        dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
-      }));
-
-      // Se só uma transação: auto-confirmar
-      if (txForList.length === 1) {
-        const t = txForList[0];
-        pendingAttachments.set(replyJid, {
-          ...pendingAttach,
-          stage: "awaiting_type",
-          selectedTransaction: t,
-        });
-        await sendReply(
-          `✅ *Transação encontrada:*\n\n📝 ${t.description}\n💰 ${formatCurrency(t.amount)}\n📅 Vencimento: ${t.dueDate ?? "-"}\n\n🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
-        );
-        return;
-      }
-
-      // Múltiplas: mostrar lista
-      const listStr = txForList.slice(0, 8).map((t, i) => {
-        return `*${i + 1}* — ${t.description} • ${formatCurrency(t.amount)}`;
-      }).join("\n");
-
-      pendingAttachments.set(replyJid, {
-        ...pendingAttach,
-        stage: "awaiting_match_confirm",
-        transactions: txForList.slice(0, 8),
-        selectedTransaction: undefined,
-      });
-
-      await sendReply(
-        `📋 *Transações pendentes em ${monthLabel}:*\n\n${listStr}\n\n*0* — Cancelar`
-      );
-      return;
-    }
 
     if (pendingAttach.stage === "awaiting_match_confirm" && pendingAttach.transactions) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
