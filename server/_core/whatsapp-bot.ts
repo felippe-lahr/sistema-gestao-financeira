@@ -640,18 +640,23 @@ async function matchTransactionWithLLM(
     return `${i + 1}. ${t.description} • ${valor} • Vencimento: ${venc}`;
   }).join("\n");
 
+  console.log(`[WhatsApp Bot] matchTransaction: descrição="${description}", ${transactions.length} candidatas`);
+
   try {
     const result = await invokeLLM({
       messages: [
         {
           role: "system",
-          content: `Você é um assistente de busca financeira. O usuário vai descrever uma transação e você deve encontrar a mais adequada na lista abaixo.
+          content: `Você é um assistente de busca financeira. O usuário vai descrever uma transação e você deve encontrar a mais parecida na lista abaixo.
 
 Transações disponíveis:
 ${listStr}
 
-Retorne APENAS o número da transação (1, 2, 3...) que melhor corresponde à descrição do usuário.
-Se nenhuma corresponder adequadamente, retorne: null`,
+Instruções:
+- Retorne APENAS o número (1, 2, 3...) da transação que melhor corresponde à descrição
+- Leve em conta descrição, valor aproximado e data, quando mencionados
+- Mesmo que a correspondência não seja perfeita, escolha a mais próxima
+- Só retorne "null" se a descrição não tiver NENHUMA relação com qualquer transação da lista`,
         },
         {
           role: "user",
@@ -663,14 +668,16 @@ Se nenhuma corresponder adequadamente, retorne: null`,
     });
 
     const content = result.choices?.[0]?.message?.content;
+    console.log(`[WhatsApp Bot] matchTransaction LLM resposta: "${content}"`);
     if (!content || typeof content !== "string") return null;
 
-    const trimmed = content.trim();
-    if (trimmed.toLowerCase() === "null") return null;
+    const cleaned = content.trim().replace(/[^\d]/g, "");
+    if (!cleaned) return null;
 
-    const idx = parseInt(trimmed, 10) - 1;
+    const idx = parseInt(cleaned, 10) - 1;
     return transactions[idx] ?? null;
-  } catch {
+  } catch (err) {
+    console.error("[WhatsApp Bot] matchTransaction erro:", err);
     return null;
   }
 }
@@ -1061,6 +1068,7 @@ async function processIncomingMessage(
         return;
       }
 
+      console.log(`[WhatsApp Bot] awaiting_description: texto="${trimmed}", entityId=${pendingAttach.entityId}`);
       await sendReply(`🔎 Buscando transação...`);
 
       const txList = await db.getTransactionsByEntityId(pendingAttach.entityId, {
@@ -1083,31 +1091,68 @@ async function processIncomingMessage(
 
       const matched = await matchTransactionWithLLM(trimmed, txForMatch);
 
-      if (!matched) {
-        await sendReply(`❌ Não encontrei uma transação correspondente.\n\nTente descrever de outra forma ou *0* para cancelar.`);
+      if (matched) {
+        const valor = formatCurrency(matched.amount);
+        const venc = matched.dueDate ?? "sem vencimento";
+
+        pendingAttachments.set(replyJid, {
+          ...pendingAttach,
+          stage: "awaiting_match_confirm",
+          transactions: txForMatch,
+          selectedTransaction: matched,
+        });
+
+        await sendReply(
+          `🎯 *Encontrei esta transação:*\n\n📝 ${matched.description}\n💰 ${valor}\n📅 Vencimento: ${venc}\n\n*1* — Confirmar ✅\n*2* — Buscar novamente 🔄\n*0* — Cancelar`
+        );
         return;
       }
 
-      const valor = formatCurrency(matched.amount);
-      const venc = matched.dueDate ?? "sem vencimento";
+      // Fallback: LLM não conseguiu match — mostrar lista das primeiras 8 para escolha manual
+      const top = txForMatch.slice(0, 8);
+      const listStr = top.map((t, i) => {
+        const valor = formatCurrency(t.amount);
+        const venc = t.dueDate ?? "sem vencimento";
+        return `*${i + 1}* — ${t.description} • ${valor} • ${venc}`;
+      }).join("\n");
 
       pendingAttachments.set(replyJid, {
         ...pendingAttach,
         stage: "awaiting_match_confirm",
-        transactions: txForMatch,
-        selectedTransaction: matched,
+        transactions: top,
+        selectedTransaction: undefined,
       });
 
       await sendReply(
-        `🎯 *Encontrei esta transação:*\n\n📝 ${matched.description}\n💰 ${valor}\n📅 Vencimento: ${venc}\n\n*1* — Confirmar ✅\n*2* — Buscar novamente 🔄\n*0* — Cancelar`
+        `❓ Não encontrei correspondência exata. Escolha pela lista:\n\n${listStr}\n\n*0* — Cancelar`
       );
       return;
     }
 
-    if (pendingAttach.stage === "awaiting_match_confirm" && pendingAttach.selectedTransaction) {
+    if (pendingAttach.stage === "awaiting_match_confirm") {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
         pendingAttachments.delete(replyJid);
         await sendReply(`❌ Operação cancelada.`);
+        return;
+      }
+
+      // Se não tem selectedTransaction, estamos no fallback com lista numerada
+      if (!pendingAttach.selectedTransaction && pendingAttach.transactions) {
+        if (trimmed === "2") {
+          pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_description", selectedTransaction: undefined });
+          await sendReply(`🔍 *Descreva a transação novamente (texto ou áudio):*`);
+          return;
+        }
+        const idx = parseInt(trimmed, 10) - 1;
+        const chosen = pendingAttach.transactions[idx];
+        if (!chosen) {
+          await sendReply(`❓ Responda com o número da transação, *2* para buscar novamente ou *0* para cancelar.`);
+          return;
+        }
+        pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_type", selectedTransaction: chosen });
+        await sendReply(
+          `🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
+        );
         return;
       }
 
