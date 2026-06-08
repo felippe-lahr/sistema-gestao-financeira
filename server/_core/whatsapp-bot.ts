@@ -139,7 +139,8 @@ const pendingConfirmations = new Map<string, {
 // ─── Estado para fluxo de anexos em múltiplos passos ─────────────────────────
 type AttachmentStage =
   | "awaiting_mode"         // perguntou "nova transação ou existente?"
-  | "awaiting_selection";   // mostrou lista de pendentes, aguarda número
+  | "awaiting_selection"    // mostrou lista de pendentes, aguarda número
+  | "awaiting_type";        // perguntou tipo do documento (comprovante/boleto/NF/doc)
 
 const pendingAttachments = new Map<string, {
   mediaUrl: string;
@@ -148,11 +149,19 @@ const pendingAttachments = new Map<string, {
   fileSize: number;
   stage: AttachmentStage;
   transactions?: Array<{ id: number; description: string; amount: number; dueDate: string | null }>;
+  selectedTransaction?: { id: number; description: string; amount: number; dueDate: string | null };
   userId: number;
   entityId: number;
   organizationId: number | null;
   expiresAt: number;
 }>();
+
+const ATTACHMENT_TYPE_LABELS: Record<string, string> = {
+  COMPROVANTE_PAGAMENTO: "Comprovante de Pagamento",
+  BOLETO: "Boleto",
+  NOTA_FISCAL: "Nota Fiscal",
+  DOCUMENTOS: "Documento",
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -978,9 +987,41 @@ async function processIncomingMessage(
         return;
       }
 
+      // Ir para etapa de escolha do tipo de documento
+      pendingAttachments.set(replyJid, {
+        ...pendingAttach,
+        stage: "awaiting_type",
+        selectedTransaction: chosen,
+      });
+
+      await sendReply(
+        `🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
+      );
+      return;
+    }
+
+    if (pendingAttach.stage === "awaiting_type" && pendingAttach.selectedTransaction) {
+      if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
+        pendingAttachments.delete(replyJid);
+        await sendReply(`❌ Operação cancelada.`);
+        return;
+      }
+
+      const typeMap: Record<string, string> = {
+        "1": "COMPROVANTE_PAGAMENTO",
+        "2": "BOLETO",
+        "3": "NOTA_FISCAL",
+        "4": "DOCUMENTOS",
+      };
+      const attachType = typeMap[trimmed];
+      if (!attachType) {
+        await sendReply(`❓ Responda com 1, 2, 3 ou 4 para escolher o tipo, ou *0* para cancelar.`);
+        return;
+      }
+
+      const chosen = pendingAttach.selectedTransaction;
       pendingAttachments.delete(replyJid);
 
-      // Salvar o anexo e marcar como PAGO
       try {
         await db.createAttachment({
           transactionId: chosen.id,
@@ -988,16 +1029,21 @@ async function processIncomingMessage(
           blobUrl: pendingAttach.mediaUrl,
           fileSize: pendingAttach.fileSize,
           mimeType: pendingAttach.mimeType,
-          type: "COMPROVANTE_PAGAMENTO",
+          type: attachType,
         } as any);
 
-        await db.updateTransaction(chosen.id, {
-          status: "PAID",
-          paymentDate: new Date(),
-        } as any);
+        const isComprovante = attachType === "COMPROVANTE_PAGAMENTO";
+        if (isComprovante) {
+          await db.updateTransaction(chosen.id, {
+            status: "PAID",
+            paymentDate: new Date(),
+          } as any);
+        }
 
+        const typeLabel = ATTACHMENT_TYPE_LABELS[attachType] ?? attachType;
+        const statusLine = isComprovante ? `\n\n🟢 Status atualizado para *PAGO*` : "";
         await sendReply(
-          `✅ *Comprovante anexado com sucesso!*\n\n📝 ${chosen.description}\n💰 ${formatCurrency(chosen.amount)}\n📅 Vencimento: ${chosen.dueDate ?? "-"}\n\n🟢 Status atualizado para *PAGO*`
+          `✅ *${typeLabel} anexado com sucesso!*\n\n📝 ${chosen.description}\n💰 ${formatCurrency(chosen.amount)}\n📅 Vencimento: ${chosen.dueDate ?? "-"}${statusLine}`
         );
       } catch (err) {
         console.error("[WhatsApp Bot] Erro ao salvar anexo:", err);
