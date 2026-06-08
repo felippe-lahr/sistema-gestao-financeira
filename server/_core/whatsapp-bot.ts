@@ -140,8 +140,8 @@ const pendingConfirmations = new Map<string, {
 type AttachmentStage =
   | "awaiting_mode"          // perguntou "nova transação ou existente?"
   | "awaiting_entity"        // escolher entidade (quando usuário tem múltiplas)
-  | "awaiting_description"   // descrever a transação por voz/texto para busca semântica
-  | "awaiting_match_confirm" // confirmar transação encontrada pelo LLM
+  | "awaiting_month"         // escolher mês de vencimento para filtrar pendentes
+  | "awaiting_match_confirm" // confirmar transação encontrada ou escolher da lista
   | "awaiting_type";         // tipo do documento (comprovante/boleto/NF/doc)
 
 const pendingAttachments = new Map<string, {
@@ -625,6 +625,57 @@ Regras:
 }
 
 /**
+ * Extrai mês e ano de uma string em português.
+ * Aceita: "junho", "jul/2026", "07/26", "julho de 2026", "6", "06/2026"
+ */
+function parseMonthYear(input: string): { month: number; year: number } | null {
+  const MONTHS: Record<string, number> = {
+    jan: 1, janeiro: 1,
+    fev: 2, fevereiro: 2,
+    mar: 3, março: 3, marco: 3,
+    abr: 4, abril: 4,
+    mai: 5, maio: 5,
+    jun: 6, junho: 6,
+    jul: 7, julho: 7,
+    ago: 8, agosto: 8,
+    set: 9, setembro: 9,
+    out: 10, outubro: 10,
+    nov: 11, novembro: 11,
+    dez: 12, dezembro: 12,
+  };
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const lower = input.toLowerCase().trim();
+
+  // "06/2026" ou "6/2026"
+  const full = lower.match(/\b(\d{1,2})[\/\-](\d{4})\b/);
+  if (full) {
+    const m = parseInt(full[1]);
+    if (m >= 1 && m <= 12) return { month: m, year: parseInt(full[2]) };
+  }
+  // "06/26" ou "6/26"
+  const short = lower.match(/\b(\d{1,2})[\/\-](\d{2})\b/);
+  if (short) {
+    const m = parseInt(short[1]);
+    if (m >= 1 && m <= 12) return { month: m, year: 2000 + parseInt(short[2]) };
+  }
+  // Nome do mês com ano opcional
+  for (const [name, month] of Object.entries(MONTHS)) {
+    if (lower.includes(name)) {
+      const yearMatch = lower.match(/\b(20\d{2})\b/);
+      return { month, year: yearMatch ? parseInt(yearMatch[1]) : currentYear };
+    }
+  }
+  // Só número 1–12
+  const numOnly = lower.match(/^\s*(\d{1,2})\s*$/);
+  if (numOnly) {
+    const m = parseInt(numOnly[1]);
+    if (m >= 1 && m <= 12) return { month: m, year: currentYear };
+  }
+  return null;
+}
+
+/**
  * Usa o LLM para encontrar a transação mais adequada dentre uma lista de pendentes.
  * Retorna a transação que melhor corresponde à descrição do usuário.
  */
@@ -1015,13 +1066,13 @@ async function processIncomingMessage(
           return;
         }
 
-        // Entidade única: pular direto para busca
+        // Entidade única: pular direto para mês
         pendingAttachments.set(replyJid, {
           ...pendingAttach,
-          stage: "awaiting_description",
+          stage: "awaiting_month",
           entityId: allEntities[0].id,
         });
-        await sendReply(`🔍 *Descreva a transação que deseja vincular (texto ou áudio):*\n\nEx: _"Compra de Herbicida de R$ 2180"_`);
+        await sendReply(`📅 *Qual o mês de vencimento da transação?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
         return;
       }
 
@@ -1049,14 +1100,14 @@ async function processIncomingMessage(
 
       pendingAttachments.set(replyJid, {
         ...pendingAttach,
-        stage: "awaiting_description",
+        stage: "awaiting_month",
         entityId: chosenEntity.id,
       });
-      await sendReply(`🔍 *Descreva a transação que deseja vincular (texto ou áudio):*\n\nEx: _"Compra de Herbicida de R$ 2180"_`);
+      await sendReply(`📅 *Qual o mês de vencimento da transação?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
       return;
     }
 
-    if (pendingAttach.stage === "awaiting_description") {
+    if (pendingAttach.stage === "awaiting_month") {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
         pendingAttachments.delete(replyJid);
         await sendReply(`❌ Operação cancelada.`);
@@ -1064,122 +1115,96 @@ async function processIncomingMessage(
       }
 
       if (!trimmed) {
-        await sendReply(`❓ Descreva a transação por texto ou áudio, ou *0* para cancelar.`);
+        await sendReply(`❓ Informe o mês de vencimento (ex: _junho_, _07/2026_) ou *0* para cancelar.`);
         return;
       }
 
-      console.log(`[WhatsApp Bot] awaiting_description: texto="${trimmed}", entityId=${pendingAttach.entityId}`);
-      await sendReply(`🔎 Buscando transação...`);
+      const parsed = parseMonthYear(trimmed);
+      if (!parsed) {
+        await sendReply(`❓ Não entendi o mês. Tente: _junho_, _jul/2026_, _07/26_ ou *0* para cancelar.`);
+        return;
+      }
 
-      const txList = await db.getTransactionsByEntityId(pendingAttach.entityId, {
+      const { month, year } = parsed;
+      console.log(`[WhatsApp Bot] awaiting_month: mês=${month}/${year}, entityId=${pendingAttach.entityId}`);
+
+      // Buscar todas as PENDING da entidade e filtrar pelo mês
+      const allTx = await db.getTransactionsByEntityId(pendingAttach.entityId, {
         status: "PENDING",
-        limit: 20,
+        limit: 200,
       });
 
-      if (txList.length === 0) {
-        pendingAttachments.delete(replyJid);
-        await sendReply(`⚠️ Não há transações pendentes para esta entidade.`);
+      const filtered = (allTx as any[]).filter((t: any) => {
+        if (!t.dueDate) return false;
+        const d = new Date(t.dueDate);
+        return d.getUTCMonth() + 1 === month && d.getUTCFullYear() === year;
+      });
+
+      const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+      const monthLabel = `${MONTH_NAMES[month - 1]}/${year}`;
+
+      if (filtered.length === 0) {
+        await sendReply(`⚠️ Nenhuma transação pendente em *${monthLabel}*.\n\nTente outro mês ou *0* para cancelar.`);
         return;
       }
 
-      const txForMatch = txList.map((t: any) => ({
+      const txForList = filtered.map((t: any) => ({
         id: t.id,
         description: t.description,
         amount: t.amount,
         dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
       }));
 
-      const matched = await matchTransactionWithLLM(trimmed, txForMatch);
-
-      if (matched) {
-        const valor = formatCurrency(matched.amount);
-        const venc = matched.dueDate ?? "sem vencimento";
-
+      // Se só uma transação: auto-confirmar
+      if (txForList.length === 1) {
+        const t = txForList[0];
         pendingAttachments.set(replyJid, {
           ...pendingAttach,
-          stage: "awaiting_match_confirm",
-          transactions: txForMatch,
-          selectedTransaction: matched,
+          stage: "awaiting_type",
+          selectedTransaction: t,
         });
-
         await sendReply(
-          `🎯 *Encontrei esta transação:*\n\n📝 ${matched.description}\n💰 ${valor}\n📅 Vencimento: ${venc}\n\n*1* — Confirmar ✅\n*2* — Buscar novamente 🔄\n*0* — Cancelar`
+          `✅ *Transação encontrada:*\n\n📝 ${t.description}\n💰 ${formatCurrency(t.amount)}\n📅 Vencimento: ${t.dueDate ?? "-"}\n\n🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
         );
         return;
       }
 
-      // Fallback: LLM não conseguiu match — mostrar lista das primeiras 8 para escolha manual
-      const top = txForMatch.slice(0, 8);
-      const listStr = top.map((t, i) => {
-        const valor = formatCurrency(t.amount);
-        const venc = t.dueDate ?? "sem vencimento";
-        return `*${i + 1}* — ${t.description} • ${valor} • ${venc}`;
+      // Múltiplas: mostrar lista
+      const listStr = txForList.slice(0, 8).map((t, i) => {
+        return `*${i + 1}* — ${t.description} • ${formatCurrency(t.amount)}`;
       }).join("\n");
 
       pendingAttachments.set(replyJid, {
         ...pendingAttach,
         stage: "awaiting_match_confirm",
-        transactions: top,
+        transactions: txForList.slice(0, 8),
         selectedTransaction: undefined,
       });
 
       await sendReply(
-        `❓ Não encontrei correspondência exata. Escolha pela lista:\n\n${listStr}\n\n*0* — Cancelar`
+        `📋 *Transações pendentes em ${monthLabel}:*\n\n${listStr}\n\n*0* — Cancelar`
       );
       return;
     }
 
-    if (pendingAttach.stage === "awaiting_match_confirm") {
+    if (pendingAttach.stage === "awaiting_match_confirm" && pendingAttach.transactions) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
         pendingAttachments.delete(replyJid);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
 
-      // Se não tem selectedTransaction, estamos no fallback com lista numerada
-      if (!pendingAttach.selectedTransaction && pendingAttach.transactions) {
-        if (trimmed === "2") {
-          pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_description", selectedTransaction: undefined });
-          await sendReply(`🔍 *Descreva a transação novamente (texto ou áudio):*`);
-          return;
-        }
-        const idx = parseInt(trimmed, 10) - 1;
-        const chosen = pendingAttach.transactions[idx];
-        if (!chosen) {
-          await sendReply(`❓ Responda com o número da transação, *2* para buscar novamente ou *0* para cancelar.`);
-          return;
-        }
-        pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_type", selectedTransaction: chosen });
-        await sendReply(
-          `🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
-        );
+      const idx = parseInt(trimmed, 10) - 1;
+      const chosen = pendingAttach.transactions[idx];
+      if (!chosen) {
+        await sendReply(`❓ Responda com o número da transação ou *0* para cancelar.`);
         return;
       }
 
-      if (trimmed === "2") {
-        // Buscar novamente
-        pendingAttachments.set(replyJid, {
-          ...pendingAttach,
-          stage: "awaiting_description",
-          selectedTransaction: undefined,
-        });
-        await sendReply(`🔍 *Descreva a transação novamente (texto ou áudio):*`);
-        return;
-      }
-
-      if (trimmed === "1") {
-        // Confirmar — ir para escolha do tipo
-        pendingAttachments.set(replyJid, {
-          ...pendingAttach,
-          stage: "awaiting_type",
-        });
-        await sendReply(
-          `🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
-        );
-        return;
-      }
-
-      await sendReply(`❓ Responda *1* para confirmar, *2* para buscar novamente ou *0* para cancelar.`);
+      pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_type", selectedTransaction: chosen });
+      await sendReply(
+        `🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
+      );
       return;
     }
 
