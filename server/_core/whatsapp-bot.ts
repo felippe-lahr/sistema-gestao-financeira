@@ -906,16 +906,23 @@ async function processIncomingMessage(
         const description = extracted.description ?? "Transação via WhatsApp";
 
         // Quando há cartão de crédito, a data da primeira parcela considera o
-        // closingDay: se hoje >= closingDay, a compra entra na próxima fatura.
+        // closingDay para determinar em qual fatura a compra cai, e retorna
+        // o 1º dia do mês de vencimento (mês seguinte ao fechamento).
+        //
+        // Exemplos com closingDay=29:
+        //   Compra em 08/jun → fatura fecha 29/jun → vence em julho → 01/07
+        //   Compra em 30/jun → fatura de jun já fechou → fatura fecha 29/jul → vence em agosto → 01/08
         const getFirstInstallmentDate = (referenceDate: Date): Date => {
           if (!creditCard) return referenceDate;
           const closingDay = creditCard.closingDay;
-          // Se hoje já passou do fechamento, a fatura do mês atual fechou → próximo mês
+          // monthOffset=0: fatura do mês atual (ainda não fechou), vence no mês+1
+          // monthOffset=1: fatura do mês seguinte (já passou do fechamento), vence no mês+2
           const monthOffset = referenceDate.getDate() >= closingDay ? 1 : 0;
+          // +1 porque o vencimento é sempre no mês APÓS o fechamento
           // Usar 15:00 UTC (meio-dia BRT) para evitar que meia-noite UTC = véspera no Brasil
           return new Date(Date.UTC(
             referenceDate.getFullYear(),
-            referenceDate.getMonth() + monthOffset,
+            referenceDate.getMonth() + monthOffset + 1,
             1, 15, 0, 0
           ));
         };
