@@ -465,18 +465,24 @@ async function transcodeToMp3(input: Buffer): Promise<Buffer | null> {
  * O provedor atual (Gemini) não tem endpoint Whisper /v1/audio/transcriptions,
  * então usamos o mesmo caminho de chat que já funciona para texto/imagem.
  */
+type AudioTranscriptionResult =
+  | { ok: true; text: string }
+  | { ok: false; reason: "ffmpeg_error" | "llm_error" | "no_content" };
+
 async function transcribeAudioWithGemini(
   buffer: Buffer,
   mimeType: string
-): Promise<string | null> {
-  // O Gemini só aceita wav/mp3. WhatsApp envia ogg/opus, então transcodificamos.
+): Promise<AudioTranscriptionResult> {
   let audioBuffer = buffer;
   let format = (mimeType.split("/")[1] || "").split(";")[0].trim();
+  console.log(`[WhatsApp Bot] Transcrição: mimeType="${mimeType}", format="${format}", size=${buffer.length}b`);
+
   if (format !== "mp3" && format !== "wav") {
     const mp3 = await transcodeToMp3(buffer);
-    if (!mp3) return null;
+    if (!mp3) return { ok: false, reason: "ffmpeg_error" };
     audioBuffer = mp3;
     format = "mp3";
+    console.log(`[WhatsApp Bot] Transcrição: áudio convertido para mp3, size=${audioBuffer.length}b`);
   }
   const base64 = audioBuffer.toString("base64");
 
@@ -500,12 +506,14 @@ async function transcribeAudioWithGemini(
     });
 
     const content = result.choices?.[0]?.message?.content;
-    if (!content || typeof content !== "string") return null;
+    console.log(`[WhatsApp Bot] Transcrição resultado: finish_reason=${result.choices?.[0]?.finish_reason}, content=${typeof content === "string" ? content.slice(0, 200) : JSON.stringify(content)?.slice(0, 200)}`);
+    if (!content || typeof content !== "string") return { ok: false, reason: "no_content" };
     const transcription = content.trim();
-    return transcription.length > 0 ? transcription : null;
+    if (!transcription) return { ok: false, reason: "no_content" };
+    return { ok: true, text: transcription };
   } catch (error) {
     console.error("[WhatsApp Bot] Erro ao transcrever áudio com Gemini:", error);
-    return null;
+    return { ok: false, reason: "llm_error" };
   }
 }
 
@@ -1035,17 +1043,21 @@ async function processIncomingMessage(
       return;
     }
 
-    // Transcrição via Gemini (multimodal). O provedor atual não tem endpoint
-    // Whisper, então enviamos o áudio direto pro modelo de chat.
-    const transcription = await transcribeAudioWithGemini(mediaData.buffer, mediaData.mimeType);
+    const transcriptionResult = await transcribeAudioWithGemini(mediaData.buffer, mediaData.mimeType);
 
-    if (!transcription) {
-      await sendReply(`❌ Não consegui transcrever o áudio. Tente enviar uma mensagem de texto.`);
+    if (!transcriptionResult.ok) {
+      if (transcriptionResult.reason === "llm_error") {
+        await sendReply(`⏳ Serviço de IA temporariamente indisponível. Aguarde alguns instantes e tente novamente.`);
+      } else if (transcriptionResult.reason === "ffmpeg_error") {
+        await sendReply(`❌ Não consegui converter o áudio. Tente enviar em formato MP3 ou por mensagem de texto.`);
+      } else {
+        await sendReply(`❌ Não consegui transcrever o áudio. Tente enviar uma mensagem de texto.`);
+      }
       return;
     }
 
-    extractedText = transcription;
-    console.log(`[WhatsApp Bot] Áudio transcrito: "${transcription}"`);
+    extractedText = transcriptionResult.text;
+    console.log(`[WhatsApp Bot] Áudio transcrito: "${transcriptionResult.text}"`);
 
     // Upload do áudio para S3 (best-effort, apenas para registro)
     let audioUrl: string | null = null;
