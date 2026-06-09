@@ -691,4 +691,82 @@ export function registerPasswordAuthRoutes(app: Express) {
       res.status(500).json({ error: "Erro ao reenviar e-mail", detail: msg });
     }
   });
+
+
+  // POST /api/auth/forgot-password — Solicita reset de senha
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({ error: "E-mail é obrigatório" });
+        return;
+      }
+
+      const successResponse = { success: true, message: "Se o e-mail estiver cadastrado, você receberá um link em breve." };
+
+      const user = await db.getUserByEmail(email.toLowerCase().trim());
+      if (!user) {
+        res.json(successResponse);
+        return;
+      }
+
+      const token = randomUUID().replace(/-/g, "");
+      await db.createPasswordResetToken(user.id, token);
+
+      const { ENV } = await import("./env");
+      const { sendPasswordResetEmail } = await import("./email");
+      const resetUrl = `${ENV.appUrl}/redefinir-senha?token=${token}`;
+
+      await sendPasswordResetEmail({
+        to: user.email ?? "",
+        name: user.name ?? "Usuário",
+        resetUrl,
+      });
+
+      console.log("[Password Auth] Reset solicitado para:", user.email);
+      res.json(successResponse);
+    } catch (error) {
+      console.error("[Password Auth] Forgot password failed", error);
+      res.status(500).json({ error: "Erro ao processar solicitação" });
+    }
+  });
+
+  // POST /api/auth/reset-password — Define nova senha com token
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { token, password } = req.body;
+      if (!token || !password) {
+        res.status(400).json({ error: "Token e nova senha são obrigatórios" });
+        return;
+      }
+      if (password.length < 6) {
+        res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
+        return;
+      }
+
+      const record = await db.getPasswordResetToken(token);
+      if (!record) {
+        res.status(400).json({ error: "Token inválido ou expirado" });
+        return;
+      }
+      if (record.usedAt) {
+        res.status(400).json({ error: "Este link já foi utilizado. Solicite um novo." });
+        return;
+      }
+      if (new Date(record.expiresAt) < new Date()) {
+        res.status(400).json({ error: "Link expirado. Solicite um novo link de recuperação." });
+        return;
+      }
+
+      const hash = await bcrypt.hash(password, 12);
+      await db.setUserPassword(record.userId, hash);
+      await db.markPasswordResetTokenUsed(token);
+
+      console.log("[Password Auth] Senha redefinida para userId:", record.userId);
+      res.json({ success: true, message: "Senha redefinida com sucesso!" });
+    } catch (error) {
+      console.error("[Password Auth] Reset password failed", error);
+      res.status(500).json({ error: "Erro ao redefinir senha" });
+    }
+  });
 }

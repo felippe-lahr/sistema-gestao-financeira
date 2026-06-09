@@ -674,6 +674,16 @@ export const emailVerifications = pgTable("email_verifications", {
 export type EmailVerification = typeof emailVerifications.$inferSelect;
 export type InsertEmailVerification = typeof emailVerifications.$inferInsert;
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 128 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
 // =============================================================================
 // OFX IMPORT TABLES - Importação de extratos bancários
 // =============================================================================

@@ -106,6 +106,17 @@ const migrations: { name: string; sql: string }[] = [
       ALTER TABLE users ADD COLUMN IF NOT EXISTS "whatsappVerifyExpires" timestamp;
     `,
   },
+  {
+    name: "create_password_reset_tokens_table",
+    sql: `CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
+      "id" serial PRIMARY KEY,
+      "userId" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "token" varchar(128) NOT NULL,
+      "expiresAt" timestamp NOT NULL,
+      "usedAt" timestamp,
+      "createdAt" timestamp DEFAULT now() NOT NULL
+    )`,
+  },
 ];
 
 async function runMigrations() {
