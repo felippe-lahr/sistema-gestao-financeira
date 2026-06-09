@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight, ChevronRight, RotateCcw, EyeOff, QrCode, Barcode, ArrowLeftRight, Banknote } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight, ChevronRight, RotateCcw, EyeOff, QrCode, Barcode, ArrowLeftRight, Banknote, Receipt, Globe } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -229,6 +229,9 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
       PIX: "PIX",
       CASH: "Dinheiro",
       BANK_TRANSFER: "Transferência Bancária",
+      TED: "TED",
+      BOLETO: "Boleto",
+      EXCHANGE: "Câmbio",
       OTHER: "Outro",
     };
     return labels[type] || type;
@@ -245,8 +248,14 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
         return <Banknote className="h-5 w-5" />;
       case "BANK_TRANSFER":
         return <ArrowLeftRight className="h-5 w-5" />;
+      case "TED":
+        return <Landmark className="h-5 w-5" />;
+      case "BOLETO":
+        return <Receipt className="h-5 w-5" />;
+      case "EXCHANGE":
+        return <Globe className="h-5 w-5" />;
       default:
-        return <Barcode className="h-5 w-5" />; // Usado para "OTHER" ou boletos
+        return <Barcode className="h-5 w-5" />;
     }
   };
 
@@ -403,6 +412,9 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
                     <SelectItem value="PIX">PIX</SelectItem>
                     <SelectItem value="CASH">Dinheiro</SelectItem>
                     <SelectItem value="BANK_TRANSFER">Transferência Bancária</SelectItem>
+                    <SelectItem value="TED">TED</SelectItem>
+                    <SelectItem value="BOLETO">Boleto</SelectItem>
+                    <SelectItem value="EXCHANGE">Câmbio</SelectItem>
                     <SelectItem value="OTHER">Outro</SelectItem>
                   </SelectContent>
                 </Select>
