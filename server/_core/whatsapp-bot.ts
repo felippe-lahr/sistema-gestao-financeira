@@ -1958,6 +1958,18 @@ export function registerWhatsAppBotRoutes(app: Express): void {
         })
         .where(eq(users.id, user.id));
 
+      // Enviar mensagem de boas-vindas
+      const firstName = (user.name ?? "").split(" ")[0] || "usuário";
+      const welcomeMsg =
+        `👋 Olá, ${firstName}! Seu WhatsApp foi vinculado com sucesso ao UnifiquePro.\n\n` +
+        `A partir de agora você pode:\n` +
+        `• Enviar áudios ou mensagens de texto para registrar transações\n` +
+        `• Anexar comprovantes a lançamentos pendentes\n\n` +
+        `Para começar, é só mandar uma mensagem. 🚀`;
+      sendWhatsAppMessage(`${normalized}@s.whatsapp.net`, welcomeMsg).catch((err) =>
+        console.warn("[WhatsApp Bot] Falha ao enviar boas-vindas:", err?.message)
+      );
+
       return res.json({ success: true, message: "WhatsApp vinculado com sucesso!" });
     } catch (error) {
       console.error("[WhatsApp Bot] Erro ao verificar código:", error);

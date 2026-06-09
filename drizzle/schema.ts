@@ -5,7 +5,7 @@ export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const transactionTypeEnum = pgEnum("transaction_type", ["INCOME", "EXPENSE"]);
 export const transactionStatusEnum = pgEnum("transaction_status", ["PENDING", "PAID", "OVERDUE"]);
 export const whatsappStatusEnum = pgEnum("whatsapp_status", ["RECEIVED", "TRANSCRIBED", "EXTRACTED", "CONFIRMED", "REJECTED"]);
-export const paymentMethodTypeEnum = pgEnum("payment_method_type", ["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "OTHER"]);
+export const paymentMethodTypeEnum = pgEnum("payment_method_type", ["CREDIT_CARD", "DEBIT_CARD", "PIX", "CASH", "BANK_TRANSFER", "TED", "BOLETO", "EXCHANGE", "OTHER"]);
 export const attachmentTypeEnum = pgEnum("attachment_type", ["NOTA_FISCAL", "DOCUMENTOS", "BOLETO", "COMPROVANTE_PAGAMENTO"]);
 
 // Organization plan enum

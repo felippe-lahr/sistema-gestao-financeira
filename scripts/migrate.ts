@@ -107,6 +107,19 @@ const migrations: { name: string; sql: string }[] = [
     `,
   },
   {
+    name: "add_payment_method_types_ted_boleto_exchange",
+    sql: `DO $$ BEGIN
+      ALTER TYPE payment_method_type ADD VALUE IF NOT EXISTS 'TED';
+      ALTER TYPE payment_method_type ADD VALUE IF NOT EXISTS 'BOLETO';
+      ALTER TYPE payment_method_type ADD VALUE IF NOT EXISTS 'EXCHANGE';
+    EXCEPTION WHEN others THEN NULL;
+    END $$`,
+  },
+  {
+    name: "add_whatsappLid_to_users",
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS "whatsappLid" varchar(100)`,
+  },
+  {
     name: "create_password_reset_tokens_table",
     sql: `CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
       "id" serial PRIMARY KEY,
