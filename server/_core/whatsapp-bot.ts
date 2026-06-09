@@ -911,47 +911,61 @@ async function showPendingTransactionsList(
   const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   const monthLabel = `${MONTH_NAMES[month - 1]}/${year}`;
 
-  const [pendingTx, overdueTx] = await Promise.all([
+  const [pendingTx, overdueTx, paidTx] = await Promise.all([
     db.getTransactionsByEntityId(entityId, { status: "PENDING", limit: 200 }),
     db.getTransactionsByEntityId(entityId, { status: "OVERDUE", limit: 200 }),
+    db.getTransactionsByEntityId(entityId, { status: "PAID", limit: 200 }),
   ]);
-  const allTx = [...(pendingTx as any[]), ...(overdueTx as any[])];
+  const allTx = [...(pendingTx as any[]), ...(overdueTx as any[]), ...(paidTx as any[])];
 
-  // Filtrar pelo mês/ano informado
+  // Filtrar pelo mês/ano usando hora local (Brasil UTC-3)
   const filtered = (allTx as any[]).filter((t: any) => {
     if (!t.dueDate) return false;
     const d = new Date(t.dueDate);
-    return d.getUTCMonth() + 1 === month && d.getUTCFullYear() === year;
+    // Usar getMonth/getFullYear (hora local) para compatibilidade com datas cadastradas no fuso Brasil
+    const localMonth = d.getMonth() + 1;
+    const localYear = d.getFullYear();
+    const utcMonth = d.getUTCMonth() + 1;
+    const utcYear = d.getUTCFullYear();
+    return (localMonth === month && localYear === year) || (utcMonth === month && utcYear === year);
   });
 
-  if (filtered.length === 0) {
-    // Manter no stage awaiting_month para tentar outro mês
+  // Transações pagas recentes (últimos 60 dias) — para anexar comprovantes a pagamentos já realizados
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  const filteredPaid = filtered.filter((t: any) =>
+    t.status === "PAID" && t.paymentDate && new Date(t.paymentDate) >= sixtyDaysAgo
+  );
+  const filteredUnpaid = filtered.filter((t: any) => t.status !== "PAID");
+
+  if (filteredUnpaid.length === 0 && filteredPaid.length === 0) {
     pendingAttachments.set(replyJid, { ...pendingAttach, entityId, stage: "awaiting_month" });
-    await sendReply(`⚠️ Nenhuma transação pendente ou vencida em *${monthLabel}*.\n\nInforme outro mês ou *0* para cancelar.`);
+    await sendReply(`⚠️ Nenhuma transação encontrada em *${monthLabel}*.\n\nInforme outro mês ou *0* para cancelar.`);
     return;
   }
 
   const now = new Date();
 
-  // Separar vencidas (status OVERDUE ou dueDate passado) das futuras
-  const overdue = filtered.filter((t: any) => t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now));
-  const upcoming = filtered.filter((t: any) => t.status !== "OVERDUE" && (!t.dueDate || new Date(t.dueDate) >= now));
+  // Ordenação: vencidas primeiro, depois pendentes, depois pagas recentes
+  const overdue = filteredUnpaid.filter((t: any) => t.status === "OVERDUE" || new Date(t.dueDate) < now);
+  const upcoming = filteredUnpaid.filter((t: any) => t.status !== "OVERDUE" && new Date(t.dueDate) >= now);
   overdue.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   upcoming.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  filteredPaid.sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
 
-  const combined = [...overdue, ...upcoming].slice(0, 10);
+  const combined = [...overdue, ...upcoming, ...filteredPaid].slice(0, 10);
 
   const txForList = combined.map((t: any) => ({
     id: t.id,
     description: t.description,
     amount: t.amount,
     dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
-    overdue: t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now),
+    status: t.status,
+    overdue: t.status === "OVERDUE" || (t.status !== "PAID" && t.dueDate && new Date(t.dueDate) < now),
   }));
 
   const listStr = txForList.map((t, i) => {
-    const flag = t.overdue ? "🔴" : "🟡";
-    const venc = t.dueDate ? `Vence ${t.dueDate}` : "sem vencimento";
+    const flag = t.status === "PAID" ? "✅" : t.overdue ? "🔴" : "🟡";
+    const venc = t.dueDate ? (t.status === "PAID" ? `Pago em ${t.dueDate}` : `Vence ${t.dueDate}`) : "sem vencimento";
     return `*${i + 1}* ${flag} ${t.description}\n    ${formatCurrency(t.amount)} • ${venc}`;
   }).join("\n");
 
@@ -963,8 +977,12 @@ async function showPendingTransactionsList(
     selectedTransaction: undefined,
   });
 
+  const legend = filteredPaid.length > 0
+    ? `🔴 Vencida  🟡 Pendente  ✅ Paga recente`
+    : `🔴 Vencida  🟡 Pendente`;
+
   await sendReply(
-    `📋 *Transações de ${monthLabel}:*\n🔴 Vencida  🟡 Pendente\n\n${listStr}\n\n*0* — Cancelar`
+    `📋 *Transações de ${monthLabel}:*\n${legend}\n\n${listStr}\n\n*0* — Cancelar`
   );
 }
 
