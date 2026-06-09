@@ -933,7 +933,7 @@ async function showPendingTransactionsList(
   const cardItems: CardInvoiceItem[] = [];
   try {
     const cards = await db.getCreditCardsByEntityId(entityId);
-    const rawDb = getDb();
+    const rawDb = await getDb();
     if (rawDb && cards.length > 0) {
       for (const card of cards as any[]) {
         const startDate = new Date(year, month - 1, 1).toISOString();
@@ -1323,7 +1323,7 @@ async function processIncomingMessage(
 
         // Fatura de cartão de crédito — salva em credit_card_invoice_attachments
         if ((chosen as any).isCreditCard && (chosen as any).creditCardId) {
-          const rawDb = getDb();
+          const rawDb = await getDb();
           if (rawDb) {
             const cardId: number = (chosen as any).creditCardId;
             const invoiceMonth: number = (chosen as any).invoiceMonth;
