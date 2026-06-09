@@ -17,14 +17,12 @@ function getResend(): Resend {
   return _resend;
 }
 
-const FROM_EMAIL = "UnifiquePro <noreply@unifiquepro.com.br>";
-
-const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310419663029179004/NujcpHuyWRVgvVLk.png";
+const FROM_EMAIL = `${ENV.emailFromName} <${ENV.emailFromAddress}>`;
 
 const emailHeader = `
   <tr>
     <td style="background-color:#1e293b;padding:28px 40px;text-align:center;">
-      <img src="${LOGO_URL}" alt="UnifiquePro" width="280" style="display:block;margin:0 auto;height:auto;max-width:280px;" />
+      <img src="${ENV.emailLogoUrl}" alt="${ENV.emailFromName}" width="280" style="display:block;margin:0 auto;height:auto;max-width:280px;" />
       <p style="margin:6px 0 0;color:#94a3b8;font-size:12px;letter-spacing:0.3px;">simplificando suas finanças</p>
     </td>
   </tr>
@@ -51,7 +49,7 @@ export async function sendVerificationEmail(params: {
   const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: "Confirme seu e-mail — UnifiquePro",
+    subject: `Confirme seu e-mail — ${ENV.emailFromName}`,
     html: `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -140,7 +138,7 @@ export async function sendWelcomeEmail(params: {
   const { data: welcomeData, error: welcomeError } = await resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: `Bem-vindo ao UnifiquePro, ${firstName}!`,
+    subject: `Bem-vindo ao ${ENV.emailFromName}, ${firstName}!`,
     html: `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -188,7 +186,7 @@ export async function sendWelcomeEmail(params: {
           <tr>
             <td style="padding:24px 40px;text-align:center;">
               <p style="margin:0;color:#94a3b8;font-size:12px;">
-                Você recebeu este e-mail porque criou uma conta no UnifiquePro.
+                Você recebeu este e-mail porque criou uma conta no ${ENV.emailFromName}.
               </p>
             </td>
           </tr>

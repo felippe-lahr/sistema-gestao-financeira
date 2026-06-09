@@ -11,6 +11,10 @@ export const ENV = {
   appUrl: process.env.APP_URL ?? "http://localhost:5173",
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  // Email
+  emailFromName: process.env.EMAIL_FROM_NAME ?? "UnifiquePro",
+  emailFromAddress: process.env.EMAIL_FROM_ADDRESS ?? "noreply@unifiquepro.com.br",
+  emailLogoUrl: process.env.EMAIL_LOGO_URL ?? "https://files.manuscdn.com/user_upload_by_module/session_file/310419663029179004/NujcpHuyWRVgvVLk.png",
   // Stripe
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
