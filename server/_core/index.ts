@@ -46,8 +46,38 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // ========== STAGING PROTECTION ==========
+  const stagingPassword = process.env.STAGING_PASSWORD;
+  if (stagingPassword) {
+    // Bloqueia indexação por buscadores
+    app.use((req, res, next) => {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
+      next();
+    });
+
+    // robots.txt explícito
+    app.get("/robots.txt", (_req, res) => {
+      res.type("text/plain").send("User-agent: *\nDisallow: /\n");
+    });
+
+    // HTTP Basic Auth — exceto webhook do WhatsApp (chamado pela Evolution API)
+    app.use((req, res, next) => {
+      if (req.path.startsWith("/api/whatsapp")) return next();
+      const auth = req.headers.authorization;
+      if (auth && auth.startsWith("Basic ")) {
+        const decoded = Buffer.from(auth.slice(6), "base64").toString();
+        const [, pass] = decoded.split(":");
+        if (pass === stagingPassword) return next();
+      }
+      res.setHeader("WWW-Authenticate", 'Basic realm="Staging"');
+      res.status(401).send("Acesso restrito ao ambiente de staging.");
+    });
+
+    console.log("[Staging] Proteção ativa: Basic Auth + noindex");
+  }
+
   // ========== SECURITY MIDDLEWARE ==========
-  
+
   // 1. Helmet - Set HTTP headers for security
   app.use(helmet({
     contentSecurityPolicy: {
