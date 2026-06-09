@@ -2255,6 +2255,61 @@ export async function hasEmailVerificationRecord(userId: number): Promise<boolea
 }
 
 /**
+ * Cria um token de reset de senha (expira em 1 hora).
+ */
+export async function createPasswordResetToken(userId: number, token: string): Promise<void> {
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    await client`DELETE FROM password_reset_tokens WHERE "userId" = ${userId} AND "usedAt" IS NULL`;
+    await client`
+      INSERT INTO password_reset_tokens ("userId", token, "expiresAt")
+      VALUES (${userId}, ${token}, ${expiresAt})
+    `;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Busca e valida um token de reset de senha.
+ */
+export async function getPasswordResetToken(token: string): Promise<{
+  id: number;
+  userId: number;
+  expiresAt: Date;
+  usedAt: Date | null;
+} | null> {
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    const rows = await client<Array<{
+      id: number;
+      userId: number;
+      expiresAt: Date;
+      usedAt: Date | null;
+    }>>`SELECT id, "userId", "expiresAt", "usedAt"
+        FROM password_reset_tokens
+        WHERE token = ${token}
+        LIMIT 1`;
+    return rows.length > 0 ? rows[0] : null;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Marca um token de reset como usado.
+ */
+export async function markPasswordResetTokenUsed(token: string): Promise<void> {
+  const client = postgres(process.env.DATABASE_URL!);
+  try {
+    await client`UPDATE password_reset_tokens SET "usedAt" = now() WHERE token = ${token}`;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
  * Busca um usuário pelo ID.
  */
 export async function getUserById(userId: number) {

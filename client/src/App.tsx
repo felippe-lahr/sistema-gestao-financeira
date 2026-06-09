@@ -29,6 +29,8 @@ const Planos = lazy(() => import("@/pages/Planos"));
 const BillingSuccess = lazy(() => import("@/pages/BillingSuccess"));
 const BankAccounts = lazy(() => import("@/pages/BankAccounts"));
 const CreditCards = lazy(() => import("@/pages/CreditCards"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 
 // Loading fallback - minimal spinner
 function PageLoader() {
@@ -64,6 +66,8 @@ function Router() {
         <Route path="/admin" component={() => <DashboardLayout><Admin /></DashboardLayout>} />
         <Route path="/planos" component={() => <DashboardLayout><Planos /></DashboardLayout>} />
         <Route path="/billing/success" component={BillingSuccess} />
+        <Route path="/recuperar-senha" component={ForgotPassword} />
+        <Route path="/redefinir-senha" component={ResetPassword} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

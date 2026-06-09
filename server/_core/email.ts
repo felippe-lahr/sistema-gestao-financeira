@@ -204,3 +204,89 @@ export async function sendWelcomeEmail(params: {
   }
   console.log("[Resend] E-mail de boas-vindas enviado:", welcomeData?.id, "para", to);
 }
+
+/**
+ * Envia e-mail de recuperação de senha.
+ */
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  name: string;
+  resetUrl: string;
+}): Promise<void> {
+  const { to, name, resetUrl } = params;
+  const firstName = name.split(" ")[0];
+  const resend = getResend();
+
+  const { data, error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: `Redefinição de senha — ${ENV.emailFromName}`,
+    html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redefinir senha</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+          ${emailHeader}
+          <tr>
+            <td style="padding:40px 40px 32px;">
+              <h2 style="margin:0 0 16px;color:#0f172a;font-size:20px;font-weight:600;">
+                Olá, ${firstName}! 🔐
+              </h2>
+              <p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">
+                Recebemos uma solicitação para redefinir a senha da sua conta. Clique no botão abaixo para criar uma nova senha.
+              </p>
+              <table cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
+                <tr>
+                  <td style="background-color:#2563eb;border-radius:8px;">
+                    <a href="${resetUrl}" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;letter-spacing:0.2px;">
+                      🔑 Redefinir minha senha
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 8px;color:#94a3b8;font-size:13px;line-height:1.5;">
+                Se o botão não funcionar, copie e cole o link abaixo no seu navegador:
+              </p>
+              <p style="margin:0 0 24px;color:#94a3b8;font-size:12px;word-break:break-all;">
+                ${resetUrl}
+              </p>
+              <p style="margin:0;color:#ef4444;font-size:13px;line-height:1.5;">
+                ⚠️ Este link expira em <strong>1 hora</strong>. Se você não solicitou a redefinição, ignore este e-mail — sua senha permanece a mesma.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 40px;">
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 40px;text-align:center;">
+              <p style="margin:0;color:#94a3b8;font-size:12px;">
+                Você recebeu este e-mail porque solicitou a redefinição de senha no ${ENV.emailFromName}.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim(),
+  });
+
+  if (error) {
+    console.error("[Resend] Erro ao enviar e-mail de reset:", JSON.stringify(error));
+    throw new Error(`Falha ao enviar e-mail de reset: ${error.message ?? JSON.stringify(error)}`);
+  }
+  console.log("[Resend] E-mail de reset enviado:", data?.id, "para", to);
+}

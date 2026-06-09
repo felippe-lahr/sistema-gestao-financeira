@@ -224,7 +224,28 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
 
   try {
     const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
-    console.log(`[WhatsApp Bot] Enviando mensagem para: ${to}`);
+
+    // @s.whatsapp.net → envia direto; v2.3.7 roteia via OnWhatsappCache para @lid internamente
+    // @lid → envia direto (v2.3.7 bypass PR #2544); mas pode resultar em PENDING
+    // número puro → tenta resolver via Evolution API
+    let sendTo = to;
+    if (to.includes("@s.whatsapp.net")) {
+      sendTo = to;
+      console.log(`[WhatsApp Bot] Enviando para @s.whatsapp.net (routing cache v2.3.7): ${sendTo}`);
+    } else if (to.includes("@lid")) {
+      sendTo = to;
+      console.log(`[WhatsApp Bot] Enviando direto para @lid (v2.3.7 bypass): ${sendTo}`);
+    } else if (!to.includes("@")) {
+      const resolved = await resolveJidViaEvolution(to);
+      if (resolved) {
+        sendTo = resolved;
+        console.log(`[WhatsApp Bot] JID resolvido para ${to}: ${sendTo}`);
+      } else {
+        console.warn(`[WhatsApp Bot] Não foi possível resolver JID para ${to}, usando número puro`);
+      }
+    }
+
+    console.log(`[WhatsApp Bot] Enviando mensagem para: ${sendTo}`);
 
     const response = await fetch(url, {
       method: "POST",
@@ -243,7 +264,15 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
 
     const responseData = await response.json().catch(() => ({})) as { status?: string };
     const msgStatus = responseData.status ?? "OK";
-    console.log(`[WhatsApp Bot] Resposta do envio para ${to} — status: ${msgStatus}`);
+
+    if (msgStatus === "PENDING") {
+      console.warn(`[WhatsApp Bot] ⚠️ PENDING para ${sendTo} — mensagem criada localmente mas sem ACK do servidor WhatsApp.`);
+      if (sendTo.includes("@s.whatsapp.net")) {
+        console.warn(`[WhatsApp Bot] 💡 Cache v2.3.7 pode não estar aquecido. Certifique-se de que o usuário enviou uma mensagem recente para acionar o cache (lid=lid).`);
+      }
+    } else {
+      console.log(`[WhatsApp Bot] ✅ Mensagem entregue para: ${sendTo} — status: ${msgStatus}`);
+    }
   } catch (error) {
     console.error(`[WhatsApp Bot] Exceção ao enviar para ${to}:`, error);
   }
@@ -1048,18 +1077,25 @@ async function processIncomingMessage(
 
   const user = userResult[0];
 
-  // Destino de envio. Hipótese: quando addressingMode = "lid", a sessão de
-  // criptografia do Baileys está indexada pelo @lid, não pelo @s.whatsapp.net.
-  // Responder ao @s.whatsapp.net deixa a mensagem PENDING para sempre porque
-  // o Baileys não acha a sessão. Então, se a Evolution mandar o @lid real do
-  // remetente no payload, respondemos para ESSE jid.
-  const senderLid = payload.data?.key?.senderLid
-    || payload.data?.key?.participantLid
-    || (payload.data?.key?.remoteJidAlt?.includes("@lid") ? payload.data.key.remoteJidAlt : undefined)
-    || (user.whatsappLid && user.whatsappLid.includes("@lid") ? user.whatsappLid : undefined);
-
-  const sendTarget = (isLid && senderLid) ? senderLid : replyJid;
-  console.log(`[WhatsApp Bot] sendTarget escolhido: ${sendTarget} (isLid=${isLid}, senderLid=${senderLid ?? "n/a"})`);
+  // Destino de envio:
+  // - @lid (isLid=true): usa @s.whatsapp.net para aproveitar OnWhatsappCache do v2.3.7.
+  //   Quando a Evolution API recebe mensagem de conta @lid, ela popula o cache
+  //   com lid=lid para aquele número. Enviar para @s.whatsapp.net logo depois
+  //   faz o v2.3.7 roteá-la internamente via @lid (confirmado: status 1/SERVER_ACK nos logs).
+  //   Enviar direto ao @lid resulta em PENDING mesmo no v2.3.7.
+  // - normal: usa número de telefone puro para resolução via Evolution API
+  let sendTarget: string;
+  if (isLid && user.whatsappPhone) {
+    sendTarget = `${user.whatsappPhone}@s.whatsapp.net`;
+    console.log(`[WhatsApp Bot] LID mode — enviando para @s.whatsapp.net via cache v2.3.7: ${sendTarget}`);
+  } else if (isLid && replyJid.includes("@s.whatsapp.net")) {
+    sendTarget = replyJid;
+    console.log(`[WhatsApp Bot] LID mode — usando replyJid @s.whatsapp.net: ${sendTarget}`);
+  } else if (user.whatsappPhone) {
+    sendTarget = user.whatsappPhone;
+  } else {
+    sendTarget = replyJid;
+  }
 
   const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt);
 

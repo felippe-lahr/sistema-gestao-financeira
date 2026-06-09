@@ -335,6 +335,14 @@ function LoginForm() {
                 </button>
               </div>
             </div>
+            <div className="flex justify-end">
+              <a
+                href="/recuperar-senha"
+                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline transition-colors"
+              >
+                Esqueci minha senha
+              </a>
+            </div>
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
