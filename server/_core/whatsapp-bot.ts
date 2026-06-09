@@ -912,9 +912,9 @@ async function showPendingTransactionsList(
   const monthLabel = `${MONTH_NAMES[month - 1]}/${year}`;
 
   const [pendingTx, overdueTx, paidTx] = await Promise.all([
-    db.getTransactionsByEntityId(entityId, { status: "PENDING", limit: 200 }),
-    db.getTransactionsByEntityId(entityId, { status: "OVERDUE", limit: 200 }),
-    db.getTransactionsByEntityId(entityId, { status: "PAID", limit: 200 }),
+    db.getTransactionsByEntityId(entityId, { status: "PENDING", limit: 200, excludeCreditCard: true }),
+    db.getTransactionsByEntityId(entityId, { status: "OVERDUE", limit: 200, excludeCreditCard: true }),
+    db.getTransactionsByEntityId(entityId, { status: "PAID", limit: 200, excludeCreditCard: true }),
   ]);
   const allTx = [...(pendingTx as any[]), ...(overdueTx as any[]), ...(paidTx as any[])];
 
