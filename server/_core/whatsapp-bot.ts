@@ -911,61 +911,98 @@ async function showPendingTransactionsList(
   const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   const monthLabel = `${MONTH_NAMES[month - 1]}/${year}`;
 
-  const [pendingTx, overdueTx, paidTx] = await Promise.all([
+  // Transações regulares (sem cartão de crédito)
+  const [pendingTx, overdueTx] = await Promise.all([
     db.getTransactionsByEntityId(entityId, { status: "PENDING", limit: 200, excludeCreditCard: true }),
     db.getTransactionsByEntityId(entityId, { status: "OVERDUE", limit: 200, excludeCreditCard: true }),
-    db.getTransactionsByEntityId(entityId, { status: "PAID", limit: 200, excludeCreditCard: true }),
   ]);
-  const allTx = [...(pendingTx as any[]), ...(overdueTx as any[]), ...(paidTx as any[])];
 
-  // Filtrar pelo mês/ano usando hora local (Brasil UTC-3)
-  const filtered = (allTx as any[]).filter((t: any) => {
-    if (!t.dueDate) return false;
-    const d = new Date(t.dueDate);
-    // Usar getMonth/getFullYear (hora local) para compatibilidade com datas cadastradas no fuso Brasil
-    const localMonth = d.getMonth() + 1;
-    const localYear = d.getFullYear();
-    const utcMonth = d.getUTCMonth() + 1;
-    const utcYear = d.getUTCFullYear();
-    return (localMonth === month && localYear === year) || (utcMonth === month && utcYear === year);
-  });
+  // Filtrar pelo mês/ano (aceita fuso local ou UTC)
+  const matchesMonth = (dueDate: any) => {
+    if (!dueDate) return false;
+    const d = new Date(dueDate);
+    return (d.getMonth() + 1 === month && d.getFullYear() === year) ||
+           (d.getUTCMonth() + 1 === month && d.getUTCFullYear() === year);
+  };
 
-  // Transações pagas recentes (últimos 60 dias) — para anexar comprovantes a pagamentos já realizados
-  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-  const filteredPaid = filtered.filter((t: any) =>
-    t.status === "PAID" && t.paymentDate && new Date(t.paymentDate) >= sixtyDaysAgo
-  );
-  const filteredUnpaid = filtered.filter((t: any) => t.status !== "PAID");
+  const regularTx = [...(pendingTx as any[]), ...(overdueTx as any[])].filter((t: any) => matchesMonth(t.dueDate));
 
-  if (filteredUnpaid.length === 0 && filteredPaid.length === 0) {
+  // Faturas de cartão de crédito com pendências no mês
+  const dbInstance = await (db as any).getDb?.() ?? null;
+  type CardInvoiceItem = { id: number; description: string; amount: number; dueDate: string | null; status: string; overdue: boolean; isCreditCard: true; creditCardId: number };
+  const cardItems: CardInvoiceItem[] = [];
+  try {
+    const cards = await db.getCreditCardsByEntityId(entityId);
+    const { sql: sqlTag } = await import("drizzle-orm");
+    const rawDb = await import("../db").then(m => m.getDb());
+    if (rawDb && cards.length > 0) {
+      for (const card of cards as any[]) {
+        const startDate = new Date(year, month - 1, 1).toISOString();
+        const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+        const rows = await rawDb.execute(
+          sqlTag`SELECT COALESCE(SUM(amount),0) as total, MIN("dueDate") as first_due
+                 FROM transactions
+                 WHERE "creditCardId" = ${card.id}
+                   AND "dueDate" >= ${startDate}
+                   AND "dueDate" <= ${endDate}
+                   AND status IN ('PENDING','OVERDUE')`
+        );
+        const row = (Array.isArray(rows) ? rows[0] : (rows as any).rows?.[0]) as any;
+        const total = Number(row?.total ?? 0);
+        if (total > 0) {
+          const firstDue = row?.first_due ? new Date(row.first_due).toLocaleDateString("pt-BR") : null;
+          const now = new Date();
+          const isOverdue = row?.first_due && new Date(row.first_due) < now;
+          cardItems.push({
+            id: -card.id,
+            description: `Fatura ${card.name}`,
+            amount: total,
+            dueDate: firstDue,
+            status: isOverdue ? "OVERDUE" : "PENDING",
+            overdue: !!isOverdue,
+            isCreditCard: true,
+            creditCardId: card.id,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[WhatsApp Bot] Erro ao buscar faturas de cartão:", err);
+  }
+
+  if (regularTx.length === 0 && cardItems.length === 0) {
     pendingAttachments.set(replyJid, { ...pendingAttach, entityId, stage: "awaiting_month" });
-    await sendReply(`⚠️ Nenhuma transação encontrada em *${monthLabel}*.\n\nInforme outro mês ou *0* para cancelar.`);
+    await sendReply(`⚠️ Nenhuma transação pendente ou vencida em *${monthLabel}*.\n\nInforme outro mês ou *0* para cancelar.`);
     return;
   }
 
   const now = new Date();
 
-  // Ordenação: vencidas primeiro, depois pendentes, depois pagas recentes
-  const overdue = filteredUnpaid.filter((t: any) => t.status === "OVERDUE" || new Date(t.dueDate) < now);
-  const upcoming = filteredUnpaid.filter((t: any) => t.status !== "OVERDUE" && new Date(t.dueDate) >= now);
+  const overdue = regularTx.filter((t: any) => t.status === "OVERDUE" || new Date(t.dueDate) < now);
+  const upcoming = regularTx.filter((t: any) => t.status !== "OVERDUE" && new Date(t.dueDate) >= now);
   overdue.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   upcoming.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  filteredPaid.sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+  const overdueCards = cardItems.filter(c => c.overdue);
+  const pendingCards = cardItems.filter(c => !c.overdue);
 
-  const combined = [...overdue, ...upcoming, ...filteredPaid].slice(0, 10);
+  const combined = [...overdueCards, ...overdue, ...pendingCards, ...upcoming].slice(0, 10);
 
   const txForList = combined.map((t: any) => ({
     id: t.id,
     description: t.description,
     amount: t.amount,
-    dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
+    dueDate: t.dueDate,
     status: t.status,
-    overdue: t.status === "OVERDUE" || (t.status !== "PAID" && t.dueDate && new Date(t.dueDate) < now),
+    overdue: t.overdue ?? (t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now)),
+    isCreditCard: t.isCreditCard ?? false,
+    creditCardId: t.creditCardId ?? null,
+    invoiceMonth: t.isCreditCard ? month : undefined,
+    invoiceYear: t.isCreditCard ? year : undefined,
   }));
 
   const listStr = txForList.map((t, i) => {
-    const flag = t.status === "PAID" ? "✅" : t.overdue ? "🔴" : "🟡";
-    const venc = t.dueDate ? (t.status === "PAID" ? `Pago em ${t.dueDate}` : `Vence ${t.dueDate}`) : "sem vencimento";
+    const flag = t.isCreditCard ? "💳" : t.overdue ? "🔴" : "🟡";
+    const venc = t.dueDate ? `Vence ${t.dueDate}` : "sem vencimento";
     return `*${i + 1}* ${flag} ${t.description}\n    ${formatCurrency(t.amount)} • ${venc}`;
   }).join("\n");
 
@@ -977,12 +1014,8 @@ async function showPendingTransactionsList(
     selectedTransaction: undefined,
   });
 
-  const legend = filteredPaid.length > 0
-    ? `🔴 Vencida  🟡 Pendente  ✅ Paga recente`
-    : `🔴 Vencida  🟡 Pendente`;
-
   await sendReply(
-    `📋 *Transações de ${monthLabel}:*\n${legend}\n\n${listStr}\n\n*0* — Cancelar`
+    `📋 *Transações de ${monthLabel}:*\n🔴 Vencida  🟡 Pendente  💳 Fatura\n\n${listStr}\n\n*0* — Cancelar`
   );
 }
 
@@ -1287,6 +1320,32 @@ async function processIncomingMessage(
       pendingAttachments.delete(replyJid);
 
       try {
+        const isComprovante = attachType === "COMPROVANTE_PAGAMENTO";
+        const typeLabel = ATTACHMENT_TYPE_LABELS[attachType] ?? attachType;
+
+        // Fatura de cartão de crédito — marcar transações do mês como pagas
+        if (chosen.isCreditCard && chosen.creditCardId) {
+          const { sql: sqlTag } = await import("drizzle-orm");
+          const rawDb = await import("../db").then(m => m.getDb());
+          if (rawDb && isComprovante) {
+            const startDate = new Date(chosen.invoiceYear, chosen.invoiceMonth - 1, 1).toISOString();
+            const endDate = new Date(chosen.invoiceYear, chosen.invoiceMonth, 0, 23, 59, 59).toISOString();
+            await rawDb.execute(
+              sqlTag`UPDATE transactions SET status = 'PAID', "paymentDate" = NOW(), "updatedAt" = NOW()
+                     WHERE "creditCardId" = ${chosen.creditCardId}
+                       AND "dueDate" >= ${startDate}
+                       AND "dueDate" <= ${endDate}
+                       AND status IN ('PENDING','OVERDUE')`
+            );
+          }
+          const statusLine = isComprovante ? `\n\n🟢 Fatura marcada como *PAGA*` : "";
+          await sendReply(
+            `✅ *${typeLabel} da ${chosen.description} salvo!*\n\n💰 ${formatCurrency(chosen.amount)}${statusLine}`
+          );
+          return;
+        }
+
+        // Transação regular
         await db.createAttachment({
           transactionId: chosen.id,
           filename: pendingAttach.filename,
@@ -1296,7 +1355,6 @@ async function processIncomingMessage(
           type: attachType,
         } as any);
 
-        const isComprovante = attachType === "COMPROVANTE_PAGAMENTO";
         if (isComprovante) {
           await db.updateTransaction(chosen.id, {
             status: "PAID",
@@ -1304,7 +1362,6 @@ async function processIncomingMessage(
           } as any);
         }
 
-        const typeLabel = ATTACHMENT_TYPE_LABELS[attachType] ?? attachType;
         const statusLine = isComprovante ? `\n\n🟢 Status atualizado para *PAGO*` : "";
         await sendReply(
           `✅ *${typeLabel} anexado com sucesso!*\n\n📝 ${chosen.description}\n💰 ${formatCurrency(chosen.amount)}\n📅 Vencimento: ${chosen.dueDate ?? "-"}${statusLine}`
