@@ -24,8 +24,8 @@ import { getDb } from "../db";
 import { sdk } from "./sdk";
 import { invokeLLM } from "./llm";
 import { uploadToS3, isS3Configured } from "./s3";
-import { eq } from "drizzle-orm";
-import { users, whatsappMessages } from "../../drizzle/schema";
+import { eq, and, sql as sqlTag, isNotNull } from "drizzle-orm";
+import { users, whatsappMessages, creditCardInvoices, creditCardInvoiceAttachments } from "../../drizzle/schema";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -933,8 +933,7 @@ async function showPendingTransactionsList(
   const cardItems: CardInvoiceItem[] = [];
   try {
     const cards = await db.getCreditCardsByEntityId(entityId);
-    const { sql: sqlTag } = await import("drizzle-orm");
-    const rawDb = await import("../db").then(m => m.getDb());
+    const rawDb = getDb();
     if (rawDb && cards.length > 0) {
       for (const card of cards as any[]) {
         const startDate = new Date(year, month - 1, 1).toISOString();
@@ -1093,7 +1092,6 @@ async function processIncomingMessage(
   // Se for LID e não encontrou por nenhum método, buscar QUALQUER usuário com whatsappPhone preenchido
   // (workaround para quando o LID não corresponde ao número)
   if (userResult.length === 0 && isLid) {
-    const { isNotNull } = await import("drizzle-orm");
     userResult = await dbInstance
       .select()
       .from(users)
@@ -1325,10 +1323,7 @@ async function processIncomingMessage(
 
         // Fatura de cartão de crédito — salva em credit_card_invoice_attachments
         if ((chosen as any).isCreditCard && (chosen as any).creditCardId) {
-          const { sql: sqlTag } = await import("drizzle-orm");
-          const { creditCardInvoices, creditCardInvoiceAttachments } = await import("../drizzle/schema");
-          const { eq, and } = await import("drizzle-orm");
-          const rawDb = await import("../db").then(m => m.getDb());
+          const rawDb = getDb();
           if (rawDb) {
             const cardId: number = (chosen as any).creditCardId;
             const invoiceMonth: number = (chosen as any).invoiceMonth;
