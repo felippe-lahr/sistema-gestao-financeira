@@ -1644,6 +1644,51 @@ async function processIncomingMessage(
     extractedText = text.trim();
   }
 
+  // ── Processar documento com legenda (compartilhamento direto de apps bancários) ─
+  else if (messageType === "documentWithCaptionMessage") {
+    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
+    const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+    if (!mediaData) {
+      await sendReply(`❌ Não consegui baixar o documento. Tente novamente.`);
+      return;
+    }
+    const mimeType = mediaData.mimeType;
+    const isImage = mimeType.startsWith("image/");
+    const ext = mimeType.includes("png") ? "png" : mimeType.includes("pdf") ? "pdf" : "jpg";
+    const filename = `whatsapp-doc-${Date.now()}.${ext}`;
+    let docUrl: string | null = null;
+    try {
+      if (isS3Configured()) {
+        docUrl = await uploadToS3(mediaData.buffer, filename, mimeType, "whatsapp");
+      } else {
+        const { storagePut } = await import("../storage");
+        const { url } = await storagePut(`whatsapp/${filename}`, mediaData.buffer, mimeType);
+        docUrl = url;
+      }
+    } catch (uploadError) {
+      console.error("[WhatsApp Bot] Erro ao fazer upload do documento com legenda:", uploadError);
+    }
+    if (!docUrl) {
+      await sendReply(`❌ Não consegui fazer o upload do documento. Tente novamente.`);
+      return;
+    }
+    pendingAttachments.set(replyJid, {
+      mediaUrl: docUrl,
+      mimeType,
+      filename,
+      fileSize: mediaData.buffer.length,
+      stage: "awaiting_mode",
+      userId: user.id,
+      entityId: defaultEntityId,
+      organizationId: org?.id ?? null,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+    await sendReply(
+      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (extrair dados do documento)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
+    );
+    return;
+  }
+
   // ── Processar documento (PDF) ────────────────────────────────────────────────
   else if (messageType === "documentMessage") {
     const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";

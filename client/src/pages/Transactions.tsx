@@ -1902,7 +1902,7 @@ export default function Transactions() {
                               {allPaid ? (
                                 <Badge variant="default" className="text-xs">Pago</Badge>
                               ) : (
-                                <Badge variant="secondary" className="text-xs">{pendingCount} pendente{pendingCount > 1 ? 's' : ''}</Badge>
+                                <Badge variant="secondary" className="text-xs">Pendente</Badge>
                               )}
                             </>
                           );
