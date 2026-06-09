@@ -1269,6 +1269,72 @@ async function processIncomingMessage(
       pendingAttachments.delete(replyJid);
 
       try {
+        const isComprovante = attachType === "COMPROVANTE_PAGAMENTO";
+        const typeLabel = ATTACHMENT_TYPE_LABELS[attachType] ?? attachType;
+
+        // Fatura de cartão de crédito — salva em credit_card_invoice_attachments
+        if ((chosen as any).isCreditCard && (chosen as any).creditCardId) {
+          const { sql: sqlTag } = await import("drizzle-orm");
+          const { creditCardInvoices, creditCardInvoiceAttachments } = await import("../drizzle/schema");
+          const { eq, and } = await import("drizzle-orm");
+          const rawDb = await import("../db").then(m => m.getDb());
+          if (rawDb) {
+            const cardId: number = (chosen as any).creditCardId;
+            const invoiceMonth: number = (chosen as any).invoiceMonth;
+            const invoiceYear: number = (chosen as any).invoiceYear;
+
+            // Buscar ou criar registro da fatura
+            let [invoice] = await rawDb.select().from(creditCardInvoices)
+              .where(and(
+                eq(creditCardInvoices.creditCardId, cardId),
+                eq(creditCardInvoices.month, invoiceMonth),
+                eq(creditCardInvoices.year, invoiceYear),
+              )).limit(1);
+
+            if (!invoice) {
+              const [newInvoice] = await rawDb.insert(creditCardInvoices).values({
+                creditCardId: cardId,
+                month: invoiceMonth,
+                year: invoiceYear,
+                status: "OPEN",
+                totalAmount: chosen.amount,
+                dueDate: new Date(invoiceYear, invoiceMonth - 1, 10),
+              }).returning();
+              invoice = newInvoice;
+            }
+
+            // Salvar anexo na tabela de faturas de cartão
+            await rawDb.insert(creditCardInvoiceAttachments).values({
+              invoiceId: invoice.id,
+              filename: pendingAttach.filename,
+              blobUrl: pendingAttach.mediaUrl,
+              fileSize: pendingAttach.fileSize,
+              mimeType: pendingAttach.mimeType,
+              type: attachType as any,
+            });
+
+            // Se comprovante de pagamento, marcar transações do mês como pagas
+            if (isComprovante) {
+              const startDate = new Date(invoiceYear, invoiceMonth - 1, 1).toISOString();
+              const endDate = new Date(invoiceYear, invoiceMonth, 0, 23, 59, 59).toISOString();
+              await rawDb.execute(
+                sqlTag`UPDATE transactions SET status = 'PAID', "paymentDate" = NOW(), "updatedAt" = NOW()
+                       WHERE "creditCardId" = ${cardId}
+                         AND "dueDate" >= ${startDate}
+                         AND "dueDate" <= ${endDate}
+                         AND status IN ('PENDING','OVERDUE')`
+              );
+            }
+          }
+
+          const statusLine = isComprovante ? `\n\n🟢 Fatura marcada como *PAGA*` : "";
+          await sendReply(
+            `✅ *${typeLabel} da ${chosen.description} salvo!*\n\n💰 ${formatCurrency(chosen.amount)}${statusLine}`
+          );
+          return;
+        }
+
+        // Transação regular
         await db.createAttachment({
           transactionId: chosen.id,
           filename: pendingAttach.filename,
@@ -1278,15 +1344,10 @@ async function processIncomingMessage(
           type: attachType,
         } as any);
 
-        const isComprovante = attachType === "COMPROVANTE_PAGAMENTO";
         if (isComprovante) {
-          await db.updateTransaction(chosen.id, {
-            status: "PAID",
-            paymentDate: new Date(),
-          } as any);
+          await db.updateTransaction(chosen.id, { status: "PAID", paymentDate: new Date() } as any);
         }
 
-        const typeLabel = ATTACHMENT_TYPE_LABELS[attachType] ?? attachType;
         const statusLine = isComprovante ? `\n\n🟢 Status atualizado para *PAGO*` : "";
         await sendReply(
           `✅ *${typeLabel} anexado com sucesso!*\n\n📝 ${chosen.description}\n💰 ${formatCurrency(chosen.amount)}\n📅 Vencimento: ${chosen.dueDate ?? "-"}${statusLine}`
