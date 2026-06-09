@@ -107,6 +107,10 @@ const migrations: { name: string; sql: string }[] = [
     `,
   },
   {
+    name: "add_whatsappLid_to_users",
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS "whatsappLid" varchar(100)`,
+  },
+  {
     name: "create_password_reset_tokens_table",
     sql: `CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
       "id" serial PRIMARY KEY,
