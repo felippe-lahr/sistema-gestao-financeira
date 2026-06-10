@@ -1608,22 +1608,29 @@ async function processIncomingMessage(
         }
         successMsg += `\n\nID: #${firstTransactionId}`;
 
-        // Se veio de extração de documento, anexar o arquivo automaticamente
+        // Se veio com documento, perguntar o tipo antes de anexar
         if (pending.pendingFile) {
-          try {
-            await db.createAttachment({
-              transactionId: firstTransactionId,
-              filename: pending.pendingFile.filename,
-              blobUrl: pending.pendingFile.mediaUrl,
-              fileSize: pending.pendingFile.fileSize,
-              mimeType: pending.pendingFile.mimeType,
-              type: "DOCUMENTOS",
-            } as any);
-            successMsg += `\n📎 Documento anexado automaticamente`;
-          } catch (e) {
-            console.error("[WhatsApp Bot] Erro ao anexar arquivo:", e);
-          }
           await sendReply(successMsg);
+          pendingAttachments.set(replyJid, {
+            mediaUrl: pending.pendingFile.mediaUrl,
+            mimeType: pending.pendingFile.mimeType,
+            filename: pending.pendingFile.filename,
+            fileSize: pending.pendingFile.fileSize,
+            stage: "awaiting_type",
+            selectedTransaction: {
+              id: firstTransactionId,
+              description,
+              amount: amountCents,
+              dueDate: (creditCard ? firstInstallmentDate : baseDate).toISOString(),
+            },
+            userId: pending.userId,
+            entityId: pending.entityId,
+            organizationId: pending.organizationId,
+            expiresAt: Date.now() + 5 * 60 * 1000,
+          });
+          await sendReply(
+            `📎 *Qual o tipo do documento anexado?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Não anexar`
+          );
         } else {
           // Transação por voz/texto — perguntar se tem anexo
           await sendReply(successMsg);
