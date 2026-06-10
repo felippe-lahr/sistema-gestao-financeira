@@ -1874,13 +1874,13 @@ export default function Transactions() {
                       className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => toggleCardExpand(group.cardName)}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
                         {expandedCards.has(group.cardName) ? (
                           <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         ) : (
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
-                        <div className="p-2 rounded-full" style={{ backgroundColor: group.cardColor + '20' }}>
+                        <div className="p-3 rounded-full" style={{ backgroundColor: group.cardColor + '20' }}>
                           <CreditCard className="h-5 w-5" style={{ color: group.cardColor }} />
                         </div>
                         <div>
