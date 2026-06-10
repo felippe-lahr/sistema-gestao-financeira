@@ -141,10 +141,14 @@ const pendingConfirmations = new Map<string, {
 type AttachmentStage =
   | "awaiting_mode"          // perguntou "nova transação ou existente?"
   | "awaiting_description"   // extração falhou — aguardando descrição por voz/texto
+  | "awaiting_file_for_tx"   // usuário disse "sim" à oferta de anexo — aguardando arquivo
   | "awaiting_entity"        // escolher entidade (quando usuário tem múltiplas)
   | "awaiting_month"         // escolher mês de vencimento
   | "awaiting_match_confirm" // escolher transação da lista filtrada
   | "awaiting_type";         // tipo do documento (comprovante/boleto/NF/doc)
+
+// Após criar uma transação por voz/texto, guarda o id para perguntar se tem anexo
+const pendingAttachOffer = new Map<string, { transactionId: number; expiresAt: number }>();
 
 const pendingAttachments = new Map<string, {
   mediaUrl: string;
@@ -155,6 +159,7 @@ const pendingAttachments = new Map<string, {
   entities?: Array<{ id: number; name: string }>;
   transactions?: Array<{ id: number; description: string; amount: number; dueDate: string | null }>;
   selectedTransaction?: { id: number; description: string; amount: number; dueDate: string | null };
+  targetTransactionId?: number; // fluxo "anexar a transação recém-criada"
   userId: number;
   entityId: number;
   organizationId: number | null;
@@ -1244,6 +1249,51 @@ async function processIncomingMessage(
       }
     }
 
+    // Extração falhou — usuário descreveu por voz/texto → criar transação e anexar o arquivo
+    if (pendingAttach.stage === "awaiting_description") {
+      if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
+        pendingAttachments.delete(replyJid);
+        await sendReply(`❌ Operação cancelada.`);
+        return;
+      }
+      if (!responseText.trim()) {
+        await sendReply(`🎙️ Por favor, descreva a transação por voz ou texto.`);
+        return;
+      }
+      const org = await db.getOrFirstOrganizationForUser(user.id);
+      const userEntities = await db.getEntitiesByUserId(user.id);
+      const defaultEntityId = userEntities[0]?.id;
+      const [categoriesList, creditCardsList] = await Promise.all([
+        db.getCategoriesByEntityId(defaultEntityId, user.id).catch(() => []),
+        db.getCreditCardsByEntityId(defaultEntityId, user.id).catch(() => []),
+      ]);
+      await sendReply(`🤔 Processando...`);
+      const extracted = await extractTransactionFromText(responseText.trim(), userEntities, categoriesList, creditCardsList).catch(() => null);
+      if (!extracted) {
+        await sendReply(`❌ Não consegui entender a transação. Tente novamente ou *0* para cancelar.`);
+        return;
+      }
+      const entityId = resolveEntityId(extracted.entityName, userEntities);
+      if (!entityId) {
+        pendingAttachments.delete(replyJid);
+        await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
+        return;
+      }
+      const entityName = userEntities.find((e: any) => e.id === entityId)?.name ?? "Entidade";
+      pendingConfirmations.set(replyJid, {
+        extracted,
+        userId: user.id,
+        organizationId: org?.id ?? null,
+        entityId,
+        messageId,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        pendingFile: { mediaUrl: pendingAttach.mediaUrl, mimeType: pendingAttach.mimeType, filename: pendingAttach.filename, fileSize: pendingAttach.fileSize },
+      });
+      pendingAttachments.delete(replyJid);
+      await sendReply(buildConfirmationMessage(extracted, entityName));
+      return;
+    }
+
     if (pendingAttach.stage === "awaiting_entity" && pendingAttach.entities) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
         pendingAttachments.delete(replyJid);
@@ -1583,7 +1633,29 @@ async function processIncomingMessage(
           successMsg += `\n🔁 Recorrência criada: ${recurringCount} lançamentos futuros`;
         }
         successMsg += `\n\nID: #${firstTransactionId}`;
-        await sendReply(successMsg);
+
+        // Se veio de extração de documento, anexar o arquivo automaticamente
+        if (pending.pendingFile) {
+          try {
+            await db.createAttachment({
+              transactionId: firstTransactionId,
+              filename: pending.pendingFile.filename,
+              blobUrl: pending.pendingFile.mediaUrl,
+              fileSize: pending.pendingFile.fileSize,
+              mimeType: pending.pendingFile.mimeType,
+              type: "DOCUMENTOS",
+            } as any);
+            successMsg += `\n📎 Documento anexado automaticamente`;
+          } catch (e) {
+            console.error("[WhatsApp Bot] Erro ao anexar arquivo:", e);
+          }
+          await sendReply(successMsg);
+        } else {
+          // Transação por voz/texto — perguntar se tem anexo
+          await sendReply(successMsg);
+          pendingAttachOffer.set(replyJid, { transactionId: firstTransactionId, expiresAt: Date.now() + 5 * 60 * 1000 });
+          await sendReply(`📎 Deseja adicionar algum documento a esta transação?\n\n*1* — Sim\n*2* — Não`);
+        }
       } catch (error) {
         console.error("[WhatsApp Bot] Erro ao criar transação:", error);
         await sendReply(
@@ -1605,6 +1677,38 @@ async function processIncomingMessage(
       await sendReply(`❌ Transação cancelada.`);
       return;
     }
+  }
+
+  // 2b. Resposta à oferta de anexo após criação de transação por voz/texto
+  const attachOffer = pendingAttachOffer.get(replyJid);
+  if (attachOffer && Date.now() < attachOffer.expiresAt) {
+    const offerText = payload.data.message?.conversation || payload.data.message?.extendedTextMessage?.text || "";
+    const offerTrimmed = offerText.trim();
+    if (offerTrimmed === "1") {
+      pendingAttachOffer.delete(replyJid);
+      // Guardar transactionId — quando o arquivo chegar, vai direto para tipo
+      pendingAttachments.set(replyJid, {
+        mediaUrl: "",
+        mimeType: "",
+        filename: "",
+        fileSize: 0,
+        stage: "awaiting_file_for_tx",
+        targetTransactionId: attachOffer.transactionId,
+        userId: user.id,
+        entityId: 0,
+        organizationId: null,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      });
+      await sendReply(`📤 Envie o documento (imagem ou PDF) que deseja anexar.`);
+      return;
+    }
+    if (offerTrimmed === "2" || offerTrimmed === "0" || offerTrimmed.toLowerCase().includes("não") || offerTrimmed.toLowerCase().includes("nao")) {
+      pendingAttachOffer.delete(replyJid);
+      await sendReply(`✅ Ok! Transação salva sem anexo.`);
+      return;
+    }
+    // Qualquer outra mensagem ignora a oferta silenciosamente
+    pendingAttachOffer.delete(replyJid);
   }
 
   // 3. Verificar comandos especiais
@@ -1731,7 +1835,22 @@ async function processIncomingMessage(
 
     mediaUrl = imageUrl;
 
-    // Perguntar ao usuário o que deseja fazer com o documento
+    // Se estava aguardando arquivo para anexar a transação recém-criada, ir direto ao tipo
+    if (pendingAttach?.stage === "awaiting_file_for_tx" && pendingAttach.targetTransactionId) {
+      const tx = await db.getTransactionById(pendingAttach.targetTransactionId).catch(() => null) as any;
+      pendingAttachments.set(replyJid, {
+        ...pendingAttach,
+        mediaUrl: imageUrl,
+        mimeType: mediaData.mimeType,
+        filename: uploadedFilename || `imagem-${Date.now()}.jpg`,
+        fileSize: mediaData.buffer.length,
+        stage: "awaiting_type",
+        selectedTransaction: tx ? { id: tx.id, description: tx.description, amount: tx.amount, dueDate: tx.dueDate ? new Date(tx.dueDate).toLocaleDateString("pt-BR") : null } : pendingAttach.selectedTransaction,
+      });
+      await sendReply(`🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`);
+      return;
+    }
+
     pendingAttachments.set(replyJid, {
       mediaUrl: imageUrl,
       mimeType: mediaData.mimeType,
@@ -1784,6 +1903,20 @@ async function processIncomingMessage(
       await sendReply(`❌ Não consegui fazer o upload do documento. Tente novamente.`);
       return;
     }
+    if (pendingAttach?.stage === "awaiting_file_for_tx" && pendingAttach.targetTransactionId) {
+      const tx = await db.getTransactionById(pendingAttach.targetTransactionId).catch(() => null) as any;
+      pendingAttachments.set(replyJid, {
+        ...pendingAttach,
+        mediaUrl: docUrl,
+        mimeType,
+        filename,
+        fileSize: mediaData.buffer.length,
+        stage: "awaiting_type",
+        selectedTransaction: tx ? { id: tx.id, description: tx.description, amount: tx.amount, dueDate: tx.dueDate ? new Date(tx.dueDate).toLocaleDateString("pt-BR") : null } : pendingAttach.selectedTransaction,
+      });
+      await sendReply(`🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`);
+      return;
+    }
     pendingAttachments.set(replyJid, {
       mediaUrl: docUrl,
       mimeType,
@@ -1824,6 +1957,20 @@ async function processIncomingMessage(
     }
     if (!docUrl) {
       await sendReply(`❌ Não consegui fazer o upload do documento. Tente novamente.`);
+      return;
+    }
+    if (pendingAttach?.stage === "awaiting_file_for_tx" && pendingAttach.targetTransactionId) {
+      const tx = await db.getTransactionById(pendingAttach.targetTransactionId).catch(() => null) as any;
+      pendingAttachments.set(replyJid, {
+        ...pendingAttach,
+        mediaUrl: docUrl,
+        mimeType: mediaData.mimeType,
+        filename: docFilename,
+        fileSize: mediaData.buffer.length,
+        stage: "awaiting_type",
+        selectedTransaction: tx ? { id: tx.id, description: tx.description, amount: tx.amount, dueDate: tx.dueDate ? new Date(tx.dueDate).toLocaleDateString("pt-BR") : null } : pendingAttach.selectedTransaction,
+      });
+      await sendReply(`🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`);
       return;
     }
     pendingAttachments.set(replyJid, {
