@@ -1884,7 +1884,7 @@ export default function Transactions() {
                           <CreditCard className="h-5 w-5" style={{ color: group.cardColor }} />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-sm">{group.cardName}</h3>
+                          <h3 className="font-semibold">{group.cardName}</h3>
                           <p className="text-xs text-muted-foreground">
                             {group.transactions.length} transaç{group.transactions.length === 1 ? 'ão' : 'ões'}
                             {group.transactions[0]?.dueDate && (
@@ -1907,8 +1907,8 @@ export default function Transactions() {
                             </>
                           );
                         })()}
-                        <div className="flex flex-col items-end">
-                          <p className="text-base font-bold text-red-600">
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-red-600">
                             -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format((group.invoiceTotal != null ? group.invoiceTotal : group.total) / 100)}
                           </p>
                           {group.invoiceTotal != null && Math.abs(group.invoiceTotal - group.total) >= 10 && (
