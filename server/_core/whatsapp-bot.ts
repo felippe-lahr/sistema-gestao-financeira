@@ -134,11 +134,23 @@ const pendingConfirmations = new Map<string, {
   entityId: number;
   messageId: string;
   expiresAt: number; // timestamp ms
+  pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
+}>();
+
+// Aguarda escolha do tipo de documento após transação criada via fluxo voz+arquivo
+const pendingDocumentType = new Map<string, {
+  transactionId: number;
+  mediaUrl: string;
+  mimeType: string;
+  filename: string;
+  fileSize: number;
+  expiresAt: number;
 }>();
 
 // ─── Estado para fluxo de anexos em múltiplos passos ─────────────────────────
 type AttachmentStage =
   | "awaiting_mode"          // perguntou "nova transação ou existente?"
+  | "awaiting_description"   // aguarda voz/texto para descrever nova transação
   | "awaiting_entity"        // escolher entidade (quando usuário tem múltiplas)
   | "awaiting_month"         // escolher mês de vencimento
   | "awaiting_match_confirm" // escolher transação da lista filtrada
@@ -1120,37 +1132,9 @@ async function processIncomingMessage(
 
     if (pendingAttach.stage === "awaiting_mode") {
       if (trimmed === "1") {
-        // Nova transação — processar como imagem normalmente
-        pendingAttachments.delete(replyJid);
-        // Re-processar o arquivo como nova transação via extractTransactionFromImage
-        const org = await db.getOrFirstOrganizationForUser(user.id);
-        const userEntities = await db.getEntitiesByUserId(user.id);
-        const defaultEntityId = userEntities[0]?.id;
-        const [categoriesList, creditCardsList] = await Promise.all([
-          db.getCategoriesByEntityId(defaultEntityId, user.id).catch(() => []),
-          db.getCreditCardsByEntityId(defaultEntityId, user.id).catch(() => []),
-        ]);
-        await sendReply(`🤔 Processando...`);
-        const extracted = await extractTransactionFromImage(pendingAttach.mediaUrl, userEntities, categoriesList, creditCardsList);
-        if (!extracted) {
-          await sendReply(`❌ Não consegui extrair dados do documento. Tente descrever a transação por texto ou voz.`);
-          return;
-        }
-        const entityId = resolveEntityId(extracted.entityName, userEntities);
-        if (!entityId) {
-          await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
-          return;
-        }
-        const entityName = userEntities.find(e => e.id === entityId)?.name ?? "Entidade";
-        pendingConfirmations.set(replyJid, {
-          extracted,
-          userId: user.id,
-          organizationId: org?.id ?? null,
-          entityId,
-          messageId,
-          expiresAt: Date.now() + 10 * 60 * 1000,
-        });
-        await sendReply(buildConfirmationMessage(extracted, entityName));
+        // Nova transação — pedir descrição por voz ou texto
+        pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_description" });
+        await sendReply(`📎 Documento guardado!\n\nDescreva a transação por *voz* ou *texto*.\nEx: _"Paguei 150 reais de mercado hoje"_\n\n*0* — Cancelar`);
         return;
       }
 
@@ -1187,6 +1171,66 @@ async function processIncomingMessage(
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
+    }
+
+    if (pendingAttach.stage === "awaiting_description") {
+      if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
+        pendingAttachments.delete(replyJid);
+        await sendReply(`❌ Operação cancelada.`);
+        return;
+      }
+
+      // Transcrever voz já foi feito acima; usar responseText como descrição
+      if (!trimmed) {
+        await sendReply(`❓ Não recebi a descrição. Envie por *voz* ou *texto*, ou *0* para cancelar.`);
+        return;
+      }
+
+      // Extrair transação do texto/voz
+      const orgForDesc = await db.getOrFirstOrganizationForUser(user.id);
+      const entitiesForDesc = await db.getEntitiesByUserId(user.id);
+      const defEntityId = entitiesForDesc[0]?.id;
+      const [catsForDesc, cardsForDesc] = await Promise.all([
+        db.getCategoriesByEntityId(defEntityId, user.id).catch(() => [] as { name: string; type: string }[]),
+        db.getCreditCardsByEntityId(defEntityId, user.id).catch(() => [] as { name: string }[]),
+      ]);
+
+      await sendReply(`🤔 Processando...`);
+      const extractionResult = await extractTransactionFromText(trimmed, entitiesForDesc, catsForDesc, cardsForDesc).catch(() => null);
+
+      if (!extractionResult || !extractionResult.ok) {
+        await sendReply(
+          `❌ Não consegui identificar uma transação na sua mensagem.\n\nTente ser mais específico, por exemplo:\n_"Paguei 150 reais de mercado hoje"_\n_"Recebi 2000 de aluguel"_`
+        );
+        return;
+      }
+
+      const extractedDesc = extractionResult.data;
+      const entityIdDesc = resolveEntityId(extractedDesc.entityName, entitiesForDesc);
+      if (!entityIdDesc) {
+        await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
+        return;
+      }
+
+      const entityNameDesc = entitiesForDesc.find(e => e.id === entityIdDesc)?.name ?? "Entidade";
+
+      pendingAttachments.delete(replyJid);
+      pendingConfirmations.set(replyJid, {
+        extracted: extractedDesc,
+        userId: user.id,
+        organizationId: orgForDesc?.id ?? null,
+        entityId: entityIdDesc,
+        messageId,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        pendingFile: {
+          mediaUrl: pendingAttach.mediaUrl,
+          mimeType: pendingAttach.mimeType,
+          filename: pendingAttach.filename,
+          fileSize: pendingAttach.fileSize,
+        },
+      });
+      await sendReply(buildConfirmationMessage(extractedDesc, entityNameDesc));
+      return;
     }
 
     if (pendingAttach.stage === "awaiting_entity" && pendingAttach.entities) {
@@ -1358,6 +1402,55 @@ async function processIncomingMessage(
       }
       return;
     }
+  }
+
+  // 3a. Verificar se há seleção de tipo de documento pendente (após criação de transação)
+  const pendingDocType = pendingDocumentType.get(replyJid);
+  if (pendingDocType && Date.now() < pendingDocType.expiresAt) {
+    const docTypeText = (payload.data.message?.conversation ||
+      payload.data.message?.extendedTextMessage?.text || "").trim();
+
+    if (docTypeText === "0" || docTypeText.toLowerCase().includes("cancel")) {
+      pendingDocumentType.delete(replyJid);
+      await sendReply(`❌ Documento não anexado.`);
+      return;
+    }
+
+    const docTypeMap: Record<string, string> = {
+      "1": "COMPROVANTE_PAGAMENTO",
+      "2": "BOLETO",
+      "3": "NOTA_FISCAL",
+      "4": "DOCUMENTOS",
+    };
+    const chosenDocType = docTypeMap[docTypeText];
+    if (!chosenDocType) {
+      await sendReply(`❓ Responda com 1, 2, 3 ou 4 para escolher o tipo, ou *0* para cancelar.`);
+      return;
+    }
+
+    pendingDocumentType.delete(replyJid);
+    try {
+      await db.createAttachment({
+        transactionId: pendingDocType.transactionId,
+        filename: pendingDocType.filename,
+        blobUrl: pendingDocType.mediaUrl,
+        fileSize: pendingDocType.fileSize,
+        mimeType: pendingDocType.mimeType,
+        type: chosenDocType,
+      } as any);
+
+      if (chosenDocType === "COMPROVANTE_PAGAMENTO") {
+        await db.updateTransaction(pendingDocType.transactionId, { status: "PAID", paymentDate: new Date() } as any);
+      }
+
+      const typeLabel = ATTACHMENT_TYPE_LABELS[chosenDocType] ?? chosenDocType;
+      const statusLine = chosenDocType === "COMPROVANTE_PAGAMENTO" ? `\n🟢 Status atualizado para *PAGO*` : "";
+      await sendReply(`✅ *${typeLabel} anexado com sucesso!*${statusLine}`);
+    } catch (err) {
+      console.error("[WhatsApp Bot] Erro ao salvar anexo de tipo:", err);
+      await sendReply(`❌ Erro ao salvar o documento. Tente novamente.`);
+    }
+    return;
   }
 
   // 3. Verificar se é uma resposta de confirmação pendente
@@ -1533,6 +1626,21 @@ async function processIncomingMessage(
         }
         successMsg += `\n\nID: #${firstTransactionId}`;
         await sendReply(successMsg);
+
+        // Se há arquivo pendente, pedir o tipo antes de anexar
+        if (pending.pendingFile) {
+          pendingDocumentType.set(replyJid, {
+            transactionId: firstTransactionId,
+            mediaUrl: pending.pendingFile.mediaUrl,
+            mimeType: pending.pendingFile.mimeType,
+            filename: pending.pendingFile.filename,
+            fileSize: pending.pendingFile.fileSize,
+            expiresAt: Date.now() + 5 * 60 * 1000,
+          });
+          await sendReply(
+            `📎 *Qual o tipo do documento anexado?*\n\n*1* — Comprovante de Pagamento ✅\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Não anexar`
+          );
+        }
       } catch (error) {
         console.error("[WhatsApp Bot] Erro ao criar transação:", error);
         await sendReply(
@@ -1694,7 +1802,7 @@ async function processIncomingMessage(
     });
 
     await sendReply(
-      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (extrair dados do documento)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
+      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (descrever por voz ou texto)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
     );
     return;
   }
@@ -1742,7 +1850,7 @@ async function processIncomingMessage(
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
     await sendReply(
-      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (extrair dados do documento)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
+      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (descrever por voz ou texto)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
     );
     return;
   }
