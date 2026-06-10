@@ -1176,41 +1176,9 @@ async function processIncomingMessage(
 
     if (pendingAttach.stage === "awaiting_mode") {
       if (trimmed === "1") {
-        // Nova transação — tentar extrair dados do documento
-        const org = await db.getOrFirstOrganizationForUser(user.id);
-        const userEntities = await db.getEntitiesByUserId(user.id);
-        const defaultEntityId = userEntities[0]?.id;
-        const [categoriesList, creditCardsList] = await Promise.all([
-          db.getCategoriesByEntityId(defaultEntityId, user.id).catch(() => []),
-          db.getCreditCardsByEntityId(defaultEntityId, user.id).catch(() => []),
-        ]);
-        await sendReply(`🤔 Processando...`);
-        const extracted = await extractTransactionFromImage(pendingAttach.mediaUrl, userEntities, categoriesList, creditCardsList);
-        if (!extracted) {
-          // Extração falhou — manter o arquivo e aguardar descrição por voz/texto
-          pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_description" });
-          await sendReply(`❌ Não consegui extrair os dados do documento.\n\n📎 O arquivo está guardado. Descreva a transação por *voz* ou *texto* que ele será anexado automaticamente.`);
-          return;
-        }
-        const entityId = resolveEntityId(extracted.entityName, userEntities);
-        if (!entityId) {
-          pendingAttachments.delete(replyJid);
-          await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
-          return;
-        }
-        const entityName = userEntities.find(e => e.id === entityId)?.name ?? "Entidade";
-        // Extração ok — salvar referência do arquivo junto com a confirmação
-        pendingAttachments.delete(replyJid);
-        pendingConfirmations.set(replyJid, {
-          extracted,
-          userId: user.id,
-          organizationId: org?.id ?? null,
-          entityId,
-          messageId,
-          expiresAt: Date.now() + 10 * 60 * 1000,
-          pendingFile: { mediaUrl: pendingAttach.mediaUrl, mimeType: pendingAttach.mimeType, filename: pendingAttach.filename, fileSize: pendingAttach.fileSize },
-        });
-        await sendReply(buildConfirmationMessage(extracted, entityName));
+        // Nova transação — pedir descrição por voz/texto (documento será anexado automaticamente)
+        pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_description" });
+        await sendReply(`📎 Documento guardado!\n\nDescreva a transação por *voz* ou *texto* que ela será criada com o documento já anexado.\n\n*0* — Cancelar`);
         return;
       }
 
