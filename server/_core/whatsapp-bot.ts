@@ -1236,11 +1236,17 @@ async function processIncomingMessage(
         db.getCreditCardsByEntityId(defaultEntityId, user.id).catch(() => []),
       ]);
       await sendReply(`🤔 Processando...`);
-      const extracted = await extractTransactionFromText(responseText.trim(), userEntities, categoriesList, creditCardsList).catch(() => null);
-      if (!extracted) {
-        await sendReply(`❌ Não consegui entender a transação. Tente novamente ou *0* para cancelar.`);
+      const extractionResult = await extractTransactionFromText(responseText.trim(), userEntities, categoriesList, creditCardsList).catch(() => null);
+      if (!extractionResult || !extractionResult.ok) {
+        const reason = extractionResult && (extractionResult as any).reason;
+        if (reason === "llm_error") {
+          await sendReply(`⏳ Serviço de IA temporariamente indisponível. Aguarde alguns instantes e tente novamente.`);
+        } else {
+          await sendReply(`❌ Não consegui entender a transação.\n\nTente ser mais específico, por exemplo:\n_"Paguei 48,80 de padaria hoje"_\n\nOu *0* para cancelar.`);
+        }
         return;
       }
+      const extracted = extractionResult.data;
       const entityId = resolveEntityId(extracted.entityName, userEntities);
       if (!entityId) {
         pendingAttachments.delete(replyJid);
