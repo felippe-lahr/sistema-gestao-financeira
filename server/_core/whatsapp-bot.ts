@@ -904,7 +904,8 @@ function buildConfirmationMessage(
 ): string {
   const typeLabel = extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito";
   const amountCents = Math.round((extracted.amount ?? 0) * 100);
-  const amountStr = formatCurrency(amountCents);
+  const isVariable = amountCents <= 0;
+  const amountStr = isVariable ? "_valor variável_" : formatCurrency(amountCents);
   const dateStr = extracted.date ? formatDate(extracted.date) : "hoje";
 
   const freqLabel = extracted.recurrenceFrequency === "weekly" ? "semanal"
@@ -912,7 +913,7 @@ function buildConfirmationMessage(
     : "mensal";
   const recurrenceCount = extracted.recurrenceCount ?? 12;
   const recurring = extracted.isRecurring
-    ? `\n🔁 Recorrente: *${recurrenceCount}x* (${freqLabel})`
+    ? `\n🔁 Recorrente: *${recurrenceCount}x* (${freqLabel})${isVariable ? "\n✏️ Valor preenchido a cada mês" : ""}`
     : "";
 
   const installments = extracted.installments && extracted.installments > 1
@@ -1041,8 +1042,10 @@ async function startTxSetupFlow(
   userEntities: Array<{ id: number; name: string }>,
   pendingFile?: PendingFileMeta
 ) {
-  // Valor ausente — perguntar antes de prosseguir (não descarta a transação)
-  if (!extracted.amount || extracted.amount <= 0) {
+  // Valor ausente. Para recorrências (contas de consumo: gás, luz, água) o valor
+  // é variável e preenchido mês a mês — segue sem perguntar. Para transações
+  // avulsas o valor é obrigatório, então perguntamos antes de prosseguir.
+  if ((!extracted.amount || extracted.amount <= 0) && !extracted.isRecurring) {
     pendingTxSetup.set(replyJid, {
       extracted,
       userId,
@@ -1794,12 +1797,16 @@ async function processIncomingMessage(
           }
           firstTransactionId = createdIds[0];
         } else {
+          // Recorrência de valor variável (conta de consumo sem valor informado):
+          // o 1º lançamento fica PENDENTE, sem data de pagamento, para preenchimento posterior.
+          const isVariableRecurring = !!extracted.isRecurring && amountCents <= 0;
           firstTransactionId = await db.createTransaction({
             ...basePayload,
             description,
             amount: amountCents,
+            status: (creditCard || isVariableRecurring) ? "PENDING" : "PAID",
             dueDate: creditCard ? firstInstallmentDate : baseDate,
-            paymentDate: creditCard ? undefined : new Date(),
+            paymentDate: (creditCard || isVariableRecurring) ? undefined : new Date(),
             isRecurring: extracted.isRecurring ?? false,
             recurrencePattern: extracted.isRecurring && extracted.recurrenceFrequency
               ? JSON.stringify({ frequency: extracted.recurrenceFrequency, interval: 1 })
@@ -1841,7 +1848,8 @@ async function processIncomingMessage(
           .set({ status: "CONFIRMED", transactionId: firstTransactionId, updatedAt: new Date() })
           .where(eq(whatsappMessages.messageId, pending.messageId));
 
-        const amountStr = formatCurrency(amountCents);
+        const isVariableRecurringMsg = !!extracted.isRecurring && amountCents <= 0;
+        const amountStr = isVariableRecurringMsg ? "_valor variável_" : formatCurrency(amountCents);
         const firstMonthLabel = firstInstallmentDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
         let successMsg = `✅ *Transação cadastrada com sucesso!*\n\n${extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito"}: *${amountStr}*\n📝 ${description}`;
         if (installments > 1) {
@@ -1856,6 +1864,7 @@ async function processIncomingMessage(
             : (extracted.recurrenceFrequency === "yearly") ? "anuais"
             : "mensais";
           successMsg += `\n🔁 Recorrência: ${recurringCount} lançamentos futuros ${freqLabel}`;
+          if (isVariableRecurringMsg) successMsg += `\n✏️ Valor a preencher em cada mês`;
         }
         successMsg += `\n\nID: #${firstTransactionId}`;
 
