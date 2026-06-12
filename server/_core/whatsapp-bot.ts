@@ -105,6 +105,7 @@ interface ExtractedTransaction {
   installments?: number;
   isRecurring?: boolean;
   recurrenceFrequency?: "monthly" | "weekly" | "yearly";
+  recurrenceCount?: number; // quantas repetições ("por 12 meses" → 12, null = indefinido → padrão 12)
   confidence?: number;
 }
 
@@ -133,8 +134,24 @@ const pendingConfirmations = new Map<string, {
   organizationId: number | null;
   entityId: number;
   messageId: string;
-  expiresAt: number; // timestamp ms
+  expiresAt: number;
   pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
+  resolvedPaymentMethodId?: number; // já resolvido antes da confirmação
+}>();
+
+// Pré-confirmação: resolve entidade e meio de pagamento quando necessário
+type TxSetupStage = "awaiting_entity" | "awaiting_payment_method";
+const pendingTxSetup = new Map<string, {
+  extracted: ExtractedTransaction;
+  userId: number;
+  organizationId: number | null;
+  messageId: string;
+  expiresAt: number;
+  pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
+  stage: TxSetupStage;
+  entityId?: number;
+  entityOptions?: Array<{ id: number; name: string }>;
+  paymentMethodOptions?: Array<{ id: number; name: string }>;
 }>();
 
 // ─── Estado para fluxo de anexos em múltiplos passos ─────────────────────────
@@ -367,8 +384,9 @@ Retorne um JSON com os campos:
 - paymentMethodName: meio de pagamento mencionado (string ou null)
 - creditCardName: se mencionar cartão de crédito (nubank, itaú, etc.), escolha EXATAMENTE um nome da lista de cartões cadastrados, ou null
 - installments: número de parcelas se mencionado ("4x", "em 4 vezes" → 4), ou null/1 se não parcelado
-- isRecurring: true se for recorrente/mensalidade/assinatura
+- isRecurring: true se for recorrente/mensalidade/assinatura/contrato
 - recurrenceFrequency: "monthly", "weekly" ou "yearly" (apenas se isRecurring=true)
+- recurrenceCount: número de repetições se mencionado ("por 12 meses" → 12, "6 meses" → 6, "1 ano" → 12, "sempre/todo mês" → null)
 - confidence: número de 0 a 1 indicando confiança na extração
 
 Se não conseguir identificar um campo obrigatório (amount ou description), retorne null para o objeto inteiro.
@@ -871,32 +889,166 @@ async function resolveCreditCardId(
  */
 function buildConfirmationMessage(
   extracted: ExtractedTransaction,
-  entityName: string
+  entityName: string,
+  resolvedPaymentMethodName?: string
 ): string {
   const typeLabel = extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito";
   const amountCents = Math.round((extracted.amount ?? 0) * 100);
   const amountStr = formatCurrency(amountCents);
   const dateStr = extracted.date ? formatDate(extracted.date) : "hoje";
+
+  const freqLabel = extracted.recurrenceFrequency === "weekly" ? "semanal"
+    : extracted.recurrenceFrequency === "yearly" ? "anual"
+    : "mensal";
+  const recurrenceCount = extracted.recurrenceCount ?? 12;
   const recurring = extracted.isRecurring
-    ? `\n🔁 Recorrente (${extracted.recurrenceFrequency === "monthly" ? "mensal" : extracted.recurrenceFrequency === "weekly" ? "semanal" : "anual"}) — serão criados 12 lançamentos`
+    ? `\n🔁 Recorrente: *${recurrenceCount}x* (${freqLabel})`
     : "";
+
   const installments = extracted.installments && extracted.installments > 1
     ? `\n🔢 Parcelado em ${extracted.installments}x de ${formatCurrency(Math.round(amountCents / extracted.installments))}`
     : "";
+
   const creditCard = extracted.creditCardName
     ? `\n💳 Cartão: ${extracted.creditCardName}`
     : "";
+
+  const paymentDisplay = resolvedPaymentMethodName ?? extracted.paymentMethodName;
 
   return `📋 *Confirmar transação?*
 
 ${typeLabel}: *${amountStr}*
 📝 ${extracted.description}
 🏷️ Entidade: ${entityName}
-📅 Data: ${dateStr}${extracted.categoryName ? `\n🗂️ Categoria: ${extracted.categoryName}` : ""}${extracted.bankAccountName ? `\n🏦 Conta: ${extracted.bankAccountName}` : ""}${extracted.paymentMethodName ? `\n💳 Pagamento: ${extracted.paymentMethodName}` : ""}${creditCard}${installments}${recurring}
+📅 Data: ${dateStr}${extracted.categoryName ? `\n🗂️ Categoria: ${extracted.categoryName}` : ""}${extracted.bankAccountName ? `\n🏦 Conta: ${extracted.bankAccountName}` : ""}${paymentDisplay ? `\n💳 Pagamento: ${paymentDisplay}` : ""}${creditCard}${installments}${recurring}
 
 Responda:
 *1* — Confirmar ✅
 *2* — Cancelar ❌`;
+}
+
+// ─── Fluxo pré-confirmação: resolve entidade e meio de pagamento ──────────────
+
+type SendReplyFn = (txt: string) => Promise<void>;
+type PendingFileMeta = { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
+
+async function goToConfirmation(
+  replyJid: string,
+  extracted: ExtractedTransaction,
+  userId: number,
+  organizationId: number | null,
+  entityId: number,
+  messageId: string,
+  sendReply: SendReplyFn,
+  pendingFile: PendingFileMeta | undefined,
+  resolvedPaymentMethodId: number | undefined,
+  resolvedPaymentMethodName: string | undefined
+) {
+  const entities = await db.getEntitiesByUserId(userId);
+  const entityName = entities.find((e: any) => e.id === entityId)?.name ?? "Entidade";
+  pendingConfirmations.set(replyJid, {
+    extracted,
+    userId,
+    organizationId,
+    entityId,
+    messageId,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    pendingFile,
+    resolvedPaymentMethodId,
+  });
+  await sendReply(buildConfirmationMessage(extracted, entityName, resolvedPaymentMethodName));
+}
+
+async function resolvePaymentMethodStep(
+  replyJid: string,
+  extracted: ExtractedTransaction,
+  userId: number,
+  organizationId: number | null,
+  entityId: number,
+  messageId: string,
+  sendReply: SendReplyFn,
+  pendingFile: PendingFileMeta | undefined,
+  entityOptions?: Array<{ id: number; name: string }>
+) {
+  if (!extracted.paymentMethodName) {
+    await goToConfirmation(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
+    return;
+  }
+
+  const methods = await db.getPaymentMethodsByEntityId(entityId, userId).catch(() => [] as any[]);
+  const normalized = extracted.paymentMethodName.toLowerCase().trim();
+  const match = methods.find((m: any) =>
+    m.name.toLowerCase().includes(normalized) || normalized.includes(m.name.toLowerCase())
+  );
+
+  if (match) {
+    await goToConfirmation(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, match.id, match.name);
+    return;
+  }
+
+  if (methods.length === 0) {
+    await goToConfirmation(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
+    return;
+  }
+
+  // Mencionado mas não encontrado → listar para escolha
+  const list = methods.map((m: any, i: number) => `*${i + 1}* — ${m.name}`).join("\n");
+  pendingTxSetup.set(replyJid, {
+    extracted,
+    userId,
+    organizationId,
+    messageId,
+    entityId,
+    stage: "awaiting_payment_method",
+    paymentMethodOptions: methods,
+    pendingFile,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  });
+  await sendReply(
+    `❓ Meio de pagamento *"${extracted.paymentMethodName}"* não encontrado.\n\nEscolha um cadastrado:\n\n${list}\n\n*0* — Pular`
+  );
+}
+
+async function startTxSetupFlow(
+  replyJid: string,
+  extracted: ExtractedTransaction,
+  userId: number,
+  organizationId: number | null,
+  messageId: string,
+  sendReply: SendReplyFn,
+  userEntities: Array<{ id: number; name: string }>,
+  pendingFile?: PendingFileMeta
+) {
+  // Resolver entidade
+  let entityId = resolveEntityId(extracted.entityName, userEntities);
+
+  // Entidade única — sempre usa ela mesmo sem mencionar
+  if (!entityId && userEntities.length === 1) {
+    entityId = userEntities[0].id;
+  }
+
+  if (!entityId && userEntities.length > 1) {
+    const list = userEntities.map((e, i) => `*${i + 1}* — ${e.name}`).join("\n");
+    pendingTxSetup.set(replyJid, {
+      extracted,
+      userId,
+      organizationId,
+      messageId,
+      stage: "awaiting_entity",
+      entityOptions: userEntities,
+      pendingFile,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+    await sendReply(`🏢 *Qual entidade?*\n\n${list}\n\n*0* — Cancelar`);
+    return;
+  }
+
+  if (!entityId) {
+    await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
+    return;
+  }
+
+  await resolvePaymentMethodStep(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile);
 }
 
 /**
@@ -1247,24 +1399,9 @@ async function processIncomingMessage(
         return;
       }
       const extracted = extractionResult.data;
-      const entityId = resolveEntityId(extracted.entityName, userEntities);
-      if (!entityId) {
-        pendingAttachments.delete(replyJid);
-        await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
-        return;
-      }
-      const entityName = userEntities.find((e: any) => e.id === entityId)?.name ?? "Entidade";
-      pendingConfirmations.set(replyJid, {
-        extracted,
-        userId: user.id,
-        organizationId: org?.id ?? null,
-        entityId,
-        messageId,
-        expiresAt: Date.now() + 10 * 60 * 1000,
-        pendingFile: { mediaUrl: pendingAttach.mediaUrl, mimeType: pendingAttach.mimeType, filename: pendingAttach.filename, fileSize: pendingAttach.fileSize },
-      });
+      const pendingFileMeta = { mediaUrl: pendingAttach.mediaUrl, mimeType: pendingAttach.mimeType, filename: pendingAttach.filename, fileSize: pendingAttach.fileSize };
       pendingAttachments.delete(replyJid);
-      await sendReply(buildConfirmationMessage(extracted, entityName));
+      await startTxSetupFlow(replyJid, extracted, user.id, org?.id ?? null, messageId, sendReply, userEntities, pendingFileMeta);
       return;
     }
 
@@ -1435,6 +1572,58 @@ async function processIncomingMessage(
     }
   }
 
+  // 2c. Verificar setup pré-confirmação (entidade / meio de pagamento)
+  const txSetup = pendingTxSetup.get(replyJid);
+  if (txSetup && Date.now() < txSetup.expiresAt) {
+    const setupText = (payload.data.message?.conversation ||
+      payload.data.message?.extendedTextMessage?.text || "").trim();
+
+    if (setupText === "0" || setupText.toLowerCase().includes("cancel")) {
+      pendingTxSetup.delete(replyJid);
+      await sendReply(`❌ Operação cancelada.`);
+      return;
+    }
+
+    if (txSetup.stage === "awaiting_entity" && txSetup.entityOptions) {
+      const idx = parseInt(setupText, 10) - 1;
+      const chosen = txSetup.entityOptions[idx];
+      if (!chosen) {
+        await sendReply(`❓ Responda com o número da entidade ou *0* para cancelar.`);
+        return;
+      }
+      pendingTxSetup.delete(replyJid);
+      await resolvePaymentMethodStep(
+        replyJid, txSetup.extracted, txSetup.userId, txSetup.organizationId,
+        chosen.id, txSetup.messageId, sendReply, txSetup.pendingFile
+      );
+      return;
+    }
+
+    if (txSetup.stage === "awaiting_payment_method" && txSetup.paymentMethodOptions) {
+      if (setupText === "0" || setupText.toLowerCase() === "pular") {
+        pendingTxSetup.delete(replyJid);
+        await goToConfirmation(
+          replyJid, txSetup.extracted, txSetup.userId, txSetup.organizationId,
+          txSetup.entityId!, txSetup.messageId, sendReply, txSetup.pendingFile, undefined, undefined
+        );
+        return;
+      }
+      const idx = parseInt(setupText, 10) - 1;
+      const chosen = txSetup.paymentMethodOptions[idx];
+      if (!chosen) {
+        const list = txSetup.paymentMethodOptions.map((m, i) => `*${i + 1}* — ${m.name}`).join("\n");
+        await sendReply(`❓ Responda com o número ou *0* para pular.\n\n${list}`);
+        return;
+      }
+      pendingTxSetup.delete(replyJid);
+      await goToConfirmation(
+        replyJid, txSetup.extracted, txSetup.userId, txSetup.organizationId,
+        txSetup.entityId!, txSetup.messageId, sendReply, txSetup.pendingFile, chosen.id, chosen.name
+      );
+      return;
+    }
+  }
+
   // 3. Verificar se é uma resposta de confirmação pendente
   const text = payload.data.message?.conversation ||
     payload.data.message?.extendedTextMessage?.text || "";
@@ -1470,11 +1659,13 @@ async function processIncomingMessage(
           pending.entityId,
           user.id
         );
-        const paymentMethodId = await resolvePaymentMethodId(
-          extracted.paymentMethodName,
-          pending.entityId,
-          user.id
-        );
+        const paymentMethodId = pending.resolvedPaymentMethodId !== undefined
+          ? pending.resolvedPaymentMethodId
+          : await resolvePaymentMethodId(
+              extracted.paymentMethodName,
+              pending.entityId,
+              user.id
+            );
         const creditCard = await resolveCreditCard(
           extracted.creditCardName,
           pending.entityId,
@@ -1562,11 +1753,12 @@ async function processIncomingMessage(
           createdIds.push(firstTransactionId);
         }
 
-        // Criar 12 transações recorrentes futuras se isRecurring=true
+        // Criar transações recorrentes futuras se isRecurring=true
         let recurringCount = 0;
         if (extracted.isRecurring && installments === 1) {
           const freq = extracted.recurrenceFrequency ?? "monthly";
-          for (let i = 1; i <= 12; i++) {
+          const totalRecurrences = extracted.recurrenceCount ?? 12;
+          for (let i = 1; i <= totalRecurrences; i++) {
             const dueDate = new Date(baseDate);
             if (freq === "monthly") dueDate.setMonth(dueDate.getMonth() + i);
             else if (freq === "weekly") dueDate.setDate(dueDate.getDate() + 7 * i);
@@ -1604,7 +1796,10 @@ async function processIncomingMessage(
           successMsg += `\n💳 Cartão: ${extracted.creditCardName}`;
         }
         if (recurringCount > 0) {
-          successMsg += `\n🔁 Recorrência criada: ${recurringCount} lançamentos futuros`;
+          const freqLabel = (extracted.recurrenceFrequency === "weekly") ? "semanais"
+            : (extracted.recurrenceFrequency === "yearly") ? "anuais"
+            : "mensais";
+          successMsg += `\n🔁 Recorrência: ${recurringCount} lançamentos futuros ${freqLabel}`;
         }
         successMsg += `\n\nID: #${firstTransactionId}`;
 
@@ -1990,13 +2185,6 @@ async function processIncomingMessage(
   }
 
   const extracted = extractionResult.data;
-  const entityId = resolveEntityId(extracted.entityName, userEntities);
-  if (!entityId) {
-    await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
-    return;
-  }
-
-  const entityName = userEntities.find(e => e.id === entityId)?.name ?? "Entidade";
 
   // Atualizar mensagem no banco com dados extraídos
   await dbInstance
@@ -2009,17 +2197,7 @@ async function processIncomingMessage(
     })
     .where(eq(whatsappMessages.messageId, messageId));
 
-  // Salvar confirmação pendente
-  pendingConfirmations.set(replyJid, {
-    extracted,
-    userId: user.id,
-    organizationId: org?.id ?? null,
-    entityId,
-    messageId,
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutos
-  });
-
-  await sendReply(buildConfirmationMessage(extracted, entityName));
+  await startTxSetupFlow(replyJid, extracted, user.id, org?.id ?? null, messageId, sendReply, userEntities);
 }
 
 // ─── Registro de Rotas ────────────────────────────────────────────────────────
