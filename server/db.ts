@@ -1,4 +1,4 @@
-import { eq, or, and, isNull, desc, asc, gte, lte, sql, aliasedTable } from "drizzle-orm";
+import { eq, or, and, isNull, desc, asc, gte, lte, lt, sql, aliasedTable } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -575,6 +575,95 @@ export async function getDashboardMetrics(entityId: number, options?: { startDat
     pendingExpenses,
     periodPendingExpenses,
   };
+}
+
+/**
+ * Extrato / projeção de saldo de conta(s) bancária(s).
+ *
+ * Calcula o saldo de abertura do período (saldo inicial das contas + movimentações
+ * PAGAS anteriores ao período) e retorna as transações do período em ordem cronológica.
+ * Transações de cartão de crédito são excluídas (não movimentam a conta diretamente —
+ * só a fatura paga movimenta).
+ *
+ * Escopo de contas:
+ *  - bankAccountId definido → apenas aquela conta
+ *  - sem bankAccountId → todas as contas da entidade
+ *      - includeUnassigned=true → inclui também lançamentos sem conta vinculada
+ *      - includeUnassigned=false → apenas lançamentos vinculados a alguma conta
+ */
+export async function getAccountStatement(
+  entityId: number,
+  options: {
+    startDate?: Date;
+    endDate?: Date;
+    bankAccountId?: number;
+    includeUnassigned?: boolean;
+    status?: "PENDING" | "PAID" | "OVERDUE";
+  }
+) {
+  const db = await getDb();
+  if (!db) return { openingBalance: 0, transactions: [] as any[] };
+
+  const { startDate, endDate, bankAccountId, includeUnassigned, status } = options;
+
+  // 1. Saldo inicial das contas selecionadas
+  const acctConds: any[] = [eq(bankAccounts.entityId, entityId), eq(bankAccounts.isActive, true)];
+  if (bankAccountId) acctConds.push(eq(bankAccounts.id, bankAccountId));
+  const acctBalance = await db
+    .select({ total: sql<number>`COALESCE(SUM(balance), 0)` })
+    .from(bankAccounts)
+    .where(and(...acctConds));
+  const initialBankBalance = Number(acctBalance[0]?.total) || 0;
+
+  // Escopo de transações (exclui cartão de crédito sempre)
+  const baseScope = (): any[] => {
+    const c: any[] = [eq(transactions.entityId, entityId), sql`transactions."creditCardId" IS NULL`];
+    if (bankAccountId) {
+      c.push(eq(transactions.bankAccountId, bankAccountId));
+    } else if (!includeUnassigned) {
+      c.push(sql`transactions."bankAccountId" IS NOT NULL`);
+    }
+    return c;
+  };
+
+  // 2. Saldo de abertura = inicial + movimentações PAGAS antes do início do período
+  let openingMovements = 0;
+  if (startDate) {
+    const before = await db
+      .select({ total: sql<number>`COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END), 0)` })
+      .from(transactions)
+      .where(and(...baseScope(), eq(transactions.status, "PAID"), lt(transactions.dueDate, startDate)));
+    openingMovements = Number(before[0]?.total) || 0;
+  }
+  const openingBalance = initialBankBalance + openingMovements;
+
+  // 3. Transações do período (ordem cronológica para saldo corrido)
+  const periodConds = [...baseScope()];
+  if (startDate) periodConds.push(gte(transactions.dueDate, startDate));
+  if (endDate) periodConds.push(lte(transactions.dueDate, endDate));
+  if (status) periodConds.push(eq(transactions.status, status));
+
+  const rows = await db
+    .select({
+      id: transactions.id,
+      type: transactions.type,
+      description: transactions.description,
+      amount: transactions.amount,
+      dueDate: transactions.dueDate,
+      paymentDate: transactions.paymentDate,
+      status: transactions.status,
+      bankAccountId: transactions.bankAccountId,
+      bankAccountName: bankAccounts.name,
+      bankAccountColor: bankAccounts.color,
+      categoryName: categories.name,
+    })
+    .from(transactions)
+    .leftJoin(bankAccounts, eq(transactions.bankAccountId, bankAccounts.id))
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(and(...periodConds))
+    .orderBy(asc(transactions.dueDate), asc(transactions.id));
+
+  return { openingBalance, transactions: rows };
 }
 
 // Função de diagnóstico para investigar cálculo do Saldo Atual

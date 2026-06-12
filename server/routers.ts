@@ -337,6 +337,57 @@ export const appRouter = router({
         );
         return summaries;
       }),
+
+    // Extrato / projeção de saldo: saldo de abertura + transações do período com saldo corrido
+    getStatement: protectedProcedure
+      .input(
+        z.object({
+          entityId: z.number(),
+          bankAccountId: z.number().nullable().optional(), // null/undefined = todas as contas
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+          status: z.enum(["ALL", "PAID", "PENDING"]).default("ALL"),
+          includeUnassigned: z.boolean().default(false),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+
+        const { openingBalance, transactions: rows } = await db.getAccountStatement(input.entityId, {
+          startDate: input.startDate ? new Date(input.startDate) : undefined,
+          endDate: input.endDate ? new Date(input.endDate) : undefined,
+          bankAccountId: input.bankAccountId ?? undefined,
+          includeUnassigned: input.includeUnassigned,
+          status: input.status === "ALL" ? undefined : input.status,
+        });
+
+        let running = openingBalance;
+        let paidIn = 0, paidOut = 0, pendingIn = 0, pendingOut = 0;
+        const entries = rows.map((t) => {
+          const signed = t.type === "INCOME" ? t.amount : -t.amount;
+          running += signed;
+          if (t.status === "PAID") {
+            if (t.type === "INCOME") paidIn += t.amount; else paidOut += t.amount;
+          } else {
+            if (t.type === "INCOME") pendingIn += t.amount; else pendingOut += t.amount;
+          }
+          return { ...t, runningBalance: running };
+        });
+
+        return {
+          openingBalance,
+          entries,
+          summary: {
+            openingBalance,
+            paidIn,
+            paidOut,
+            pendingIn,
+            pendingOut,
+            realizedBalance: openingBalance + paidIn - paidOut,
+            projectedBalance: running,
+          },
+        };
+      }),
   }),
 
   // ========== PAYMENT METHODS ==========

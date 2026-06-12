@@ -44,6 +44,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CurrencyInput, parseCurrency } from "@/components/CurrencyInput";
+import BankStatement from "@/components/BankStatement";
 // parseCurrency retorna o valor em reais (float), o tRPC router converte para centavos
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -95,6 +96,7 @@ type Decision = {
 
 export default function BankAccounts() {
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
+  const [view, setView] = useState<"accounts" | "statement">("accounts");
 
   const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery(undefined, {
     refetchInterval: 60_000,
@@ -138,8 +140,28 @@ export default function BankAccounts() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Contas Bancárias</h1>
         <p className="text-sm text-muted-foreground">
-          Gerencie suas contas e importe extratos OFX para conciliação automática.
+          Gerencie suas contas, importe extratos OFX e acompanhe o saldo da entidade.
         </p>
+      </div>
+
+      {/* Abas: Contas / Extrato */}
+      <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl w-fit">
+        {([
+          { key: "accounts", label: "Contas" },
+          { key: "statement", label: "Extrato" },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setView(tab.key)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              view === tab.key
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Seletor de entidade (se mais de uma) */}
@@ -161,7 +183,7 @@ export default function BankAccounts() {
         </div>
       )}
 
-      {selectedEntityId && (
+      {selectedEntityId && view === "accounts" && (
         <BankAccountsList
           entityId={selectedEntityId}
           canWrite={canWrite}
@@ -170,6 +192,10 @@ export default function BankAccounts() {
           selectedEntityId={selectedEntityId}
           onEntityChange={(id) => setSelectedEntityId(id)}
         />
+      )}
+
+      {selectedEntityId && view === "statement" && (
+        <BankStatement entityId={selectedEntityId} />
       )}
     </div>
   );
