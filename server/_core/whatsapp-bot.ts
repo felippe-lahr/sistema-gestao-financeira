@@ -993,28 +993,30 @@ async function resolvePaymentMethodStep(
   pendingFile: PendingFileMeta | undefined,
   entityOptions?: Array<{ id: number; name: string }>
 ) {
-  if (!extracted.paymentMethodName) {
-    await goToConfirmation(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
-    return;
-  }
-
   const methods = await db.getPaymentMethodsByEntityId(entityId, userId).catch(() => [] as any[]);
-  const normalized = extracted.paymentMethodName.toLowerCase().trim();
-  const match = methods.find((m: any) =>
-    m.name.toLowerCase().includes(normalized) || normalized.includes(m.name.toLowerCase())
-  );
 
-  if (match) {
-    await goToConfirmation(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, match.id, match.name);
-    return;
-  }
-
+  // Sem meios cadastrados → pula direto pra confirmação
   if (methods.length === 0) {
     await goToConfirmation(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
     return;
   }
 
-  // Mencionado mas não encontrado → listar para escolha
+  // Nome mencionado e encontrado exatamente → resolve na hora
+  if (extracted.paymentMethodName) {
+    const normalized = extracted.paymentMethodName.toLowerCase().trim();
+    const match = methods.find((m: any) =>
+      m.name.toLowerCase().includes(normalized) || normalized.includes(m.name.toLowerCase())
+    );
+    if (match) {
+      await goToConfirmation(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, match.id, match.name);
+      return;
+    }
+  }
+
+  // Não mencionado ou não encontrado → sempre perguntar mostrando a lista
+  const notFoundNote = extracted.paymentMethodName
+    ? `❓ Meio de pagamento *"${extracted.paymentMethodName}"* não encontrado.\n\n`
+    : "";
   const list = methods.map((m: any, i: number) => `*${i + 1}* — ${m.name}`).join("\n");
   pendingTxSetup.set(replyJid, {
     extracted,
@@ -1027,9 +1029,7 @@ async function resolvePaymentMethodStep(
     pendingFile,
     expiresAt: Date.now() + 10 * 60 * 1000,
   });
-  await sendReply(
-    `❓ Meio de pagamento *"${extracted.paymentMethodName}"* não encontrado.\n\nEscolha um cadastrado:\n\n${list}\n\n*0* — Pular`
-  );
+  await sendReply(`${notFoundNote}💳 *Qual o meio de pagamento?*\n\n${list}\n\n*0* — Pular`);
 }
 
 async function startTxSetupFlow(
