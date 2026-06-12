@@ -140,7 +140,7 @@ const pendingConfirmations = new Map<string, {
 }>();
 
 // Pré-confirmação: resolve entidade e meio de pagamento quando necessário
-type TxSetupStage = "awaiting_entity" | "awaiting_payment_method";
+type TxSetupStage = "awaiting_amount" | "awaiting_entity" | "awaiting_payment_method";
 const pendingTxSetup = new Map<string, {
   extracted: ExtractedTransaction;
   userId: number;
@@ -374,9 +374,9 @@ Entidades disponíveis: ${entitiesStr || "nenhuma"}
 Data de hoje: ${today}
 Cartões de crédito cadastrados: ${creditCardsStr}
 
-Retorne um JSON com os campos:
+Retorne UM ÚNICO objeto JSON (NUNCA um array) com os campos:
 - entityName: nome da entidade/centro de custo (string ou null)
-- amount: valor em reais como número decimal (ex: 150.50) — valor TOTAL, não por parcela
+- amount: valor em reais como número decimal (ex: 150.50) — valor TOTAL, não por parcela. Use null se o valor NÃO for mencionado (não invente 0)
 - date: data no formato YYYY-MM-DD (use hoje se não informado)
 - description: descrição curta da transação
 - type: "INCOME" para crédito/receita ou "EXPENSE" para débito/despesa
@@ -389,7 +389,8 @@ Retorne um JSON com os campos:
 - recurrenceCount: número de repetições se mencionado ("por 12 meses" → 12, "6 meses" → 6, "1 ano" → 12, "sempre/todo mês" → null)
 - confidence: número de 0 a 1 indicando confiança na extração
 
-Se não conseguir identificar um campo obrigatório (amount ou description), retorne null para o objeto inteiro.
+O único campo OBRIGATÓRIO é description. Se não houver uma descrição de transação, retorne null para o objeto inteiro.
+O valor (amount) pode ser null quando não mencionado — será perguntado depois. NÃO retorne null só porque o valor está ausente.
 Retorne APENAS o JSON, sem texto adicional.`,
         },
         {
@@ -407,13 +408,22 @@ Retorne APENAS o JSON, sem texto adicional.`,
     if (!content || typeof content !== "string") return null;
 
     const cleaned = content.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
-    const parsed = JSON.parse(cleaned) as ExtractedTransaction | null;
+    let parsed = JSON.parse(cleaned) as any;
 
-    if (!parsed || !parsed.amount || !parsed.description) {
+    // O LLM às vezes retorna um array de transações ou aninha em { transactions/transaction }
+    if (Array.isArray(parsed)) {
+      parsed = parsed[0] ?? null;
+    } else if (parsed && typeof parsed === "object" && !parsed.description) {
+      if (Array.isArray(parsed.transactions)) parsed = parsed.transactions[0] ?? null;
+      else if (parsed.transaction && typeof parsed.transaction === "object") parsed = parsed.transaction;
+    }
+
+    // Só a descrição é obrigatória — o valor (amount) é perguntado depois quando ausente
+    if (!parsed || typeof parsed !== "object" || !parsed.description) {
       console.warn(`[WhatsApp Bot] Extração descartada — amount=${parsed?.amount}, description=${parsed?.description}`);
       return { ok: false as const, reason: "no_transaction" as const };
     }
-    return { ok: true as const, data: parsed };
+    return { ok: true as const, data: parsed as ExtractedTransaction };
   } catch (error) {
     console.error("[WhatsApp Bot] Erro ao extrair transação:", error);
     return { ok: false as const, reason: "llm_error" as const };
@@ -932,6 +942,18 @@ Responda:
 type SendReplyFn = (txt: string) => Promise<void>;
 type PendingFileMeta = { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
 
+/** Converte texto digitado pelo usuário em valor numérico (aceita "100", "100,50", "R$ 1.000,50"). */
+function parseAmountInput(raw: string): number | null {
+  let s = raw.replace(/r\$/i, "").replace(/\s/g, "").trim();
+  if (!s) return null;
+  // Formato BR (1.000,50) → remove separador de milhar e troca vírgula decimal por ponto
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 async function goToConfirmation(
   replyJid: string,
   extracted: ExtractedTransaction,
@@ -1019,6 +1041,23 @@ async function startTxSetupFlow(
   userEntities: Array<{ id: number; name: string }>,
   pendingFile?: PendingFileMeta
 ) {
+  // Valor ausente — perguntar antes de prosseguir (não descarta a transação)
+  if (!extracted.amount || extracted.amount <= 0) {
+    pendingTxSetup.set(replyJid, {
+      extracted,
+      userId,
+      organizationId,
+      messageId,
+      stage: "awaiting_amount",
+      pendingFile,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+    await sendReply(
+      `💰 *Qual o valor?*\n\n_${extracted.description ?? "Transação"}_\n\nDigite o valor em reais (ex: *100* ou *100,50*) ou *0* para cancelar.`
+    );
+    return;
+  }
+
   // Resolver entidade
   let entityId = resolveEntityId(extracted.entityName, userEntities);
 
@@ -1581,6 +1620,23 @@ async function processIncomingMessage(
     if (setupText === "0" || setupText.toLowerCase().includes("cancel")) {
       pendingTxSetup.delete(replyJid);
       await sendReply(`❌ Operação cancelada.`);
+      return;
+    }
+
+    if (txSetup.stage === "awaiting_amount") {
+      const parsedAmount = parseAmountInput(setupText);
+      if (parsedAmount === null || parsedAmount <= 0) {
+        await sendReply(`❓ Não entendi o valor. Digite apenas o número (ex: *100* ou *100,50*) ou *0* para cancelar.`);
+        return;
+      }
+      pendingTxSetup.delete(replyJid);
+      const updatedExtracted = { ...txSetup.extracted, amount: parsedAmount };
+      const entities = await db.getEntitiesByUserId(txSetup.userId);
+      const userEntities = entities.map((e: any) => ({ id: e.id, name: e.name }));
+      await startTxSetupFlow(
+        replyJid, updatedExtracted, txSetup.userId, txSetup.organizationId,
+        txSetup.messageId, sendReply, userEntities, txSetup.pendingFile
+      );
       return;
     }
 
