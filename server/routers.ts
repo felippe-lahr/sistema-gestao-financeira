@@ -388,6 +388,14 @@ export const appRouter = router({
           },
         };
       }),
+
+    setDefault: protectedProcedure
+      .input(z.object({ id: z.number(), entityId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "EDITOR");
+        await db.setDefaultBankAccount(input.entityId, input.id);
+        return { success: true };
+      }),
   }),
 
   // ========== PAYMENT METHODS ==========
@@ -2666,6 +2674,15 @@ export const appRouter = router({
         await dbInstance.update(creditCards).set({ isActive: false, updatedAt: new Date() }).where(eq(creditCards.id, input.id));
         return { success: true };
       }),
+
+    setDefault: protectedProcedure
+      .input(z.object({ id: z.number(), entityId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "EDITOR");
+        await db.setDefaultCreditCard(input.entityId, input.id);
+        return { success: true };
+      }),
+
     getTransactionCount: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {

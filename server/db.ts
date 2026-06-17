@@ -874,6 +874,21 @@ export async function deleteBankAccount(accountId: number) {
   await db.delete(bankAccounts).where(eq(bankAccounts.id, accountId));
 }
 
+export async function setDefaultBankAccount(entityId: number, accountId: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Clear default on all accounts of this entity, then set on chosen one
+  await db.update(bankAccounts).set({ isDefault: false }).where(eq(bankAccounts.entityId, entityId));
+  await db.update(bankAccounts).set({ isDefault: true }).where(eq(bankAccounts.id, accountId));
+}
+
+export async function setDefaultCreditCard(entityId: number, cardId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(creditCards).set({ isDefault: false }).where(eq(creditCards.entityId, entityId));
+  await db.update(creditCards).set({ isDefault: true }).where(eq(creditCards.id, cardId));
+}
+
 // ========== PAYMENT METHOD OPERATIONS ==========
 
 export async function getPaymentMethodsByEntityId(entityId: number, userId?: number) {

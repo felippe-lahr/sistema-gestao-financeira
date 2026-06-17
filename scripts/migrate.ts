@@ -130,6 +130,14 @@ const migrations: { name: string; sql: string }[] = [
       "createdAt" timestamp DEFAULT now() NOT NULL
     )`,
   },
+  {
+    name: "add_isDefault_to_bank_accounts",
+    sql: `ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS "isDefault" boolean NOT NULL DEFAULT false`,
+  },
+  {
+    name: "add_isDefault_to_credit_cards",
+    sql: `ALTER TABLE credit_cards ADD COLUMN IF NOT EXISTS "isDefault" boolean NOT NULL DEFAULT false`,
+  },
 ];
 
 async function runMigrations() {

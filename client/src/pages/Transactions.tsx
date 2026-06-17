@@ -517,6 +517,16 @@ export default function Transactions() {
     setEditingTransaction(null);
   };
 
+  // Pre-select default bank account when create drawer opens
+  useEffect(() => {
+    if (isCreateOpen && bankAccounts) {
+      const def = bankAccounts.find((a: any) => a.isDefault);
+      if (def && !formData.bankAccountId) {
+        setFormData(prev => ({ ...prev, bankAccountId: String(def.id) }));
+      }
+    }
+  }, [isCreateOpen, bankAccounts]);
+
   const handleCreate = () => {
     if (!selectedEntityId) return;
 
@@ -1044,7 +1054,7 @@ export default function Transactions() {
           </Sheet>
           
           {canWrite && (
-          <Button className="w-full md:w-auto" onClick={() => setIsCreateOpen(true)}>
+          <Button className="w-full md:w-auto" onClick={() => { resetForm(); setIsCreateOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />
             Nova Transação
           </Button>

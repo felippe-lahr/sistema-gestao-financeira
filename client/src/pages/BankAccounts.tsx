@@ -39,6 +39,7 @@ import {
   Ban,
   Banknote,
   Landmark,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -265,6 +266,14 @@ function BankAccountsList({
     onError: (e) => toast.error("Erro ao excluir conta: " + e.message),
   });
 
+  const setDefaultMutation = trpc.bankAccounts.setDefault.useMutation({
+    onSuccess: () => {
+      utils.bankAccounts.listByEntity.invalidate();
+      toast.success("Conta padrão definida!");
+    },
+    onError: (e) => toast.error("Erro ao definir conta padrão: " + e.message),
+  });
+
   const resetForm = () =>
     setFormData({ name: "", bank: "", accountNumber: "", balance: "", color: "#2563EB", entityId });
 
@@ -420,6 +429,17 @@ function BankAccountsList({
 
                       {/* Ações */}
                       <div className="flex items-center gap-1">
+                        {canWrite && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-9 w-9 rounded-lg ${account.isDefault ? "text-yellow-500" : "text-gray-300 hover:text-yellow-400"}`}
+                            onClick={() => setDefaultMutation.mutate({ id: account.id, entityId })}
+                            title={account.isDefault ? "Conta padrão" : "Definir como padrão"}
+                          >
+                            <Star className={`h-4 w-4 ${account.isDefault ? "fill-yellow-500" : ""}`} />
+                          </Button>
+                        )}
                         {canWrite && (
                           <Button
                             variant="ghost"

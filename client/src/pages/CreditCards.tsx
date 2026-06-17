@@ -34,6 +34,7 @@ import {
   Loader2,
   Upload,
   Check,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -1107,6 +1108,13 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
     },
     onError: (err) => toast.error(err.message),
   });
+  const setDefaultMutation = trpc.creditCards.setDefault.useMutation({
+    onSuccess: () => {
+      utils.creditCards.listByEntity.invalidate({ entityId });
+      toast.success("Cartão padrão definido!");
+    },
+    onError: (err) => toast.error("Erro ao definir cartão padrão: " + err.message),
+  });
   const usagePercent = summary?.usagePercent ?? 0;
   const usedAmount = summary?.usedAmount ?? 0;
   const availableLimit = summary?.availableLimit ?? card.creditLimit;
@@ -1144,6 +1152,13 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold opacity-80 uppercase tracking-wider">{BRAND_LABELS[card.brand]}</span>
           <div className="flex gap-1">
+            <button
+              onClick={() => setDefaultMutation.mutate({ id: card.id, entityId })}
+              className="h-6 w-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              title={card.isDefault ? "Cartão padrão" : "Definir como padrão"}
+            >
+              <Star className={`h-3 w-3 ${card.isDefault ? "fill-yellow-300 text-yellow-300" : ""}`} />
+            </button>
             <button
               onClick={onEdit}
               className="h-6 w-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"

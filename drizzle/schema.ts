@@ -204,6 +204,7 @@ export const bankAccounts = pgTable("bank_accounts", {
   balance: integer("balance").default(0).notNull(), // Stored in cents
   color: varchar("color", { length: 7 }).default("#6B7280"),
   isActive: boolean("isActive").default(true).notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -798,6 +799,7 @@ export const creditCards = pgTable("credit_cards", {
   dueDay: integer("dueDay").default(10).notNull(),
   color: varchar("color", { length: 7 }).default("#7C3AED"),
   isActive: boolean("isActive").default(true).notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
