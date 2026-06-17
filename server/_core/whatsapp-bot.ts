@@ -1604,7 +1604,7 @@ async function processIncomingMessage(
 
         const statusLine = isComprovante ? `\n\n🟢 Status atualizado para *PAGO*` : "";
         await sendReply(
-          `✅ *${typeLabel} anexado com sucesso!*\n\n📝 ${chosen.description}\n💰 ${formatCurrency(chosen.amount)}\n📅 Vencimento: ${chosen.dueDate ?? "-"}${statusLine}`
+          `✅ *${typeLabel} anexado com sucesso!*\n\n📝 ${chosen.description}\n💰 ${formatCurrency(chosen.amount)}\n📅 Vencimento: ${chosen.dueDate ? new Date(chosen.dueDate).toLocaleDateString("pt-BR") : "-"}${statusLine}`
         );
       } catch (err) {
         console.error("[WhatsApp Bot] Erro ao salvar anexo:", err);
@@ -1699,10 +1699,12 @@ async function processIncomingMessage(
       try {
         const extracted = pending.extracted;
         const amountCents = Math.round((extracted.amount ?? 0) * 100);
+        // Data em UTC puro (sem conversão de fuso) para evitar que "26/06" vire "25/06"
+        // quando o servidor salva em UTC e o banco interpreta meia-noite local como véspera.
         const baseDate = extracted.date
           ? (() => {
               const [y, m, d] = extracted.date!.split("-").map(Number);
-              return new Date(y, m - 1, d);
+              return new Date(Date.UTC(y, m - 1, d, 12, 0, 0)); // meio-dia UTC = nunca muda de dia no Brasil
             })()
           : new Date();
 
@@ -1764,8 +1766,10 @@ async function processIncomingMessage(
         const firstInstallmentDate = getFirstInstallmentDate(baseDate);
         console.log(`[WhatsApp Bot] baseDate=${baseDate.toISOString()}, closingDay=${creditCard?.closingDay}, firstInstallmentDate=${firstInstallmentDate.toISOString()}`);
 
-        // Compras no cartão de crédito ficam PENDING (serão pagas na fatura)
-        const txStatus = creditCard ? "PENDING" : "PAID";
+        // Status: cartão → PENDING (pago via fatura); data futura → PENDING; passado/hoje → PAID
+        const today = new Date();
+        today.setUTCHours(12, 0, 0, 0); // normaliza para comparação sem influência de hora
+        const txStatus = (creditCard || baseDate > today) ? "PENDING" : "PAID";
 
         const basePayload = {
           entityId: pending.entityId,
@@ -1800,13 +1804,14 @@ async function processIncomingMessage(
           // Recorrência de valor variável (conta de consumo sem valor informado):
           // o 1º lançamento fica PENDENTE, sem data de pagamento, para preenchimento posterior.
           const isVariableRecurring = !!extracted.isRecurring && amountCents <= 0;
+          const finalStatus = (creditCard || isVariableRecurring) ? "PENDING" : txStatus;
           firstTransactionId = await db.createTransaction({
             ...basePayload,
             description,
             amount: amountCents,
-            status: (creditCard || isVariableRecurring) ? "PENDING" : "PAID",
+            status: finalStatus,
             dueDate: creditCard ? firstInstallmentDate : baseDate,
-            paymentDate: (creditCard || isVariableRecurring) ? undefined : new Date(),
+            paymentDate: finalStatus === "PAID" ? new Date() : undefined,
             isRecurring: extracted.isRecurring ?? false,
             recurrencePattern: extracted.isRecurring && extracted.recurrenceFrequency
               ? JSON.stringify({ frequency: extracted.recurrenceFrequency, interval: 1 })
