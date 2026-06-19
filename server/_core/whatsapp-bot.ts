@@ -29,6 +29,15 @@ import { users, whatsappMessages } from "../../drizzle/schema";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
+interface NormalizedIncomingMessage {
+  messageType: "text" | "audio" | "image" | "document";
+  text: string;
+  caption?: string;
+  mediaId?: string;
+  filename?: string;
+  mimeType?: string;
+}
+
 interface EvolutionWebhookPayload {
   event: string;
   instance: string;
@@ -221,110 +230,76 @@ function formatDate(dateStr: string): string {
 }
 
 /**
- * Envia mensagem de texto via Evolution API.
- * Responde para o JID/número informado (normalmente o remoteJid da conversa).
+ * Envia mensagem de texto via WhatsApp Cloud API.
  */
 async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
-  const evolutionUrl = process.env.EVOLUTION_API_URL;
-  const evolutionKey = process.env.EVOLUTION_API_KEY;
-  const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
-  if (!evolutionUrl || !evolutionKey) {
-    console.warn("[WhatsApp Bot] EVOLUTION_API_URL ou EVOLUTION_API_KEY não configurados");
+  if (!phoneNumberId || !accessToken) {
+    console.warn("[WhatsApp Bot] WHATSAPP_PHONE_NUMBER_ID ou WHATSAPP_ACCESS_TOKEN não configurados");
     return;
   }
 
+  const cleanTo = to.replace(/@.*$/, "").replace(/\D/g, "");
+
   try {
-    const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
-
-    // @s.whatsapp.net → envia direto; v2.3.7 roteia via OnWhatsappCache para @lid internamente
-    // @lid → envia direto (v2.3.7 bypass PR #2544); mas pode resultar em PENDING
-    // número puro → tenta resolver via Evolution API
-    let sendTo = to;
-    if (to.includes("@s.whatsapp.net")) {
-      sendTo = to;
-      console.log(`[WhatsApp Bot] Enviando para @s.whatsapp.net (routing cache v2.3.7): ${sendTo}`);
-    } else if (to.includes("@lid")) {
-      sendTo = to;
-      console.log(`[WhatsApp Bot] Enviando direto para @lid (v2.3.7 bypass): ${sendTo}`);
-    } else if (!to.includes("@")) {
-      const resolved = await resolveJidViaEvolution(to);
-      if (resolved) {
-        sendTo = resolved;
-        console.log(`[WhatsApp Bot] JID resolvido para ${to}: ${sendTo}`);
-      } else {
-        console.warn(`[WhatsApp Bot] Não foi possível resolver JID para ${to}, usando número puro`);
-      }
-    }
-
-    console.log(`[WhatsApp Bot] Enviando mensagem para: ${sendTo}`);
-
-    const response = await fetch(url, {
+    const response = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "apikey": evolutionKey,
+        "Authorization": `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ number: to, text }),
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanTo,
+        type: "text",
+        text: { preview_url: false, body: text },
+      }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      console.error(`[WhatsApp Bot] ❌ Falha ao enviar para ${to} — HTTP ${response.status}: ${errText}`);
+      console.error(`[WhatsApp Bot] ❌ Falha ao enviar para ${cleanTo} — HTTP ${response.status}: ${errText}`);
       return;
     }
 
-    const responseData = await response.json().catch(() => ({})) as { status?: string };
-    const msgStatus = responseData.status ?? "OK";
-
-    if (msgStatus === "PENDING") {
-      console.warn(`[WhatsApp Bot] ⚠️ PENDING para ${sendTo} — mensagem criada localmente mas sem ACK do servidor WhatsApp.`);
-      if (sendTo.includes("@s.whatsapp.net")) {
-        console.warn(`[WhatsApp Bot] 💡 Cache v2.3.7 pode não estar aquecido. Certifique-se de que o usuário enviou uma mensagem recente para acionar o cache (lid=lid).`);
-      }
-    } else {
-      console.log(`[WhatsApp Bot] ✅ Mensagem entregue para: ${sendTo} — status: ${msgStatus}`);
-    }
+    console.log(`[WhatsApp Bot] ✅ Mensagem enviada para: ${cleanTo}`);
   } catch (error) {
     console.error(`[WhatsApp Bot] Exceção ao enviar para ${to}:`, error);
   }
 }
 
 /**
- * Baixa mídia da Evolution API (áudio, imagem, documento)
+ * Baixa mídia da WhatsApp Cloud API pelo mediaId
  */
-async function downloadEvolutionMedia(
-  messageId: string,
-  instanceName: string
-): Promise<{ buffer: Buffer; mimeType: string } | null> {
-  const evolutionUrl = process.env.EVOLUTION_API_URL;
-  const evolutionKey = process.env.EVOLUTION_API_KEY;
-
-  if (!evolutionUrl || !evolutionKey) return null;
+async function downloadCloudMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  if (!accessToken) return null;
 
   try {
-    const url = `${evolutionUrl.replace(/\/$/, "")}/chat/getBase64FromMediaMessage/${instanceName}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": evolutionKey,
-      },
-      body: JSON.stringify({ message: { key: { id: messageId } } }),
+    const metaRes = await fetch(`https://graph.facebook.com/v20.0/${mediaId}`, {
+      headers: { "Authorization": `Bearer ${accessToken}` },
     });
-
-    if (!response.ok) {
-      console.error(`[WhatsApp Bot] Erro ao baixar mídia: ${response.status}`);
+    if (!metaRes.ok) {
+      console.error(`[WhatsApp Bot] Erro ao obter URL da mídia: ${metaRes.status}`);
       return null;
     }
+    const metaData = await metaRes.json() as { url?: string; mime_type?: string };
+    if (!metaData.url) return null;
 
-    const data = await response.json() as { base64?: string; mimetype?: string };
-    if (!data.base64) return null;
-
-    const buffer = Buffer.from(data.base64, "base64");
-    return { buffer, mimeType: data.mimetype || "audio/ogg" };
+    const mediaRes = await fetch(metaData.url, {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+    });
+    if (!mediaRes.ok) {
+      console.error(`[WhatsApp Bot] Erro ao baixar mídia: ${mediaRes.status}`);
+      return null;
+    }
+    const buffer = Buffer.from(await mediaRes.arrayBuffer());
+    return { buffer, mimeType: metaData.mime_type || "application/octet-stream" };
   } catch (error) {
-    console.error("[WhatsApp Bot] Erro ao baixar mídia:", error);
+    console.error("[WhatsApp Bot] Erro ao baixar mídia Cloud API:", error);
     return null;
   }
 }
@@ -982,20 +957,17 @@ async function showPendingTransactionsList(
 
 async function processIncomingMessage(
   fromPhone: string,
-  replyJid: string,
   messageId: string,
-  messageType: string,
-  payload: EvolutionWebhookPayload
+  msg: NormalizedIncomingMessage,
 ): Promise<void> {
-  // 1. Buscar usuário pelo número de WhatsApp ou pelo LID
+  // 1. Buscar usuário pelo número de WhatsApp
   const dbInstance = await getDb();
   if (!dbInstance) {
     console.error("[WhatsApp Bot] Database não disponível");
     return;
   }
 
-  // Deduplicação: a Evolution API às vezes entrega o mesmo messageId duas vezes
-  // (uma via @lid e outra via @s.whatsapp.net). Ignorar se já foi processado.
+  // Deduplicação: verificar se o messageId já foi processado no banco
   const existing = await dbInstance
     .select({ id: whatsappMessages.id })
     .from(whatsappMessages)
@@ -1006,30 +978,16 @@ async function processIncomingMessage(
     return;
   }
 
-  // v2.3.7 mapeia @lid → @s.whatsapp.net no webhook, mas preserva addressingMode: "lid"
-  const addressingMode = payload.data?.key?.addressingMode;
-  const isLid = replyJid.includes("@lid") || addressingMode === "lid";
-  console.log(`[WhatsApp Bot] Buscando usuário - fromPhone: ${fromPhone}, replyJid: ${replyJid}, isLid: ${isLid}, addressingMode: ${addressingMode}`);
+  console.log(`[WhatsApp Bot] Buscando usuário - fromPhone: ${fromPhone}`);
 
   let userResult: any[] = [];
 
-  // Primeiro tenta buscar pelo LID salvo (se for mensagem com LID)
-  if (isLid) {
-    userResult = await dbInstance
-      .select()
-      .from(users)
-      .where(eq(users.whatsappLid, replyJid))
-      .limit(1);
-  }
-
-  // Se não encontrou pelo LID, busca pelo número
-  if (userResult.length === 0) {
-    userResult = await dbInstance
-      .select()
-      .from(users)
-      .where(eq(users.whatsappPhone, fromPhone))
-      .limit(1);
-  }
+  // Busca pelo número
+  userResult = await dbInstance
+    .select()
+    .from(users)
+    .where(eq(users.whatsappPhone, fromPhone))
+    .limit(1);
 
   // Se ainda não encontrou, tentar com/sem o 55
   if (userResult.length === 0) {
@@ -1041,87 +999,29 @@ async function processIncomingMessage(
       .limit(1);
   }
 
-  // Se for LID e encontrou usuário pelo número, atualizar o LID salvo (pode ter mudado após reconexão)
-  if (userResult.length > 0 && isLid && userResult[0].whatsappLid !== replyJid) {
-    console.log(`[WhatsApp Bot] Atualizando LID: ${userResult[0].whatsappLid ?? "(vazio)"} → ${replyJid} para usuário ${userResult[0].id}`);
-    await dbInstance
-      .update(users)
-      .set({ whatsappLid: replyJid, updatedAt: new Date() })
-      .where(eq(users.id, userResult[0].id));
-    userResult[0].whatsappLid = replyJid;
-  }
-
-  // Se for LID e não encontrou por nenhum método, buscar QUALQUER usuário com whatsappPhone preenchido
-  // (workaround para quando o LID não corresponde ao número)
-  if (userResult.length === 0 && isLid) {
-    const { isNotNull } = await import("drizzle-orm");
-    userResult = await dbInstance
-      .select()
-      .from(users)
-      .where(isNotNull(users.whatsappPhone))
-      .limit(10);
-    
-    // Se só tem um usuário com WhatsApp vinculado, usar esse
-    if (userResult.length === 1) {
-      console.log(`[WhatsApp Bot] Único usuário com WhatsApp vinculado: ${userResult[0].id}, auto-vinculando LID`);
-      await dbInstance
-        .update(users)
-        .set({ whatsappLid: replyJid, updatedAt: new Date() })
-        .where(eq(users.id, userResult[0].id));
-    } else {
-      // Múltiplos usuários - não consegue determinar qual é
-      userResult = [];
-    }
-  }
-
   if (userResult.length === 0) {
-    console.log(`[WhatsApp Bot] Usuário não encontrado para fromPhone=${fromPhone}, replyJid=${replyJid}`);
-    // Enviar para o número do próprio bot como fallback (não vai funcionar para LID)
-    // Não enviar nada se for LID pois vai dar erro
-    if (!isLid) {
-      await sendWhatsAppMessage(
-        replyJid,
-        `⚠️ Seu número não está vinculado ao SGF.\n\nPara vincular, acesse *Perfil → WhatsApp Bot* no sistema e siga as instruções.`
-      );
-    }
+    console.log(`[WhatsApp Bot] Usuário não encontrado para fromPhone=${fromPhone}`);
+    await sendWhatsAppMessage(
+      fromPhone,
+      `⚠️ Seu número não está vinculado ao SGF.\n\nPara vincular, acesse *Perfil → WhatsApp Bot* no sistema e siga as instruções.`
+    );
     return;
   }
 
   const user = userResult[0];
-
-  // Destino de envio:
-  // - @lid (isLid=true): usa @s.whatsapp.net para aproveitar OnWhatsappCache do v2.3.7.
-  //   Quando a Evolution API recebe mensagem de conta @lid, ela popula o cache
-  //   com lid=lid para aquele número. Enviar para @s.whatsapp.net logo depois
-  //   faz o v2.3.7 roteá-la internamente via @lid (confirmado: status 1/SERVER_ACK nos logs).
-  //   Enviar direto ao @lid resulta em PENDING mesmo no v2.3.7.
-  // - normal: usa número de telefone puro para resolução via Evolution API
-  let sendTarget: string;
-  if (isLid && user.whatsappPhone) {
-    sendTarget = `${user.whatsappPhone}@s.whatsapp.net`;
-    console.log(`[WhatsApp Bot] LID mode — enviando para @s.whatsapp.net via cache v2.3.7: ${sendTarget}`);
-  } else if (isLid && replyJid.includes("@s.whatsapp.net")) {
-    sendTarget = replyJid;
-    console.log(`[WhatsApp Bot] LID mode — usando replyJid @s.whatsapp.net: ${sendTarget}`);
-  } else if (user.whatsappPhone) {
-    sendTarget = user.whatsappPhone;
-  } else {
-    sendTarget = replyJid;
-  }
+  const replyJid = fromPhone;
+  const sendTarget = user.whatsappPhone || fromPhone;
 
   const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt);
 
   // 2. Verificar se há fluxo de anexo pendente
   const pendingAttach = pendingAttachments.get(replyJid);
   if (pendingAttach && Date.now() < pendingAttach.expiresAt) {
-    const messageType = payload.data?.messageType ?? "conversation";
-    let responseText = payload.data.message?.conversation ||
-      payload.data.message?.extendedTextMessage?.text || "";
+    let responseText = msg.text || "";
 
     // Transcrever voz se necessário
-    if ((messageType === "audioMessage" || messageType === "pttMessage") && !responseText) {
-      const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-      const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+    if (msg.messageType === "audio" && !responseText) {
+      const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
       if (mediaData) {
         const tr = await transcribeAudioWithGemini(mediaData.buffer, mediaData.mimeType);
         if (tr.ok) responseText = tr.text;
@@ -1407,8 +1307,7 @@ async function processIncomingMessage(
   // 3a. Verificar se há seleção de tipo de documento pendente (após criação de transação)
   const pendingDocType = pendingDocumentType.get(replyJid);
   if (pendingDocType && Date.now() < pendingDocType.expiresAt) {
-    const docTypeText = (payload.data.message?.conversation ||
-      payload.data.message?.extendedTextMessage?.text || "").trim();
+    const docTypeText = (msg.text || "").trim();
 
     if (docTypeText === "0" || docTypeText.toLowerCase().includes("cancel")) {
       pendingDocumentType.delete(replyJid);
@@ -1454,8 +1353,7 @@ async function processIncomingMessage(
   }
 
   // 3. Verificar se é uma resposta de confirmação pendente
-  const text = payload.data.message?.conversation ||
-    payload.data.message?.extendedTextMessage?.text || "";
+  const text = msg.text || "";
 
   const pending = pendingConfirmations.get(replyJid);
 
@@ -1705,11 +1603,10 @@ async function processIncomingMessage(
   let mediaUrl: string | null = null;
 
   // ── Processar áudio ──────────────────────────────────────────────────────────
-  if (messageType === "audioMessage" || messageType === "pttMessage") {
+  if (msg.messageType === "audio") {
     await sendReply(`🎙️ Transcrevendo seu áudio...`);
 
-    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-    const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+    const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
 
     if (!mediaData) {
       await sendReply(`❌ Não consegui baixar o áudio. Tente novamente.`);
@@ -1751,11 +1648,10 @@ async function processIncomingMessage(
   }
 
   // ── Processar imagem (comprovante) ───────────────────────────────────────────
-  else if (messageType === "imageMessage") {
+  else if (msg.messageType === "image") {
     await sendReply(`📎 Documento recebido! Fazendo upload...`);
 
-    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-    const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+    const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
 
     if (!mediaData) {
       await sendReply(`❌ Não consegui baixar a imagem. Tente novamente.`);
@@ -1808,21 +1704,20 @@ async function processIncomingMessage(
   }
 
   // ── Processar texto ──────────────────────────────────────────────────────────
-  else if (messageType === "conversation" || messageType === "extendedTextMessage") {
+  else if (msg.messageType === "text") {
     if (!text.trim()) return;
     extractedText = text.trim();
   }
 
   // ── Processar documento (PDF) ────────────────────────────────────────────────
-  else if (messageType === "documentMessage") {
-    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-    const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+  else if (msg.messageType === "document") {
+    const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
     if (!mediaData) {
       await sendReply(`❌ Não consegui baixar o documento. Tente novamente.`);
       return;
     }
     let docUrl: string | null = null;
-    let docFilename = `whatsapp-doc-${Date.now()}.pdf`;
+    let docFilename = msg.filename || `whatsapp-doc-${Date.now()}.pdf`;
     try {
       if (isS3Configured()) {
         docUrl = await uploadToS3(mediaData.buffer, docFilename, mediaData.mimeType, "whatsapp");
@@ -1910,113 +1805,76 @@ async function processIncomingMessage(
 
 export function registerWhatsAppBotRoutes(app: Express): void {
 
-  // ── GET /api/whatsapp/test?to=5511... — Testa envio direto via Evolution API ──
+  // ── GET /api/whatsapp/test?to=5511... — Testa envio via Cloud API ──────────────
   app.get("/api/whatsapp/test", async (req: Request, res: Response) => {
-    const evolutionUrl = process.env.EVOLUTION_API_URL;
-    const evolutionKey = process.env.EVOLUTION_API_KEY;
-    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
     const to = (req.query.to as string) || "5511947728157";
-
-    const results: Record<string, unknown> = {};
-
-    // 0. Estado real da conexão Baileys
-    try {
-      const stateUrl = `${evolutionUrl?.replace(/\/$/, "")}/instance/connectionState/${instanceName}`;
-      const stateResp = await fetch(stateUrl, {
-        headers: { "apikey": evolutionKey! },
-      });
-      results.connectionState = { status: stateResp.status, body: await stateResp.json().catch(() => stateResp.text()) };
-    } catch (e) {
-      results.connectionState = { error: String(e) };
-    }
-
-    // 1. Testa envio de mensagem
-    try {
-      const sendUrl = `${evolutionUrl?.replace(/\/$/, "")}/message/sendText/${instanceName}`;
-      const sendResp = await fetch(sendUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": evolutionKey! },
-        body: JSON.stringify({ number: to, text: "🧪 Teste de envio SGF — " + new Date().toISOString() }),
-      });
-      results.send = { status: sendResp.status, body: await sendResp.json().catch(() => sendResp.text()) };
-    } catch (e) {
-      results.send = { error: String(e) };
-    }
-
-    // 2. Consulta JID do número via whatsappNumbers
-    try {
-      const checkUrl = `${evolutionUrl?.replace(/\/$/, "")}/chat/whatsappNumbers/${instanceName}`;
-      const checkResp = await fetch(checkUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": evolutionKey! },
-        body: JSON.stringify({ numbers: [to] }),
-      });
-      results.whatsappNumbers = { status: checkResp.status, body: await checkResp.json().catch(() => checkResp.text()) };
-    } catch (e) {
-      results.whatsappNumbers = { error: String(e) };
-    }
-
-    // 3. Se o parâmetro 'lid' for passado, testa envio direto ao @lid
-    const lidParam = req.query.lid as string | undefined;
-    if (lidParam) {
-      try {
-        const sendUrl = `${evolutionUrl?.replace(/\/$/, "")}/message/sendText/${instanceName}`;
-        const sendResp = await fetch(sendUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "apikey": evolutionKey! },
-          body: JSON.stringify({ number: lidParam, text: "🧪 Teste @lid direto — " + new Date().toISOString() }),
-        });
-        results.sendLid = { number: lidParam, status: sendResp.status, body: await sendResp.json().catch(() => sendResp.text()) };
-      } catch (e) {
-        results.sendLid = { error: String(e) };
-      }
-    }
-
-    return res.json(results);
+    await sendWhatsAppMessage(to, "🧪 Teste de envio SGF — " + new Date().toISOString());
+    return res.json({ ok: true, to });
   });
 
-  // ── POST /api/whatsapp/webhook — Recebe eventos da Evolution API ──────────────
+  // ── GET /api/whatsapp/webhook — Verificação do webhook pelo Meta ──────────────
+  app.get("/api/whatsapp/webhook", (req: Request, res: Response) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+    const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+
+    if (mode === "subscribe" && token === verifyToken) {
+      console.log("[WhatsApp Bot] Webhook verificado pelo Meta");
+      return res.status(200).send(challenge);
+    }
+    console.warn("[WhatsApp Bot] Falha na verificação do webhook — token inválido");
+    return res.status(403).json({ error: "Verificação falhou" });
+  });
+
+  // ── POST /api/whatsapp/webhook — Recebe eventos da Meta Cloud API ─────────────
   app.post("/api/whatsapp/webhook", async (req: Request, res: Response) => {
-    // Responder imediatamente para não bloquear a Evolution API
     res.status(200).json({ ok: true });
 
     try {
-      const payload = req.body as EvolutionWebhookPayload;
+      const body = req.body as any;
+      if (body.object !== "whatsapp_business_account") return;
 
-      // Processar apenas mensagens recebidas (não enviadas pelo bot)
-      // A Evolution API v2 envia eventos em maiúsculas (MESSAGES_UPSERT)
-      // enquanto versões anteriores usavam minúsculas (messages.upsert)
-      const eventNorm = (payload.event ?? "").toLowerCase().replace(/_/g, ".");
-      if (eventNorm !== "messages.upsert") return;
-      if (payload.data?.key?.fromMe === true) return;
+      for (const entry of (body.entry ?? [])) {
+        for (const change of (entry.changes ?? [])) {
+          if (change.field !== "messages") continue;
+          const value = change.value;
+          if (!value?.messages?.length) continue;
 
-      const remoteJid = payload.data?.key?.remoteJid ?? "";
-      const messageId = payload.data?.key?.id ?? "";
+          for (const message of value.messages) {
+            const messageId = message.id as string;
+            const fromPhone = message.from as string;
 
-      // Ignorar mensagens de grupos
-      if (remoteJid.includes("@g.us")) return;
+            if (!messageId || !fromPhone) continue;
+            if (!markMessageSeen(messageId)) {
+              console.log(`[WhatsApp Bot] Duplicata ignorada: ${messageId}`);
+              continue;
+            }
 
-      // Log do objeto key COMPLETO para descobrir onde vem o @lid real do remetente
-      console.log(`[WhatsApp Bot] key bruto: ${JSON.stringify(payload.data?.key)}`);
+            console.log(`[WhatsApp Bot] Mensagem recebida - from: ${fromPhone}, type: ${message.type}, id: ${messageId}`);
 
-      // Dedup atômico em memória ANTES de processar (evita envio duplicado)
-      if (!messageId || !markMessageSeen(messageId)) {
-        if (messageId) console.log(`[WhatsApp Bot] Duplicata ignorada no webhook: ${messageId}`);
-        return;
+            const msgType = message.type as string;
+            let normalized: NormalizedIncomingMessage;
+
+            if (msgType === "text") {
+              normalized = { messageType: "text", text: message.text?.body ?? "" };
+            } else if (msgType === "audio") {
+              normalized = { messageType: "audio", text: "", mediaId: message.audio?.id, mimeType: message.audio?.mime_type };
+            } else if (msgType === "image") {
+              normalized = { messageType: "image", text: "", mediaId: message.image?.id, caption: message.image?.caption, mimeType: message.image?.mime_type };
+            } else if (msgType === "document") {
+              normalized = { messageType: "document", text: "", mediaId: message.document?.id, caption: message.document?.caption, filename: message.document?.filename, mimeType: message.document?.mime_type };
+            } else {
+              console.log(`[WhatsApp Bot] Tipo de mensagem não suportado: ${msgType}`);
+              continue;
+            }
+
+            processIncomingMessage(fromPhone, messageId, normalized).catch(err => {
+              console.error("[WhatsApp Bot] Erro ao processar mensagem:", err);
+            });
+          }
+        }
       }
-
-      const fromPhone = normalizePhone(remoteJid);
-      const replyJid = getReplyJid(remoteJid);
-      const messageType = payload.data?.messageType ?? "conversation";
-
-      console.log(`[WhatsApp Bot] Mensagem recebida - remoteJid: ${remoteJid}, fromPhone: ${fromPhone}, replyJid: ${replyJid}`);
-
-      if (!fromPhone) return;
-
-      // Processar em background para não bloquear
-      processIncomingMessage(fromPhone, replyJid, messageId, messageType, payload).catch(err => {
-        console.error("[WhatsApp Bot] Erro ao processar mensagem:", err);
-      });
     } catch (error) {
       console.error("[WhatsApp Bot] Erro no webhook:", error);
     }
