@@ -167,6 +167,24 @@ function getReplyJid(remoteJid: string): string {
 }
 
 /**
+ * Normaliza uma mensagem recebida da Cloud API para formato interno
+ */
+function normalizeCloudMessage(message: any): NormalizedIncomingMessage {
+  const msgType = message.type as string;
+  if (msgType === "text") {
+    return { messageType: "text", text: message.text?.body ?? "" };
+  } else if (msgType === "audio") {
+    return { messageType: "audio", text: "", mediaId: message.audio?.id, mimeType: message.audio?.mime_type };
+  } else if (msgType === "image") {
+    return { messageType: "image", text: message.image?.caption ?? "", mediaId: message.image?.id, caption: message.image?.caption, mimeType: message.image?.mime_type };
+  } else if (msgType === "document") {
+    return { messageType: "document", text: message.document?.caption ?? "", mediaId: message.document?.id, caption: message.document?.caption, filename: message.document?.filename, mimeType: message.document?.mime_type };
+  }
+  // Fallback: tratar como texto vazio
+  return { messageType: "text", text: "" };
+}
+
+/**
  * Formata valor em centavos para BRL
  */
 function formatCurrency(cents: number): string {
@@ -1075,7 +1093,7 @@ async function processIncomingMessage(
     return;
   }
 
-  // Deduplicação: verificar se o messageId já foi processado no banco
+  // Deduplicação: ignorar se já foi processado.
   const existing = await dbInstance
     .select({ id: whatsappMessages.id })
     .from(whatsappMessages)
@@ -1088,16 +1106,13 @@ async function processIncomingMessage(
 
   console.log(`[WhatsApp Bot] Buscando usuário - fromPhone: ${fromPhone}`);
 
-  let userResult: any[] = [];
-
-  // Busca pelo número
-  userResult = await dbInstance
+  let userResult: any[] = await dbInstance
     .select()
     .from(users)
     .where(eq(users.whatsappPhone, fromPhone))
     .limit(1);
 
-  // Se ainda não encontrou, tentar com/sem o 55
+  // Tentar com/sem o prefixo 55 do Brasil
   if (userResult.length === 0) {
     const altPhone = fromPhone.startsWith("55") ? fromPhone.slice(2) : "55" + fromPhone;
     userResult = await dbInstance
@@ -1117,19 +1132,18 @@ async function processIncomingMessage(
   }
 
   const user = userResult[0];
-  const replyJid = fromPhone;
   const sendTarget = user.whatsappPhone || fromPhone;
-
+  const messageType = msg.messageType;
   const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt);
 
   // 2. Verificar se há fluxo de anexo pendente
-  const pendingAttach = pendingAttachments.get(replyJid);
+  const pendingAttach = pendingAttachments.get(fromPhone);
   if (pendingAttach && Date.now() < pendingAttach.expiresAt) {
-    let responseText = msg.text || "";
+    let responseText = msg.text;
 
     // Transcrever voz se necessário
-    if (msg.messageType === "audio" && !responseText) {
-      const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
+    if (messageType === "audio" && !responseText && msg.mediaId) {
+      const mediaData = await downloadCloudMedia(msg.mediaId);
       if (mediaData) {
         const tr = await transcribeAudioWithGemini(mediaData.buffer, mediaData.mimeType);
         if (tr.ok) responseText = tr.text;
@@ -1140,9 +1154,9 @@ async function processIncomingMessage(
 
     if (pendingAttach.stage === "awaiting_mode") {
       if (trimmed === "1") {
-        // Nova transação — pedir descrição por voz ou texto
-        pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_description" });
-        await sendReply(`📎 Documento guardado!\n\nDescreva a transação por *voz* ou *texto*.\nEx: _"Paguei 150 reais de mercado hoje"_\n\n*0* — Cancelar`);
+        // Nova transação — pedir descrição por voz/texto (documento será anexado automaticamente)
+        pendingAttachments.set(fromPhone, { ...pendingAttach, stage: "awaiting_description" });
+        await sendReply(`📎 Documento guardado!\n\nDescreva a transação por *voz* ou *texto* que ela será criada com o documento já anexado.\n\n*0* — Cancelar`);
         return;
       }
 
@@ -1150,7 +1164,7 @@ async function processIncomingMessage(
         // Anexar a transação existente — verificar se há múltiplas entidades
         const allEntities = await db.getEntitiesByUserId(pendingAttach.userId);
         if (allEntities.length === 0) {
-          pendingAttachments.delete(replyJid);
+          pendingAttachments.delete(fromPhone);
           await sendReply(`⚠️ Nenhuma entidade encontrada. Cadastre uma entidade no sistema.`);
           return;
         }
@@ -1158,7 +1172,7 @@ async function processIncomingMessage(
         if (allEntities.length > 1) {
           // Múltiplas entidades: pedir para escolher
           const listStr = allEntities.map((e: { id: number; name: string }, i: number) => `*${i + 1}* — ${e.name}`).join("\n");
-          pendingAttachments.set(replyJid, {
+          pendingAttachments.set(fromPhone, {
             ...pendingAttach,
             stage: "awaiting_entity",
             entities: allEntities,
@@ -1168,82 +1182,58 @@ async function processIncomingMessage(
         }
 
         // Entidade única: pedir mês
-        pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_month", entityId: allEntities[0].id });
+        pendingAttachments.set(fromPhone, { ...pendingAttach, stage: "awaiting_month", entityId: allEntities[0].id });
         await sendReply(`📅 *Qual o mês de vencimento?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
         return;
       }
 
       // Cancelar
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
     }
 
+    // Extração falhou — usuário descreveu por voz/texto → criar transação e anexar o arquivo
     if (pendingAttach.stage === "awaiting_description") {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
-
-      // Transcrever voz já foi feito acima; usar responseText como descrição
-      if (!trimmed) {
-        await sendReply(`❓ Não recebi a descrição. Envie por *voz* ou *texto*, ou *0* para cancelar.`);
+      if (!responseText.trim()) {
+        await sendReply(`🎙️ Por favor, descreva a transação por voz ou texto.`);
         return;
       }
-
-      // Extrair transação do texto/voz
-      const orgForDesc = await db.getOrFirstOrganizationForUser(user.id);
-      const entitiesForDesc = await db.getEntitiesByUserId(user.id);
-      const defEntityId = entitiesForDesc[0]?.id;
-      const [catsForDesc, cardsForDesc] = await Promise.all([
-        db.getCategoriesByEntityId(defEntityId, user.id).catch(() => [] as { name: string; type: string }[]),
-        db.getCreditCardsByEntityId(defEntityId, user.id).catch(() => [] as { name: string }[]),
+      const org = await db.getOrFirstOrganizationForUser(user.id);
+      const userEntities = await db.getEntitiesByUserId(user.id);
+      const defaultEntityId = userEntities[0]?.id;
+      const [categoriesList, creditCardsList] = await Promise.all([
+        db.getCategoriesByEntityId(defaultEntityId, user.id).catch(() => []),
+        db.getCreditCardsByEntityId(defaultEntityId, user.id).catch(() => []),
       ]);
-
       await sendReply(`🤔 Processando...`);
-      const extractionResult = await extractTransactionFromText(trimmed, entitiesForDesc, catsForDesc, cardsForDesc).catch(() => null);
-
+      const extractionResult = await extractTransactionFromText(responseText.trim(), userEntities, categoriesList, creditCardsList).catch(() => null);
       if (!extractionResult || !extractionResult.ok) {
-        await sendReply(
-          `❌ Não consegui identificar uma transação na sua mensagem.\n\nTente ser mais específico, por exemplo:\n_"Paguei 150 reais de mercado hoje"_\n_"Recebi 2000 de aluguel"_`
-        );
+        const reason = extractionResult && (extractionResult as any).reason;
+        if (reason === "llm_error") {
+          await sendReply(`⏳ Serviço de IA temporariamente indisponível. Aguarde alguns instantes e tente novamente.`);
+        } else {
+          await sendReply(`❌ Não consegui entender a transação.\n\nTente ser mais específico, por exemplo:\n_"Paguei 48,80 de padaria hoje"_\n\nOu *0* para cancelar.`);
+        }
         return;
       }
-
-      const extractedDesc = extractionResult.data;
-      const entityIdDesc = resolveEntityId(extractedDesc.entityName, entitiesForDesc);
-      if (!entityIdDesc) {
-        await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
-        return;
-      }
-
-      const entityNameDesc = entitiesForDesc.find(e => e.id === entityIdDesc)?.name ?? "Entidade";
-
-      pendingAttachments.delete(replyJid);
-      pendingConfirmations.set(replyJid, {
-        extracted: extractedDesc,
-        userId: user.id,
-        organizationId: orgForDesc?.id ?? null,
-        entityId: entityIdDesc,
-        messageId,
-        expiresAt: Date.now() + 10 * 60 * 1000,
-        pendingFile: {
-          mediaUrl: pendingAttach.mediaUrl,
-          mimeType: pendingAttach.mimeType,
-          filename: pendingAttach.filename,
-          fileSize: pendingAttach.fileSize,
-        },
-      });
-      await sendReply(buildConfirmationMessage(extractedDesc, entityNameDesc));
+      const extracted = extractionResult.data;
+      const pendingFileMeta = { mediaUrl: pendingAttach.mediaUrl, mimeType: pendingAttach.mimeType, filename: pendingAttach.filename, fileSize: pendingAttach.fileSize };
+      pendingAttachments.delete(fromPhone);
+      await startTxSetupFlow(fromPhone, extracted, user.id, org?.id ?? null, messageId, sendReply, userEntities, pendingFileMeta);
       return;
     }
 
     if (pendingAttach.stage === "awaiting_entity" && pendingAttach.entities) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1255,14 +1245,14 @@ async function processIncomingMessage(
         return;
       }
 
-      pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_month", entityId: chosenEntity.id });
+      pendingAttachments.set(fromPhone, { ...pendingAttach, stage: "awaiting_month", entityId: chosenEntity.id });
       await sendReply(`📅 *Qual o mês de vencimento?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
       return;
     }
 
     if (pendingAttach.stage === "awaiting_month") {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1273,13 +1263,13 @@ async function processIncomingMessage(
         return;
       }
 
-      await showPendingTransactionsList(replyJid, pendingAttach, pendingAttach.entityId, parsed.month, parsed.year, sendReply);
+      await showPendingTransactionsList(fromPhone, pendingAttach, pendingAttach.entityId, parsed.month, parsed.year, sendReply);
       return;
     }
 
     if (pendingAttach.stage === "awaiting_match_confirm" && pendingAttach.transactions) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1291,7 +1281,7 @@ async function processIncomingMessage(
         return;
       }
 
-      pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_type", selectedTransaction: chosen });
+      pendingAttachments.set(fromPhone, { ...pendingAttach, stage: "awaiting_type", selectedTransaction: chosen });
       await sendReply(
         `🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
       );
@@ -1300,7 +1290,7 @@ async function processIncomingMessage(
 
     if (pendingAttach.stage === "awaiting_type" && pendingAttach.selectedTransaction) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1318,7 +1308,7 @@ async function processIncomingMessage(
       }
 
       const chosen = pendingAttach.selectedTransaction;
-      pendingAttachments.delete(replyJid);
+      pendingAttachments.delete(fromPhone);
 
       try {
         const isComprovante = attachType === "COMPROVANTE_PAGAMENTO";
@@ -1326,11 +1316,11 @@ async function processIncomingMessage(
 
         // Fatura de cartão de crédito — salva em credit_card_invoice_attachments
         if ((chosen as any).isCreditCard && (chosen as any).creditCardId) {
-          const { sql: sqlTag } = await import("drizzle-orm");
-          const { creditCardInvoices, creditCardInvoiceAttachments } = await import("../drizzle/schema");
-          const { eq, and } = await import("drizzle-orm");
-          const rawDb = await import("../db").then(m => m.getDb());
+          const rawDb = await getDb();
           if (rawDb) {
+            const { creditCardInvoices, creditCardInvoiceAttachments } = await import("../../drizzle/schema");
+            const { eq: eqOp, and } = await import("drizzle-orm");
+            const { sql: sqlTag } = await import("drizzle-orm");
             const cardId: number = (chosen as any).creditCardId;
             const invoiceMonth: number = (chosen as any).invoiceMonth;
             const invoiceYear: number = (chosen as any).invoiceYear;
@@ -1338,9 +1328,9 @@ async function processIncomingMessage(
             // Buscar ou criar registro da fatura
             let [invoice] = await rawDb.select().from(creditCardInvoices)
               .where(and(
-                eq(creditCardInvoices.creditCardId, cardId),
-                eq(creditCardInvoices.month, invoiceMonth),
-                eq(creditCardInvoices.year, invoiceYear),
+                eqOp(creditCardInvoices.creditCardId, cardId),
+                eqOp(creditCardInvoices.month, invoiceMonth),
+                eqOp(creditCardInvoices.year, invoiceYear),
               )).limit(1);
 
             if (!invoice) {
@@ -1378,7 +1368,6 @@ async function processIncomingMessage(
               );
             }
           }
-
           const statusLine = isComprovante ? `\n\n🟢 Fatura marcada como *PAGA*` : "";
           await sendReply(
             `✅ *${typeLabel} da ${chosen.description} salvo!*\n\n💰 ${formatCurrency(chosen.amount)}${statusLine}`
@@ -1402,7 +1391,7 @@ async function processIncomingMessage(
 
         const statusLine = isComprovante ? `\n\n🟢 Status atualizado para *PAGO*` : "";
         await sendReply(
-          `✅ *${typeLabel} anexado com sucesso!*\n\n📝 ${chosen.description}\n💰 ${formatCurrency(chosen.amount)}\n📅 Vencimento: ${chosen.dueDate ?? "-"}${statusLine}`
+          `✅ *${typeLabel} anexado com sucesso!*\n\n📝 ${chosen.description}\n💰 ${formatCurrency(chosen.amount)}\n📅 Vencimento: ${chosen.dueDate ? new Date(chosen.dueDate).toLocaleDateString("pt-BR") : "-"}${statusLine}`
         );
       } catch (err) {
         console.error("[WhatsApp Bot] Erro ao salvar anexo:", err);
@@ -1412,73 +1401,94 @@ async function processIncomingMessage(
     }
   }
 
-  // 3a. Verificar se há seleção de tipo de documento pendente (após criação de transação)
-  const pendingDocType = pendingDocumentType.get(replyJid);
-  if (pendingDocType && Date.now() < pendingDocType.expiresAt) {
-    const docTypeText = (msg.text || "").trim();
+  // 2c. Verificar setup pré-confirmação (entidade / meio de pagamento)
+  const txSetup = pendingTxSetup.get(fromPhone);
+  if (txSetup && Date.now() < txSetup.expiresAt) {
+    const setupText = msg.text.trim();
 
-    if (docTypeText === "0" || docTypeText.toLowerCase().includes("cancel")) {
-      pendingDocumentType.delete(replyJid);
-      await sendReply(`❌ Documento não anexado.`);
+    if (setupText === "0" || setupText.toLowerCase().includes("cancel")) {
+      pendingTxSetup.delete(fromPhone);
+      await sendReply(`❌ Operação cancelada.`);
       return;
     }
 
-    const docTypeMap: Record<string, string> = {
-      "1": "COMPROVANTE_PAGAMENTO",
-      "2": "BOLETO",
-      "3": "NOTA_FISCAL",
-      "4": "DOCUMENTOS",
-    };
-    const chosenDocType = docTypeMap[docTypeText];
-    if (!chosenDocType) {
-      await sendReply(`❓ Responda com 1, 2, 3 ou 4 para escolher o tipo, ou *0* para cancelar.`);
-      return;
-    }
-
-    pendingDocumentType.delete(replyJid);
-    try {
-      await db.createAttachment({
-        transactionId: pendingDocType.transactionId,
-        filename: pendingDocType.filename,
-        blobUrl: pendingDocType.mediaUrl,
-        fileSize: pendingDocType.fileSize,
-        mimeType: pendingDocType.mimeType,
-        type: chosenDocType,
-      } as any);
-
-      if (chosenDocType === "COMPROVANTE_PAGAMENTO") {
-        await db.updateTransaction(pendingDocType.transactionId, { status: "PAID", paymentDate: new Date() } as any);
+    if (txSetup.stage === "awaiting_amount") {
+      const parsedAmount = parseAmountInput(setupText);
+      if (parsedAmount === null || parsedAmount <= 0) {
+        await sendReply(`❓ Não entendi o valor. Digite apenas o número (ex: *100* ou *100,50*) ou *0* para cancelar.`);
+        return;
       }
-
-      const typeLabel = ATTACHMENT_TYPE_LABELS[chosenDocType] ?? chosenDocType;
-      const statusLine = chosenDocType === "COMPROVANTE_PAGAMENTO" ? `\n🟢 Status atualizado para *PAGO*` : "";
-      await sendReply(`✅ *${typeLabel} anexado com sucesso!*${statusLine}`);
-    } catch (err) {
-      console.error("[WhatsApp Bot] Erro ao salvar anexo de tipo:", err);
-      await sendReply(`❌ Erro ao salvar o documento. Tente novamente.`);
+      pendingTxSetup.delete(fromPhone);
+      const updatedExtracted = { ...txSetup.extracted, amount: parsedAmount };
+      const entities = await db.getEntitiesByUserId(txSetup.userId);
+      const userEntities = entities.map((e: any) => ({ id: e.id, name: e.name }));
+      await startTxSetupFlow(
+        fromPhone, updatedExtracted, txSetup.userId, txSetup.organizationId,
+        txSetup.messageId, sendReply, userEntities, txSetup.pendingFile
+      );
+      return;
     }
-    return;
+
+    if (txSetup.stage === "awaiting_entity" && txSetup.entityOptions) {
+      const idx = parseInt(setupText, 10) - 1;
+      const chosen = txSetup.entityOptions[idx];
+      if (!chosen) {
+        await sendReply(`❓ Responda com o número da entidade ou *0* para cancelar.`);
+        return;
+      }
+      pendingTxSetup.delete(fromPhone);
+      await resolvePaymentMethodStep(
+        fromPhone, txSetup.extracted, txSetup.userId, txSetup.organizationId,
+        chosen.id, txSetup.messageId, sendReply, txSetup.pendingFile
+      );
+      return;
+    }
+
+    if (txSetup.stage === "awaiting_payment_method" && txSetup.paymentMethodOptions) {
+      if (setupText === "0" || setupText.toLowerCase() === "pular") {
+        pendingTxSetup.delete(fromPhone);
+        await goToConfirmation(
+          fromPhone, txSetup.extracted, txSetup.userId, txSetup.organizationId,
+          txSetup.entityId!, txSetup.messageId, sendReply, txSetup.pendingFile, undefined, undefined
+        );
+        return;
+      }
+      const idx = parseInt(setupText, 10) - 1;
+      const chosen = txSetup.paymentMethodOptions[idx];
+      if (!chosen) {
+        const list = txSetup.paymentMethodOptions.map((m, i) => `*${i + 1}* — ${m.name}`).join("\n");
+        await sendReply(`❓ Responda com o número ou *0* para pular.\n\n${list}`);
+        return;
+      }
+      pendingTxSetup.delete(fromPhone);
+      await goToConfirmation(
+        fromPhone, txSetup.extracted, txSetup.userId, txSetup.organizationId,
+        txSetup.entityId!, txSetup.messageId, sendReply, txSetup.pendingFile, chosen.id, chosen.name
+      );
+      return;
+    }
   }
 
   // 3. Verificar se é uma resposta de confirmação pendente
-  const text = msg.text || "";
+  const text = msg.text;
 
-  const pending = pendingConfirmations.get(replyJid);
+  const pending = pendingConfirmations.get(fromPhone);
 
   if (pending && Date.now() < pending.expiresAt) {
     const trimmed = text.trim();
 
     if (trimmed === "1") {
       // Confirmar transação
-      pendingConfirmations.delete(replyJid);
+      pendingConfirmations.delete(fromPhone);
 
       try {
         const extracted = pending.extracted;
         const amountCents = Math.round((extracted.amount ?? 0) * 100);
+        // Data em UTC puro (sem conversão de fuso) para evitar que "26/06" vire "25/06"
         const baseDate = extracted.date
           ? (() => {
               const [y, m, d] = extracted.date!.split("-").map(Number);
-              return new Date(y, m - 1, d);
+              return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
             })()
           : new Date();
 
@@ -1494,11 +1504,13 @@ async function processIncomingMessage(
           pending.entityId,
           user.id
         );
-        const paymentMethodId = await resolvePaymentMethodId(
-          extracted.paymentMethodName,
-          pending.entityId,
-          user.id
-        );
+        const paymentMethodId = pending.resolvedPaymentMethodId !== undefined
+          ? pending.resolvedPaymentMethodId
+          : await resolvePaymentMethodId(
+              extracted.paymentMethodName,
+              pending.entityId,
+              user.id
+            );
         const creditCard = await resolveCreditCard(
           extracted.creditCardName,
           pending.entityId,
@@ -1513,21 +1525,10 @@ async function processIncomingMessage(
           : 1;
         const description = extracted.description ?? "Transação via WhatsApp";
 
-        // Quando há cartão de crédito, a data da primeira parcela considera o
-        // closingDay para determinar em qual fatura a compra cai, e retorna
-        // o 1º dia do mês de vencimento (mês seguinte ao fechamento).
-        //
-        // Exemplos com closingDay=29:
-        //   Compra em 08/jun → fatura fecha 29/jun → vence em julho → 01/07
-        //   Compra em 30/jun → fatura de jun já fechou → fatura fecha 29/jul → vence em agosto → 01/08
         const getFirstInstallmentDate = (referenceDate: Date): Date => {
           if (!creditCard) return referenceDate;
           const closingDay = creditCard.closingDay;
-          // monthOffset=0: fatura do mês atual (ainda não fechou), vence no mês+1
-          // monthOffset=1: fatura do mês seguinte (já passou do fechamento), vence no mês+2
           const monthOffset = referenceDate.getDate() >= closingDay ? 1 : 0;
-          // +1 porque o vencimento é sempre no mês APÓS o fechamento
-          // Usar 15:00 UTC (meio-dia BRT) para evitar que meia-noite UTC = véspera no Brasil
           return new Date(Date.UTC(
             referenceDate.getFullYear(),
             referenceDate.getMonth() + monthOffset + 1,
@@ -1538,8 +1539,10 @@ async function processIncomingMessage(
         const firstInstallmentDate = getFirstInstallmentDate(baseDate);
         console.log(`[WhatsApp Bot] baseDate=${baseDate.toISOString()}, closingDay=${creditCard?.closingDay}, firstInstallmentDate=${firstInstallmentDate.toISOString()}`);
 
-        // Compras no cartão de crédito ficam PENDING (serão pagas na fatura)
-        const txStatus = creditCard ? "PENDING" : "PAID";
+        // Status: cartão → PENDING (pago via fatura); data futura → PENDING; passado/hoje → PAID
+        const today = new Date();
+        today.setUTCHours(12, 0, 0, 0);
+        const txStatus = (creditCard || baseDate > today) ? "PENDING" : "PAID";
 
         const basePayload = {
           entityId: pending.entityId,
@@ -1571,12 +1574,16 @@ async function processIncomingMessage(
           }
           firstTransactionId = createdIds[0];
         } else {
+          // Recorrência de valor variável (conta de consumo sem valor informado):
+          const isVariableRecurring = !!extracted.isRecurring && amountCents <= 0;
+          const finalStatus = (creditCard || isVariableRecurring) ? "PENDING" : txStatus;
           firstTransactionId = await db.createTransaction({
             ...basePayload,
             description,
             amount: amountCents,
+            status: finalStatus,
             dueDate: creditCard ? firstInstallmentDate : baseDate,
-            paymentDate: creditCard ? undefined : new Date(),
+            paymentDate: finalStatus === "PAID" ? new Date() : undefined,
             isRecurring: extracted.isRecurring ?? false,
             recurrencePattern: extracted.isRecurring && extracted.recurrenceFrequency
               ? JSON.stringify({ frequency: extracted.recurrenceFrequency, interval: 1 })
@@ -1586,11 +1593,12 @@ async function processIncomingMessage(
           createdIds.push(firstTransactionId);
         }
 
-        // Criar 12 transações recorrentes futuras se isRecurring=true
+        // Criar transações recorrentes futuras se isRecurring=true
         let recurringCount = 0;
         if (extracted.isRecurring && installments === 1) {
           const freq = extracted.recurrenceFrequency ?? "monthly";
-          for (let i = 1; i <= 12; i++) {
+          const totalRecurrences = (extracted as any).recurrenceCount ?? 12;
+          for (let i = 1; i <= totalRecurrences; i++) {
             const dueDate = new Date(baseDate);
             if (freq === "monthly") dueDate.setMonth(dueDate.getMonth() + i);
             else if (freq === "weekly") dueDate.setDate(dueDate.getDate() + 7 * i);
@@ -1617,7 +1625,8 @@ async function processIncomingMessage(
           .set({ status: "CONFIRMED", transactionId: firstTransactionId, updatedAt: new Date() })
           .where(eq(whatsappMessages.messageId, pending.messageId));
 
-        const amountStr = formatCurrency(amountCents);
+        const isVariableRecurringMsg = !!extracted.isRecurring && amountCents <= 0;
+        const amountStr = isVariableRecurringMsg ? "_valor variável_" : formatCurrency(amountCents);
         const firstMonthLabel = firstInstallmentDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
         let successMsg = `✅ *Transação cadastrada com sucesso!*\n\n${extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito"}: *${amountStr}*\n📝 ${description}`;
         if (installments > 1) {
@@ -1628,24 +1637,42 @@ async function processIncomingMessage(
           successMsg += `\n💳 Cartão: ${extracted.creditCardName}`;
         }
         if (recurringCount > 0) {
-          successMsg += `\n🔁 Recorrência criada: ${recurringCount} lançamentos futuros`;
+          const freqLabel = (extracted.recurrenceFrequency === "weekly") ? "semanais"
+            : (extracted.recurrenceFrequency === "yearly") ? "anuais"
+            : "mensais";
+          successMsg += `\n🔁 Recorrência: ${recurringCount} lançamentos futuros ${freqLabel}`;
+          if (isVariableRecurringMsg) successMsg += `\n✏️ Valor a preencher em cada mês`;
         }
         successMsg += `\n\nID: #${firstTransactionId}`;
-        await sendReply(successMsg);
 
-        // Se há arquivo pendente, pedir o tipo antes de anexar
+        // Se veio com documento, perguntar o tipo antes de anexar
         if (pending.pendingFile) {
-          pendingDocumentType.set(replyJid, {
-            transactionId: firstTransactionId,
+          await sendReply(successMsg);
+          pendingAttachments.set(fromPhone, {
             mediaUrl: pending.pendingFile.mediaUrl,
             mimeType: pending.pendingFile.mimeType,
             filename: pending.pendingFile.filename,
             fileSize: pending.pendingFile.fileSize,
+            stage: "awaiting_type",
+            selectedTransaction: {
+              id: firstTransactionId,
+              description,
+              amount: amountCents,
+              dueDate: (creditCard ? firstInstallmentDate : baseDate).toISOString(),
+            },
+            userId: pending.userId,
+            entityId: pending.entityId,
+            organizationId: pending.organizationId,
             expiresAt: Date.now() + 5 * 60 * 1000,
           });
           await sendReply(
-            `📎 *Qual o tipo do documento anexado?*\n\n*1* — Comprovante de Pagamento ✅\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Não anexar`
+            `📎 *Qual o tipo do documento anexado?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Não anexar`
           );
+        } else {
+          // Transação por voz/texto — perguntar se tem anexo
+          await sendReply(successMsg);
+          pendingAttachOffer.set(fromPhone, { transactionId: firstTransactionId, expiresAt: Date.now() + 5 * 60 * 1000 });
+          await sendReply(`📎 Deseja adicionar algum documento a esta transação?\n\n*1* — Sim\n*2* — Não`);
         }
       } catch (error) {
         console.error("[WhatsApp Bot] Erro ao criar transação:", error);
@@ -1658,7 +1685,7 @@ async function processIncomingMessage(
 
     if (trimmed === "2") {
       // Cancelar
-      pendingConfirmations.delete(replyJid);
+      pendingConfirmations.delete(fromPhone);
 
       await dbInstance
         .update(whatsappMessages)
@@ -1668,6 +1695,38 @@ async function processIncomingMessage(
       await sendReply(`❌ Transação cancelada.`);
       return;
     }
+  }
+
+  // 2b. Resposta à oferta de anexo após criação de transação por voz/texto
+  const attachOffer = pendingAttachOffer.get(fromPhone);
+  if (attachOffer && Date.now() < attachOffer.expiresAt) {
+    const offerText = msg.text;
+    const offerTrimmed = offerText.trim();
+    if (offerTrimmed === "1") {
+      pendingAttachOffer.delete(fromPhone);
+      // Guardar transactionId — quando o arquivo chegar, vai direto para tipo
+      pendingAttachments.set(fromPhone, {
+        mediaUrl: "",
+        mimeType: "",
+        filename: "",
+        fileSize: 0,
+        stage: "awaiting_file_for_tx",
+        targetTransactionId: attachOffer.transactionId,
+        userId: user.id,
+        entityId: 0,
+        organizationId: null,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      });
+      await sendReply(`📤 Envie o documento (imagem ou PDF) que deseja anexar.`);
+      return;
+    }
+    if (offerTrimmed === "2" || offerTrimmed === "0" || offerTrimmed.toLowerCase().includes("não") || offerTrimmed.toLowerCase().includes("nao")) {
+      pendingAttachOffer.delete(fromPhone);
+      await sendReply(`✅ Ok! Transação salva sem anexo.`);
+      return;
+    }
+    // Qualquer outra mensagem ignora a oferta silenciosamente
+    pendingAttachOffer.delete(fromPhone);
   }
 
   // 3. Verificar comandos especiais
@@ -1711,7 +1770,7 @@ async function processIncomingMessage(
   let mediaUrl: string | null = null;
 
   // ── Processar áudio ──────────────────────────────────────────────────────────
-  if (msg.messageType === "audio") {
+  if (messageType === "audio") {
     await sendReply(`🎙️ Transcrevendo seu áudio...`);
 
     const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
@@ -1756,7 +1815,7 @@ async function processIncomingMessage(
   }
 
   // ── Processar imagem (comprovante) ───────────────────────────────────────────
-  else if (msg.messageType === "image") {
+  else if (messageType === "image") {
     await sendReply(`📎 Documento recebido! Fazendo upload...`);
 
     const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
@@ -1792,8 +1851,23 @@ async function processIncomingMessage(
 
     mediaUrl = imageUrl;
 
-    // Perguntar ao usuário o que deseja fazer com o documento
-    pendingAttachments.set(replyJid, {
+    // Se estava aguardando arquivo para anexar a transação recém-criada, ir direto ao tipo
+    if (pendingAttach?.stage === "awaiting_file_for_tx" && pendingAttach.targetTransactionId) {
+      const tx = await db.getTransactionById(pendingAttach.targetTransactionId).catch(() => null) as any;
+      pendingAttachments.set(fromPhone, {
+        ...pendingAttach,
+        mediaUrl: imageUrl,
+        mimeType: mediaData.mimeType,
+        filename: uploadedFilename || `imagem-${Date.now()}.jpg`,
+        fileSize: mediaData.buffer.length,
+        stage: "awaiting_type",
+        selectedTransaction: tx ? { id: tx.id, description: tx.description, amount: tx.amount, dueDate: tx.dueDate ? new Date(tx.dueDate).toLocaleDateString("pt-BR") : null } : pendingAttach.selectedTransaction,
+      });
+      await sendReply(`🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`);
+      return;
+    }
+
+    pendingAttachments.set(fromPhone, {
       mediaUrl: imageUrl,
       mimeType: mediaData.mimeType,
       filename: uploadedFilename || `imagem-${Date.now()}.jpg`,
@@ -1806,32 +1880,34 @@ async function processIncomingMessage(
     });
 
     await sendReply(
-      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (descrever por voz ou texto)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
+      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (extrair dados do documento)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
     );
     return;
   }
 
   // ── Processar texto ──────────────────────────────────────────────────────────
-  else if (msg.messageType === "text") {
-    if (!text.trim()) return;
-    extractedText = text.trim();
+  else if (messageType === "text") {
+    if (!msg.text.trim()) return;
+    extractedText = msg.text.trim();
   }
 
-  // ── Processar documento (PDF) ────────────────────────────────────────────────
-  else if (msg.messageType === "document") {
+  // ── Processar documento ──────────────────────────────────────────────────────
+  else if (messageType === "document") {
     const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
     if (!mediaData) {
       await sendReply(`❌ Não consegui baixar o documento. Tente novamente.`);
       return;
     }
+    const mimeType = msg.mimeType || mediaData.mimeType;
+    const ext = mimeType.includes("png") ? "png" : mimeType.includes("pdf") ? "pdf" : "jpg";
+    const filename = msg.filename || `whatsapp-doc-${Date.now()}.${ext}`;
     let docUrl: string | null = null;
-    let docFilename = msg.filename || `whatsapp-doc-${Date.now()}.pdf`;
     try {
       if (isS3Configured()) {
-        docUrl = await uploadToS3(mediaData.buffer, docFilename, mediaData.mimeType, "whatsapp");
+        docUrl = await uploadToS3(mediaData.buffer, filename, mimeType, "whatsapp");
       } else {
         const { storagePut } = await import("../storage");
-        const { url } = await storagePut(`whatsapp/${docFilename}`, mediaData.buffer, mediaData.mimeType);
+        const { url } = await storagePut(`whatsapp/${filename}`, mediaData.buffer, mimeType);
         docUrl = url;
       }
     } catch (uploadError) {
@@ -1841,10 +1917,24 @@ async function processIncomingMessage(
       await sendReply(`❌ Não consegui fazer o upload do documento. Tente novamente.`);
       return;
     }
-    pendingAttachments.set(replyJid, {
+    if (pendingAttach?.stage === "awaiting_file_for_tx" && pendingAttach.targetTransactionId) {
+      const tx = await db.getTransactionById(pendingAttach.targetTransactionId).catch(() => null) as any;
+      pendingAttachments.set(fromPhone, {
+        ...pendingAttach,
+        mediaUrl: docUrl,
+        mimeType,
+        filename,
+        fileSize: mediaData.buffer.length,
+        stage: "awaiting_type",
+        selectedTransaction: tx ? { id: tx.id, description: tx.description, amount: tx.amount, dueDate: tx.dueDate ? new Date(tx.dueDate).toLocaleDateString("pt-BR") : null } : pendingAttach.selectedTransaction,
+      });
+      await sendReply(`🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`);
+      return;
+    }
+    pendingAttachments.set(fromPhone, {
       mediaUrl: docUrl,
-      mimeType: mediaData.mimeType,
-      filename: docFilename,
+      mimeType,
+      filename,
       fileSize: mediaData.buffer.length,
       stage: "awaiting_mode",
       userId: user.id,
@@ -1853,7 +1943,7 @@ async function processIncomingMessage(
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
     await sendReply(
-      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (descrever por voz ou texto)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
+      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (extrair dados do documento)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
     );
     return;
   }
@@ -1877,13 +1967,6 @@ async function processIncomingMessage(
   }
 
   const extracted = extractionResult.data;
-  const entityId = resolveEntityId(extracted.entityName, userEntities);
-  if (!entityId) {
-    await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
-    return;
-  }
-
-  const entityName = userEntities.find(e => e.id === entityId)?.name ?? "Entidade";
 
   // Atualizar mensagem no banco com dados extraídos
   await dbInstance
@@ -1896,93 +1979,68 @@ async function processIncomingMessage(
     })
     .where(eq(whatsappMessages.messageId, messageId));
 
-  // Salvar confirmação pendente
-  pendingConfirmations.set(replyJid, {
-    extracted,
-    userId: user.id,
-    organizationId: org?.id ?? null,
-    entityId,
-    messageId,
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutos
-  });
-
-  await sendReply(buildConfirmationMessage(extracted, entityName));
+  await startTxSetupFlow(fromPhone, extracted, user.id, org?.id ?? null, messageId, sendReply, userEntities);
 }
 
 // ─── Registro de Rotas ────────────────────────────────────────────────────────
 
 export function registerWhatsAppBotRoutes(app: Express): void {
 
-  // ── GET /api/whatsapp/test?to=5511... — Testa envio via Cloud API ──────────────
-  app.get("/api/whatsapp/test", async (req: Request, res: Response) => {
-    const to = (req.query.to as string) || "5511947728157";
-    await sendWhatsAppMessage(to, "🧪 Teste de envio SGF — " + new Date().toISOString());
-    return res.json({ ok: true, to });
-  });
-
   // ── GET /api/whatsapp/webhook — Verificação do webhook pelo Meta ──────────────
   app.get("/api/whatsapp/webhook", (req: Request, res: Response) => {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
-    const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+
+    const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "sgf-webhook-token";
 
     if (mode === "subscribe" && token === verifyToken) {
-      console.log("[WhatsApp Bot] Webhook verificado pelo Meta");
+      console.log("[WhatsApp Bot] Webhook verificado com sucesso");
       return res.status(200).send(challenge);
     }
-    console.warn("[WhatsApp Bot] Falha na verificação do webhook — token inválido");
-    return res.status(403).json({ error: "Verificação falhou" });
+
+    console.log("[WhatsApp Bot] Webhook - verificação falhou");
+    return res.status(403).json({ error: "Forbidden" });
   });
 
-  // ── POST /api/whatsapp/webhook — Recebe eventos da Meta Cloud API ─────────────
+  // ── POST /api/whatsapp/webhook — Recebe eventos do Meta WhatsApp Cloud API ────
   app.post("/api/whatsapp/webhook", async (req: Request, res: Response) => {
+    // Responder imediatamente para não bloquear o Meta
     res.status(200).json({ ok: true });
 
     try {
       const body = req.body as any;
+
+      // Verificar se é um evento de mensagem válido
       if (body.object !== "whatsapp_business_account") return;
 
-      for (const entry of (body.entry ?? [])) {
-        for (const change of (entry.changes ?? [])) {
-          if (change.field !== "messages") continue;
-          const value = change.value;
-          if (!value?.messages?.length) continue;
+      const entry = body.entry?.[0];
+      const changes = entry?.changes?.[0];
+      const value = changes?.value;
 
-          for (const message of value.messages) {
-            const messageId = message.id as string;
-            const fromPhone = message.from as string;
+      if (!value?.messages?.[0]) return;
 
-            if (!messageId || !fromPhone) continue;
-            if (!markMessageSeen(messageId)) {
-              console.log(`[WhatsApp Bot] Duplicata ignorada: ${messageId}`);
-              continue;
-            }
+      const message = value.messages[0];
+      const fromPhone = normalizePhone(message.from);
+      const messageId = message.id;
 
-            console.log(`[WhatsApp Bot] Mensagem recebida - from: ${fromPhone}, type: ${message.type}, id: ${messageId}`);
+      if (!fromPhone || !messageId) return;
 
-            const msgType = message.type as string;
-            let normalized: NormalizedIncomingMessage;
-
-            if (msgType === "text") {
-              normalized = { messageType: "text", text: message.text?.body ?? "" };
-            } else if (msgType === "audio") {
-              normalized = { messageType: "audio", text: "", mediaId: message.audio?.id, mimeType: message.audio?.mime_type };
-            } else if (msgType === "image") {
-              normalized = { messageType: "image", text: "", mediaId: message.image?.id, caption: message.image?.caption, mimeType: message.image?.mime_type };
-            } else if (msgType === "document") {
-              normalized = { messageType: "document", text: "", mediaId: message.document?.id, caption: message.document?.caption, filename: message.document?.filename, mimeType: message.document?.mime_type };
-            } else {
-              console.log(`[WhatsApp Bot] Tipo de mensagem não suportado: ${msgType}`);
-              continue;
-            }
-
-            processIncomingMessage(fromPhone, messageId, normalized).catch(err => {
-              console.error("[WhatsApp Bot] Erro ao processar mensagem:", err);
-            });
-          }
-        }
+      // Dedup atômico em memória
+      if (!markMessageSeen(messageId)) {
+        console.log(`[WhatsApp Bot] Duplicata ignorada no webhook: ${messageId}`);
+        return;
       }
+
+      // Normalizar mensagem para formato interno
+      const msg: NormalizedIncomingMessage = normalizeCloudMessage(message);
+
+      console.log(`[WhatsApp Bot] Mensagem recebida - from: ${fromPhone}, type: ${msg.messageType}, id: ${messageId}`);
+
+      // Processar em background para não bloquear
+      processIncomingMessage(fromPhone, messageId, msg).catch(err => {
+        console.error("[WhatsApp Bot] Erro ao processar mensagem:", err);
+      });
     } catch (error) {
       console.error("[WhatsApp Bot] Erro no webhook:", error);
     }
