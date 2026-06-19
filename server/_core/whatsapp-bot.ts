@@ -1992,7 +1992,7 @@ export function registerWhatsAppBotRoutes(app: Express): void {
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
 
-    const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "sgf-webhook-token";
+    const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
     if (mode === "subscribe" && token === verifyToken) {
       console.log("[WhatsApp Bot] Webhook verificado com sucesso");
