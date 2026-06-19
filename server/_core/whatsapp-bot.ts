@@ -38,69 +38,6 @@ interface NormalizedIncomingMessage {
   mimeType?: string;
 }
 
-interface EvolutionWebhookPayload {
-  event: string;
-  instance: string;
-  data: {
-    key?: {
-      remoteJid?: string;
-      fromMe?: boolean;
-      id?: string;
-      addressingMode?: string; // "lid" quando a conta usa @lid (v2.3.7+)
-      senderLid?: string; // JID @lid do remetente (v2.3.7+ quando addressingMode = "lid")
-      participantLid?: string;
-      remoteJidAlt?: string; // JID alternativo (algumas builds mandam o @lid aqui)
-      senderPn?: string; // Phone number do remetente
-    };
-    message?: {
-      conversation?: string;
-      extendedTextMessage?: { text?: string };
-      audioMessage?: {
-        url?: string;
-        mimetype?: string;
-        mediaKey?: string;
-        fileEncSha256?: string;
-        fileSha256?: string;
-        fileLength?: string;
-        seconds?: number;
-        ptt?: boolean;
-        mediaKeyTimestamp?: string;
-        directPath?: string;
-      };
-      imageMessage?: {
-        url?: string;
-        mimetype?: string;
-        caption?: string;
-        mediaKey?: string;
-        fileEncSha256?: string;
-        fileSha256?: string;
-        fileLength?: string;
-        height?: number;
-        width?: number;
-        mediaKeyTimestamp?: string;
-        directPath?: string;
-        jpegThumbnail?: string;
-      };
-      documentMessage?: {
-        url?: string;
-        mimetype?: string;
-        title?: string;
-        mediaKey?: string;
-        fileEncSha256?: string;
-        fileSha256?: string;
-        fileLength?: string;
-        pageCount?: number;
-        mediaKeyTimestamp?: string;
-        directPath?: string;
-        fileName?: string;
-      };
-    };
-    messageType?: string;
-    instanceId?: string;
-    messageTimestamp?: number;
-  };
-}
-
 interface ExtractedTransaction {
   entityName?: string;
   amount?: number; // em reais (float)
