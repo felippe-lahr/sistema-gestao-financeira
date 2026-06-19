@@ -80,17 +80,30 @@ const pendingConfirmations = new Map<string, {
   entityId: number;
   messageId: string;
   expiresAt: number; // timestamp ms
+  resolvedPaymentMethodId?: number | null;
   pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
 }>();
 
-// Aguarda escolha do tipo de documento após transação criada via fluxo voz+arquivo
-const pendingDocumentType = new Map<string, {
+// Aguarda arquivo pendente para transação recém-criada (fluxo post-confirmation)
+// Stage "awaiting_file_for_tx": aguarda envio do arquivo pelo usuário
+// Extends pendingAttachments with targetTransactionId
+
+const pendingAttachOffer = new Map<string, {
   transactionId: number;
-  mediaUrl: string;
-  mimeType: string;
-  filename: string;
-  fileSize: number;
   expiresAt: number;
+}>();
+
+const pendingTxSetup = new Map<string, {
+  extracted: ExtractedTransaction;
+  userId: number;
+  organizationId: number | null;
+  entityId?: number;
+  messageId: string;
+  expiresAt: number;
+  stage: "awaiting_amount" | "awaiting_entity" | "awaiting_payment_method";
+  entityOptions?: Array<{ id: number; name: string }>;
+  paymentMethodOptions?: Array<{ id: number; name: string }>;
+  pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
 }>();
 
 // ─── Estado para fluxo de anexos em múltiplos passos ─────────────────────────
@@ -100,7 +113,8 @@ type AttachmentStage =
   | "awaiting_entity"        // escolher entidade (quando usuário tem múltiplas)
   | "awaiting_month"         // escolher mês de vencimento
   | "awaiting_match_confirm" // escolher transação da lista filtrada
-  | "awaiting_type";         // tipo do documento (comprovante/boleto/NF/doc)
+  | "awaiting_type"          // tipo do documento (comprovante/boleto/NF/doc)
+  | "awaiting_file_for_tx";  // aguarda envio do arquivo pelo usuário (post-confirmation)
 
 const pendingAttachments = new Map<string, {
   mediaUrl: string;
@@ -108,6 +122,11 @@ const pendingAttachments = new Map<string, {
   filename: string;
   fileSize: number;
   stage: AttachmentStage;
+  targetTransactionId?: number;
+  isCreditCard?: boolean;
+  creditCardId?: number;
+  invoiceMonth?: number;
+  invoiceYear?: number;
   entities?: Array<{ id: number; name: string }>;
   transactions?: Array<{ id: number; description: string; amount: number; dueDate: string | null }>;
   selectedTransaction?: { id: number; description: string; amount: number; dueDate: string | null };
@@ -817,8 +836,20 @@ Responda:
 }
 
 /**
- * Processa uma mensagem recebida do WhatsApp
+ * Interpreta input de valor monetário digitado pelo usuário.
+ * Aceita: "100", "100,50", "100.50", "R$100", etc.
+ * Retorna valor em reais (float) ou null se inválido.
  */
+function parseAmountInput(input: string): number | null {
+  const cleaned = input.replace(/[^\d,\.]/g, "").trim();
+  if (!cleaned) return null;
+  // "100,50" → "100.50"
+  const normalized = cleaned.replace(",", ".");
+  const value = parseFloat(normalized);
+  if (isNaN(value) || value < 0) return null;
+  return value;
+}
+
 /**
  * Busca transações PENDING da entidade para o mês/ano informado,
  * ordena vencidas primeiro e exibe lista numerada.
@@ -890,6 +921,146 @@ async function showPendingTransactionsList(
   await sendReply(
     `📋 *Transações de ${monthLabel}:*\n🔴 Vencida  🟡 Pendente\n\n${listStr}\n\n*0* — Cancelar`
   );
+}
+
+async function startTxSetupFlow(
+  fromPhone: string,
+  extracted: ExtractedTransaction,
+  userId: number,
+  organizationId: number | null,
+  messageId: string,
+  sendReply: (txt: string) => Promise<void>,
+  userEntities: Array<{ id: number; name: string }>,
+  pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number },
+): Promise<void> {
+  if (!extracted.amount || extracted.amount <= 0) {
+    pendingTxSetup.set(fromPhone, {
+      extracted,
+      userId,
+      organizationId,
+      messageId,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      stage: "awaiting_amount",
+      pendingFile,
+    });
+    await sendReply(`💰 *Qual o valor da transação?*\n\nDigite apenas o número (ex: *100* ou *100,50*).\n\n*0* — Cancelar`);
+    return;
+  }
+
+  if (userEntities.length === 0) {
+    await sendReply(`⚠️ Você não possui entidades cadastradas no SGF. Acesse o sistema para criar uma entidade primeiro.`);
+    return;
+  }
+
+  if (userEntities.length > 1) {
+    const resolved = resolveEntityId(extracted.entityName, userEntities);
+    if (!resolved) {
+      const listStr = userEntities.map((e, i) => `*${i + 1}* — ${e.name}`).join("\n");
+      pendingTxSetup.set(fromPhone, {
+        extracted,
+        userId,
+        organizationId,
+        messageId,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        stage: "awaiting_entity",
+        entityOptions: userEntities,
+        pendingFile,
+      });
+      await sendReply(`🏢 *Qual entidade?*\n\n${listStr}\n\n*0* — Cancelar`);
+      return;
+    }
+    await resolvePaymentMethodStep(fromPhone, extracted, userId, organizationId, resolved, messageId, sendReply, pendingFile);
+    return;
+  }
+
+  await resolvePaymentMethodStep(fromPhone, extracted, userId, organizationId, userEntities[0].id, messageId, sendReply, pendingFile);
+}
+
+async function resolvePaymentMethodStep(
+  fromPhone: string,
+  extracted: ExtractedTransaction,
+  userId: number,
+  organizationId: number | null,
+  entityId: number,
+  messageId: string,
+  sendReply: (txt: string) => Promise<void>,
+  pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number },
+): Promise<void> {
+  // Se já tem meio de pagamento extraído, pular
+  if (extracted.paymentMethodName || extracted.creditCardName) {
+    await goToConfirmation(fromPhone, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
+    return;
+  }
+
+  // Buscar contas bancárias e cartões para mostrar como opções
+  const dbInstance = await getDb();
+  if (!dbInstance) {
+    await goToConfirmation(fromPhone, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
+    return;
+  }
+
+  const { bankAccounts, creditCards: creditCardsSchema } = await import("../../drizzle/schema");
+  const { eq: eqOp } = await import("drizzle-orm");
+  const [bankAccountsList, creditCardsList] = await Promise.all([
+    dbInstance.select({ id: bankAccounts.id, name: bankAccounts.name }).from(bankAccounts).where(eqOp(bankAccounts.entityId, entityId)),
+    dbInstance.select({ id: creditCardsSchema.id, name: creditCardsSchema.name }).from(creditCardsSchema).where(eqOp(creditCardsSchema.entityId, entityId)),
+  ]);
+
+  const options: Array<{ id: number; name: string }> = [
+    ...bankAccountsList.map((b: { id: number; name: string }) => ({ id: b.id, name: b.name })),
+    ...creditCardsList.map((c: { id: number; name: string }) => ({ id: -c.id, name: `💳 ${c.name}` })),
+  ];
+
+  if (options.length === 0) {
+    await goToConfirmation(fromPhone, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
+    return;
+  }
+
+  const listStr = options.map((o, i) => `*${i + 1}* — ${o.name}`).join("\n");
+  pendingTxSetup.set(fromPhone, {
+    extracted,
+    userId,
+    organizationId,
+    entityId,
+    messageId,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    stage: "awaiting_payment_method",
+    paymentMethodOptions: options,
+    pendingFile,
+  });
+  await sendReply(`💳 *Meio de pagamento:*\n\n${listStr}\n\n*0* — Pular`);
+}
+
+async function goToConfirmation(
+  fromPhone: string,
+  extracted: ExtractedTransaction,
+  userId: number,
+  organizationId: number | null,
+  entityId: number,
+  messageId: string,
+  sendReply: (txt: string) => Promise<void>,
+  pendingFile: { mediaUrl: string; mimeType: string; filename: string; fileSize: number } | undefined,
+  resolvedPaymentMethodId: number | undefined,
+  resolvedPaymentMethodName: string | undefined,
+): Promise<void> {
+  const userEntities = await db.getEntitiesByUserId(userId).catch(() => [] as Array<{ id: number; name: string }>);
+  const entityName = userEntities.find((e: { id: number; name: string }) => e.id === entityId)?.name ?? "Entidade";
+
+  const finalExtracted = resolvedPaymentMethodName
+    ? { ...extracted, paymentMethodName: resolvedPaymentMethodName }
+    : extracted;
+
+  pendingConfirmations.set(fromPhone, {
+    extracted: finalExtracted,
+    userId,
+    organizationId,
+    entityId,
+    messageId,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    resolvedPaymentMethodId,
+    pendingFile,
+  });
+  await sendReply(buildConfirmationMessage(finalExtracted, entityName));
 }
 
 async function processIncomingMessage(
