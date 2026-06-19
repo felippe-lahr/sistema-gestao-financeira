@@ -1018,10 +1018,10 @@ async function resolvePaymentMethodStep(
   }
 
   const { bankAccounts, creditCards: creditCardsSchema } = await import("../../drizzle/schema");
-  const { eq: eqOp } = await import("drizzle-orm");
+  const { eq: eqOp, and: andOp } = await import("drizzle-orm");
   const [bankAccountsList, creditCardsList] = await Promise.all([
-    dbInstance.select({ id: bankAccounts.id, name: bankAccounts.name }).from(bankAccounts).where(eqOp(bankAccounts.entityId, entityId)),
-    dbInstance.select({ id: creditCardsSchema.id, name: creditCardsSchema.name }).from(creditCardsSchema).where(eqOp(creditCardsSchema.entityId, entityId)),
+    dbInstance.select({ id: bankAccounts.id, name: bankAccounts.name }).from(bankAccounts).where(andOp(eqOp(bankAccounts.entityId, entityId), eqOp(bankAccounts.isActive, true))),
+    dbInstance.select({ id: creditCardsSchema.id, name: creditCardsSchema.name }).from(creditCardsSchema).where(andOp(eqOp(creditCardsSchema.entityId, entityId), eqOp(creditCardsSchema.isActive, true))),
   ]);
 
   const rawOptions: Array<{ id: number; name: string }> = [
