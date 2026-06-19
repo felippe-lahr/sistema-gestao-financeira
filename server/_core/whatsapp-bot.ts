@@ -1,16 +1,22 @@
 /**
- * WhatsApp Bot — Integração Multi-Tenant via Evolution API
+ * WhatsApp Bot — Integração Multi-Tenant via Meta WhatsApp Cloud API
  *
  * Endpoints:
- *   POST /api/whatsapp/webhook          — Recebe eventos da Evolution API
+ *   GET  /api/whatsapp/webhook          — Verificação do webhook pelo Meta
+ *   POST /api/whatsapp/webhook          — Recebe eventos da Meta Cloud API
  *   POST /api/whatsapp/link             — Inicia vinculação: envia código de verificação
  *   POST /api/whatsapp/verify           — Confirma o código e vincula o número
  *   DELETE /api/whatsapp/unlink         — Remove a vinculação do número
  *   GET  /api/whatsapp/status           — Retorna status da vinculação do usuário
  *
+ * Variáveis de ambiente:
+ *   WHATSAPP_PHONE_NUMBER_ID  — ID do número de telefone (Meta Developer Console)
+ *   WHATSAPP_ACCESS_TOKEN     — Token de acesso permanente (System User)
+ *   WHATSAPP_VERIFY_TOKEN     — Token de verificação do webhook (string secreta)
+ *
  * Fluxo de cadastro de transação:
  *   1. Usuário envia mensagem de voz, texto ou imagem (comprovante)
- *   2. Bot transcreve o áudio (Whisper) ou lê a imagem (Gemini Vision)
+ *   2. Bot transcreve o áudio (Gemini) ou lê a imagem (Gemini Vision)
  *   3. GPT extrai: entidade, valor, data, descrição, tipo (débito/crédito)
  *   4. Bot envia resumo e pede confirmação (1 = confirmar, 2 = cancelar)
  *   5. Usuário responde 1 → transação cadastrada; 2 → cancelado
@@ -24,72 +30,18 @@ import { getDb } from "../db";
 import { sdk } from "./sdk";
 import { invokeLLM } from "./llm";
 import { uploadToS3, isS3Configured } from "./s3";
-import { eq, and, sql as sqlTag, isNotNull } from "drizzle-orm";
+import { eq, and, sql as sqlTag } from "drizzle-orm";
 import { users, whatsappMessages, creditCardInvoices, creditCardInvoiceAttachments } from "../../drizzle/schema";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-interface EvolutionWebhookPayload {
-  event: string;
-  instance: string;
-  data: {
-    key?: {
-      remoteJid?: string;
-      fromMe?: boolean;
-      id?: string;
-      addressingMode?: string; // "lid" quando a conta usa @lid (v2.3.7+)
-      senderLid?: string; // JID @lid do remetente (v2.3.7+ quando addressingMode = "lid")
-      participantLid?: string;
-      remoteJidAlt?: string; // JID alternativo (algumas builds mandam o @lid aqui)
-      senderPn?: string; // Phone number do remetente
-    };
-    message?: {
-      conversation?: string;
-      extendedTextMessage?: { text?: string };
-      audioMessage?: {
-        url?: string;
-        mimetype?: string;
-        mediaKey?: string;
-        fileEncSha256?: string;
-        fileSha256?: string;
-        fileLength?: string;
-        seconds?: number;
-        ptt?: boolean;
-        mediaKeyTimestamp?: string;
-        directPath?: string;
-      };
-      imageMessage?: {
-        url?: string;
-        mimetype?: string;
-        caption?: string;
-        mediaKey?: string;
-        fileEncSha256?: string;
-        fileSha256?: string;
-        fileLength?: string;
-        height?: number;
-        width?: number;
-        mediaKeyTimestamp?: string;
-        directPath?: string;
-        jpegThumbnail?: string;
-      };
-      documentMessage?: {
-        url?: string;
-        mimetype?: string;
-        title?: string;
-        mediaKey?: string;
-        fileEncSha256?: string;
-        fileSha256?: string;
-        fileLength?: string;
-        pageCount?: number;
-        mediaKeyTimestamp?: string;
-        directPath?: string;
-        fileName?: string;
-      };
-    };
-    messageType?: string;
-    instanceId?: string;
-    messageTimestamp?: number;
-  };
+interface NormalizedIncomingMessage {
+  messageType: "text" | "audio" | "image" | "document";
+  text: string;
+  caption?: string;
+  mediaId?: string;
+  filename?: string;
+  mimeType?: string;
 }
 
 interface ExtractedTransaction {
@@ -193,27 +145,6 @@ const ATTACHMENT_TYPE_LABELS: Record<string, string> = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Normaliza número de telefone para formato internacional sem @s.whatsapp.net
- * Ex: "5511947728157@s.whatsapp.net" → "5511947728157"
- */
-function normalizePhone(jid: string): string {
-  // Remove sufixo @s.whatsapp.net/@lid/etc
-  const withoutSuffix = jid.replace(/@.*$/, "");
-  // Remove device ID do formato multi-device (ex: "5511947728157:15" → "5511947728157")
-  const withoutDevice = withoutSuffix.split(":")[0];
-  return withoutDevice.replace(/\D/g, "");
-}
-
-/**
- * Extrai o JID para resposta — mantém o remoteJid original para suporte a LID
- * WhatsApp Business usa @lid em vez de @s.whatsapp.net
- */
-function getReplyJid(remoteJid: string): string {
-  // Se for LID ou s.whatsapp.net, retorna o JID completo para resposta
-  return remoteJid;
-}
-
-/**
  * Formata valor em centavos para BRL
  */
 function formatCurrency(cents: number): string {
@@ -233,110 +164,79 @@ function formatDate(dateStr: string): string {
 }
 
 /**
- * Envia mensagem de texto via Evolution API.
- * Responde para o JID/número informado (normalmente o remoteJid da conversa).
+ * Envia mensagem de texto via Meta WhatsApp Cloud API.
  */
 async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
-  const evolutionUrl = process.env.EVOLUTION_API_URL;
-  const evolutionKey = process.env.EVOLUTION_API_KEY;
-  const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
-  if (!evolutionUrl || !evolutionKey) {
-    console.warn("[WhatsApp Bot] EVOLUTION_API_URL ou EVOLUTION_API_KEY não configurados");
+  if (!phoneNumberId || !accessToken) {
+    console.warn("[WhatsApp Bot] WHATSAPP_PHONE_NUMBER_ID ou WHATSAPP_ACCESS_TOKEN não configurados");
     return;
   }
 
+  // Aceita número puro ou com @s.whatsapp.net — normaliza para número puro
+  const cleanTo = to.replace(/@.*$/, "").replace(/\D/g, "");
+
   try {
-    const url = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instanceName}`;
-
-    // @s.whatsapp.net → envia direto; v2.3.7 roteia via OnWhatsappCache para @lid internamente
-    // @lid → envia direto (v2.3.7 bypass PR #2544); mas pode resultar em PENDING
-    // número puro → tenta resolver via Evolution API
-    let sendTo = to;
-    if (to.includes("@s.whatsapp.net")) {
-      sendTo = to;
-      console.log(`[WhatsApp Bot] Enviando para @s.whatsapp.net (routing cache v2.3.7): ${sendTo}`);
-    } else if (to.includes("@lid")) {
-      sendTo = to;
-      console.log(`[WhatsApp Bot] Enviando direto para @lid (v2.3.7 bypass): ${sendTo}`);
-    } else if (!to.includes("@")) {
-      const resolved = await resolveJidViaEvolution(to);
-      if (resolved) {
-        sendTo = resolved;
-        console.log(`[WhatsApp Bot] JID resolvido para ${to}: ${sendTo}`);
-      } else {
-        console.warn(`[WhatsApp Bot] Não foi possível resolver JID para ${to}, usando número puro`);
-      }
-    }
-
-    console.log(`[WhatsApp Bot] Enviando mensagem para: ${sendTo}`);
-
-    const response = await fetch(url, {
+    const response = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "apikey": evolutionKey,
+        "Authorization": `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ number: to, text }),
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanTo,
+        type: "text",
+        text: { preview_url: false, body: text },
+      }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      console.error(`[WhatsApp Bot] ❌ Falha ao enviar para ${to} — HTTP ${response.status}: ${errText}`);
+      console.error(`[WhatsApp Bot] ❌ Falha ao enviar para ${cleanTo} — HTTP ${response.status}: ${errText}`);
       return;
     }
 
-    const responseData = await response.json().catch(() => ({})) as { status?: string };
-    const msgStatus = responseData.status ?? "OK";
-
-    if (msgStatus === "PENDING") {
-      console.warn(`[WhatsApp Bot] ⚠️ PENDING para ${sendTo} — mensagem criada localmente mas sem ACK do servidor WhatsApp.`);
-      if (sendTo.includes("@s.whatsapp.net")) {
-        console.warn(`[WhatsApp Bot] 💡 Cache v2.3.7 pode não estar aquecido. Certifique-se de que o usuário enviou uma mensagem recente para acionar o cache (lid=lid).`);
-      }
-    } else {
-      console.log(`[WhatsApp Bot] ✅ Mensagem entregue para: ${sendTo} — status: ${msgStatus}`);
-    }
+    console.log(`[WhatsApp Bot] ✅ Mensagem enviada para: ${cleanTo}`);
   } catch (error) {
     console.error(`[WhatsApp Bot] Exceção ao enviar para ${to}:`, error);
   }
 }
 
 /**
- * Baixa mídia da Evolution API (áudio, imagem, documento)
+ * Baixa mídia da Meta WhatsApp Cloud API usando o media ID.
  */
-async function downloadEvolutionMedia(
-  messageId: string,
-  instanceName: string
-): Promise<{ buffer: Buffer; mimeType: string } | null> {
-  const evolutionUrl = process.env.EVOLUTION_API_URL;
-  const evolutionKey = process.env.EVOLUTION_API_KEY;
-
-  if (!evolutionUrl || !evolutionKey) return null;
+async function downloadCloudMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  if (!accessToken) return null;
 
   try {
-    const url = `${evolutionUrl.replace(/\/$/, "")}/chat/getBase64FromMediaMessage/${instanceName}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": evolutionKey,
-      },
-      body: JSON.stringify({ message: { key: { id: messageId } } }),
+    // Passo 1: obter a URL de download da mídia
+    const metaRes = await fetch(`https://graph.facebook.com/v20.0/${mediaId}`, {
+      headers: { "Authorization": `Bearer ${accessToken}` },
     });
-
-    if (!response.ok) {
-      console.error(`[WhatsApp Bot] Erro ao baixar mídia: ${response.status}`);
+    if (!metaRes.ok) {
+      console.error(`[WhatsApp Bot] Erro ao obter URL da mídia: ${metaRes.status}`);
       return null;
     }
+    const metaData = await metaRes.json() as { url?: string; mime_type?: string };
+    if (!metaData.url) return null;
 
-    const data = await response.json() as { base64?: string; mimetype?: string };
-    if (!data.base64) return null;
-
-    const buffer = Buffer.from(data.base64, "base64");
-    return { buffer, mimeType: data.mimetype || "audio/ogg" };
+    // Passo 2: baixar os bytes da mídia
+    const mediaRes = await fetch(metaData.url, {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+    });
+    if (!mediaRes.ok) {
+      console.error(`[WhatsApp Bot] Erro ao baixar mídia: ${mediaRes.status}`);
+      return null;
+    }
+    const buffer = Buffer.from(await mediaRes.arrayBuffer());
+    return { buffer, mimeType: metaData.mime_type || "application/octet-stream" };
   } catch (error) {
-    console.error("[WhatsApp Bot] Erro ao baixar mídia:", error);
+    console.error("[WhatsApp Bot] Erro ao baixar mídia Cloud API:", error);
     return null;
   }
 }
@@ -1102,7 +1002,7 @@ async function startTxSetupFlow(
  * Avança o stage para awaiting_match_confirm.
  */
 async function showPendingTransactionsList(
-  replyJid: string,
+  phoneKey: string,
   pendingAttach: NonNullable<ReturnType<typeof pendingAttachments.get>>,
   entityId: number,
   month: number,
@@ -1171,7 +1071,7 @@ async function showPendingTransactionsList(
   }
 
   if (regularTx.length === 0 && cardItems.length === 0) {
-    pendingAttachments.set(replyJid, { ...pendingAttach, entityId, stage: "awaiting_month" });
+    pendingAttachments.set(phoneKey, { ...pendingAttach, entityId, stage: "awaiting_month" });
     await sendReply(`⚠️ Nenhuma transação pendente ou vencida em *${monthLabel}*.\n\nInforme outro mês ou *0* para cancelar.`);
     return;
   }
@@ -1206,7 +1106,7 @@ async function showPendingTransactionsList(
     return `*${i + 1}* ${flag} ${t.description}\n    ${formatCurrency(t.amount)} • ${venc}`;
   }).join("\n");
 
-  pendingAttachments.set(replyJid, {
+  pendingAttachments.set(phoneKey, {
     ...pendingAttach,
     stage: "awaiting_match_confirm",
     entityId,
@@ -1221,20 +1121,17 @@ async function showPendingTransactionsList(
 
 async function processIncomingMessage(
   fromPhone: string,
-  replyJid: string,
   messageId: string,
-  messageType: string,
-  payload: EvolutionWebhookPayload
+  msg: NormalizedIncomingMessage,
 ): Promise<void> {
-  // 1. Buscar usuário pelo número de WhatsApp ou pelo LID
+  // 1. Buscar usuário pelo número de WhatsApp
   const dbInstance = await getDb();
   if (!dbInstance) {
     console.error("[WhatsApp Bot] Database não disponível");
     return;
   }
 
-  // Deduplicação: a Evolution API às vezes entrega o mesmo messageId duas vezes
-  // (uma via @lid e outra via @s.whatsapp.net). Ignorar se já foi processado.
+  // Deduplicação: ignorar se já foi processado
   const existing = await dbInstance
     .select({ id: whatsappMessages.id })
     .from(whatsappMessages)
@@ -1245,32 +1142,15 @@ async function processIncomingMessage(
     return;
   }
 
-  // v2.3.7 mapeia @lid → @s.whatsapp.net no webhook, mas preserva addressingMode: "lid"
-  const addressingMode = payload.data?.key?.addressingMode;
-  const isLid = replyJid.includes("@lid") || addressingMode === "lid";
-  console.log(`[WhatsApp Bot] Buscando usuário - fromPhone: ${fromPhone}, replyJid: ${replyJid}, isLid: ${isLid}, addressingMode: ${addressingMode}`);
+  console.log(`[WhatsApp Bot] Buscando usuário - fromPhone: ${fromPhone}`);
 
-  let userResult: any[] = [];
+  let userResult: any[] = await dbInstance
+    .select()
+    .from(users)
+    .where(eq(users.whatsappPhone, fromPhone))
+    .limit(1);
 
-  // Primeiro tenta buscar pelo LID salvo (se for mensagem com LID)
-  if (isLid) {
-    userResult = await dbInstance
-      .select()
-      .from(users)
-      .where(eq(users.whatsappLid, replyJid))
-      .limit(1);
-  }
-
-  // Se não encontrou pelo LID, busca pelo número
-  if (userResult.length === 0) {
-    userResult = await dbInstance
-      .select()
-      .from(users)
-      .where(eq(users.whatsappPhone, fromPhone))
-      .limit(1);
-  }
-
-  // Se ainda não encontrou, tentar com/sem o 55
+  // Tentar com/sem o prefixo 55 do Brasil
   if (userResult.length === 0) {
     const altPhone = fromPhone.startsWith("55") ? fromPhone.slice(2) : "55" + fromPhone;
     userResult = await dbInstance
@@ -1280,86 +1160,28 @@ async function processIncomingMessage(
       .limit(1);
   }
 
-  // Se for LID e encontrou usuário pelo número, atualizar o LID salvo (pode ter mudado após reconexão)
-  if (userResult.length > 0 && isLid && userResult[0].whatsappLid !== replyJid) {
-    console.log(`[WhatsApp Bot] Atualizando LID: ${userResult[0].whatsappLid ?? "(vazio)"} → ${replyJid} para usuário ${userResult[0].id}`);
-    await dbInstance
-      .update(users)
-      .set({ whatsappLid: replyJid, updatedAt: new Date() })
-      .where(eq(users.id, userResult[0].id));
-    userResult[0].whatsappLid = replyJid;
-  }
-
-  // Se for LID e não encontrou por nenhum método, buscar QUALQUER usuário com whatsappPhone preenchido
-  // (workaround para quando o LID não corresponde ao número)
-  if (userResult.length === 0 && isLid) {
-    userResult = await dbInstance
-      .select()
-      .from(users)
-      .where(isNotNull(users.whatsappPhone))
-      .limit(10);
-    
-    // Se só tem um usuário com WhatsApp vinculado, usar esse
-    if (userResult.length === 1) {
-      console.log(`[WhatsApp Bot] Único usuário com WhatsApp vinculado: ${userResult[0].id}, auto-vinculando LID`);
-      await dbInstance
-        .update(users)
-        .set({ whatsappLid: replyJid, updatedAt: new Date() })
-        .where(eq(users.id, userResult[0].id));
-    } else {
-      // Múltiplos usuários - não consegue determinar qual é
-      userResult = [];
-    }
-  }
-
   if (userResult.length === 0) {
-    console.log(`[WhatsApp Bot] Usuário não encontrado para fromPhone=${fromPhone}, replyJid=${replyJid}`);
-    // Enviar para o número do próprio bot como fallback (não vai funcionar para LID)
-    // Não enviar nada se for LID pois vai dar erro
-    if (!isLid) {
-      await sendWhatsAppMessage(
-        replyJid,
-        `⚠️ Seu número não está vinculado ao SGF.\n\nPara vincular, acesse *Perfil → WhatsApp Bot* no sistema e siga as instruções.`
-      );
-    }
+    console.log(`[WhatsApp Bot] Usuário não encontrado para fromPhone=${fromPhone}`);
+    await sendWhatsAppMessage(
+      fromPhone,
+      `⚠️ Seu número não está vinculado ao SGF.\n\nPara vincular, acesse *Perfil → WhatsApp Bot* no sistema e siga as instruções.`
+    );
     return;
   }
 
   const user = userResult[0];
-
-  // Destino de envio:
-  // - @lid (isLid=true): usa @s.whatsapp.net para aproveitar OnWhatsappCache do v2.3.7.
-  //   Quando a Evolution API recebe mensagem de conta @lid, ela popula o cache
-  //   com lid=lid para aquele número. Enviar para @s.whatsapp.net logo depois
-  //   faz o v2.3.7 roteá-la internamente via @lid (confirmado: status 1/SERVER_ACK nos logs).
-  //   Enviar direto ao @lid resulta em PENDING mesmo no v2.3.7.
-  // - normal: usa número de telefone puro para resolução via Evolution API
-  let sendTarget: string;
-  if (isLid && user.whatsappPhone) {
-    sendTarget = `${user.whatsappPhone}@s.whatsapp.net`;
-    console.log(`[WhatsApp Bot] LID mode — enviando para @s.whatsapp.net via cache v2.3.7: ${sendTarget}`);
-  } else if (isLid && replyJid.includes("@s.whatsapp.net")) {
-    sendTarget = replyJid;
-    console.log(`[WhatsApp Bot] LID mode — usando replyJid @s.whatsapp.net: ${sendTarget}`);
-  } else if (user.whatsappPhone) {
-    sendTarget = user.whatsappPhone;
-  } else {
-    sendTarget = replyJid;
-  }
-
+  const sendTarget = user.whatsappPhone || fromPhone;
+  const messageType = msg.messageType;
   const sendReply = (txt: string) => sendWhatsAppMessage(sendTarget, txt);
 
   // 2. Verificar se há fluxo de anexo pendente
-  const pendingAttach = pendingAttachments.get(replyJid);
+  const pendingAttach = pendingAttachments.get(fromPhone);
   if (pendingAttach && Date.now() < pendingAttach.expiresAt) {
-    const messageType = payload.data?.messageType ?? "conversation";
-    let responseText = payload.data.message?.conversation ||
-      payload.data.message?.extendedTextMessage?.text || "";
+    let responseText = msg.text;
 
     // Transcrever voz se necessário
-    if ((messageType === "audioMessage" || messageType === "pttMessage") && !responseText) {
-      const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-      const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+    if (messageType === "audio" && !responseText && msg.mediaId) {
+      const mediaData = await downloadCloudMedia(msg.mediaId);
       if (mediaData) {
         const tr = await transcribeAudioWithGemini(mediaData.buffer, mediaData.mimeType);
         if (tr.ok) responseText = tr.text;
@@ -1371,7 +1193,7 @@ async function processIncomingMessage(
     if (pendingAttach.stage === "awaiting_mode") {
       if (trimmed === "1") {
         // Nova transação — pedir descrição por voz/texto (documento será anexado automaticamente)
-        pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_description" });
+        pendingAttachments.set(fromPhone, { ...pendingAttach, stage: "awaiting_description" });
         await sendReply(`📎 Documento guardado!\n\nDescreva a transação por *voz* ou *texto* que ela será criada com o documento já anexado.\n\n*0* — Cancelar`);
         return;
       }
@@ -1380,7 +1202,7 @@ async function processIncomingMessage(
         // Anexar a transação existente — verificar se há múltiplas entidades
         const allEntities = await db.getEntitiesByUserId(pendingAttach.userId);
         if (allEntities.length === 0) {
-          pendingAttachments.delete(replyJid);
+          pendingAttachments.delete(fromPhone);
           await sendReply(`⚠️ Nenhuma entidade encontrada. Cadastre uma entidade no sistema.`);
           return;
         }
@@ -1388,7 +1210,7 @@ async function processIncomingMessage(
         if (allEntities.length > 1) {
           // Múltiplas entidades: pedir para escolher
           const listStr = allEntities.map((e: { id: number; name: string }, i: number) => `*${i + 1}* — ${e.name}`).join("\n");
-          pendingAttachments.set(replyJid, {
+          pendingAttachments.set(fromPhone, {
             ...pendingAttach,
             stage: "awaiting_entity",
             entities: allEntities,
@@ -1398,14 +1220,14 @@ async function processIncomingMessage(
         }
 
         // Entidade única: pedir mês
-        pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_month", entityId: allEntities[0].id });
+        pendingAttachments.set(fromPhone, { ...pendingAttach, stage: "awaiting_month", entityId: allEntities[0].id });
         await sendReply(`📅 *Qual o mês de vencimento?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
         return;
       }
 
       // Cancelar
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1414,7 +1236,7 @@ async function processIncomingMessage(
     // Extração falhou — usuário descreveu por voz/texto → criar transação e anexar o arquivo
     if (pendingAttach.stage === "awaiting_description") {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1442,14 +1264,14 @@ async function processIncomingMessage(
       }
       const extracted = extractionResult.data;
       const pendingFileMeta = { mediaUrl: pendingAttach.mediaUrl, mimeType: pendingAttach.mimeType, filename: pendingAttach.filename, fileSize: pendingAttach.fileSize };
-      pendingAttachments.delete(replyJid);
-      await startTxSetupFlow(replyJid, extracted, user.id, org?.id ?? null, messageId, sendReply, userEntities, pendingFileMeta);
+      pendingAttachments.delete(fromPhone);
+      await startTxSetupFlow(fromPhone, extracted, user.id, org?.id ?? null, messageId, sendReply, userEntities, pendingFileMeta);
       return;
     }
 
     if (pendingAttach.stage === "awaiting_entity" && pendingAttach.entities) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1461,14 +1283,14 @@ async function processIncomingMessage(
         return;
       }
 
-      pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_month", entityId: chosenEntity.id });
+      pendingAttachments.set(fromPhone, { ...pendingAttach, stage: "awaiting_month", entityId: chosenEntity.id });
       await sendReply(`📅 *Qual o mês de vencimento?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
       return;
     }
 
     if (pendingAttach.stage === "awaiting_month") {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1479,13 +1301,13 @@ async function processIncomingMessage(
         return;
       }
 
-      await showPendingTransactionsList(replyJid, pendingAttach, pendingAttach.entityId, parsed.month, parsed.year, sendReply);
+      await showPendingTransactionsList(fromPhone, pendingAttach, pendingAttach.entityId, parsed.month, parsed.year, sendReply);
       return;
     }
 
     if (pendingAttach.stage === "awaiting_match_confirm" && pendingAttach.transactions) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1497,7 +1319,7 @@ async function processIncomingMessage(
         return;
       }
 
-      pendingAttachments.set(replyJid, { ...pendingAttach, stage: "awaiting_type", selectedTransaction: chosen });
+      pendingAttachments.set(fromPhone, { ...pendingAttach, stage: "awaiting_type", selectedTransaction: chosen });
       await sendReply(
         `🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`
       );
@@ -1506,7 +1328,7 @@ async function processIncomingMessage(
 
     if (pendingAttach.stage === "awaiting_type" && pendingAttach.selectedTransaction) {
       if (trimmed === "0" || trimmed.toLowerCase().includes("cancel")) {
-        pendingAttachments.delete(replyJid);
+        pendingAttachments.delete(fromPhone);
         await sendReply(`❌ Operação cancelada.`);
         return;
       }
@@ -1524,7 +1346,7 @@ async function processIncomingMessage(
       }
 
       const chosen = pendingAttach.selectedTransaction;
-      pendingAttachments.delete(replyJid);
+      pendingAttachments.delete(fromPhone);
 
       try {
         const isComprovante = attachType === "COMPROVANTE_PAGAMENTO";
@@ -1615,13 +1437,12 @@ async function processIncomingMessage(
   }
 
   // 2c. Verificar setup pré-confirmação (entidade / meio de pagamento)
-  const txSetup = pendingTxSetup.get(replyJid);
+  const txSetup = pendingTxSetup.get(fromPhone);
   if (txSetup && Date.now() < txSetup.expiresAt) {
-    const setupText = (payload.data.message?.conversation ||
-      payload.data.message?.extendedTextMessage?.text || "").trim();
+    const setupText = msg.text.trim();
 
     if (setupText === "0" || setupText.toLowerCase().includes("cancel")) {
-      pendingTxSetup.delete(replyJid);
+      pendingTxSetup.delete(fromPhone);
       await sendReply(`❌ Operação cancelada.`);
       return;
     }
@@ -1632,12 +1453,12 @@ async function processIncomingMessage(
         await sendReply(`❓ Não entendi o valor. Digite apenas o número (ex: *100* ou *100,50*) ou *0* para cancelar.`);
         return;
       }
-      pendingTxSetup.delete(replyJid);
+      pendingTxSetup.delete(fromPhone);
       const updatedExtracted = { ...txSetup.extracted, amount: parsedAmount };
       const entities = await db.getEntitiesByUserId(txSetup.userId);
       const userEntities = entities.map((e: any) => ({ id: e.id, name: e.name }));
       await startTxSetupFlow(
-        replyJid, updatedExtracted, txSetup.userId, txSetup.organizationId,
+        fromPhone, updatedExtracted, txSetup.userId, txSetup.organizationId,
         txSetup.messageId, sendReply, userEntities, txSetup.pendingFile
       );
       return;
@@ -1650,9 +1471,9 @@ async function processIncomingMessage(
         await sendReply(`❓ Responda com o número da entidade ou *0* para cancelar.`);
         return;
       }
-      pendingTxSetup.delete(replyJid);
+      pendingTxSetup.delete(fromPhone);
       await resolvePaymentMethodStep(
-        replyJid, txSetup.extracted, txSetup.userId, txSetup.organizationId,
+        fromPhone, txSetup.extracted, txSetup.userId, txSetup.organizationId,
         chosen.id, txSetup.messageId, sendReply, txSetup.pendingFile
       );
       return;
@@ -1660,9 +1481,9 @@ async function processIncomingMessage(
 
     if (txSetup.stage === "awaiting_payment_method" && txSetup.paymentMethodOptions) {
       if (setupText === "0" || setupText.toLowerCase() === "pular") {
-        pendingTxSetup.delete(replyJid);
+        pendingTxSetup.delete(fromPhone);
         await goToConfirmation(
-          replyJid, txSetup.extracted, txSetup.userId, txSetup.organizationId,
+          fromPhone, txSetup.extracted, txSetup.userId, txSetup.organizationId,
           txSetup.entityId!, txSetup.messageId, sendReply, txSetup.pendingFile, undefined, undefined
         );
         return;
@@ -1674,9 +1495,9 @@ async function processIncomingMessage(
         await sendReply(`❓ Responda com o número ou *0* para pular.\n\n${list}`);
         return;
       }
-      pendingTxSetup.delete(replyJid);
+      pendingTxSetup.delete(fromPhone);
       await goToConfirmation(
-        replyJid, txSetup.extracted, txSetup.userId, txSetup.organizationId,
+        fromPhone, txSetup.extracted, txSetup.userId, txSetup.organizationId,
         txSetup.entityId!, txSetup.messageId, sendReply, txSetup.pendingFile, chosen.id, chosen.name
       );
       return;
@@ -1684,17 +1505,16 @@ async function processIncomingMessage(
   }
 
   // 3. Verificar se é uma resposta de confirmação pendente
-  const text = payload.data.message?.conversation ||
-    payload.data.message?.extendedTextMessage?.text || "";
+  const text = msg.text;
 
-  const pending = pendingConfirmations.get(replyJid);
+  const pending = pendingConfirmations.get(fromPhone);
 
   if (pending && Date.now() < pending.expiresAt) {
     const trimmed = text.trim();
 
     if (trimmed === "1") {
       // Confirmar transação
-      pendingConfirmations.delete(replyJid);
+      pendingConfirmations.delete(fromPhone);
 
       try {
         const extracted = pending.extracted;
@@ -1876,7 +1696,7 @@ async function processIncomingMessage(
         // Se veio com documento, perguntar o tipo antes de anexar
         if (pending.pendingFile) {
           await sendReply(successMsg);
-          pendingAttachments.set(replyJid, {
+          pendingAttachments.set(fromPhone, {
             mediaUrl: pending.pendingFile.mediaUrl,
             mimeType: pending.pendingFile.mimeType,
             filename: pending.pendingFile.filename,
@@ -1899,7 +1719,7 @@ async function processIncomingMessage(
         } else {
           // Transação por voz/texto — perguntar se tem anexo
           await sendReply(successMsg);
-          pendingAttachOffer.set(replyJid, { transactionId: firstTransactionId, expiresAt: Date.now() + 5 * 60 * 1000 });
+          pendingAttachOffer.set(fromPhone, { transactionId: firstTransactionId, expiresAt: Date.now() + 5 * 60 * 1000 });
           await sendReply(`📎 Deseja adicionar algum documento a esta transação?\n\n*1* — Sim\n*2* — Não`);
         }
       } catch (error) {
@@ -1913,7 +1733,7 @@ async function processIncomingMessage(
 
     if (trimmed === "2") {
       // Cancelar
-      pendingConfirmations.delete(replyJid);
+      pendingConfirmations.delete(fromPhone);
 
       await dbInstance
         .update(whatsappMessages)
@@ -1926,14 +1746,14 @@ async function processIncomingMessage(
   }
 
   // 2b. Resposta à oferta de anexo após criação de transação por voz/texto
-  const attachOffer = pendingAttachOffer.get(replyJid);
+  const attachOffer = pendingAttachOffer.get(fromPhone);
   if (attachOffer && Date.now() < attachOffer.expiresAt) {
-    const offerText = payload.data.message?.conversation || payload.data.message?.extendedTextMessage?.text || "";
+    const offerText = msg.text;
     const offerTrimmed = offerText.trim();
     if (offerTrimmed === "1") {
-      pendingAttachOffer.delete(replyJid);
+      pendingAttachOffer.delete(fromPhone);
       // Guardar transactionId — quando o arquivo chegar, vai direto para tipo
-      pendingAttachments.set(replyJid, {
+      pendingAttachments.set(fromPhone, {
         mediaUrl: "",
         mimeType: "",
         filename: "",
@@ -1949,12 +1769,12 @@ async function processIncomingMessage(
       return;
     }
     if (offerTrimmed === "2" || offerTrimmed === "0" || offerTrimmed.toLowerCase().includes("não") || offerTrimmed.toLowerCase().includes("nao")) {
-      pendingAttachOffer.delete(replyJid);
+      pendingAttachOffer.delete(fromPhone);
       await sendReply(`✅ Ok! Transação salva sem anexo.`);
       return;
     }
     // Qualquer outra mensagem ignora a oferta silenciosamente
-    pendingAttachOffer.delete(replyJid);
+    pendingAttachOffer.delete(fromPhone);
   }
 
   // 3. Verificar comandos especiais
@@ -1998,11 +1818,10 @@ async function processIncomingMessage(
   let mediaUrl: string | null = null;
 
   // ── Processar áudio ──────────────────────────────────────────────────────────
-  if (messageType === "audioMessage" || messageType === "pttMessage") {
+  if (messageType === "audio") {
     await sendReply(`🎙️ Transcrevendo seu áudio...`);
 
-    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-    const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+    const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
 
     if (!mediaData) {
       await sendReply(`❌ Não consegui baixar o áudio. Tente novamente.`);
@@ -2044,11 +1863,10 @@ async function processIncomingMessage(
   }
 
   // ── Processar imagem (comprovante) ───────────────────────────────────────────
-  else if (messageType === "imageMessage") {
+  else if (messageType === "image") {
     await sendReply(`📎 Documento recebido! Fazendo upload...`);
 
-    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-    const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+    const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
 
     if (!mediaData) {
       await sendReply(`❌ Não consegui baixar a imagem. Tente novamente.`);
@@ -2084,7 +1902,7 @@ async function processIncomingMessage(
     // Se estava aguardando arquivo para anexar a transação recém-criada, ir direto ao tipo
     if (pendingAttach?.stage === "awaiting_file_for_tx" && pendingAttach.targetTransactionId) {
       const tx = await db.getTransactionById(pendingAttach.targetTransactionId).catch(() => null) as any;
-      pendingAttachments.set(replyJid, {
+      pendingAttachments.set(fromPhone, {
         ...pendingAttach,
         mediaUrl: imageUrl,
         mimeType: mediaData.mimeType,
@@ -2097,7 +1915,7 @@ async function processIncomingMessage(
       return;
     }
 
-    pendingAttachments.set(replyJid, {
+    pendingAttachments.set(fromPhone, {
       mediaUrl: imageUrl,
       mimeType: mediaData.mimeType,
       filename: uploadedFilename || `imagem-${Date.now()}.jpg`,
@@ -2116,21 +1934,19 @@ async function processIncomingMessage(
   }
 
   // ── Processar texto ──────────────────────────────────────────────────────────
-  else if (messageType === "conversation" || messageType === "extendedTextMessage") {
-    if (!text.trim()) return;
-    extractedText = text.trim();
+  else if (messageType === "text") {
+    if (!msg.text.trim()) return;
+    extractedText = msg.text.trim();
   }
 
-  // ── Processar documento com legenda (compartilhamento direto de apps bancários) ─
-  else if (messageType === "documentWithCaptionMessage") {
-    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-    const mediaData = await downloadEvolutionMedia(messageId, instanceName);
+  // ── Processar documento ──────────────────────────────────────────────────────
+  else if (messageType === "document") {
+    const mediaData = msg.mediaId ? await downloadCloudMedia(msg.mediaId) : null;
     if (!mediaData) {
       await sendReply(`❌ Não consegui baixar o documento. Tente novamente.`);
       return;
     }
-    const mimeType = mediaData.mimeType;
-    const isImage = mimeType.startsWith("image/");
+    const mimeType = msg.mimeType || mediaData.mimeType;
     const ext = mimeType.includes("png") ? "png" : mimeType.includes("pdf") ? "pdf" : "jpg";
     const filename = `whatsapp-doc-${Date.now()}.${ext}`;
     let docUrl: string | null = null;
@@ -2180,61 +1996,6 @@ async function processIncomingMessage(
     return;
   }
 
-  // ── Processar documento (PDF) ────────────────────────────────────────────────
-  else if (messageType === "documentMessage") {
-    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
-    const mediaData = await downloadEvolutionMedia(messageId, instanceName);
-    if (!mediaData) {
-      await sendReply(`❌ Não consegui baixar o documento. Tente novamente.`);
-      return;
-    }
-    let docUrl: string | null = null;
-    let docFilename = `whatsapp-doc-${Date.now()}.pdf`;
-    try {
-      if (isS3Configured()) {
-        docUrl = await uploadToS3(mediaData.buffer, docFilename, mediaData.mimeType, "whatsapp");
-      } else {
-        const { storagePut } = await import("../storage");
-        const { url } = await storagePut(`whatsapp/${docFilename}`, mediaData.buffer, mediaData.mimeType);
-        docUrl = url;
-      }
-    } catch (uploadError) {
-      console.error("[WhatsApp Bot] Erro ao fazer upload do documento:", uploadError);
-    }
-    if (!docUrl) {
-      await sendReply(`❌ Não consegui fazer o upload do documento. Tente novamente.`);
-      return;
-    }
-    if (pendingAttach?.stage === "awaiting_file_for_tx" && pendingAttach.targetTransactionId) {
-      const tx = await db.getTransactionById(pendingAttach.targetTransactionId).catch(() => null) as any;
-      pendingAttachments.set(replyJid, {
-        ...pendingAttach,
-        mediaUrl: docUrl,
-        mimeType: mediaData.mimeType,
-        filename: docFilename,
-        fileSize: mediaData.buffer.length,
-        stage: "awaiting_type",
-        selectedTransaction: tx ? { id: tx.id, description: tx.description, amount: tx.amount, dueDate: tx.dueDate ? new Date(tx.dueDate).toLocaleDateString("pt-BR") : null } : pendingAttach.selectedTransaction,
-      });
-      await sendReply(`🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`);
-      return;
-    }
-    pendingAttachments.set(replyJid, {
-      mediaUrl: docUrl,
-      mimeType: mediaData.mimeType,
-      filename: docFilename,
-      fileSize: mediaData.buffer.length,
-      stage: "awaiting_mode",
-      userId: user.id,
-      entityId: defaultEntityId,
-      organizationId: org?.id ?? null,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    });
-    await sendReply(
-      `📎 *Documento recebido! O que deseja fazer?*\n\n*1* — Nova transação (extrair dados do documento)\n*2* — Anexar a uma transação já cadastrada\n*0* — Cancelar`
-    );
-    return;
-  }
 
   // ── Extrair transação do texto ───────────────────────────────────────────────
   if (!extractedText) return;
@@ -2274,113 +2035,76 @@ async function processIncomingMessage(
 
 export function registerWhatsAppBotRoutes(app: Express): void {
 
-  // ── GET /api/whatsapp/test?to=5511... — Testa envio direto via Evolution API ──
+  // ── GET /api/whatsapp/test?to=5511... — Testa envio via Cloud API ──────────────
   app.get("/api/whatsapp/test", async (req: Request, res: Response) => {
-    const evolutionUrl = process.env.EVOLUTION_API_URL;
-    const evolutionKey = process.env.EVOLUTION_API_KEY;
-    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || "sgf-bot";
     const to = (req.query.to as string) || "5511947728157";
-
-    const results: Record<string, unknown> = {};
-
-    // 0. Estado real da conexão Baileys
-    try {
-      const stateUrl = `${evolutionUrl?.replace(/\/$/, "")}/instance/connectionState/${instanceName}`;
-      const stateResp = await fetch(stateUrl, {
-        headers: { "apikey": evolutionKey! },
-      });
-      results.connectionState = { status: stateResp.status, body: await stateResp.json().catch(() => stateResp.text()) };
-    } catch (e) {
-      results.connectionState = { error: String(e) };
-    }
-
-    // 1. Testa envio de mensagem
-    try {
-      const sendUrl = `${evolutionUrl?.replace(/\/$/, "")}/message/sendText/${instanceName}`;
-      const sendResp = await fetch(sendUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": evolutionKey! },
-        body: JSON.stringify({ number: to, text: "🧪 Teste de envio SGF — " + new Date().toISOString() }),
-      });
-      results.send = { status: sendResp.status, body: await sendResp.json().catch(() => sendResp.text()) };
-    } catch (e) {
-      results.send = { error: String(e) };
-    }
-
-    // 2. Consulta JID do número via whatsappNumbers
-    try {
-      const checkUrl = `${evolutionUrl?.replace(/\/$/, "")}/chat/whatsappNumbers/${instanceName}`;
-      const checkResp = await fetch(checkUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": evolutionKey! },
-        body: JSON.stringify({ numbers: [to] }),
-      });
-      results.whatsappNumbers = { status: checkResp.status, body: await checkResp.json().catch(() => checkResp.text()) };
-    } catch (e) {
-      results.whatsappNumbers = { error: String(e) };
-    }
-
-    // 3. Se o parâmetro 'lid' for passado, testa envio direto ao @lid
-    const lidParam = req.query.lid as string | undefined;
-    if (lidParam) {
-      try {
-        const sendUrl = `${evolutionUrl?.replace(/\/$/, "")}/message/sendText/${instanceName}`;
-        const sendResp = await fetch(sendUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "apikey": evolutionKey! },
-          body: JSON.stringify({ number: lidParam, text: "🧪 Teste @lid direto — " + new Date().toISOString() }),
-        });
-        results.sendLid = { number: lidParam, status: sendResp.status, body: await sendResp.json().catch(() => sendResp.text()) };
-      } catch (e) {
-        results.sendLid = { error: String(e) };
-      }
-    }
-
-    return res.json(results);
+    await sendWhatsAppMessage(to, "🧪 Teste de envio SGF — " + new Date().toISOString());
+    return res.json({ ok: true, to });
   });
 
-  // ── POST /api/whatsapp/webhook — Recebe eventos da Evolution API ──────────────
+  // ── GET /api/whatsapp/webhook — Verificação do webhook pelo Meta ──────────────
+  app.get("/api/whatsapp/webhook", (req: Request, res: Response) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+    const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+
+    if (mode === "subscribe" && token === verifyToken) {
+      console.log("[WhatsApp Bot] Webhook verificado pelo Meta");
+      return res.status(200).send(challenge);
+    }
+    console.warn("[WhatsApp Bot] Falha na verificação do webhook — token inválido");
+    return res.status(403).json({ error: "Verificação falhou" });
+  });
+
+  // ── POST /api/whatsapp/webhook — Recebe eventos da Meta Cloud API ─────────────
   app.post("/api/whatsapp/webhook", async (req: Request, res: Response) => {
-    // Responder imediatamente para não bloquear a Evolution API
     res.status(200).json({ ok: true });
 
     try {
-      const payload = req.body as EvolutionWebhookPayload;
+      const body = req.body as any;
+      if (body.object !== "whatsapp_business_account") return;
 
-      // Processar apenas mensagens recebidas (não enviadas pelo bot)
-      // A Evolution API v2 envia eventos em maiúsculas (MESSAGES_UPSERT)
-      // enquanto versões anteriores usavam minúsculas (messages.upsert)
-      const eventNorm = (payload.event ?? "").toLowerCase().replace(/_/g, ".");
-      if (eventNorm !== "messages.upsert") return;
-      if (payload.data?.key?.fromMe === true) return;
+      for (const entry of (body.entry ?? [])) {
+        for (const change of (entry.changes ?? [])) {
+          if (change.field !== "messages") continue;
+          const value = change.value;
+          if (!value?.messages?.length) continue;
 
-      const remoteJid = payload.data?.key?.remoteJid ?? "";
-      const messageId = payload.data?.key?.id ?? "";
+          for (const message of value.messages) {
+            const messageId = message.id as string;
+            const fromPhone = message.from as string;
 
-      // Ignorar mensagens de grupos
-      if (remoteJid.includes("@g.us")) return;
+            if (!messageId || !fromPhone) continue;
+            if (!markMessageSeen(messageId)) {
+              console.log(`[WhatsApp Bot] Duplicata ignorada: ${messageId}`);
+              continue;
+            }
 
-      // Log do objeto key COMPLETO para descobrir onde vem o @lid real do remetente
-      console.log(`[WhatsApp Bot] key bruto: ${JSON.stringify(payload.data?.key)}`);
+            console.log(`[WhatsApp Bot] Mensagem recebida - from: ${fromPhone}, type: ${message.type}, id: ${messageId}`);
 
-      // Dedup atômico em memória ANTES de processar (evita envio duplicado)
-      if (!messageId || !markMessageSeen(messageId)) {
-        if (messageId) console.log(`[WhatsApp Bot] Duplicata ignorada no webhook: ${messageId}`);
-        return;
+            const msgType = message.type as string;
+            let normalized: NormalizedIncomingMessage;
+
+            if (msgType === "text") {
+              normalized = { messageType: "text", text: message.text?.body ?? "" };
+            } else if (msgType === "audio") {
+              normalized = { messageType: "audio", text: "", mediaId: message.audio?.id, mimeType: message.audio?.mime_type };
+            } else if (msgType === "image") {
+              normalized = { messageType: "image", text: "", mediaId: message.image?.id, caption: message.image?.caption, mimeType: message.image?.mime_type };
+            } else if (msgType === "document") {
+              normalized = { messageType: "document", text: "", mediaId: message.document?.id, caption: message.document?.caption, filename: message.document?.filename, mimeType: message.document?.mime_type };
+            } else {
+              console.log(`[WhatsApp Bot] Tipo de mensagem não suportado: ${msgType}`);
+              continue;
+            }
+
+            processIncomingMessage(fromPhone, messageId, normalized).catch(err => {
+              console.error("[WhatsApp Bot] Erro ao processar mensagem:", err);
+            });
+          }
+        }
       }
-
-      const fromPhone = normalizePhone(remoteJid);
-      const replyJid = getReplyJid(remoteJid);
-      const messageType = payload.data?.messageType ?? "conversation";
-
-      console.log(`[WhatsApp Bot] Mensagem recebida - remoteJid: ${remoteJid}, fromPhone: ${fromPhone}, replyJid: ${replyJid}`);
-
-      if (!fromPhone) return;
-
-      // Processar em background para não bloquear
-      processIncomingMessage(fromPhone, replyJid, messageId, messageType, payload).catch(err => {
-        console.error("[WhatsApp Bot] Erro ao processar mensagem:", err);
-      });
     } catch (error) {
       console.error("[WhatsApp Bot] Erro no webhook:", error);
     }
@@ -2499,7 +2223,7 @@ export function registerWhatsAppBotRoutes(app: Express): void {
         `• Enviar áudios ou mensagens de texto para registrar transações\n` +
         `• Anexar comprovantes a lançamentos pendentes\n\n` +
         `Para começar, é só mandar uma mensagem. 🚀`;
-      sendWhatsAppMessage(`${normalized}@s.whatsapp.net`, welcomeMsg).catch((err) =>
+      sendWhatsAppMessage(normalized, welcomeMsg).catch((err) =>
         console.warn("[WhatsApp Bot] Falha ao enviar boas-vindas:", err?.message)
       );
 
