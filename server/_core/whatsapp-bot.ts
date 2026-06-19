@@ -1024,10 +1024,18 @@ async function resolvePaymentMethodStep(
     dbInstance.select({ id: creditCardsSchema.id, name: creditCardsSchema.name }).from(creditCardsSchema).where(eqOp(creditCardsSchema.entityId, entityId)),
   ]);
 
-  const options: Array<{ id: number; name: string }> = [
+  const rawOptions: Array<{ id: number; name: string }> = [
     ...bankAccountsList.map((b: { id: number; name: string }) => ({ id: b.id, name: b.name })),
     ...creditCardsList.map((c: { id: number; name: string }) => ({ id: -c.id, name: `💳 ${c.name}` })),
   ];
+
+  // Deduplica por nome, mantendo a primeira ocorrência
+  const seen = new Set<string>();
+  const options = rawOptions.filter(o => {
+    if (seen.has(o.name)) return false;
+    seen.add(o.name);
+    return true;
+  });
 
   if (options.length === 0) {
     await goToConfirmation(fromPhone, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
