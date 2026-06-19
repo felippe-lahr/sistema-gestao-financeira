@@ -1,22 +1,16 @@
 /**
- * WhatsApp Bot — Integração Multi-Tenant via Meta WhatsApp Cloud API
+ * WhatsApp Bot — Integração Multi-Tenant via Evolution API
  *
  * Endpoints:
- *   GET  /api/whatsapp/webhook          — Verificação do webhook pelo Meta
- *   POST /api/whatsapp/webhook          — Recebe eventos da Meta Cloud API
+ *   POST /api/whatsapp/webhook          — Recebe eventos da Evolution API
  *   POST /api/whatsapp/link             — Inicia vinculação: envia código de verificação
  *   POST /api/whatsapp/verify           — Confirma o código e vincula o número
  *   DELETE /api/whatsapp/unlink         — Remove a vinculação do número
  *   GET  /api/whatsapp/status           — Retorna status da vinculação do usuário
  *
- * Variáveis de ambiente:
- *   WHATSAPP_PHONE_NUMBER_ID  — ID do número de telefone (Meta Developer Console)
- *   WHATSAPP_ACCESS_TOKEN     — Token de acesso permanente (System User)
- *   WHATSAPP_VERIFY_TOKEN     — Token de verificação do webhook (string secreta)
- *
  * Fluxo de cadastro de transação:
  *   1. Usuário envia mensagem de voz, texto ou imagem (comprovante)
- *   2. Bot transcreve o áudio (Gemini) ou lê a imagem (Gemini Vision)
+ *   2. Bot transcreve o áudio (Whisper) ou lê a imagem (Gemini Vision)
  *   3. GPT extrai: entidade, valor, data, descrição, tipo (débito/crédito)
  *   4. Bot envia resumo e pede confirmação (1 = confirmar, 2 = cancelar)
  *   5. Usuário responde 1 → transação cadastrada; 2 → cancelado
@@ -30,8 +24,8 @@ import { getDb } from "../db";
 import { sdk } from "./sdk";
 import { invokeLLM } from "./llm";
 import { uploadToS3, isS3Configured } from "./s3";
-import { eq, and, sql as sqlTag } from "drizzle-orm";
-import { users, whatsappMessages, creditCardInvoices, creditCardInvoiceAttachments } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
+import { users, whatsappMessages } from "../../drizzle/schema";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -57,7 +51,6 @@ interface ExtractedTransaction {
   installments?: number;
   isRecurring?: boolean;
   recurrenceFrequency?: "monthly" | "weekly" | "yearly";
-  recurrenceCount?: number; // quantas repetições ("por 12 meses" → 12, null = indefinido → padrão 12)
   confidence?: number;
 }
 
@@ -86,38 +79,42 @@ const pendingConfirmations = new Map<string, {
   organizationId: number | null;
   entityId: number;
   messageId: string;
-  expiresAt: number;
+  expiresAt: number; // timestamp ms
+  resolvedPaymentMethodId?: number | null;
   pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
-  resolvedPaymentMethodId?: number; // já resolvido antes da confirmação
 }>();
 
-// Pré-confirmação: resolve entidade e meio de pagamento quando necessário
-type TxSetupStage = "awaiting_amount" | "awaiting_entity" | "awaiting_payment_method";
+// Aguarda arquivo pendente para transação recém-criada (fluxo post-confirmation)
+// Stage "awaiting_file_for_tx": aguarda envio do arquivo pelo usuário
+// Extends pendingAttachments with targetTransactionId
+
+const pendingAttachOffer = new Map<string, {
+  transactionId: number;
+  expiresAt: number;
+}>();
+
 const pendingTxSetup = new Map<string, {
   extracted: ExtractedTransaction;
   userId: number;
   organizationId: number | null;
+  entityId?: number;
   messageId: string;
   expiresAt: number;
-  pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
-  stage: TxSetupStage;
-  entityId?: number;
+  stage: "awaiting_amount" | "awaiting_entity" | "awaiting_payment_method";
   entityOptions?: Array<{ id: number; name: string }>;
   paymentMethodOptions?: Array<{ id: number; name: string }>;
+  pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
 }>();
 
 // ─── Estado para fluxo de anexos em múltiplos passos ─────────────────────────
 type AttachmentStage =
   | "awaiting_mode"          // perguntou "nova transação ou existente?"
-  | "awaiting_description"   // extração falhou — aguardando descrição por voz/texto
-  | "awaiting_file_for_tx"   // usuário disse "sim" à oferta de anexo — aguardando arquivo
+  | "awaiting_description"   // aguarda voz/texto para descrever nova transação
   | "awaiting_entity"        // escolher entidade (quando usuário tem múltiplas)
   | "awaiting_month"         // escolher mês de vencimento
   | "awaiting_match_confirm" // escolher transação da lista filtrada
-  | "awaiting_type";         // tipo do documento (comprovante/boleto/NF/doc)
-
-// Após criar uma transação por voz/texto, guarda o id para perguntar se tem anexo
-const pendingAttachOffer = new Map<string, { transactionId: number; expiresAt: number }>();
+  | "awaiting_type"          // tipo do documento (comprovante/boleto/NF/doc)
+  | "awaiting_file_for_tx";  // aguarda envio do arquivo pelo usuário (post-confirmation)
 
 const pendingAttachments = new Map<string, {
   mediaUrl: string;
@@ -125,10 +122,14 @@ const pendingAttachments = new Map<string, {
   filename: string;
   fileSize: number;
   stage: AttachmentStage;
+  targetTransactionId?: number;
+  isCreditCard?: boolean;
+  creditCardId?: number;
+  invoiceMonth?: number;
+  invoiceYear?: number;
   entities?: Array<{ id: number; name: string }>;
   transactions?: Array<{ id: number; description: string; amount: number; dueDate: string | null }>;
   selectedTransaction?: { id: number; description: string; amount: number; dueDate: string | null };
-  targetTransactionId?: number; // fluxo "anexar a transação recém-criada"
   userId: number;
   entityId: number;
   organizationId: number | null;
@@ -143,6 +144,45 @@ const ATTACHMENT_TYPE_LABELS: Record<string, string> = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Normaliza número de telefone para formato internacional sem @s.whatsapp.net
+ * Ex: "5511947728157@s.whatsapp.net" → "5511947728157"
+ */
+function normalizePhone(jid: string): string {
+  // Remove sufixo @s.whatsapp.net/@lid/etc
+  const withoutSuffix = jid.replace(/@.*$/, "");
+  // Remove device ID do formato multi-device (ex: "5511947728157:15" → "5511947728157")
+  const withoutDevice = withoutSuffix.split(":")[0];
+  return withoutDevice.replace(/\D/g, "");
+}
+
+/**
+ * Extrai o JID para resposta — mantém o remoteJid original para suporte a LID
+ * WhatsApp Business usa @lid em vez de @s.whatsapp.net
+ */
+function getReplyJid(remoteJid: string): string {
+  // Se for LID ou s.whatsapp.net, retorna o JID completo para resposta
+  return remoteJid;
+}
+
+/**
+ * Normaliza uma mensagem recebida da Cloud API para formato interno
+ */
+function normalizeCloudMessage(message: any): NormalizedIncomingMessage {
+  const msgType = message.type as string;
+  if (msgType === "text") {
+    return { messageType: "text", text: message.text?.body ?? "" };
+  } else if (msgType === "audio") {
+    return { messageType: "audio", text: "", mediaId: message.audio?.id, mimeType: message.audio?.mime_type };
+  } else if (msgType === "image") {
+    return { messageType: "image", text: message.image?.caption ?? "", mediaId: message.image?.id, caption: message.image?.caption, mimeType: message.image?.mime_type };
+  } else if (msgType === "document") {
+    return { messageType: "document", text: message.document?.caption ?? "", mediaId: message.document?.id, caption: message.document?.caption, filename: message.document?.filename, mimeType: message.document?.mime_type };
+  }
+  // Fallback: tratar como texto vazio
+  return { messageType: "text", text: "" };
+}
 
 /**
  * Formata valor em centavos para BRL
@@ -164,7 +204,7 @@ function formatDate(dateStr: string): string {
 }
 
 /**
- * Envia mensagem de texto via Meta WhatsApp Cloud API.
+ * Envia mensagem de texto via WhatsApp Cloud API.
  */
 async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -175,7 +215,6 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
     return;
   }
 
-  // Aceita número puro ou com @s.whatsapp.net — normaliza para número puro
   const cleanTo = to.replace(/@.*$/, "").replace(/\D/g, "");
 
   try {
@@ -207,14 +246,13 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
 }
 
 /**
- * Baixa mídia da Meta WhatsApp Cloud API usando o media ID.
+ * Baixa mídia da WhatsApp Cloud API pelo mediaId
  */
 async function downloadCloudMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   if (!accessToken) return null;
 
   try {
-    // Passo 1: obter a URL de download da mídia
     const metaRes = await fetch(`https://graph.facebook.com/v20.0/${mediaId}`, {
       headers: { "Authorization": `Bearer ${accessToken}` },
     });
@@ -225,7 +263,6 @@ async function downloadCloudMedia(mediaId: string): Promise<{ buffer: Buffer; mi
     const metaData = await metaRes.json() as { url?: string; mime_type?: string };
     if (!metaData.url) return null;
 
-    // Passo 2: baixar os bytes da mídia
     const mediaRes = await fetch(metaData.url, {
       headers: { "Authorization": `Bearer ${accessToken}` },
     });
@@ -274,9 +311,9 @@ Entidades disponíveis: ${entitiesStr || "nenhuma"}
 Data de hoje: ${today}
 Cartões de crédito cadastrados: ${creditCardsStr}
 
-Retorne UM ÚNICO objeto JSON (NUNCA um array) com os campos:
+Retorne um JSON com os campos:
 - entityName: nome da entidade/centro de custo (string ou null)
-- amount: valor em reais como número decimal (ex: 150.50) — valor TOTAL, não por parcela. Use null se o valor NÃO for mencionado (não invente 0)
+- amount: valor em reais como número decimal (ex: 150.50) — valor TOTAL, não por parcela
 - date: data no formato YYYY-MM-DD (use hoje se não informado)
 - description: descrição curta da transação
 - type: "INCOME" para crédito/receita ou "EXPENSE" para débito/despesa
@@ -284,13 +321,11 @@ Retorne UM ÚNICO objeto JSON (NUNCA um array) com os campos:
 - paymentMethodName: meio de pagamento mencionado (string ou null)
 - creditCardName: se mencionar cartão de crédito (nubank, itaú, etc.), escolha EXATAMENTE um nome da lista de cartões cadastrados, ou null
 - installments: número de parcelas se mencionado ("4x", "em 4 vezes" → 4), ou null/1 se não parcelado
-- isRecurring: true se for recorrente/mensalidade/assinatura/contrato
+- isRecurring: true se for recorrente/mensalidade/assinatura
 - recurrenceFrequency: "monthly", "weekly" ou "yearly" (apenas se isRecurring=true)
-- recurrenceCount: número de repetições se mencionado ("por 12 meses" → 12, "6 meses" → 6, "1 ano" → 12, "sempre/todo mês" → null)
 - confidence: número de 0 a 1 indicando confiança na extração
 
-O único campo OBRIGATÓRIO é description. Se não houver uma descrição de transação, retorne null para o objeto inteiro.
-O valor (amount) pode ser null quando não mencionado — será perguntado depois. NÃO retorne null só porque o valor está ausente.
+Se não conseguir identificar um campo obrigatório (amount ou description), retorne null para o objeto inteiro.
 Retorne APENAS o JSON, sem texto adicional.`,
         },
         {
@@ -308,22 +343,13 @@ Retorne APENAS o JSON, sem texto adicional.`,
     if (!content || typeof content !== "string") return null;
 
     const cleaned = content.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
-    let parsed = JSON.parse(cleaned) as any;
+    const parsed = JSON.parse(cleaned) as ExtractedTransaction | null;
 
-    // O LLM às vezes retorna um array de transações ou aninha em { transactions/transaction }
-    if (Array.isArray(parsed)) {
-      parsed = parsed[0] ?? null;
-    } else if (parsed && typeof parsed === "object" && !parsed.description) {
-      if (Array.isArray(parsed.transactions)) parsed = parsed.transactions[0] ?? null;
-      else if (parsed.transaction && typeof parsed.transaction === "object") parsed = parsed.transaction;
-    }
-
-    // Só a descrição é obrigatória — o valor (amount) é perguntado depois quando ausente
-    if (!parsed || typeof parsed !== "object" || !parsed.description) {
+    if (!parsed || !parsed.amount || !parsed.description) {
       console.warn(`[WhatsApp Bot] Extração descartada — amount=${parsed?.amount}, description=${parsed?.description}`);
       return { ok: false as const, reason: "no_transaction" as const };
     }
-    return { ok: true as const, data: parsed as ExtractedTransaction };
+    return { ok: true as const, data: parsed };
   } catch (error) {
     console.error("[WhatsApp Bot] Erro ao extrair transação:", error);
     return { ok: false as const, reason: "llm_error" as const };
@@ -799,210 +825,56 @@ async function resolveCreditCardId(
  */
 function buildConfirmationMessage(
   extracted: ExtractedTransaction,
-  entityName: string,
-  resolvedPaymentMethodName?: string
+  entityName: string
 ): string {
   const typeLabel = extracted.type === "INCOME" ? "💰 Crédito" : "💸 Débito";
   const amountCents = Math.round((extracted.amount ?? 0) * 100);
-  const isVariable = amountCents <= 0;
-  const amountStr = isVariable ? "_valor variável_" : formatCurrency(amountCents);
+  const amountStr = formatCurrency(amountCents);
   const dateStr = extracted.date ? formatDate(extracted.date) : "hoje";
-
-  const freqLabel = extracted.recurrenceFrequency === "weekly" ? "semanal"
-    : extracted.recurrenceFrequency === "yearly" ? "anual"
-    : "mensal";
-  const recurrenceCount = extracted.recurrenceCount ?? 12;
   const recurring = extracted.isRecurring
-    ? `\n🔁 Recorrente: *${recurrenceCount}x* (${freqLabel})${isVariable ? "\n✏️ Valor preenchido a cada mês" : ""}`
+    ? `\n🔁 Recorrente (${extracted.recurrenceFrequency === "monthly" ? "mensal" : extracted.recurrenceFrequency === "weekly" ? "semanal" : "anual"}) — serão criados 12 lançamentos`
     : "";
-
   const installments = extracted.installments && extracted.installments > 1
     ? `\n🔢 Parcelado em ${extracted.installments}x de ${formatCurrency(Math.round(amountCents / extracted.installments))}`
     : "";
-
   const creditCard = extracted.creditCardName
     ? `\n💳 Cartão: ${extracted.creditCardName}`
     : "";
-
-  const paymentDisplay = resolvedPaymentMethodName ?? extracted.paymentMethodName;
 
   return `📋 *Confirmar transação?*
 
 ${typeLabel}: *${amountStr}*
 📝 ${extracted.description}
 🏷️ Entidade: ${entityName}
-📅 Data: ${dateStr}${extracted.categoryName ? `\n🗂️ Categoria: ${extracted.categoryName}` : ""}${extracted.bankAccountName ? `\n🏦 Conta: ${extracted.bankAccountName}` : ""}${paymentDisplay ? `\n💳 Pagamento: ${paymentDisplay}` : ""}${creditCard}${installments}${recurring}
+📅 Data: ${dateStr}${extracted.categoryName ? `\n🗂️ Categoria: ${extracted.categoryName}` : ""}${extracted.bankAccountName ? `\n🏦 Conta: ${extracted.bankAccountName}` : ""}${extracted.paymentMethodName ? `\n💳 Pagamento: ${extracted.paymentMethodName}` : ""}${creditCard}${installments}${recurring}
 
 Responda:
 *1* — Confirmar ✅
 *2* — Cancelar ❌`;
 }
 
-// ─── Fluxo pré-confirmação: resolve entidade e meio de pagamento ──────────────
-
-type SendReplyFn = (txt: string) => Promise<void>;
-type PendingFileMeta = { mediaUrl: string; mimeType: string; filename: string; fileSize: number };
-
-/** Converte texto digitado pelo usuário em valor numérico (aceita "100", "100,50", "R$ 1.000,50"). */
-function parseAmountInput(raw: string): number | null {
-  let s = raw.replace(/r\$/i, "").replace(/\s/g, "").trim();
-  if (!s) return null;
-  // Formato BR (1.000,50) → remove separador de milhar e troca vírgula decimal por ponto
-  if (s.includes(",")) {
-    s = s.replace(/\./g, "").replace(",", ".");
-  }
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : null;
-}
-
-async function goToConfirmation(
-  replyJid: string,
-  extracted: ExtractedTransaction,
-  userId: number,
-  organizationId: number | null,
-  entityId: number,
-  messageId: string,
-  sendReply: SendReplyFn,
-  pendingFile: PendingFileMeta | undefined,
-  resolvedPaymentMethodId: number | undefined,
-  resolvedPaymentMethodName: string | undefined
-) {
-  const entities = await db.getEntitiesByUserId(userId);
-  const entityName = entities.find((e: any) => e.id === entityId)?.name ?? "Entidade";
-  pendingConfirmations.set(replyJid, {
-    extracted,
-    userId,
-    organizationId,
-    entityId,
-    messageId,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-    pendingFile,
-    resolvedPaymentMethodId,
-  });
-  await sendReply(buildConfirmationMessage(extracted, entityName, resolvedPaymentMethodName));
-}
-
-async function resolvePaymentMethodStep(
-  replyJid: string,
-  extracted: ExtractedTransaction,
-  userId: number,
-  organizationId: number | null,
-  entityId: number,
-  messageId: string,
-  sendReply: SendReplyFn,
-  pendingFile: PendingFileMeta | undefined,
-  entityOptions?: Array<{ id: number; name: string }>
-) {
-  const methods = await db.getPaymentMethodsByEntityId(entityId, userId).catch(() => [] as any[]);
-
-  // Sem meios cadastrados → pula direto pra confirmação
-  if (methods.length === 0) {
-    await goToConfirmation(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
-    return;
-  }
-
-  // Nome mencionado e encontrado exatamente → resolve na hora
-  if (extracted.paymentMethodName) {
-    const normalized = extracted.paymentMethodName.toLowerCase().trim();
-    const match = methods.find((m: any) =>
-      m.name.toLowerCase().includes(normalized) || normalized.includes(m.name.toLowerCase())
-    );
-    if (match) {
-      await goToConfirmation(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, match.id, match.name);
-      return;
-    }
-  }
-
-  // Não mencionado ou não encontrado → sempre perguntar mostrando a lista
-  const notFoundNote = extracted.paymentMethodName
-    ? `❓ Meio de pagamento *"${extracted.paymentMethodName}"* não encontrado.\n\n`
-    : "";
-  const list = methods.map((m: any, i: number) => `*${i + 1}* — ${m.name}`).join("\n");
-  pendingTxSetup.set(replyJid, {
-    extracted,
-    userId,
-    organizationId,
-    messageId,
-    entityId,
-    stage: "awaiting_payment_method",
-    paymentMethodOptions: methods,
-    pendingFile,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
-  await sendReply(`${notFoundNote}💳 *Qual o meio de pagamento?*\n\n${list}\n\n*0* — Pular`);
-}
-
-async function startTxSetupFlow(
-  replyJid: string,
-  extracted: ExtractedTransaction,
-  userId: number,
-  organizationId: number | null,
-  messageId: string,
-  sendReply: SendReplyFn,
-  userEntities: Array<{ id: number; name: string }>,
-  pendingFile?: PendingFileMeta
-) {
-  // Valor ausente. Para recorrências (contas de consumo: gás, luz, água) o valor
-  // é variável e preenchido mês a mês — segue sem perguntar. Para transações
-  // avulsas o valor é obrigatório, então perguntamos antes de prosseguir.
-  if ((!extracted.amount || extracted.amount <= 0) && !extracted.isRecurring) {
-    pendingTxSetup.set(replyJid, {
-      extracted,
-      userId,
-      organizationId,
-      messageId,
-      stage: "awaiting_amount",
-      pendingFile,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    });
-    await sendReply(
-      `💰 *Qual o valor?*\n\n_${extracted.description ?? "Transação"}_\n\nDigite o valor em reais (ex: *100* ou *100,50*) ou *0* para cancelar.`
-    );
-    return;
-  }
-
-  // Resolver entidade
-  let entityId = resolveEntityId(extracted.entityName, userEntities);
-
-  // Entidade única — sempre usa ela mesmo sem mencionar
-  if (!entityId && userEntities.length === 1) {
-    entityId = userEntities[0].id;
-  }
-
-  if (!entityId && userEntities.length > 1) {
-    const list = userEntities.map((e, i) => `*${i + 1}* — ${e.name}`).join("\n");
-    pendingTxSetup.set(replyJid, {
-      extracted,
-      userId,
-      organizationId,
-      messageId,
-      stage: "awaiting_entity",
-      entityOptions: userEntities,
-      pendingFile,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    });
-    await sendReply(`🏢 *Qual entidade?*\n\n${list}\n\n*0* — Cancelar`);
-    return;
-  }
-
-  if (!entityId) {
-    await sendReply(`❌ Não encontrei a entidade. Verifique suas entidades no sistema.`);
-    return;
-  }
-
-  await resolvePaymentMethodStep(replyJid, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile);
-}
-
 /**
- * Processa uma mensagem recebida do WhatsApp
+ * Interpreta input de valor monetário digitado pelo usuário.
+ * Aceita: "100", "100,50", "100.50", "R$100", etc.
+ * Retorna valor em reais (float) ou null se inválido.
  */
+function parseAmountInput(input: string): number | null {
+  const cleaned = input.replace(/[^\d,\.]/g, "").trim();
+  if (!cleaned) return null;
+  // "100,50" → "100.50"
+  const normalized = cleaned.replace(",", ".");
+  const value = parseFloat(normalized);
+  if (isNaN(value) || value < 0) return null;
+  return value;
+}
+
 /**
  * Busca transações PENDING da entidade para o mês/ano informado,
  * ordena vencidas primeiro e exibe lista numerada.
  * Avança o stage para awaiting_match_confirm.
  */
 async function showPendingTransactionsList(
-  phoneKey: string,
+  replyJid: string,
   pendingAttach: NonNullable<ReturnType<typeof pendingAttachments.get>>,
   entityId: number,
   month: number,
@@ -1012,101 +884,51 @@ async function showPendingTransactionsList(
   const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   const monthLabel = `${MONTH_NAMES[month - 1]}/${year}`;
 
-  // Transações regulares (sem cartão de crédito)
   const [pendingTx, overdueTx] = await Promise.all([
-    db.getTransactionsByEntityId(entityId, { status: "PENDING", limit: 200, excludeCreditCard: true }),
-    db.getTransactionsByEntityId(entityId, { status: "OVERDUE", limit: 200, excludeCreditCard: true }),
+    db.getTransactionsByEntityId(entityId, { status: "PENDING", limit: 200 }),
+    db.getTransactionsByEntityId(entityId, { status: "OVERDUE", limit: 200 }),
   ]);
+  const allTx = [...(pendingTx as any[]), ...(overdueTx as any[])];
 
-  // Filtrar pelo mês/ano (aceita fuso local ou UTC)
-  const matchesMonth = (dueDate: any) => {
-    if (!dueDate) return false;
-    const d = new Date(dueDate);
-    return (d.getMonth() + 1 === month && d.getFullYear() === year) ||
-           (d.getUTCMonth() + 1 === month && d.getUTCFullYear() === year);
-  };
+  // Filtrar pelo mês/ano informado
+  const filtered = (allTx as any[]).filter((t: any) => {
+    if (!t.dueDate) return false;
+    const d = new Date(t.dueDate);
+    return d.getUTCMonth() + 1 === month && d.getUTCFullYear() === year;
+  });
 
-  const regularTx = [...(pendingTx as any[]), ...(overdueTx as any[])].filter((t: any) => matchesMonth(t.dueDate));
-
-  // Faturas de cartão de crédito com pendências no mês
-  const dbInstance = await (db as any).getDb?.() ?? null;
-  type CardInvoiceItem = { id: number; description: string; amount: number; dueDate: string | null; status: string; overdue: boolean; isCreditCard: true; creditCardId: number };
-  const cardItems: CardInvoiceItem[] = [];
-  try {
-    const cards = await db.getCreditCardsByEntityId(entityId);
-    const rawDb = await getDb();
-    if (rawDb && cards.length > 0) {
-      for (const card of cards as any[]) {
-        const startDate = new Date(year, month - 1, 1).toISOString();
-        const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
-        const rows = await rawDb.execute(
-          sqlTag`SELECT COALESCE(SUM(amount),0) as total, MIN("dueDate") as first_due
-                 FROM transactions
-                 WHERE "creditCardId" = ${card.id}
-                   AND "dueDate" >= ${startDate}
-                   AND "dueDate" <= ${endDate}
-                   AND status IN ('PENDING','OVERDUE')`
-        );
-        const row = (Array.isArray(rows) ? rows[0] : (rows as any).rows?.[0]) as any;
-        const total = Number(row?.total ?? 0);
-        if (total > 0) {
-          const firstDue = row?.first_due ? new Date(row.first_due).toLocaleDateString("pt-BR") : null;
-          const now = new Date();
-          const isOverdue = row?.first_due && new Date(row.first_due) < now;
-          cardItems.push({
-            id: -card.id,
-            description: `Fatura ${card.name}`,
-            amount: total,
-            dueDate: firstDue,
-            status: isOverdue ? "OVERDUE" : "PENDING",
-            overdue: !!isOverdue,
-            isCreditCard: true,
-            creditCardId: card.id,
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.warn("[WhatsApp Bot] Erro ao buscar faturas de cartão:", err);
-  }
-
-  if (regularTx.length === 0 && cardItems.length === 0) {
-    pendingAttachments.set(phoneKey, { ...pendingAttach, entityId, stage: "awaiting_month" });
+  if (filtered.length === 0) {
+    // Manter no stage awaiting_month para tentar outro mês
+    pendingAttachments.set(replyJid, { ...pendingAttach, entityId, stage: "awaiting_month" });
     await sendReply(`⚠️ Nenhuma transação pendente ou vencida em *${monthLabel}*.\n\nInforme outro mês ou *0* para cancelar.`);
     return;
   }
 
   const now = new Date();
 
-  const overdue = regularTx.filter((t: any) => t.status === "OVERDUE" || new Date(t.dueDate) < now);
-  const upcoming = regularTx.filter((t: any) => t.status !== "OVERDUE" && new Date(t.dueDate) >= now);
+  // Separar vencidas (status OVERDUE ou dueDate passado) das futuras
+  const overdue = filtered.filter((t: any) => t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now));
+  const upcoming = filtered.filter((t: any) => t.status !== "OVERDUE" && (!t.dueDate || new Date(t.dueDate) >= now));
   overdue.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   upcoming.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  const overdueCards = cardItems.filter(c => c.overdue);
-  const pendingCards = cardItems.filter(c => !c.overdue);
 
-  const combined = [...overdueCards, ...overdue, ...pendingCards, ...upcoming].slice(0, 10);
+  const combined = [...overdue, ...upcoming].slice(0, 10);
 
   const txForList = combined.map((t: any) => ({
     id: t.id,
     description: t.description,
     amount: t.amount,
-    dueDate: t.dueDate,
-    status: t.status,
-    overdue: t.overdue ?? (t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now)),
-    isCreditCard: t.isCreditCard ?? false,
-    creditCardId: t.creditCardId ?? null,
-    invoiceMonth: t.isCreditCard ? month : undefined,
-    invoiceYear: t.isCreditCard ? year : undefined,
+    dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
+    overdue: t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now),
   }));
 
   const listStr = txForList.map((t, i) => {
-    const flag = t.isCreditCard ? "💳" : t.overdue ? "🔴" : "🟡";
+    const flag = t.overdue ? "🔴" : "🟡";
     const venc = t.dueDate ? `Vence ${t.dueDate}` : "sem vencimento";
     return `*${i + 1}* ${flag} ${t.description}\n    ${formatCurrency(t.amount)} • ${venc}`;
   }).join("\n");
 
-  pendingAttachments.set(phoneKey, {
+  pendingAttachments.set(replyJid, {
     ...pendingAttach,
     stage: "awaiting_match_confirm",
     entityId,
@@ -1115,8 +937,148 @@ async function showPendingTransactionsList(
   });
 
   await sendReply(
-    `📋 *Transações de ${monthLabel}:*\n🔴 Vencida  🟡 Pendente  💳 Fatura\n\n${listStr}\n\n*0* — Cancelar`
+    `📋 *Transações de ${monthLabel}:*\n🔴 Vencida  🟡 Pendente\n\n${listStr}\n\n*0* — Cancelar`
   );
+}
+
+async function startTxSetupFlow(
+  fromPhone: string,
+  extracted: ExtractedTransaction,
+  userId: number,
+  organizationId: number | null,
+  messageId: string,
+  sendReply: (txt: string) => Promise<void>,
+  userEntities: Array<{ id: number; name: string }>,
+  pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number },
+): Promise<void> {
+  if (!extracted.amount || extracted.amount <= 0) {
+    pendingTxSetup.set(fromPhone, {
+      extracted,
+      userId,
+      organizationId,
+      messageId,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      stage: "awaiting_amount",
+      pendingFile,
+    });
+    await sendReply(`💰 *Qual o valor da transação?*\n\nDigite apenas o número (ex: *100* ou *100,50*).\n\n*0* — Cancelar`);
+    return;
+  }
+
+  if (userEntities.length === 0) {
+    await sendReply(`⚠️ Você não possui entidades cadastradas no SGF. Acesse o sistema para criar uma entidade primeiro.`);
+    return;
+  }
+
+  if (userEntities.length > 1) {
+    const resolved = resolveEntityId(extracted.entityName, userEntities);
+    if (!resolved) {
+      const listStr = userEntities.map((e, i) => `*${i + 1}* — ${e.name}`).join("\n");
+      pendingTxSetup.set(fromPhone, {
+        extracted,
+        userId,
+        organizationId,
+        messageId,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        stage: "awaiting_entity",
+        entityOptions: userEntities,
+        pendingFile,
+      });
+      await sendReply(`🏢 *Qual entidade?*\n\n${listStr}\n\n*0* — Cancelar`);
+      return;
+    }
+    await resolvePaymentMethodStep(fromPhone, extracted, userId, organizationId, resolved, messageId, sendReply, pendingFile);
+    return;
+  }
+
+  await resolvePaymentMethodStep(fromPhone, extracted, userId, organizationId, userEntities[0].id, messageId, sendReply, pendingFile);
+}
+
+async function resolvePaymentMethodStep(
+  fromPhone: string,
+  extracted: ExtractedTransaction,
+  userId: number,
+  organizationId: number | null,
+  entityId: number,
+  messageId: string,
+  sendReply: (txt: string) => Promise<void>,
+  pendingFile?: { mediaUrl: string; mimeType: string; filename: string; fileSize: number },
+): Promise<void> {
+  // Se já tem meio de pagamento extraído, pular
+  if (extracted.paymentMethodName || extracted.creditCardName) {
+    await goToConfirmation(fromPhone, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
+    return;
+  }
+
+  // Buscar contas bancárias e cartões para mostrar como opções
+  const dbInstance = await getDb();
+  if (!dbInstance) {
+    await goToConfirmation(fromPhone, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
+    return;
+  }
+
+  const { bankAccounts, creditCards: creditCardsSchema } = await import("../../drizzle/schema");
+  const { eq: eqOp } = await import("drizzle-orm");
+  const [bankAccountsList, creditCardsList] = await Promise.all([
+    dbInstance.select({ id: bankAccounts.id, name: bankAccounts.name }).from(bankAccounts).where(eqOp(bankAccounts.entityId, entityId)),
+    dbInstance.select({ id: creditCardsSchema.id, name: creditCardsSchema.name }).from(creditCardsSchema).where(eqOp(creditCardsSchema.entityId, entityId)),
+  ]);
+
+  const options: Array<{ id: number; name: string }> = [
+    ...bankAccountsList.map((b: { id: number; name: string }) => ({ id: b.id, name: b.name })),
+    ...creditCardsList.map((c: { id: number; name: string }) => ({ id: -c.id, name: `💳 ${c.name}` })),
+  ];
+
+  if (options.length === 0) {
+    await goToConfirmation(fromPhone, extracted, userId, organizationId, entityId, messageId, sendReply, pendingFile, undefined, undefined);
+    return;
+  }
+
+  const listStr = options.map((o, i) => `*${i + 1}* — ${o.name}`).join("\n");
+  pendingTxSetup.set(fromPhone, {
+    extracted,
+    userId,
+    organizationId,
+    entityId,
+    messageId,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    stage: "awaiting_payment_method",
+    paymentMethodOptions: options,
+    pendingFile,
+  });
+  await sendReply(`💳 *Meio de pagamento:*\n\n${listStr}\n\n*0* — Pular`);
+}
+
+async function goToConfirmation(
+  fromPhone: string,
+  extracted: ExtractedTransaction,
+  userId: number,
+  organizationId: number | null,
+  entityId: number,
+  messageId: string,
+  sendReply: (txt: string) => Promise<void>,
+  pendingFile: { mediaUrl: string; mimeType: string; filename: string; fileSize: number } | undefined,
+  resolvedPaymentMethodId: number | undefined,
+  resolvedPaymentMethodName: string | undefined,
+): Promise<void> {
+  const userEntities = await db.getEntitiesByUserId(userId).catch(() => [] as Array<{ id: number; name: string }>);
+  const entityName = userEntities.find((e: { id: number; name: string }) => e.id === entityId)?.name ?? "Entidade";
+
+  const finalExtracted = resolvedPaymentMethodName
+    ? { ...extracted, paymentMethodName: resolvedPaymentMethodName }
+    : extracted;
+
+  pendingConfirmations.set(fromPhone, {
+    extracted: finalExtracted,
+    userId,
+    organizationId,
+    entityId,
+    messageId,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    resolvedPaymentMethodId,
+    pendingFile,
+  });
+  await sendReply(buildConfirmationMessage(finalExtracted, entityName));
 }
 
 async function processIncomingMessage(
@@ -1131,7 +1093,7 @@ async function processIncomingMessage(
     return;
   }
 
-  // Deduplicação: ignorar se já foi processado
+  // Deduplicação: ignorar se já foi processado.
   const existing = await dbInstance
     .select({ id: whatsappMessages.id })
     .from(whatsappMessages)
@@ -1356,6 +1318,9 @@ async function processIncomingMessage(
         if ((chosen as any).isCreditCard && (chosen as any).creditCardId) {
           const rawDb = await getDb();
           if (rawDb) {
+            const { creditCardInvoices, creditCardInvoiceAttachments } = await import("../../drizzle/schema");
+            const { eq: eqOp, and } = await import("drizzle-orm");
+            const { sql: sqlTag } = await import("drizzle-orm");
             const cardId: number = (chosen as any).creditCardId;
             const invoiceMonth: number = (chosen as any).invoiceMonth;
             const invoiceYear: number = (chosen as any).invoiceYear;
@@ -1363,9 +1328,9 @@ async function processIncomingMessage(
             // Buscar ou criar registro da fatura
             let [invoice] = await rawDb.select().from(creditCardInvoices)
               .where(and(
-                eq(creditCardInvoices.creditCardId, cardId),
-                eq(creditCardInvoices.month, invoiceMonth),
-                eq(creditCardInvoices.year, invoiceYear),
+                eqOp(creditCardInvoices.creditCardId, cardId),
+                eqOp(creditCardInvoices.month, invoiceMonth),
+                eqOp(creditCardInvoices.year, invoiceYear),
               )).limit(1);
 
             if (!invoice) {
@@ -1520,11 +1485,10 @@ async function processIncomingMessage(
         const extracted = pending.extracted;
         const amountCents = Math.round((extracted.amount ?? 0) * 100);
         // Data em UTC puro (sem conversão de fuso) para evitar que "26/06" vire "25/06"
-        // quando o servidor salva em UTC e o banco interpreta meia-noite local como véspera.
         const baseDate = extracted.date
           ? (() => {
               const [y, m, d] = extracted.date!.split("-").map(Number);
-              return new Date(Date.UTC(y, m - 1, d, 12, 0, 0)); // meio-dia UTC = nunca muda de dia no Brasil
+              return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
             })()
           : new Date();
 
@@ -1561,21 +1525,10 @@ async function processIncomingMessage(
           : 1;
         const description = extracted.description ?? "Transação via WhatsApp";
 
-        // Quando há cartão de crédito, a data da primeira parcela considera o
-        // closingDay para determinar em qual fatura a compra cai, e retorna
-        // o 1º dia do mês de vencimento (mês seguinte ao fechamento).
-        //
-        // Exemplos com closingDay=29:
-        //   Compra em 08/jun → fatura fecha 29/jun → vence em julho → 01/07
-        //   Compra em 30/jun → fatura de jun já fechou → fatura fecha 29/jul → vence em agosto → 01/08
         const getFirstInstallmentDate = (referenceDate: Date): Date => {
           if (!creditCard) return referenceDate;
           const closingDay = creditCard.closingDay;
-          // monthOffset=0: fatura do mês atual (ainda não fechou), vence no mês+1
-          // monthOffset=1: fatura do mês seguinte (já passou do fechamento), vence no mês+2
           const monthOffset = referenceDate.getDate() >= closingDay ? 1 : 0;
-          // +1 porque o vencimento é sempre no mês APÓS o fechamento
-          // Usar 15:00 UTC (meio-dia BRT) para evitar que meia-noite UTC = véspera no Brasil
           return new Date(Date.UTC(
             referenceDate.getFullYear(),
             referenceDate.getMonth() + monthOffset + 1,
@@ -1588,7 +1541,7 @@ async function processIncomingMessage(
 
         // Status: cartão → PENDING (pago via fatura); data futura → PENDING; passado/hoje → PAID
         const today = new Date();
-        today.setUTCHours(12, 0, 0, 0); // normaliza para comparação sem influência de hora
+        today.setUTCHours(12, 0, 0, 0);
         const txStatus = (creditCard || baseDate > today) ? "PENDING" : "PAID";
 
         const basePayload = {
@@ -1622,7 +1575,6 @@ async function processIncomingMessage(
           firstTransactionId = createdIds[0];
         } else {
           // Recorrência de valor variável (conta de consumo sem valor informado):
-          // o 1º lançamento fica PENDENTE, sem data de pagamento, para preenchimento posterior.
           const isVariableRecurring = !!extracted.isRecurring && amountCents <= 0;
           const finalStatus = (creditCard || isVariableRecurring) ? "PENDING" : txStatus;
           firstTransactionId = await db.createTransaction({
@@ -1645,7 +1597,7 @@ async function processIncomingMessage(
         let recurringCount = 0;
         if (extracted.isRecurring && installments === 1) {
           const freq = extracted.recurrenceFrequency ?? "monthly";
-          const totalRecurrences = extracted.recurrenceCount ?? 12;
+          const totalRecurrences = (extracted as any).recurrenceCount ?? 12;
           for (let i = 1; i <= totalRecurrences; i++) {
             const dueDate = new Date(baseDate);
             if (freq === "monthly") dueDate.setMonth(dueDate.getMonth() + i);
@@ -1948,7 +1900,7 @@ async function processIncomingMessage(
     }
     const mimeType = msg.mimeType || mediaData.mimeType;
     const ext = mimeType.includes("png") ? "png" : mimeType.includes("pdf") ? "pdf" : "jpg";
-    const filename = `whatsapp-doc-${Date.now()}.${ext}`;
+    const filename = msg.filename || `whatsapp-doc-${Date.now()}.${ext}`;
     let docUrl: string | null = null;
     try {
       if (isS3Configured()) {
@@ -1959,7 +1911,7 @@ async function processIncomingMessage(
         docUrl = url;
       }
     } catch (uploadError) {
-      console.error("[WhatsApp Bot] Erro ao fazer upload do documento com legenda:", uploadError);
+      console.error("[WhatsApp Bot] Erro ao fazer upload do documento:", uploadError);
     }
     if (!docUrl) {
       await sendReply(`❌ Não consegui fazer o upload do documento. Tente novamente.`);
@@ -1967,7 +1919,7 @@ async function processIncomingMessage(
     }
     if (pendingAttach?.stage === "awaiting_file_for_tx" && pendingAttach.targetTransactionId) {
       const tx = await db.getTransactionById(pendingAttach.targetTransactionId).catch(() => null) as any;
-      pendingAttachments.set(replyJid, {
+      pendingAttachments.set(fromPhone, {
         ...pendingAttach,
         mediaUrl: docUrl,
         mimeType,
@@ -1979,7 +1931,7 @@ async function processIncomingMessage(
       await sendReply(`🗂️ *Qual o tipo do documento?*\n\n*1* — Comprovante de Pagamento ✅ (marca como pago)\n*2* — Boleto\n*3* — Nota Fiscal\n*4* — Documento\n*0* — Cancelar`);
       return;
     }
-    pendingAttachments.set(replyJid, {
+    pendingAttachments.set(fromPhone, {
       mediaUrl: docUrl,
       mimeType,
       filename,
@@ -1995,7 +1947,6 @@ async function processIncomingMessage(
     );
     return;
   }
-
 
   // ── Extrair transação do texto ───────────────────────────────────────────────
   if (!extractedText) return;
@@ -2028,83 +1979,68 @@ async function processIncomingMessage(
     })
     .where(eq(whatsappMessages.messageId, messageId));
 
-  await startTxSetupFlow(replyJid, extracted, user.id, org?.id ?? null, messageId, sendReply, userEntities);
+  await startTxSetupFlow(fromPhone, extracted, user.id, org?.id ?? null, messageId, sendReply, userEntities);
 }
 
 // ─── Registro de Rotas ────────────────────────────────────────────────────────
 
 export function registerWhatsAppBotRoutes(app: Express): void {
 
-  // ── GET /api/whatsapp/test?to=5511... — Testa envio via Cloud API ──────────────
-  app.get("/api/whatsapp/test", async (req: Request, res: Response) => {
-    const to = (req.query.to as string) || "5511947728157";
-    await sendWhatsAppMessage(to, "🧪 Teste de envio SGF — " + new Date().toISOString());
-    return res.json({ ok: true, to });
-  });
-
   // ── GET /api/whatsapp/webhook — Verificação do webhook pelo Meta ──────────────
   app.get("/api/whatsapp/webhook", (req: Request, res: Response) => {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
+
     const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
     if (mode === "subscribe" && token === verifyToken) {
-      console.log("[WhatsApp Bot] Webhook verificado pelo Meta");
+      console.log("[WhatsApp Bot] Webhook verificado com sucesso");
       return res.status(200).send(challenge);
     }
-    console.warn("[WhatsApp Bot] Falha na verificação do webhook — token inválido");
-    return res.status(403).json({ error: "Verificação falhou" });
+
+    console.log("[WhatsApp Bot] Webhook - verificação falhou");
+    return res.status(403).json({ error: "Forbidden" });
   });
 
-  // ── POST /api/whatsapp/webhook — Recebe eventos da Meta Cloud API ─────────────
+  // ── POST /api/whatsapp/webhook — Recebe eventos do Meta WhatsApp Cloud API ────
   app.post("/api/whatsapp/webhook", async (req: Request, res: Response) => {
+    // Responder imediatamente para não bloquear o Meta
     res.status(200).json({ ok: true });
 
     try {
       const body = req.body as any;
+
+      // Verificar se é um evento de mensagem válido
       if (body.object !== "whatsapp_business_account") return;
 
-      for (const entry of (body.entry ?? [])) {
-        for (const change of (entry.changes ?? [])) {
-          if (change.field !== "messages") continue;
-          const value = change.value;
-          if (!value?.messages?.length) continue;
+      const entry = body.entry?.[0];
+      const changes = entry?.changes?.[0];
+      const value = changes?.value;
 
-          for (const message of value.messages) {
-            const messageId = message.id as string;
-            const fromPhone = message.from as string;
+      if (!value?.messages?.[0]) return;
 
-            if (!messageId || !fromPhone) continue;
-            if (!markMessageSeen(messageId)) {
-              console.log(`[WhatsApp Bot] Duplicata ignorada: ${messageId}`);
-              continue;
-            }
+      const message = value.messages[0];
+      const fromPhone = normalizePhone(message.from);
+      const messageId = message.id;
 
-            console.log(`[WhatsApp Bot] Mensagem recebida - from: ${fromPhone}, type: ${message.type}, id: ${messageId}`);
+      if (!fromPhone || !messageId) return;
 
-            const msgType = message.type as string;
-            let normalized: NormalizedIncomingMessage;
-
-            if (msgType === "text") {
-              normalized = { messageType: "text", text: message.text?.body ?? "" };
-            } else if (msgType === "audio") {
-              normalized = { messageType: "audio", text: "", mediaId: message.audio?.id, mimeType: message.audio?.mime_type };
-            } else if (msgType === "image") {
-              normalized = { messageType: "image", text: "", mediaId: message.image?.id, caption: message.image?.caption, mimeType: message.image?.mime_type };
-            } else if (msgType === "document") {
-              normalized = { messageType: "document", text: "", mediaId: message.document?.id, caption: message.document?.caption, filename: message.document?.filename, mimeType: message.document?.mime_type };
-            } else {
-              console.log(`[WhatsApp Bot] Tipo de mensagem não suportado: ${msgType}`);
-              continue;
-            }
-
-            processIncomingMessage(fromPhone, messageId, normalized).catch(err => {
-              console.error("[WhatsApp Bot] Erro ao processar mensagem:", err);
-            });
-          }
-        }
+      // Dedup atômico em memória
+      if (!markMessageSeen(messageId)) {
+        console.log(`[WhatsApp Bot] Duplicata ignorada no webhook: ${messageId}`);
+        return;
       }
+
+      // Normalizar mensagem para formato interno
+      const msg: NormalizedIncomingMessage = normalizeCloudMessage(message);
+
+      console.log(`[WhatsApp Bot] Mensagem recebida - from: ${fromPhone}, type: ${msg.messageType}, id: ${messageId}`);
+
+      // Processar em background para não bloquear
+      processIncomingMessage(fromPhone, messageId, msg).catch(err => {
+        console.error("[WhatsApp Bot] Erro ao processar mensagem:", err);
+      });
     } catch (error) {
       console.error("[WhatsApp Bot] Erro no webhook:", error);
     }
@@ -2214,18 +2150,6 @@ export function registerWhatsAppBotRoutes(app: Express): void {
           updatedAt: new Date(),
         })
         .where(eq(users.id, user.id));
-
-      // Enviar mensagem de boas-vindas
-      const firstName = (user.name ?? "").split(" ")[0] || "usuário";
-      const welcomeMsg =
-        `👋 Olá, ${firstName}! Seu WhatsApp foi vinculado com sucesso ao UnifiquePro.\n\n` +
-        `A partir de agora você pode:\n` +
-        `• Enviar áudios ou mensagens de texto para registrar transações\n` +
-        `• Anexar comprovantes a lançamentos pendentes\n\n` +
-        `Para começar, é só mandar uma mensagem. 🚀`;
-      sendWhatsAppMessage(normalized, welcomeMsg).catch((err) =>
-        console.warn("[WhatsApp Bot] Falha ao enviar boas-vindas:", err?.message)
-      );
 
       return res.json({ success: true, message: "WhatsApp vinculado com sucesso!" });
     } catch (error) {
