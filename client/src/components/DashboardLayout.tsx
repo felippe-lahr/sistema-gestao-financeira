@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark, CreditCard, Smartphone, BarChart2, TrendingUp, Shield, Zap } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark, CreditCard, Smartphone, TrendingUp, Shield, Zap } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -172,11 +172,8 @@ function LoginForm() {
 
       <div className="relative z-10 text-center max-w-md">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-3 mb-10">
-          <BarChart2 style={{ color: 'oklch(0.52 0.16 256)', width: 32, height: 32 }} />
-          <span style={{ fontSize: 26, fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
-            UnifiquePro
-          </span>
+        <div className="flex items-center justify-center mb-10">
+          <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ height: 36, width: 'auto' }} />
         </div>
 
         <h2 style={{ fontSize: 28, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.3, marginBottom: 16 }}>
@@ -223,9 +220,9 @@ function LoginForm() {
         >
           <div className="w-full max-w-md">
             {/* Logo mobile */}
-            <div className="flex items-center justify-center gap-2 mb-8 lg:hidden">
-              <BarChart2 style={{ color: 'oklch(0.52 0.16 256)', width: 24, height: 24 }} />
-              <span style={{ fontSize: 20, fontWeight: 800, color: '#16161A' }}>UnifiquePro</span>
+            <div className="flex items-center justify-center mb-8 lg:hidden">
+              <img src="/logo-unifique-pro.png" alt="UnifiquePro" className="dark:hidden" style={{ height: 30, width: 'auto' }} />
+              <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" className="hidden dark:block" style={{ height: 30, width: 'auto' }} />
             </div>
 
             <div className="mb-8 text-center">
@@ -297,9 +294,9 @@ function LoginForm() {
       >
         <div className="w-full max-w-md">
           {/* Logo — visível apenas no mobile */}
-          <div className="flex items-center justify-center gap-2 mb-8 lg:hidden">
-            <BarChart2 style={{ color: 'oklch(0.52 0.16 256)', width: 24, height: 24 }} />
-            <span style={{ fontSize: 20, fontWeight: 800, color: '#16161A' }}>UnifiquePro</span>
+          <div className="flex items-center justify-center mb-8 lg:hidden">
+            <img src="/logo-unifique-pro.png" alt="UnifiquePro" className="dark:hidden" style={{ height: 30, width: 'auto' }} />
+            <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" className="hidden dark:block" style={{ height: 30, width: 'auto' }} />
           </div>
 
           {/* Título */}
@@ -683,11 +680,19 @@ function DashboardLayoutContent({
                 <Menu style={{ width: 18, height: 18, color: '#8A8A92' }} />
               </button>
               {!isCollapsed && (
-                <div className="flex items-center gap-2 min-w-0">
-                  <BarChart2 style={{ width: 22, height: 22, color: 'oklch(0.52 0.16 256)', flexShrink: 0 }} />
-                  <span style={{ fontSize: 19, fontWeight: 800, color: '#16161A', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-                    UnifiquePro
-                  </span>
+                <div className="flex items-center min-w-0">
+                  <img
+                    src="/logo-unifique-pro.png"
+                    alt="UnifiquePro"
+                    className="h-8 w-auto dark:hidden"
+                    style={{ maxWidth: 160 }}
+                  />
+                  <img
+                    src="/logo-unifique-pro-dark.png"
+                    alt="UnifiquePro"
+                    className="h-8 w-auto hidden dark:block"
+                    style={{ maxWidth: 160 }}
+                  />
                 </div>
               )}
             </div>
