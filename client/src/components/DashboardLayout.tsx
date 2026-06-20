@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark, CreditCard, Smartphone } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark, CreditCard, Smartphone, BarChart2, TrendingUp, Shield, Zap } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -154,27 +154,97 @@ function LoginForm() {
     }
   };
 
+  // Painel direito (dark) reutilizável
+  const RightPanel = ({ title, subtitle }: { title: string; subtitle?: string }) => (
+    <div
+      className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden flex-col items-center justify-center p-12"
+      style={{ background: '#16161A' }}
+    >
+      {/* Background decoration */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        aria-hidden="true"
+        style={{
+          backgroundImage: `radial-gradient(circle at 70% 30%, oklch(0.52 0.16 256 / 0.15) 0%, transparent 60%),
+            radial-gradient(circle at 20% 80%, oklch(0.52 0.12 158 / 0.1) 0%, transparent 50%)`,
+        }}
+      />
+
+      <div className="relative z-10 text-center max-w-md">
+        {/* Logo */}
+        <div className="flex items-center justify-center gap-3 mb-10">
+          <BarChart2 style={{ color: 'oklch(0.52 0.16 256)', width: 32, height: 32 }} />
+          <span style={{ fontSize: 26, fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
+            UnifiquePro
+          </span>
+        </div>
+
+        <h2 style={{ fontSize: 28, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.3, marginBottom: 16 }}>
+          {title}
+        </h2>
+        {subtitle && (
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 1.7, marginBottom: 48 }}>
+            {subtitle}
+          </p>
+        )}
+
+        {/* Trust stats */}
+        <div
+          className="grid grid-cols-3 gap-4"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 36 }}
+        >
+          {[
+            { value: '500+', label: 'empresas' },
+            { value: 'R$2M+', label: 'gerenciados' },
+            { value: '99.9%', label: 'uptime' },
+          ].map((stat) => (
+            <div key={stat.label} className="text-center">
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#FFFFFF', fontVariantNumeric: 'tabular-nums' }}>
+                {stat.value}
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   // Se o 2FA for necessário, exibir a tela de verificação
   if (requiresTwoFactor) {
     return (
       <div className="flex min-h-screen">
-        <div className="flex-1 flex items-center justify-center p-6 sm:p-10 bg-white dark:bg-gray-950 min-h-screen">
+        {/* Painel esquerdo — formulário 2FA */}
+        <div
+          className="flex-1 flex items-center justify-center p-6 sm:p-10 min-h-screen"
+          style={{ background: '#FFFFFF' }}
+        >
           <div className="w-full max-w-md">
-            <div className="flex justify-center mb-8 lg:hidden">
-              <img src="/logo-unifique-pro.png" alt="UnifiquePro" style={{ width: '220px' }} className="h-auto object-contain dark:hidden" />
-              <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '220px' }} className="h-auto object-contain hidden dark:block" />
+            {/* Logo mobile */}
+            <div className="flex items-center justify-center gap-2 mb-8 lg:hidden">
+              <BarChart2 style={{ color: 'oklch(0.52 0.16 256)', width: 24, height: 24 }} />
+              <span style={{ fontSize: 20, fontWeight: 800, color: '#16161A' }}>UnifiquePro</span>
             </div>
+
             <div className="mb-8 text-center">
               <div className="flex justify-center mb-4">
-                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-                  <Smartphone className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                <div
+                  className="p-3 rounded-full"
+                  style={{ background: 'oklch(0.96 0.028 256)' }}
+                >
+                  <Smartphone style={{ width: 32, height: 32, color: 'oklch(0.52 0.16 256)' }} />
                 </div>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Verificação em dois fatores</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                Abra o <strong>Google Authenticator</strong> e insira o código de 6 dígitos gerado para o <strong>UnifiquePro</strong>.
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: '#16161A', marginBottom: 8 }}>
+                Verificação em dois fatores
+              </h1>
+              <p style={{ fontSize: 14, color: '#8A8A92', lineHeight: 1.6 }}>
+                Abra o <strong style={{ color: '#3C3C44' }}>Google Authenticator</strong> e insira o código de 6 dígitos gerado para o <strong style={{ color: '#3C3C44' }}>UnifiquePro</strong>.
               </p>
             </div>
+
             <div className="space-y-6">
               <div className="flex justify-center">
                 <InputOTP
@@ -195,79 +265,70 @@ function LoginForm() {
               </div>
               <Button
                 onClick={handleVerify2FA}
-                className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm hover:shadow-md"
+                className="w-full"
                 disabled={twoFaLoading || totpCode.length !== 6}
+                style={{ height: 50 }}
               >
                 {twoFaLoading ? "Verificando..." : "Verificar e Entrar"}
               </Button>
               <button
                 type="button"
                 onClick={() => { setRequiresTwoFactor(false); setTotpCode(""); }}
-                className="w-full text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                style={{ width: '100%', fontSize: 14, color: '#8A8A92', background: 'none', border: 'none', cursor: 'pointer' }}
+                className="hover:text-[#3C3C44] transition-colors"
               >
                 ← Voltar ao login
               </button>
             </div>
           </div>
         </div>
-        {/* Painel direito */}
-        <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex-col items-center justify-center p-12">
-          {/* Ilustração financeira decorativa */}
-          <img
-            src="/login-bg.svg"
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none select-none"
-            aria-hidden="true"
-          />
-          <div className="relative z-10 text-center text-white max-w-md">
-            <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '260px' }} className="h-auto object-contain mx-auto mb-8 brightness-0 invert" />
-            <h2 className="text-3xl font-bold mb-4">Segurança em primeiro lugar</h2>
-            <p className="text-blue-100 text-lg">Seu acesso está protegido com autenticação de dois fatores.</p>
-          </div>
-        </div>
+
+        <RightPanel title="Segurança em primeiro lugar" subtitle="Seu acesso está protegido com autenticação de dois fatores." />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen" style={{ fontFamily: "'Manrope', system-ui, sans-serif" }}>
       {/* Painel esquerdo — formulário */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-10 bg-white dark:bg-gray-950 min-h-screen">
+      <div
+        className="flex-1 flex items-center justify-center p-6 sm:p-10 min-h-screen"
+        style={{ background: '#FFFFFF' }}
+      >
         <div className="w-full max-w-md">
           {/* Logo — visível apenas no mobile */}
-          <div className="flex justify-center mb-8 lg:hidden">
-            <img
-              src="/logo-unifique-pro.png"
-              alt="UnifiquePro"
-              style={{ width: '220px' }}
-              className="h-auto object-contain dark:hidden"
-            />
-            <img
-              src="/logo-unifique-pro-dark.png"
-              alt="UnifiquePro"
-              style={{ width: '220px' }}
-              className="h-auto object-contain hidden dark:block"
-            />
+          <div className="flex items-center justify-center gap-2 mb-8 lg:hidden">
+            <BarChart2 style={{ color: 'oklch(0.52 0.16 256)', width: 24, height: 24 }} />
+            <span style={{ fontSize: 20, fontWeight: 800, color: '#16161A' }}>UnifiquePro</span>
           </div>
 
           {/* Título */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Seja bem vindo</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Faça seu login ou cadastre-se</p>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: '#16161A', marginBottom: 6 }}>
+              Seja bem-vindo
+            </h1>
+            <p style={{ fontSize: 14, color: '#8A8A92' }}>Faça seu login ou cadastre-se</p>
           </div>
 
           {/* Alerta e-mail não verificado */}
           {emailNotVerified && (
-            <div className="mb-5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4 space-y-3">
-              <span className="text-amber-600 dark:text-amber-400 text-sm font-medium">⚠️ E-mail não verificado</span>
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                Verifique sua caixa de entrada e clique no link de ativação enviado para <strong>{unverifiedEmail}</strong>.
+            <div
+              className="mb-5 rounded-[12px] p-4 space-y-3"
+              style={{ background: '#FBF3E0', border: '1px solid #EFE7CF' }}
+            >
+              <span style={{ color: 'oklch(0.52 0.10 72)', fontSize: 14, fontWeight: 600 }}>
+                E-mail não verificado
+              </span>
+              <p style={{ fontSize: 13, color: 'oklch(0.45 0.09 72)', lineHeight: 1.5 }}>
+                Verifique sua caixa de entrada e clique no link de ativação enviado para{" "}
+                <strong>{unverifiedEmail}</strong>.
               </p>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
+                className="w-full"
+                style={{ borderColor: '#EFE7CF', color: 'oklch(0.52 0.10 72)' }}
                 onClick={handleResendVerification}
                 disabled={resendLoading || resendCooldown > 0}
               >
@@ -279,9 +340,23 @@ function LoginForm() {
           {/* Botão Google */}
           <a
             href="/api/auth/google"
-            className="flex items-center justify-center gap-3 w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 font-medium text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm hover:shadow-md mb-5"
+            className="flex items-center justify-center gap-3 w-full transition-all"
+            style={{
+              height: 50,
+              padding: '0 16px',
+              borderRadius: 12,
+              border: '1px solid #E4E4E8',
+              background: '#FFFFFF',
+              color: '#3C3C44',
+              fontWeight: 500,
+              fontSize: 14,
+              marginBottom: 20,
+              textDecoration: 'none',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#F6F6F8'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#FFFFFF'; }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5 flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style={{ width: 20, height: 20, flexShrink: 0 }}>
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
@@ -293,17 +368,21 @@ function LoginForm() {
           {/* Divisor */}
           <div className="relative mb-5">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-gray-200 dark:border-gray-800" />
+              <span className="w-full" style={{ borderTop: '1px solid #ECECEF' }} />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-gray-950 px-3 text-gray-400">ou entre com e-mail</span>
+            <div className="relative flex justify-center">
+              <span style={{ background: '#FFFFFF', padding: '0 12px', fontSize: 12, color: '#A6A6AE', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                ou entre com e-mail
+              </span>
             </div>
           </div>
 
           {/* Formulário */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">E-mail</Label>
+              <Label htmlFor="email" style={{ fontSize: 13, fontWeight: 600, color: '#3C3C44' }}>
+                E-mail
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -311,11 +390,12 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-blue-500"
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">Senha</Label>
+              <Label htmlFor="password" style={{ fontSize: 13, fontWeight: 600, color: '#3C3C44' }}>
+                Senha
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -324,79 +404,70 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-blue-500 pr-10"
+                  style={{ paddingRight: 48 }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: '#A6A6AE', background: 'none', border: 'none', cursor: 'pointer' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#5C5C66'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#A6A6AE'; }}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <EyeOff style={{ width: 16, height: 16 }} /> : <Eye style={{ width: 16, height: 16 }} />}
                 </button>
               </div>
             </div>
-            <div className="flex justify-end">
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{ width: 16, height: 16, borderRadius: 4, border: '1px solid #E4E4E8', accentColor: 'oklch(0.52 0.16 256)', cursor: 'pointer' }}
+                />
+                <Label htmlFor="rememberMe" style={{ fontSize: 13, fontWeight: 400, color: '#5C5C66', cursor: 'pointer' }}>
+                  Lembrar-me
+                </Label>
+              </div>
               <a
                 href="/recuperar-senha"
-                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline transition-colors"
+                style={{ fontSize: 13, color: 'oklch(0.52 0.16 256)', fontWeight: 500, textDecoration: 'none' }}
+                className="hover:underline transition-colors"
               >
                 Esqueci minha senha
               </a>
             </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="rememberMe"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-              />
-              <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer text-gray-600 dark:text-gray-400">
-                Manter conectado por 24 horas
-              </Label>
-            </div>
+
             <Button
               type="submit"
-              className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm hover:shadow-md"
+              className="w-full"
               disabled={isLoading}
+              style={{ height: 50 }}
             >
               {isLoading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-6 text-center" style={{ fontSize: 14, color: '#8A8A92' }}>
             Não tem uma conta?{" "}
-            <a href="/signup" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold hover:underline transition-colors">
+            <a
+              href="/signup"
+              style={{ color: 'oklch(0.52 0.16 256)', fontWeight: 600, textDecoration: 'none' }}
+              className="hover:underline transition-colors"
+            >
               Cadastre-se gratuitamente
             </a>
           </p>
         </div>
       </div>
 
-      {/* Painel direito — gradiente (oculto no mobile) */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex-col items-center justify-center p-12">
-        {/* Ilustração financeira decorativa */}
-        <img
-          src="/login-bg.svg"
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none select-none"
-          aria-hidden="true"
-        />
-        <div className="relative z-10 text-center text-white max-w-md">
-          <img
-            src="/logo-unifique-pro-dark.png"
-            alt="UnifiquePro"
-            style={{ width: '260px' }}
-            className="h-auto object-contain mx-auto mb-10 brightness-0 invert"
-          />
-          <h2 className="text-4xl font-bold mb-6 leading-tight">
-            Gerencie suas finanças com inteligência
-          </h2>
-          <p className="text-blue-100 text-xl leading-relaxed">
-            Controle transações, investimentos e patrimônio de múltiplas entidades em um único lugar.
-          </p>
-        </div>
-      </div>
+      <RightPanel
+        title="Controle total das suas finanças"
+        subtitle="Gerencie transações, investimentos e patrimônio de múltiplas entidades em um único lugar."
+      />
     </div>
   );
 }
@@ -450,11 +521,11 @@ function LiveClock() {
   }
 
   return (
-    <div className="flex flex-col gap-0.5 px-2 py-1.5 text-center border dark:border-gray-700-b border dark:border-gray-700-border dark:border-gray-700/40">
-      <div className="text-xs font-mono text-muted-foreground">
+    <div className="flex flex-col gap-0.5 px-2 py-1.5 text-center" style={{ borderBottom: '1px solid #ECECEF' }}>
+      <div className="text-xs font-mono" style={{ color: '#A6A6AE' }}>
         {formatDate(time)}
       </div>
-      <div className="text-sm font-mono font-medium tracking-wider">
+      <div className="text-sm font-mono font-medium tracking-wider" style={{ color: '#5C5C66', fontVariantNumeric: 'tabular-nums' }}>
         {formatTime(time)}
       </div>
     </div>
@@ -462,7 +533,7 @@ function LiveClock() {
 }
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
-const DEFAULT_WIDTH = 280;
+const DEFAULT_WIDTH = 252;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 480;
 
@@ -486,14 +557,14 @@ export default function DashboardLayout({
   useEffect(() => {
     // Verificar se o usuário marcou "Manter conectado por 24h"
     const rememberMe = JSON.parse(localStorage.getItem('rememberMe') || 'false');
-    
+
     // Se rememberMe está ativo, não aplicar timer de inatividade
     // A sessão será controlada apenas pelo JWT (24h fixas)
     if (rememberMe) {
       console.log('[Auth] RememberMe ativo - timer de inatividade desabilitado');
       return;
     }
-    
+
     // Sem rememberMe: logout após 30min de inatividade
     const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
     const resetTimer = () => {
@@ -595,40 +666,38 @@ function DashboardLayoutContent({
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"
-          className="border dark:border-gray-700-r-0"
+          style={{ background: '#FFFFFF', borderRight: '1px solid #ECECEF' }}
           disableTransition={isResizing}
         >
-          <SidebarHeader className="h-16 justify-center">
-            <div className="flex items-center justify-center gap-3 px-2 transition-all w-full">
+          {/* Sidebar Header - Logo */}
+          <SidebarHeader style={{ padding: '22px 16px 16px' }}>
+            <div className="flex items-center gap-2">
               <button
                 onClick={toggleSidebar}
-                className="h-10 w-10 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
+                className="flex items-center justify-center rounded-[10px] transition-colors focus:outline-none"
+                style={{ width: 36, height: 36 }}
                 aria-label="Toggle navigation"
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#F4F4F6'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
               >
-                <Menu className="h-5 w-5 text-muted-foreground" />
+                <Menu style={{ width: 18, height: 18, color: '#8A8A92' }} />
               </button>
-              {!isCollapsed ? (
-                <div className="flex items-center min-w-0 flex-1">
-                  <img
-                    src="/logo-unifique-pro.png"
-                    alt="UnifiquePro"
-                    style={{ width: '180px' }} className="h-auto object-contain dark:hidden"
-                  />
-                  <img
-                    src="/logo-unifique-pro-dark.png"
-                    alt="UnifiquePro"
-                    style={{ width: '180px' }} className="h-auto object-contain hidden dark:block"
-                  />
+              {!isCollapsed && (
+                <div className="flex items-center gap-2 min-w-0">
+                  <BarChart2 style={{ width: 22, height: 22, color: 'oklch(0.52 0.16 256)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 19, fontWeight: 800, color: '#16161A', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                    UnifiquePro
+                  </span>
                 </div>
-              ) : null}
+              )}
             </div>
           </SidebarHeader>
 
           <SidebarContent className="gap-0 flex flex-col">
-            <SidebarMenu className="px-2 py-1 flex-1">
+            <SidebarMenu style={{ padding: '4px 10px', flex: 1 }}>
+              {/* Main nav items */}
               {menuItems.map(item => {
                 const isActive = location === item.path;
-                // Mapear path para data-tour id
                 const tourId = {
                   '/': 'nav-home',
                   '/entities': 'nav-entities',
@@ -643,37 +712,72 @@ function DashboardLayoutContent({
                       isActive={isActive}
                       onClick={() => setLocation(item.path)}
                       tooltip={item.label}
-                      className={`h-10 transition-all font-normal`}
                       data-tour={tourId}
+                      style={{
+                        height: 38,
+                        borderRadius: 10,
+                        padding: '0 12px',
+                        fontSize: 14,
+                        fontWeight: isActive ? 600 : 500,
+                        color: isActive ? 'oklch(0.52 0.16 256)' : '#5C5C66',
+                        background: isActive ? 'oklch(0.96 0.028 256)' : 'transparent',
+                        transition: 'all 0.15s',
+                      }}
                     >
                       <item.icon
-                        className={`h-5 w-5 ${isActive ? "text-primary" : ""}`}
+                        style={{ width: 17, height: 17, color: isActive ? 'oklch(0.52 0.16 256)' : '#8A8A92', flexShrink: 0 }}
                       />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
               })}
+
+              {/* Divider */}
+              {!isCollapsed && (
+                <div style={{ margin: '8px 4px', borderTop: '1px solid #ECECEF' }} />
+              )}
+
+              {/* Secondary nav - Plans */}
               <SidebarMenuItem key="/planos">
                 <SidebarMenuButton
                   isActive={location === "/planos"}
                   onClick={() => setLocation("/planos")}
                   tooltip="Planos"
-                  className={`h-10 transition-all font-normal text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300`}
+                  style={{
+                    height: 38,
+                    borderRadius: 10,
+                    padding: '0 12px',
+                    fontSize: 14,
+                    fontWeight: location === "/planos" ? 600 : 500,
+                    color: location === "/planos" ? 'oklch(0.52 0.16 256)' : '#5C5C66',
+                    background: location === "/planos" ? 'oklch(0.96 0.028 256)' : 'transparent',
+                    transition: 'all 0.15s',
+                  }}
                 >
-                  <Crown className={`h-5 w-5 ${location === "/planos" ? "text-blue-600 dark:text-blue-400" : ""}`} />
+                  <Crown style={{ width: 17, height: 17, color: location === "/planos" ? 'oklch(0.52 0.16 256)' : '#8A8A92', flexShrink: 0 }} />
                   <span>Planos</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               {user?.role === "admin" && (
                 <SidebarMenuItem key="/admin">
                   <SidebarMenuButton
                     isActive={location === "/admin"}
                     onClick={() => setLocation("/admin")}
                     tooltip="Painel Admin"
-                    className={`h-10 transition-all font-normal text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300`}
+                    style={{
+                      height: 38,
+                      borderRadius: 10,
+                      padding: '0 12px',
+                      fontSize: 14,
+                      fontWeight: location === "/admin" ? 600 : 500,
+                      color: location === "/admin" ? 'oklch(0.52 0.16 256)' : '#5C5C66',
+                      background: location === "/admin" ? 'oklch(0.96 0.028 256)' : 'transparent',
+                      transition: 'all 0.15s',
+                    }}
                   >
-                    <ShieldCheck className={`h-5 w-5 ${location === "/admin" ? "text-purple-600 dark:text-purple-400" : ""}`} />
+                    <ShieldCheck style={{ width: 17, height: 17, color: location === "/admin" ? 'oklch(0.52 0.16 256)' : '#8A8A92', flexShrink: 0 }} />
                     <span>Painel Admin</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -681,32 +785,50 @@ function DashboardLayoutContent({
             </SidebarMenu>
           </SidebarContent>
 
-          <SidebarFooter className="p-3 space-y-2">
-            <div className="px-1 group-data-[collapsible=icon]:hidden">
-              <p className="text-[10px] text-muted-foreground/50 text-center select-none">
+          <SidebarFooter style={{ padding: '12px 10px 16px' }}>
+            {/* Version + date */}
+            <div className="group-data-[collapsible=icon]:hidden px-2 mb-2">
+              <p style={{ fontSize: 11, color: '#8A8A92', textAlign: 'center', userSelect: 'none' }}>
                 v{__APP_VERSION__}
               </p>
             </div>
+
             <LiveClock />
-            <div className="flex items-center justify-center group-data-[collapsible=icon]:justify-center">
+
+            {/* Mode toggle */}
+            <div className="flex items-center justify-center my-2">
               <ModeToggle />
             </div>
+
+            {/* User avatar card */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button data-tour="user-menu" className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-9 w-9 border dark:border-gray-700 shrink-0">
-                    <AvatarFallback className="text-xs font-medium">
+                <button
+                  data-tour="user-menu"
+                  className="flex items-center gap-3 w-full text-left focus:outline-none transition-all group-data-[collapsible=icon]:justify-center"
+                  style={{
+                    background: '#F6F6F8',
+                    border: '1px solid #EDEDF0',
+                    borderRadius: 12,
+                    padding: '10px 12px',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#D6D6DC'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#EDEDF0'; }}
+                >
+                  <Avatar style={{ width: 32, height: 32, flexShrink: 0 }}>
+                    <AvatarFallback style={{ fontSize: 12, fontWeight: 600, background: 'oklch(0.96 0.028 256)', color: 'oklch(0.52 0.16 256)' }}>
                       {user?.name?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium truncate leading-none">
+                    <p style={{ fontSize: 13, fontWeight: 600, color: '#16161A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
                       {user?.name || "-"}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate mt-1.5">
+                    <p style={{ fontSize: 11, color: '#8A8A92', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
                       {user?.email || "-"}
                     </p>
                   </div>
+                  <LogOut style={{ width: 14, height: 14, color: '#A6A6AE', flexShrink: 0 }} className="group-data-[collapsible=icon]:hidden" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
@@ -728,24 +850,30 @@ function DashboardLayoutContent({
             </DropdownMenu>
           </SidebarFooter>
         </Sidebar>
+
         <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
+          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize transition-colors ${isCollapsed ? "hidden" : ""}`}
           onMouseDown={() => {
             if (isCollapsed) return;
             setIsResizing(true);
           }}
           style={{ zIndex: 50 }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'oklch(0.52 0.16 256 / 0.2)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
         />
       </div>
 
-      <SidebarInset>
+      <SidebarInset style={{ background: 'var(--bg-page)' }}>
         {isMobile && (
-          <div className="flex border dark:border-gray-700-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+          <div
+            className="flex h-14 items-center justify-between px-2 sticky top-0 z-40"
+            style={{ background: 'rgba(246,246,248,0.95)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #ECECEF' }}
+          >
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="h-10 w-10 rounded-lg bg-background" />
+              <SidebarTrigger className="h-10 w-10 rounded-lg" />
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
+                  <span style={{ color: '#16161A', fontWeight: 600, fontSize: 15 }}>
                     {activeMenuItem?.label ?? "Menu"}
                   </span>
                 </div>
@@ -754,7 +882,7 @@ function DashboardLayoutContent({
             <ModeToggle />
           </div>
         )}
-        <main className="flex-1 p-4">{children}</main>
+        <main className="flex-1" style={{ padding: '30px 38px 56px' }}>{children}</main>
       </SidebarInset>
       <OnboardingTour />
     </>

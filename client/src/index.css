@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -44,52 +45,79 @@
 }
 
 :root {
-  /* Primary Colors - Modern Blue */
-  --primary: #2563EB;
+  /* ── Design tokens (UnifiquePro redesign) ── */
+  --bg-page: #F6F6F8;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #FBFBFC;
+
+  --text-primary: #16161A;
+  --text-secondary: #3C3C44;
+  --text-tertiary: #5C5C66;
+  --text-muted: #8A8A92;
+  --text-placeholder: #A6A6AE;
+
+  --border-default: #ECECEF;
+  --border-input: #E4E4E8;
+  --border-strong: #D6D6DC;
+
+  --accent: oklch(0.52 0.16 256);
+  --accent-soft: oklch(0.96 0.028 256);
+
+  --green: oklch(0.52 0.12 158);
+  --green-bg: #EAF6EF;
+  --red: oklch(0.52 0.16 25);
+  --red-bg: #FBECEC;
+  --amber: oklch(0.52 0.10 72);
+  --amber-bg: #FBF3E0;
+  --amber-border: #EFE7CF;
+
+  --surface-dark: #16161A;
+
+  /* Primary Colors */
+  --primary: oklch(0.52 0.16 256);
   --primary-foreground: #FFFFFF;
-  --sidebar-primary: #1E40AF;
-  --sidebar-primary-foreground: #F0F9FF;
-  
+  --sidebar-primary: oklch(0.52 0.16 256);
+  --sidebar-primary-foreground: #FFFFFF;
+
   /* Chart Colors - Pastel palette */
   --chart-1: #93C5FD;  /* Blue pastel */
   --chart-2: #6EE7B7;  /* Emerald pastel */
   --chart-3: #FDE047;  /* Amber pastel */
   --chart-4: #FCA5A5;  /* Red pastel */
   --chart-5: #C4B5FD;  /* Violet pastel */
-  
+
   /* Status Colors */
-  --success: #10B981;
-  --success-foreground: #F0FDF4;
-  --warning: #F59E0B;
-  --warning-foreground: #FFFBEB;
-  
+  --success: oklch(0.52 0.12 158);
+  --success-foreground: #EAF6EF;
+  --warning: oklch(0.52 0.10 72);
+  --warning-foreground: #FBF3E0;
+
   /* Border Radius */
-  --radius: 0.5rem;
-  
+  --radius: 0.75rem;
+
   /* Light Mode Colors */
-  --background: #FFFFFF;
-  --foreground: #1F2937;
+  --background: #F6F6F8;
+  --foreground: #16161A;
   --card: #FFFFFF;
-  --card-foreground: #1F2937;
+  --card-foreground: #16161A;
   --popover: #FFFFFF;
-  --popover-foreground: #1F2937;
-  --secondary: #F3F4F6;
-  --secondary-foreground: #374151;
-  --muted: #F3F4F6;
-  --muted-foreground: #6B7280;
-  --accent: #DBEAFE;
-  --accent-foreground: #1E40AF;
-  --destructive: #EF4444;
+  --popover-foreground: #16161A;
+  --secondary: #F3F3F5;
+  --secondary-foreground: #3C3C44;
+  --muted: #F3F3F5;
+  --muted-foreground: #8A8A92;
+  --accent-foreground: oklch(0.52 0.16 256);
+  --destructive: oklch(0.52 0.16 25);
   --destructive-foreground: #FFFFFF;
-  --border: #E5E7EB;
-  --input: #F3F4F6;
-  --ring: #3B82F6;
+  --border: #ECECEF;
+  --input: #F6F6F8;
+  --ring: oklch(0.52 0.16 256);
   --sidebar: #FFFFFF;
-  --sidebar-foreground: #1F2937;
-  --sidebar-accent: #F3F4F6;
-  --sidebar-accent-foreground: #1E40AF;
-  --sidebar-border: #E5E7EB;
-  --sidebar-ring: #3B82F6;
+  --sidebar-foreground: #16161A;
+  --sidebar-accent: oklch(0.96 0.028 256);
+  --sidebar-accent-foreground: oklch(0.52 0.16 256);
+  --sidebar-border: #ECECEF;
+  --sidebar-ring: oklch(0.52 0.16 256);
 }
 
 .dark {
@@ -127,13 +155,21 @@
   --sidebar-ring: #60A5FA;
 }
 
+/* Scrollbar styles */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #DBDBE0; border-radius: 8px; border: 3px solid #F6F6F8; }
+::-webkit-scrollbar-thumb:hover { background: #C7C7CE; }
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--bg-page);
+    color: var(--text-primary);
     font-weight: 400;
     letter-spacing: -0.01em;
   }
@@ -190,7 +226,8 @@
   }
 
   /* Currency formatting */
-  .currency {
+  .currency,
+  .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 
