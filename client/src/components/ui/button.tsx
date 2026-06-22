@@ -10,16 +10,16 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "rounded-[11px] bg-[oklch(0.52_0.16_256)] text-white py-[10px] px-[17px] hover:brightness-[0.93]",
+          "rounded-[11px] bg-[#1a67c2] text-white py-[10px] px-[17px] hover:brightness-[0.93]",
         destructive:
-          "rounded-[11px] bg-transparent border border-[#E4E4E8] text-[#3C3C44] hover:bg-[#FBECEC] hover:text-[oklch(0.55_0.16_25)] focus-visible:ring-destructive/20",
+          "rounded-[11px] bg-transparent border border-[#E4E4E8] text-[#3C3C44] hover:bg-[#FBECEC] hover:text-[#c0392b] focus-visible:ring-destructive/20",
         outline:
           "rounded-[11px] bg-white border border-[#E4E4E8] text-[#3C3C44] py-[10px] px-[15px] hover:bg-[#F6F6F8] hover:border-[#D6D6DC]",
         secondary:
           "rounded-[11px] bg-[#F3F3F5] text-[#3C3C44] py-[10px] px-[15px] hover:bg-[#ECECEF]",
         ghost:
           "rounded-[11px] py-[10px] px-[15px] hover:bg-[#F1F1F4] hover:text-[#3C3C44]",
-        link: "text-[oklch(0.52_0.16_256)] underline-offset-4 hover:underline",
+        link: "text-[#1a67c2] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

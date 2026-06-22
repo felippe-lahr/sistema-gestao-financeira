@@ -10,24 +10,24 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-transparent bg-[oklch(0.96_0.028_256)] text-[oklch(0.52_0.16_256)]",
+          "border-transparent bg-[#EBF3FC] text-[#1a67c2]",
         secondary:
           "border-transparent bg-[#F3F3F5] text-[#52525C]",
         destructive:
-          "border-transparent bg-[#FBECEC] text-[oklch(0.52_0.16_25)]",
+          "border-transparent bg-[#FBECEC] text-[#c0392b]",
         outline:
           "border-[#ECECEF] text-[#3C3C44] bg-transparent",
         success:
-          "border-transparent bg-[#EAF6EF] text-[oklch(0.46_0.11_158)]",
+          "border-transparent bg-[#EAF6EF] text-[#1a6b45]",
         warning:
-          "border-transparent bg-[#FBF3E0] text-[oklch(0.52_0.10_72)]",
+          "border-transparent bg-[#FBF3E0] text-[#7a5c00]",
         // Aliases for financial status
         pago:
-          "border-transparent bg-[#EAF6EF] text-[oklch(0.46_0.11_158)]",
+          "border-transparent bg-[#EAF6EF] text-[#1a6b45]",
         pendente:
-          "border-transparent bg-[#FBF3E0] text-[oklch(0.52_0.10_72)]",
+          "border-transparent bg-[#FBF3E0] text-[#7a5c00]",
         vencido:
-          "border-transparent bg-[#FBECEC] text-[oklch(0.52_0.16_25)]",
+          "border-transparent bg-[#FBECEC] text-[#c0392b]",
       },
     },
     defaultVariants: {

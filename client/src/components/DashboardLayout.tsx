@@ -165,8 +165,8 @@ function LoginForm() {
         className="absolute inset-0 pointer-events-none"
         aria-hidden="true"
         style={{
-          backgroundImage: `radial-gradient(circle at 70% 30%, oklch(0.52 0.16 256 / 0.15) 0%, transparent 60%),
-            radial-gradient(circle at 20% 80%, oklch(0.52 0.12 158 / 0.1) 0%, transparent 50%)`,
+          backgroundImage: `radial-gradient(circle at 70% 30%, #1a67c226 0%, transparent 60%),
+            radial-gradient(circle at 20% 80%, #1a6b4519 0%, transparent 50%)`,
         }}
       />
 
@@ -229,9 +229,9 @@ function LoginForm() {
               <div className="flex justify-center mb-4">
                 <div
                   className="p-3 rounded-full"
-                  style={{ background: 'oklch(0.96 0.028 256)' }}
+                  style={{ background: '#EBF3FC' }}
                 >
-                  <Smartphone style={{ width: 32, height: 32, color: 'oklch(0.52 0.16 256)' }} />
+                  <Smartphone style={{ width: 32, height: 32, color: '#1a67c2' }} />
                 </div>
               </div>
               <h1 style={{ fontSize: 24, fontWeight: 700, color: '#16161A', marginBottom: 8 }}>
@@ -313,10 +313,10 @@ function LoginForm() {
               className="mb-5 rounded-[12px] p-4 space-y-3"
               style={{ background: '#FBF3E0', border: '1px solid #EFE7CF' }}
             >
-              <span style={{ color: 'oklch(0.52 0.10 72)', fontSize: 14, fontWeight: 600 }}>
+              <span style={{ color: '#7a5c00', fontSize: 14, fontWeight: 600 }}>
                 E-mail não verificado
               </span>
-              <p style={{ fontSize: 13, color: 'oklch(0.45 0.09 72)', lineHeight: 1.5 }}>
+              <p style={{ fontSize: 13, color: '#5e4600', lineHeight: 1.5 }}>
                 Verifique sua caixa de entrada e clique no link de ativação enviado para{" "}
                 <strong>{unverifiedEmail}</strong>.
               </p>
@@ -325,7 +325,7 @@ function LoginForm() {
                 variant="outline"
                 size="sm"
                 className="w-full"
-                style={{ borderColor: '#EFE7CF', color: 'oklch(0.52 0.10 72)' }}
+                style={{ borderColor: '#EFE7CF', color: '#7a5c00' }}
                 onClick={handleResendVerification}
                 disabled={resendLoading || resendCooldown > 0}
               >
@@ -423,7 +423,7 @@ function LoginForm() {
                   id="rememberMe"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ width: 16, height: 16, borderRadius: 4, border: '1px solid #E4E4E8', accentColor: 'oklch(0.52 0.16 256)', cursor: 'pointer' }}
+                  style={{ width: 16, height: 16, borderRadius: 4, border: '1px solid #E4E4E8', accentColor: '#1a67c2', cursor: 'pointer' }}
                 />
                 <Label htmlFor="rememberMe" style={{ fontSize: 13, fontWeight: 400, color: '#5C5C66', cursor: 'pointer' }}>
                   Lembrar-me
@@ -431,7 +431,7 @@ function LoginForm() {
               </div>
               <a
                 href="/recuperar-senha"
-                style={{ fontSize: 13, color: 'oklch(0.52 0.16 256)', fontWeight: 500, textDecoration: 'none' }}
+                style={{ fontSize: 13, color: '#1a67c2', fontWeight: 500, textDecoration: 'none' }}
                 className="hover:underline transition-colors"
               >
                 Esqueci minha senha
@@ -452,7 +452,7 @@ function LoginForm() {
             Não tem uma conta?{" "}
             <a
               href="/signup"
-              style={{ color: 'oklch(0.52 0.16 256)', fontWeight: 600, textDecoration: 'none' }}
+              style={{ color: '#1a67c2', fontWeight: 600, textDecoration: 'none' }}
               className="hover:underline transition-colors"
             >
               Cadastre-se gratuitamente
@@ -724,13 +724,13 @@ function DashboardLayoutContent({
                         padding: '0 12px',
                         fontSize: 14,
                         fontWeight: isActive ? 600 : 500,
-                        color: isActive ? 'oklch(0.52 0.16 256)' : '#5C5C66',
-                        background: isActive ? 'oklch(0.96 0.028 256)' : 'transparent',
+                        color: isActive ? '#1a67c2' : '#5C5C66',
+                        background: isActive ? '#EBF3FC' : 'transparent',
                         transition: 'all 0.15s',
                       }}
                     >
                       <item.icon
-                        style={{ width: 17, height: 17, color: isActive ? 'oklch(0.52 0.16 256)' : '#8A8A92', flexShrink: 0 }}
+                        style={{ width: 17, height: 17, color: isActive ? '#1a67c2' : '#8A8A92', flexShrink: 0 }}
                       />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
@@ -755,12 +755,12 @@ function DashboardLayoutContent({
                     padding: '0 12px',
                     fontSize: 14,
                     fontWeight: location === "/planos" ? 600 : 500,
-                    color: location === "/planos" ? 'oklch(0.52 0.16 256)' : '#5C5C66',
-                    background: location === "/planos" ? 'oklch(0.96 0.028 256)' : 'transparent',
+                    color: location === "/planos" ? '#1a67c2' : '#5C5C66',
+                    background: location === "/planos" ? '#EBF3FC' : 'transparent',
                     transition: 'all 0.15s',
                   }}
                 >
-                  <Crown style={{ width: 17, height: 17, color: location === "/planos" ? 'oklch(0.52 0.16 256)' : '#8A8A92', flexShrink: 0 }} />
+                  <Crown style={{ width: 17, height: 17, color: location === "/planos" ? '#1a67c2' : '#8A8A92', flexShrink: 0 }} />
                   <span>Planos</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -777,12 +777,12 @@ function DashboardLayoutContent({
                       padding: '0 12px',
                       fontSize: 14,
                       fontWeight: location === "/admin" ? 600 : 500,
-                      color: location === "/admin" ? 'oklch(0.52 0.16 256)' : '#5C5C66',
-                      background: location === "/admin" ? 'oklch(0.96 0.028 256)' : 'transparent',
+                      color: location === "/admin" ? '#1a67c2' : '#5C5C66',
+                      background: location === "/admin" ? '#EBF3FC' : 'transparent',
                       transition: 'all 0.15s',
                     }}
                   >
-                    <ShieldCheck style={{ width: 17, height: 17, color: location === "/admin" ? 'oklch(0.52 0.16 256)' : '#8A8A92', flexShrink: 0 }} />
+                    <ShieldCheck style={{ width: 17, height: 17, color: location === "/admin" ? '#1a67c2' : '#8A8A92', flexShrink: 0 }} />
                     <span>Painel Admin</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -821,7 +821,7 @@ function DashboardLayoutContent({
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#EDEDF0'; }}
                 >
                   <Avatar style={{ width: 32, height: 32, flexShrink: 0 }}>
-                    <AvatarFallback style={{ fontSize: 12, fontWeight: 600, background: 'oklch(0.96 0.028 256)', color: 'oklch(0.52 0.16 256)' }}>
+                    <AvatarFallback style={{ fontSize: 12, fontWeight: 600, background: '#EBF3FC', color: '#1a67c2' }}>
                       {user?.name?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -863,7 +863,7 @@ function DashboardLayoutContent({
             setIsResizing(true);
           }}
           style={{ zIndex: 50 }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'oklch(0.52 0.16 256 / 0.2)'; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#1a67c233'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
         />
       </div>

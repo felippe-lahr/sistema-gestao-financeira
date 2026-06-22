@@ -58,11 +58,11 @@ function Input({
         "font-[Manrope,system-ui,sans-serif] text-[14px] font-medium text-[#16161A]",
         "placeholder:text-[#A6A6AE]",
         "transition-[color,box-shadow,border-color] outline-none",
-        "focus-visible:border-[oklch(0.52_0.16_256)] focus-visible:ring-[3px] focus-visible:ring-[oklch(0.96_0.028_256)]",
+        "focus-visible:border-[#1a67c2] focus-visible:ring-[3px] focus-visible:ring-[#EBF3FC]",
         "file:text-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
         "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
         "aria-invalid:ring-destructive/20 aria-invalid:border-destructive",
-        "selection:bg-[oklch(0.52_0.16_256)] selection:text-white",
+        "selection:bg-[#1a67c2] selection:text-white",
         className
       )}
       onCompositionStart={handleCompositionStart}

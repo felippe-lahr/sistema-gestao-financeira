@@ -1922,7 +1922,7 @@ export default function Transactions() {
                         </Badge>
                         {/* Amount */}
                         <div className="text-right">
-                          <p className="text-base font-bold" style={{ color: 'oklch(0.52 0.16 25)' }}>
+                          <p className="text-base font-bold" style={{ color: '#c0392b' }}>
                             -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format((group.invoiceTotal != null ? group.invoiceTotal : group.total) / 100)}
                           </p>
                           {group.invoiceTotal != null && Math.abs(group.invoiceTotal - group.total) >= 10 && (
@@ -2033,7 +2033,7 @@ export default function Transactions() {
                             </span>
                             <button
                               className="text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-70"
-                              style={{ color: 'oklch(0.52 0.16 256)' }}
+                              style={{ color: '#1a67c2' }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setExpandedCardsFull(prev => { const n = new Set(prev); n.add(group.cardName); return n; });
@@ -2070,9 +2070,9 @@ export default function Transactions() {
                       {/* Icon */}
                       <div className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-[10px] ${transaction.type === "INCOME" ? "bg-[#EAF6EF]" : "bg-[#FBECEC]"}`}>
                         {transaction.type === "INCOME" ? (
-                          <ArrowUpRight className="h-5 w-5" style={{ color: 'oklch(0.52 0.12 158)' }} />
+                          <ArrowUpRight className="h-5 w-5" style={{ color: '#1a6b45' }} />
                         ) : (
-                          <ArrowDownRight className="h-5 w-5" style={{ color: 'oklch(0.52 0.16 25)' }} />
+                          <ArrowDownRight className="h-5 w-5" style={{ color: '#c0392b' }} />
                         )}
                       </div>
                       {/* Description + meta */}
@@ -2115,7 +2115,7 @@ export default function Transactions() {
                           {!transaction.categoryId && canWrite && (
                             <Popover>
                               <PopoverTrigger asChild>
-                                <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#FBF3E0] text-[oklch(0.52_0.10_72)] hover:opacity-80 transition-opacity">
+                                <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#FBF3E0] text-[#7a5c00] hover:opacity-80 transition-opacity">
                                   <Tag className="h-3 w-3" />
                                   Sem categoria
                                 </button>
@@ -2149,7 +2149,7 @@ export default function Transactions() {
                       <div className="flex items-center gap-3 flex-shrink-0">
                         {getStatusBadge(transaction.status)}
                         <p className={`text-base font-bold tabular-nums ${transaction.type === "INCOME" ? "" : ""}`}
-                          style={{ color: transaction.type === "INCOME" ? 'oklch(0.52 0.12 158)' : 'oklch(0.52 0.16 25)' }}>
+                          style={{ color: transaction.type === "INCOME" ? '#1a6b45' : '#c0392b' }}>
                           {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
                         </p>
                         {canWrite && (
@@ -2169,9 +2169,9 @@ export default function Transactions() {
                     <div className="md:hidden flex items-start gap-3">
                       <div className={`flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-[10px] mt-0.5 ${transaction.type === "INCOME" ? "bg-[#EAF6EF]" : "bg-[#FBECEC]"}`}>
                         {transaction.type === "INCOME" ? (
-                          <ArrowUpRight className="h-4 w-4" style={{ color: 'oklch(0.52 0.12 158)' }} />
+                          <ArrowUpRight className="h-4 w-4" style={{ color: '#1a6b45' }} />
                         ) : (
-                          <ArrowDownRight className="h-4 w-4" style={{ color: 'oklch(0.52 0.16 25)' }} />
+                          <ArrowDownRight className="h-4 w-4" style={{ color: '#c0392b' }} />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -2196,7 +2196,7 @@ export default function Transactions() {
                               onClick={() => { if (!canWrite) return; setEditingDescriptionId(transaction.id); setEditingDescriptionValue(transaction.description); }}
                             >{transaction.description}</h3>
                           )}
-                          <p className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color: transaction.type === "INCOME" ? 'oklch(0.52 0.12 158)' : 'oklch(0.52 0.16 25)' }}>
+                          <p className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color: transaction.type === "INCOME" ? '#1a6b45' : '#c0392b' }}>
                             {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
                           </p>
                         </div>
@@ -2206,7 +2206,7 @@ export default function Transactions() {
                           {!transaction.categoryId && canWrite && (
                             <Popover>
                               <PopoverTrigger asChild>
-                                <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#FBF3E0] text-[oklch(0.52_0.10_72)]">
+                                <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#FBF3E0] text-[#7a5c00]">
                                   <Tag className="h-3 w-3" />Sem categoria
                                 </button>
                               </PopoverTrigger>
