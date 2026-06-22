@@ -60,7 +60,7 @@
   --border-input: #E4E4E8;
   --border-strong: #D6D6DC;
 
-  --accent: oklch(0.52 0.16 256);
+  --accent: oklch(0.96 0.028 256);
   --accent-soft: oklch(0.96 0.028 256);
 
   --green: oklch(0.52 0.12 158);
