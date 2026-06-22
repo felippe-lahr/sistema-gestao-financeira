@@ -19,13 +19,13 @@ import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
 
 const PRIORITY_COLORS = {
-  LOW: "bg-blue-500",
+  LOW: "bg-[#1a67c2]",
   MEDIUM: "bg-yellow-500",
   HIGH: "bg-red-500",
 };
 
 const PRIORITY_BADGE_COLORS = {
-  LOW: "bg-blue-100 text-blue-800 border-blue-200",
+  LOW: "bg-[#DBEAFE] text-blue-800 border-[#BFDBFE]",
   MEDIUM: "bg-yellow-100 text-yellow-800 border-yellow-200",
   HIGH: "bg-red-100 text-red-800 border-red-200",
 };
@@ -528,7 +528,7 @@ export default function Agenda() {
                     min-h-[100px] p-1 cursor-pointer transition-colors bg-white dark:bg-gray-800
                     ${!isCurrentMonth ? "bg-gray-50 dark:bg-gray-700" : ""}
                     ${isSelected ? "ring-2 ring-blue-500 ring-inset" : ""}
-                    ${isToday(day) ? "bg-blue-50 dark:bg-blue-900/30" : ""}
+                    ${isToday(day) ? "bg-[#EBF3FC] dark:bg-[#1E2D4A]/30" : ""}
                     hover:bg-gray-100 dark:hover:bg-gray-700
                   `}
                 >
@@ -536,7 +536,7 @@ export default function Agenda() {
                     text-sm font-medium mb-1
                     ${!isCurrentMonth ? "text-gray-400" : ""}
                     ${isPast && isCurrentMonth ? "text-gray-400" : ""}
-                    ${isToday(day) ? "text-blue-600 font-bold" : ""}
+                    ${isToday(day) ? "text-[#1a67c2] font-bold" : ""}
                   `}>
                     {format(day, "d")}
                   </div>

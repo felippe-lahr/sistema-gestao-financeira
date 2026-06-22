@@ -245,7 +245,7 @@ export default function TreasurySelix() {
 
               {/* Values */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-blue-50 dark:bg-blue-950">
+                <Card className="bg-[#EBF3FC] dark:bg-[#1E2D4A]">
                   <CardContent className="pt-6">
                     <p className="text-sm text-muted-foreground mb-1">Valor Inicial Total</p>
                     <p className="text-2xl font-bold">
@@ -254,7 +254,7 @@ export default function TreasurySelix() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-blue-50 dark:bg-blue-950">
+                <Card className="bg-[#EBF3FC] dark:bg-[#1E2D4A]">
                   <CardContent className="pt-6">
                     <p className="text-sm text-muted-foreground mb-1">Valor Atual Total</p>
                     <p className="text-2xl font-bold">

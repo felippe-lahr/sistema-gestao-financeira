@@ -110,7 +110,7 @@ export function TreasuryDirectSelector({ onTitleSelected, isLoading }: TreasuryD
       </div>
 
       {selectedTitleData && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded text-sm text-blue-900">
+        <div className="bg-[#EBF3FC] dark:bg-[#1E2D4A]/20 p-3 rounded text-sm text-blue-900">
           <p>
             <strong>Preço Unitário:</strong> R${((selectedTitleData.unitaryPrice || 0) / 100).toFixed(2)}
           </p>

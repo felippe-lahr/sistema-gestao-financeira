@@ -1038,7 +1038,7 @@ export default function Transactions() {
                 <Button variant="outline" onClick={() => setIsExportAttachmentsOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleExportAttachments} disabled={exportingAttachments} className="bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleExportAttachments} disabled={exportingAttachments} className="bg-[#1a67c2] hover:bg-[#1558a8]">
                   {exportingAttachments ? (
                     <>
                       <Download className="h-4 w-4 mr-2 animate-spin" />
@@ -1100,7 +1100,7 @@ export default function Transactions() {
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-[#1a67c2] hover:bg-[#1558a8]">
                   {createMutation.isPending ? "Criando..." : "Criar Transação"}
                 </Button>
               </div>
@@ -1146,7 +1146,7 @@ export default function Transactions() {
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-[#1a67c2] hover:bg-[#1558a8]">
               {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </div>
@@ -1371,7 +1371,7 @@ export default function Transactions() {
             <Filter className="h-4 w-4 mr-2" />
             Filtros
             {activeFiltersCount > 0 && (
-              <Badge className="ml-2 bg-blue-50 dark:bg-blue-900/200 text-white">{activeFiltersCount}</Badge>
+              <Badge className="ml-2 bg-[#EBF3FC] dark:bg-[#1E2D4A]/200 text-white">{activeFiltersCount}</Badge>
             )}
           </Button>
 
@@ -2131,7 +2131,7 @@ export default function Transactions() {
                             </Popover>
                           )}
                           {(transaction as any).importOrigin === "OFX" && (
-                            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">OFX</span>
+                            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-[#DBEAFE] text-[#1558a8]">OFX</span>
                           )}
                           {(transaction as any).bankAccountName && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#F3F3F5] text-[#52525C]">
@@ -2305,7 +2305,7 @@ export default function Transactions() {
             <Button
               onClick={handleSaveBulkCategory}
               disabled={bulkCategorySaving || Object.values(bulkCategoryAssignments).every(v => v === '')}
-              className="bg-blue-600 hover:bg-blue-700 w-full"
+              className="bg-[#1a67c2] hover:bg-[#1558a8] w-full"
             >
               {bulkCategorySaving ? "Salvando..." : (
                 <>
@@ -2399,7 +2399,7 @@ export default function Transactions() {
                       : previewAttachment.blobUrl,
                     'PDFViewer', 'width=900,height=700,scrollbars=yes,resizable=yes'
                   )}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-6 py-3 bg-[#1a67c2] text-white rounded-lg hover:bg-[#1558a8] transition-colors"
                 >
                   Abrir PDF em nova janela
                 </button>
@@ -2577,7 +2577,7 @@ function TransactionForm({
               type="button"
               onClick={() => setFormData({ ...formData, creditCardId: formData.creditCardId ? "" : creditCards[0].id.toString(), bankAccountId: "", installments: "1", purchaseDate: "" })}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                formData.creditCardId ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
+                formData.creditCardId ? "bg-[#1a67c2]" : "bg-gray-200 dark:bg-gray-700"
               }`}
             >
               <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
@@ -2587,7 +2587,7 @@ function TransactionForm({
           </div>
 
           {formData.creditCardId ? (
-            <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="space-y-3 p-3 bg-[#EBF3FC] dark:bg-[#1E2D4A]/20 rounded-lg border border-[#BFDBFE] dark:border-[#1E2D4A]">
               {/* Seletor do cartão */}
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Cartão</Label>
@@ -2679,7 +2679,7 @@ function TransactionForm({
               </div>
 
               {/* Info sobre a Data de Vencimento */}
-              <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-300">
+              <div className="flex items-start gap-2 text-xs text-[#1558a8] dark:text-[#93C5FD]">
                 <span>ℹ️</span>
                 <span>
                   A <strong>Data de Vencimento</strong> acima é quando a fatura vence (impacto no caixa).

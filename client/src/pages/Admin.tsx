@@ -76,7 +76,7 @@ const PLAN_LABELS: Record<string, string> = {
 
 const PLAN_COLORS: Record<string, string> = {
   free: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  pro: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  pro: "bg-[#DBEAFE] text-[#1558a8] dark:bg-[#1E2D4A]/40 dark:text-[#93C5FD]",
   enterprise: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
 };
 
@@ -124,8 +124,8 @@ function StatCard({
             <p className="text-2xl font-bold mt-1 tabular-nums">{value}</p>
             {sub && <p className="text-xs text-muted-foreground mt-0.5 truncate">{sub}</p>}
           </div>
-          <div className={`p-2.5 rounded-xl flex-shrink-0 ${bgClass ?? "bg-blue-50 dark:bg-blue-950/30"}`}>
-            <Icon className={`h-5 w-5 ${iconClass ?? "text-blue-600 dark:text-blue-400"}`} />
+          <div className={`p-2.5 rounded-xl flex-shrink-0 ${bgClass ?? "bg-[#EBF3FC] dark:bg-[#1E2D4A]/30"}`}>
+            <Icon className={`h-5 w-5 ${iconClass ?? "text-[#1a67c2] dark:text-[#60A5FA]"}`} />
           </div>
         </div>
       </CardContent>
@@ -659,7 +659,7 @@ export default function Admin() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="p-1.5 rounded-lg bg-blue-600 dark:bg-blue-500">
+            <div className="p-1.5 rounded-lg bg-[#1a67c2] dark:bg-[#1a67c2]">
               <ShieldCheck className="h-5 w-5 text-white" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Painel Admin</h1>
@@ -693,8 +693,8 @@ export default function Admin() {
               icon={Users}
               label="Total de usuários"
               value={stats?.totalUsers ?? 0}
-              bgClass="bg-blue-50 dark:bg-blue-950/30"
-              iconClass="text-blue-600 dark:text-blue-400"
+              bgClass="bg-[#EBF3FC] dark:bg-[#1E2D4A]/30"
+              iconClass="text-[#1a67c2] dark:text-[#60A5FA]"
             />
             <StatCard
               icon={CheckCircle2}
@@ -712,8 +712,8 @@ export default function Admin() {
               icon={TrendingUp}
               label="Novos esta semana"
               value={stats?.newUsersThisWeek ?? 0}
-              bgClass="bg-indigo-50 dark:bg-indigo-950/30"
-              iconClass="text-indigo-600 dark:text-indigo-400"
+              bgClass="bg-[#EBF3FC] dark:bg-indigo-950/30"
+              iconClass="text-[#1a67c2] dark:text-[#60A5FA]"
             />
             <StatCard
               icon={Building2}

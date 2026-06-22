@@ -66,7 +66,7 @@ const ROLE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  VIEWER: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  VIEWER: "bg-[#DBEAFE] text-blue-800 dark:bg-[#1E2D4A] dark:text-blue-200",
   EDITOR: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   ADMIN: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
   OWNER: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
@@ -204,7 +204,7 @@ export function EntitySharingModal({ entity, open, onOpenChange }: EntitySharing
             </h3>
 
             {/* Aviso informativo */}
-            <div className="flex gap-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-800 dark:text-blue-200">
+            <div className="flex gap-2 p-3 bg-[#EBF3FC] dark:bg-[#1E2D4A] border border-[#BFDBFE] dark:border-[#1E2D4A] rounded-lg text-xs text-blue-800 dark:text-blue-200">
               <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <p>
                 O convidado receberá um link para <strong>criar conta com senha própria</strong> ou

@@ -680,7 +680,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
               </Button>
               <Button
                 type="submit"
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-[#1a67c2] hover:bg-[#1558a8]"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 {createMutation.isPending || updateMutation.isPending
@@ -891,7 +891,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                       <span className="text-amber-600 font-medium">⚠ {pdfTransactions.filter(t => t.is_duplicate).length} já existem (serão ignoradas)</span>
                     )}
                     {pdfTransactions.filter(t => !t.is_duplicate && t.has_future_installments).length > 0 && (
-                      <span className="text-blue-600 font-medium">↻ {pdfTransactions.filter(t => !t.is_duplicate && t.has_future_installments).length} com parcelas futuras</span>
+                      <span className="text-[#1a67c2] font-medium">↻ {pdfTransactions.filter(t => !t.is_duplicate && t.has_future_installments).length} com parcelas futuras</span>
                     )}
                   </div>
                   {/* Totais para conferência */}
@@ -953,7 +953,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                             {tx.purchase_date && <span>Compra: {new Date(tx.purchase_date + "T12:00:00").toLocaleDateString("pt-BR")}</span>}
                             {tx.installment && (
                               <span className={`px-1.5 py-0.5 rounded font-medium ${
-                                tx.has_future_installments ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-muted text-muted-foreground"
+                                tx.has_future_installments ? "bg-[#DBEAFE] text-[#1558a8] dark:bg-[#1E2D4A]/30 dark:text-[#60A5FA]" : "bg-muted text-muted-foreground"
                               }`}>
                                 Parcela {tx.installment}
                                 {tx.has_future_installments && " → cria futuras"}

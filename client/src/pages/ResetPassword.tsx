@@ -24,7 +24,7 @@ export default function ResetPassword() {
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
             Este link de redefinição de senha é inválido ou já expirou.
           </p>
-          <a href="/recuperar-senha" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm font-medium hover:underline">
+          <a href="/recuperar-senha" className="text-[#1a67c2] hover:text-[#1558a8] dark:text-[#60A5FA] text-sm font-medium hover:underline">
             Solicitar novo link
           </a>
         </div>
@@ -82,7 +82,7 @@ export default function ResetPassword() {
               </p>
               <a
                 href="/"
-                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm font-medium hover:underline"
+                className="text-[#1a67c2] hover:text-[#1558a8] dark:text-[#60A5FA] text-sm font-medium hover:underline"
               >
                 ← Ir para o login
               </a>
@@ -117,7 +117,7 @@ export default function ResetPassword() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-blue-500 pr-10"
+                      className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-[#1a67c2] pr-10"
                     />
                     <button
                       type="button"
@@ -140,13 +140,13 @@ export default function ResetPassword() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-blue-500"
+                    className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-[#1a67c2]"
                   />
                 </div>
 
                 <Button
                   type="submit"
-                  className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm"
+                  className="w-full h-11 rounded-xl bg-[#1a67c2] hover:bg-[#1558a8] text-white font-semibold text-sm"
                   disabled={isLoading}
                 >
                   {isLoading ? "Salvando..." : "Salvar nova senha"}

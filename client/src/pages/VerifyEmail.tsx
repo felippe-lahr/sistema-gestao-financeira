@@ -72,8 +72,8 @@ export default function VerifyEmail() {
           {status === "loading" && (
             <>
               <div className="flex justify-center">
-                <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                  <Loader2 className="h-10 w-10 text-blue-600 dark:text-blue-400 animate-spin" />
+                <div className="w-20 h-20 rounded-full bg-[#DBEAFE] dark:bg-[#1E2D4A] flex items-center justify-center">
+                  <Loader2 className="h-10 w-10 text-[#1a67c2] dark:text-[#60A5FA] animate-spin" />
                 </div>
               </div>
               <div className="space-y-2">

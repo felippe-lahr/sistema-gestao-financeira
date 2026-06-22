@@ -26,7 +26,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  VIEWER: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  VIEWER: "bg-[#DBEAFE] text-blue-800 dark:bg-[#1E2D4A] dark:text-blue-200",
   EDITOR: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   ADMIN: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
   OWNER: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
@@ -397,7 +397,7 @@ export default function Entities() {
               <Label className="text-base font-semibold">Módulos</Label>
               <div className="flex items-center justify-between p-3 border dark:border-gray-700 rounded-lg hover:bg-accent/50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-blue-600" />
+                  <Calendar className="h-5 w-5 text-[#1a67c2]" />
                   <div>
                     <p className="font-medium">Locação por Temporada</p>
                     <p className="text-sm text-muted-foreground">Gerencie reservas e bloqueios</p>
@@ -407,7 +407,7 @@ export default function Entities() {
                   type="button"
                   onClick={() => setFormData({ ...formData, temporaryRentalEnabled: !formData.temporaryRentalEnabled })}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    formData.temporaryRentalEnabled ? "bg-blue-600" : "bg-gray-300"
+                    formData.temporaryRentalEnabled ? "bg-[#1a67c2]" : "bg-gray-300"
                   }`}
                 >
                   <span
@@ -496,7 +496,7 @@ function SortableEntityCard({
   };
 
   const ROLE_COLORS: Record<string, string> = {
-    VIEWER: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    VIEWER: "bg-[#DBEAFE] text-blue-800 dark:bg-[#1E2D4A] dark:text-blue-200",
     EDITOR: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
     ADMIN: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
     OWNER: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",

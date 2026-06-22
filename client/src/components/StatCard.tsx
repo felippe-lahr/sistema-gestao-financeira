@@ -25,21 +25,21 @@ export function StatCard({
   variant = "default",
 }: StatCardProps) {
   const variantClasses = {
-    default: "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800",
+    default: "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-[#BFDBFE] dark:border-[#1E2D4A]",
     success: "bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-emerald-200 dark:border-emerald-800",
     warning: "bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800",
     danger: "bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-800",
   };
 
   const iconClasses = {
-    default: "text-blue-600 dark:text-blue-400",
+    default: "text-[#1a67c2] dark:text-[#60A5FA]",
     success: "text-emerald-600 dark:text-emerald-400",
     warning: "text-amber-600 dark:text-amber-400",
     danger: "text-red-600 dark:text-red-400",
   };
 
   const trendClasses = {
-    default: "text-blue-600 dark:text-blue-400",
+    default: "text-[#1a67c2] dark:text-[#60A5FA]",
     success: "text-emerald-600 dark:text-emerald-400",
     warning: "text-amber-600 dark:text-amber-400",
     danger: "text-red-600 dark:text-red-400",

@@ -26,7 +26,7 @@ export default function BillingSuccess() {
           Você será redirecionado automaticamente em alguns segundos.
         </p>
         <Button
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          className="w-full bg-[#1a67c2] hover:bg-[#1558a8] text-white"
           onClick={() => navigate("/")}
         >
           Ir para o painel

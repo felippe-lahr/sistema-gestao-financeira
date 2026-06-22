@@ -367,10 +367,10 @@ export default function OverallDashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className={`text-2xl font-bold ${metrics.balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+              <div className={`text-2xl font-bold ${metrics.balance >= 0 ? 'text-[#1a67c2]' : 'text-red-600'}`}>
                 {formatCurrency(metrics.balance)}
               </div>
-              <Wallet className="h-8 w-8 text-blue-600 opacity-20" />
+              <Wallet className="h-8 w-8 text-[#1a67c2] opacity-20" />
             </div>
           </CardContent>
         </Card>

@@ -53,7 +53,7 @@ const ROLE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  VIEWER: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  VIEWER: "bg-[#DBEAFE] text-blue-800 dark:bg-[#1E2D4A]/30 dark:text-[#93C5FD]",
   EDITOR: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
   ADMIN: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
 };
@@ -102,7 +102,7 @@ function InviteLayout({ children }: { children: React.ReactNode }) {
           <h2 className="text-4xl font-bold mb-6 leading-tight">
             Gerencie suas finanças com inteligência
           </h2>
-          <p className="text-blue-100 text-xl leading-relaxed">
+          <p className="text-[#DBEAFE] text-xl leading-relaxed">
             Controle transações, investimentos e patrimônio de múltiplas entidades em um único lugar.
           </p>
         </div>
@@ -291,7 +291,7 @@ export default function AcceptInvite() {
 
       {/* Card da entidade */}
       <div className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 mb-5">
-        <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-lg bg-[#1a67c2] flex items-center justify-center shrink-0">
           <Building2 className="h-5 w-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
@@ -376,7 +376,7 @@ export default function AcceptInvite() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-blue-500"
+              className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-[#1a67c2]"
             />
           </div>
         )}
@@ -396,7 +396,7 @@ export default function AcceptInvite() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-blue-500 pr-10"
+              className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-[#1a67c2] pr-10"
             />
             <button
               type="button"
@@ -422,7 +422,7 @@ export default function AcceptInvite() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-blue-500 pr-10"
+                className="h-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-[#1a67c2] pr-10"
               />
               <button
                 type="button"
@@ -440,7 +440,7 @@ export default function AcceptInvite() {
 
         <Button
           type="submit"
-          className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm hover:shadow-md"
+          className="w-full h-11 rounded-xl bg-[#1a67c2] hover:bg-[#1558a8] text-white font-semibold text-sm transition-all shadow-sm hover:shadow-md"
           disabled={isSubmitting}
         >
           {isSubmitting ? (

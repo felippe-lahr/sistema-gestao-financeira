@@ -691,9 +691,9 @@ export default function UserProfile() {
               </div>
             ) : waStep === "verify" ? (
               <div className="space-y-4">
-                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Código enviado!</p>
-                  <p className="text-sm text-blue-700 dark:text-blue-400">
+                <div className="p-3 bg-[#EBF3FC] dark:bg-[#1E2D4A]/30 border border-[#BFDBFE] dark:border-[#1E2D4A] rounded-lg">
+                  <p className="text-sm font-medium text-blue-800 dark:text-[#93C5FD]">Código enviado!</p>
+                  <p className="text-sm text-[#1558a8] dark:text-[#60A5FA]">
                     Verifique o WhatsApp do número <strong>{waPhoneInput}</strong> e insira o código de 6 dígitos abaixo.
                   </p>
                 </div>

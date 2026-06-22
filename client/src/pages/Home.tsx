@@ -167,8 +167,8 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
             {/* Saldo */}
             <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border dark:border-gray-700-blue-200 dark:border dark:border-gray-700-blue-800">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">Saldo</span>
+                <DollarSign className="h-5 w-5 text-[#1a67c2] dark:text-[#60A5FA]" />
+                <span className="text-sm font-semibold text-blue-900 dark:text-[#DBEAFE]">Saldo</span>
               </div>
               <span className={`text-lg font-bold ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                 {maskValue(balance)}

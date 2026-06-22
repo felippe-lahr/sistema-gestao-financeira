@@ -255,7 +255,7 @@ export default function Rentals() {
       case "AIRBNB":
         return "bg-red-400 hover:bg-red-500";
       case "DIRECT":
-        return "bg-blue-300 hover:bg-blue-400";
+        return "bg-blue-300 hover:bg-[#3b82f6]";
       case "BLOCKED":
         return "bg-gray-400 hover:bg-gray-500";
       default:
@@ -359,7 +359,7 @@ export default function Rentals() {
             <span>Relatórios</span>
           </Button>
           {canWrite && (
-            <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700 gap-2 flex-1 sm:flex-none">
+            <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-[#1a67c2] hover:bg-[#1558a8] gap-2 flex-1 sm:flex-none">
               <Plus className="h-4 w-4" />
               <span>Nova Reserva</span>
             </Button>
@@ -892,7 +892,7 @@ export default function Rentals() {
                   onClick={() => setFormData({ ...formData, competencyDate: "CHECK_IN" })}
                   className={`px-4 py-2 rounded-l-md border transition-colors ${
                     formData.competencyDate === "CHECK_IN"
-                      ? "bg-blue-600 text-white border-blue-600"
+                      ? "bg-[#1a67c2] text-white border-blue-600"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                   }`}
                 >
@@ -903,7 +903,7 @@ export default function Rentals() {
                   onClick={() => setFormData({ ...formData, competencyDate: "CHECK_OUT" })}
                   className={`px-4 py-2 rounded-r-md border-t border-b border-r transition-colors ${
                     formData.competencyDate === "CHECK_OUT"
-                      ? "bg-blue-600 text-white border-blue-600"
+                      ? "bg-[#1a67c2] text-white border-blue-600"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                   }`}
                 >
@@ -1022,7 +1022,7 @@ export default function Rentals() {
             <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleCreate} className="bg-[#1a67c2] hover:bg-[#1558a8]">
               Criar Reserva
             </Button>
           </div>
@@ -1235,7 +1235,7 @@ export default function Rentals() {
                   onClick={() => setFormData({ ...formData, competencyDate: "CHECK_IN" })}
                   className={`px-4 py-2 rounded font-medium transition-colors ${
                     formData.competencyDate === "CHECK_IN"
-                      ? "bg-blue-500 text-white"
+                      ? "bg-[#1a67c2] text-white"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                 >
@@ -1245,7 +1245,7 @@ export default function Rentals() {
                   onClick={() => setFormData({ ...formData, competencyDate: "CHECK_OUT" })}
                   className={`px-4 py-2 rounded font-medium transition-colors ${
                     formData.competencyDate === "CHECK_OUT"
-                      ? "bg-blue-500 text-white"
+                      ? "bg-[#1a67c2] text-white"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                 >
@@ -1370,7 +1370,7 @@ export default function Rentals() {
               </Button>
             )}
             {canWrite && (
-              <Button onClick={handleUpdate} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={handleUpdate} className="bg-[#1a67c2] hover:bg-[#1558a8]">
                 Salvar Alterações
               </Button>
             )}

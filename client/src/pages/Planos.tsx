@@ -115,7 +115,7 @@ export default function Planos() {
               onClick={() => setInterval("month")}
               className={`px-5 py-1.5 rounded-full text-sm font-medium transition-all ${
                 interval === "month"
-                  ? "bg-white dark:bg-gray-900 text-blue-600 shadow-sm"
+                  ? "bg-white dark:bg-gray-900 text-[#1a67c2] shadow-sm"
                   : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
@@ -125,7 +125,7 @@ export default function Planos() {
               onClick={() => setInterval("year")}
               className={`px-5 py-1.5 rounded-full text-sm font-medium transition-all ${
                 interval === "year"
-                  ? "bg-white dark:bg-gray-900 text-blue-600 shadow-sm"
+                  ? "bg-white dark:bg-gray-900 text-[#1a67c2] shadow-sm"
                   : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
@@ -170,16 +170,16 @@ export default function Planos() {
         <div className="rounded-2xl border-2 border-blue-600 p-8 bg-white dark:bg-gray-900 flex flex-col relative shadow-lg">
           {/* Badge popular */}
           <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-            <Badge className="bg-blue-600 text-white px-4 py-1 text-xs font-semibold">
+            <Badge className="bg-[#1a67c2] text-white px-4 py-1 text-xs font-semibold">
               MAIS POPULAR
             </Badge>
           </div>
 
           <div className="flex items-center gap-2 mb-2">
-            <Crown className="w-5 h-5 text-blue-600" />
-            <span className="font-semibold text-blue-600">Pro</span>
+            <Crown className="w-5 h-5 text-[#1a67c2]" />
+            <span className="font-semibold text-[#1a67c2]">Pro</span>
             {isPro && (
-              <Badge className="ml-auto bg-blue-100 text-blue-700">Plano atual</Badge>
+              <Badge className="ml-auto bg-[#DBEAFE] text-[#1558a8]">Plano atual</Badge>
             )}
           </div>
 
@@ -202,7 +202,7 @@ export default function Planos() {
           <ul className="space-y-3 flex-1 mb-8 mt-6">
             {proFeatures.map((f) => (
               <li key={f} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <Check className="w-4 h-4 text-[#1a67c2] flex-shrink-0" />
                 {f}
               </li>
             ))}
@@ -216,7 +216,7 @@ export default function Planos() {
           ) : isPro ? (
             <Button
               variant="outline"
-              className="w-full border-blue-600 text-blue-600 hover:bg-blue-50"
+              className="w-full border-blue-600 text-[#1a67c2] hover:bg-[#EBF3FC]"
               onClick={handlePortal}
               disabled={portalLoading}
             >
@@ -229,7 +229,7 @@ export default function Planos() {
             </Button>
           ) : (
             <Button
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full bg-[#1a67c2] hover:bg-[#1558a8] text-white"
               onClick={() => handleCheckout(interval)}
               disabled={!!checkoutLoading}
             >

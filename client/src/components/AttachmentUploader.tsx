@@ -101,7 +101,7 @@ export function AttachmentUploader({
       return <FileText className="w-8 h-8 text-red-500" />;
     }
     if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
-      return <Image className="w-8 h-8 text-blue-500" />;
+      return <Image className="w-8 h-8 text-[#1a67c2]" />;
     }
     if (mimeType === "image/png") {
       return <Image className="w-8 h-8 text-green-500" />;
@@ -145,7 +145,7 @@ export function AttachmentUploader({
       <div
         className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
           isDragging
-            ? "border-blue-500 bg-blue-50"
+            ? "border-[#1a67c2] bg-[#EBF3FC]"
             : "border-gray-300 hover:border-gray-400"
         }`}
         onDragOver={handleDragOver}
@@ -210,7 +210,7 @@ export function AttachmentUploader({
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={() => handlePreview(attachment)}
-                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:bg-blue-900/20 rounded"
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-[#1a67c2] hover:bg-[#EBF3FC] dark:bg-[#1E2D4A]/20 rounded"
                   title="Visualizar"
                 >
                   <Eye className="w-4 h-4" />

@@ -340,7 +340,7 @@ export default function EntityDashboard() {
             )}
             <Button
               onClick={() => setLocation(`/investments/${entityId}`)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-[#1a67c2] hover:bg-[#1558a8] text-white"
             >
               <TrendingUp className="h-4 w-4 mr-2" />
               Investimentos
@@ -372,7 +372,7 @@ export default function EntityDashboard() {
           )}
           <Button
             onClick={() => setLocation(`/investments/${entityId}`)}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full bg-[#1a67c2] hover:bg-[#1558a8] text-white"
           >
             <TrendingUp className="h-4 w-4 mr-2" />
             Investimentos
@@ -391,7 +391,7 @@ export default function EntityDashboard() {
             <Filter className="h-4 w-4 mr-2" />
             Filtros
             {activeFiltersCount > 0 && (
-              <Badge className="ml-2 bg-blue-50 dark:bg-blue-900/200 text-white">{activeFiltersCount}</Badge>
+              <Badge className="ml-2 bg-[#EBF3FC] dark:bg-[#1E2D4A]/200 text-white">{activeFiltersCount}</Badge>
             )}
           </Button>
 
@@ -580,7 +580,7 @@ export default function EntityDashboard() {
               <Button 
                 variant="link" 
                 size="sm" 
-                className="p-0 h-auto mt-1 text-xs text-blue-500"
+                className="p-0 h-auto mt-1 text-xs text-[#1a67c2]"
                 onClick={() => setShowDiagnostic(true)}
               >
                 Ver detalhes do cálculo
@@ -981,12 +981,12 @@ export default function EntityDashboard() {
                   const urgencyColor = 
                     transaction.daysUntilDue === 0 ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30" :
                     transaction.daysUntilDue <= 3 ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/30" :
-                    "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30";
+                    "bg-[#EBF3FC] dark:bg-[#1E2D4A]/20 border-[#BFDBFE] dark:border-[#1E2D4A] hover:bg-[#DBEAFE] dark:hover:bg-blue-900/30";
                   
                   const urgencyBadge = 
                     transaction.daysUntilDue === 0 ? "bg-red-500" :
                     transaction.daysUntilDue <= 3 ? "bg-yellow-500" :
-                    "bg-blue-500";
+                    "bg-[#1a67c2]";
 
                   return (
                     <div
@@ -1162,7 +1162,7 @@ export default function EntityDashboard() {
                     )}
                     {/* Badge OFX */}
                     {(transaction as any).importOrigin === "OFX" && (
-                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 w-fit">
+                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-[#DBEAFE] text-[#1558a8] dark:bg-[#1E2D4A] dark:text-[#93C5FD] w-fit">
                         OFX
                       </span>
                     )}

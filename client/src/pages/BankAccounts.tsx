@@ -174,7 +174,7 @@ export default function BankAccounts() {
               onClick={() => setSelectedEntityId(e.id)}
               className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                 selectedEntityId === e.id
-                  ? "bg-blue-600 text-white shadow-sm"
+                  ? "bg-[#1a67c2] text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               }`}
             >
@@ -336,7 +336,7 @@ function BankAccountsList({
       {/* Card de resumo */}
       {accounts && accounts.length > 0 && (
         <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white shadow-lg">
-          <p className="text-blue-100 text-sm font-medium mb-1">Saldo atual em contas</p>
+          <p className="text-[#DBEAFE] text-sm font-medium mb-1">Saldo atual em contas</p>
           <p className="text-3xl font-bold">
             {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalCurrentBalance)}
           </p>
@@ -351,7 +351,7 @@ function BankAccountsList({
       {canWrite && (
         <Button
           onClick={() => { resetForm(); setIsCreateOpen(true); }}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-medium"
+          className="w-full bg-[#1a67c2] hover:bg-[#1558a8] text-white rounded-xl h-12 font-medium"
         >
           <Plus className="h-5 w-5 mr-2" />
           Nova Conta Bancária
@@ -444,7 +444,7 @@ function BankAccountsList({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-9 px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg"
+                            className="h-9 px-3 text-[#1a67c2] hover:text-[#1558a8] hover:bg-[#EBF3FC] dark:hover:bg-[#1E2D4A] rounded-lg"
                             onClick={() => setOfxAccountId(account.id)}
                           >
                             <Upload className="h-4 w-4 mr-1.5" />
@@ -718,7 +718,7 @@ function AccountSheet({
             Cancelar
           </Button>
           <Button
-            className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl"
+            className="flex-1 bg-[#1a67c2] hover:bg-[#1558a8] rounded-xl"
             onClick={onSubmit}
             disabled={isPending}
           >
@@ -883,13 +883,13 @@ function OfxImportSheet({
           {/* Progresso */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span className={step === "upload" ? "text-blue-600 font-medium" : ""}>
+              <span className={step === "upload" ? "text-[#1a67c2] font-medium" : ""}>
                 1. Upload
               </span>
-              <span className={step === "review" ? "text-blue-600 font-medium" : ""}>
+              <span className={step === "review" ? "text-[#1a67c2] font-medium" : ""}>
                 2. Revisão
               </span>
-              <span className={step === "done" ? "text-blue-600 font-medium" : ""}>
+              <span className={step === "done" ? "text-[#1a67c2] font-medium" : ""}>
                 3. Concluído
               </span>
             </div>
@@ -924,7 +924,7 @@ function OfxImportSheet({
                 onClick={() => fileInputRef.current?.click()}
                 className={`relative border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
                   isDragging
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                    ? "border-[#1a67c2] bg-[#EBF3FC] dark:bg-[#1E2D4A]"
                     : "border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800"
                 }`}
               >
@@ -937,15 +937,15 @@ function OfxImportSheet({
                 />
                 {parsing ? (
                   <div className="space-y-3">
-                    <RefreshCw className="h-10 w-10 mx-auto text-blue-500 animate-spin" />
+                    <RefreshCw className="h-10 w-10 mx-auto text-[#1a67c2] animate-spin" />
                     <p className="font-medium text-gray-700 dark:text-gray-300">
                       Processando arquivo...
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-2xl flex items-center justify-center mx-auto">
-                      <Upload className="h-8 w-8 text-blue-600" />
+                    <div className="w-16 h-16 bg-[#DBEAFE] dark:bg-[#1E2D4A] rounded-2xl flex items-center justify-center mx-auto">
+                      <Upload className="h-8 w-8 text-[#1a67c2]" />
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900 dark:text-white">
@@ -991,15 +991,15 @@ function OfxImportSheet({
           {step === "review" && parseResult && (
             <div className="p-6 space-y-5">
               {/* Resumo do extrato */}
-              <div className="rounded-xl bg-blue-50 dark:bg-blue-950 p-4 space-y-2">
+              <div className="rounded-xl bg-[#EBF3FC] dark:bg-[#1E2D4A] p-4 space-y-2">
                 <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
                   Resumo do extrato
                 </p>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   {parseResult.period.startDate && (
                     <div>
-                      <p className="text-blue-600 dark:text-blue-400 text-xs">Período</p>
-                      <p className="font-medium text-blue-900 dark:text-blue-100">
+                      <p className="text-[#1a67c2] dark:text-[#60A5FA] text-xs">Período</p>
+                      <p className="font-medium text-blue-900 dark:text-[#DBEAFE]">
                         {format(new Date(parseResult.period.startDate), "dd/MM/yy", { locale: ptBR })}
                         {parseResult.period.endDate &&
                           ` – ${format(new Date(parseResult.period.endDate), "dd/MM/yy", { locale: ptBR })}`}
@@ -1008,21 +1008,21 @@ function OfxImportSheet({
                   )}
                   {parseResult.ledgerBalance !== undefined && (
                     <div>
-                      <p className="text-blue-600 dark:text-blue-400 text-xs">Saldo no extrato</p>
-                      <p className="font-medium text-blue-900 dark:text-blue-100">
+                      <p className="text-[#1a67c2] dark:text-[#60A5FA] text-xs">Saldo no extrato</p>
+                      <p className="font-medium text-blue-900 dark:text-[#DBEAFE]">
                         {formatCurrency(parseResult.ledgerBalance)}
                       </p>
                     </div>
                   )}
                   <div>
-                    <p className="text-blue-600 dark:text-blue-400 text-xs">Total de lançamentos</p>
-                    <p className="font-medium text-blue-900 dark:text-blue-100">
+                    <p className="text-[#1a67c2] dark:text-[#60A5FA] text-xs">Total de lançamentos</p>
+                    <p className="font-medium text-blue-900 dark:text-[#DBEAFE]">
                       {parseResult.totalTransactions}
                     </p>
                   </div>
                   <div>
-                    <p className="text-blue-600 dark:text-blue-400 text-xs">Possíveis duplicatas</p>
-                    <p className="font-medium text-blue-900 dark:text-blue-100">
+                    <p className="text-[#1a67c2] dark:text-[#60A5FA] text-xs">Possíveis duplicatas</p>
+                    <p className="font-medium text-blue-900 dark:text-[#DBEAFE]">
                       {parseResult.duplicatesFound}
                     </p>
                   </div>
@@ -1036,7 +1036,7 @@ function OfxImportSheet({
                   <span className="text-muted-foreground">Importar como nova</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <div className="w-3 h-3 rounded-full bg-[#1a67c2]" />
                   <span className="text-muted-foreground">Conciliar com existente</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1060,7 +1060,7 @@ function OfxImportSheet({
                         action === "IGNORE"
                           ? "opacity-50 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
                           : action === "MATCH"
-                          ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
+                          ? "border-[#BFDBFE] dark:border-[#1E2D4A] bg-[#EBF3FC] dark:bg-[#1E2D4A]"
                           : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
                       }`}
                     >
@@ -1126,8 +1126,8 @@ function OfxImportSheet({
                             onClick={() => setDecisionAction(tx.ofxId, "MATCH")}
                             className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
                               action === "MATCH"
-                                ? "bg-blue-600 text-white"
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-950 hover:text-blue-700"
+                                ? "bg-[#1a67c2] text-white"
+                                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-[#EBF3FC] dark:hover:bg-[#1E2D4A] hover:text-[#1558a8]"
                             }`}
                           >
                             <CheckCircle2 className="h-3 w-3" />
@@ -1176,11 +1176,11 @@ function OfxImportSheet({
                   </p>
                   <p className="text-xs text-green-600 dark:text-green-400 mt-1">Importadas</p>
                 </div>
-                <div className="rounded-xl bg-blue-50 dark:bg-blue-950 p-4">
-                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                <div className="rounded-xl bg-[#EBF3FC] dark:bg-[#1E2D4A] p-4">
+                  <p className="text-2xl font-bold text-[#1558a8] dark:text-[#93C5FD]">
                     {importResult.matchedCount}
                   </p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Conciliadas</p>
+                  <p className="text-xs text-[#1a67c2] dark:text-[#60A5FA] mt-1">Conciliadas</p>
                 </div>
                 <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-4">
                   <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">
@@ -1215,7 +1215,7 @@ function OfxImportSheet({
                 Voltar
               </Button>
               <Button
-                className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl"
+                className="flex-1 bg-[#1a67c2] hover:bg-[#1558a8] rounded-xl"
                 onClick={handleImport}
                 disabled={importing || decisions.every((d) => d.action === "IGNORE")}
               >
@@ -1234,7 +1234,7 @@ function OfxImportSheet({
             </div>
           )}
           {step === "done" && (
-            <Button className="w-full bg-blue-600 hover:bg-blue-700 rounded-xl" onClick={onClose}>
+            <Button className="w-full bg-[#1a67c2] hover:bg-[#1558a8] rounded-xl" onClick={onClose}>
               Concluir
             </Button>
           )}

@@ -169,22 +169,22 @@ export default function BankStatement({ entityId }: { entityId: number }) {
         <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white shadow-lg space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-100 text-sm font-medium">Saldo projetado ao fim do período</p>
+              <p className="text-[#DBEAFE] text-sm font-medium">Saldo projetado ao fim do período</p>
               <p className="text-3xl font-bold">{formatCurrency(summary.projectedBalance)}</p>
             </div>
             <Wallet className="h-8 w-8 text-blue-200" />
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-white/10 p-3">
-              <p className="text-blue-100 text-xs">Saldo inicial do período</p>
+              <p className="text-[#DBEAFE] text-xs">Saldo inicial do período</p>
               <p className="font-semibold">{formatCurrency(summary.openingBalance)}</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3">
-              <p className="text-blue-100 text-xs">Saldo realizado (até agora)</p>
+              <p className="text-[#DBEAFE] text-xs">Saldo realizado (até agora)</p>
               <p className="font-semibold">{formatCurrency(summary.realizedBalance)}</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3">
-              <p className="text-blue-100 text-xs flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Entradas</p>
+              <p className="text-[#DBEAFE] text-xs flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Entradas</p>
               <p className="font-semibold">
                 +{formatCurrency(summary.paidIn)}
                 {summary.pendingIn > 0 && (
@@ -193,7 +193,7 @@ export default function BankStatement({ entityId }: { entityId: number }) {
               </p>
             </div>
             <div className="rounded-xl bg-white/10 p-3">
-              <p className="text-blue-100 text-xs flex items-center gap-1"><TrendingDown className="h-3 w-3" /> Saídas</p>
+              <p className="text-[#DBEAFE] text-xs flex items-center gap-1"><TrendingDown className="h-3 w-3" /> Saídas</p>
               <p className="font-semibold">
                 -{formatCurrency(summary.paidOut)}
                 {summary.pendingOut > 0 && (

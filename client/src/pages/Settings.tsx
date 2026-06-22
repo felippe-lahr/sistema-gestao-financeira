@@ -86,14 +86,14 @@ export default function Settings() {
       {/* Card de acesso rápido a Contas Bancárias */}
       <button
         onClick={() => navigate("/bank-accounts")}
-        className="w-full flex items-center gap-4 p-4 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors text-left"
+        className="w-full flex items-center gap-4 p-4 rounded-xl border border-[#BFDBFE] dark:border-[#1E2D4A] bg-[#EBF3FC] dark:bg-[#1E2D4A]/30 hover:bg-[#DBEAFE] dark:hover:bg-[#1E2D4A]/50 transition-colors text-left"
       >
-        <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 rounded-lg bg-[#1a67c2] flex items-center justify-center flex-shrink-0">
           <Landmark className="h-5 w-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-blue-900 dark:text-blue-100">Contas Bancárias</p>
-          <p className="text-sm text-blue-600 dark:text-blue-400">Gerencie contas e importe extratos OFX</p>
+          <p className="font-semibold text-blue-900 dark:text-[#DBEAFE]">Contas Bancárias</p>
+          <p className="text-sm text-[#1a67c2] dark:text-[#60A5FA]">Gerencie contas e importe extratos OFX</p>
         </div>
         <ArrowRight className="h-5 w-5 text-blue-400 flex-shrink-0" />
       </button>
@@ -463,7 +463,7 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
             <Button 
               onClick={isEditOpen ? handleUpdate : handleCreate} 
               disabled={createMutation.isPending || updateMutation.isPending} 
-              className="h-11 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold"
+              className="h-11 px-8 bg-[#1a67c2] hover:bg-[#1558a8] text-white font-bold"
             >
               {createMutation.isPending || updateMutation.isPending ? "Salvando..." : (isEditOpen ? "Salvar Alterações" : "Criar Meio")}
             </Button>
@@ -744,7 +744,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
           </button>
         </div>
         {canWrite && (
-          <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-[#1a67c2] hover:bg-[#1558a8]">
             <Plus className="mr-2 h-4 w-4" />
             Nova Categoria
           </Button>
@@ -764,7 +764,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
               <Tag className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">Nenhuma categoria de receita</p>
               {canWrite && (
-                <button onClick={() => { resetForm(); setFormData(f => ({ ...f, type: "INCOME" })); setIsCreateOpen(true); }} className="mt-2 text-xs text-blue-600 hover:underline">
+                <button onClick={() => { resetForm(); setFormData(f => ({ ...f, type: "INCOME" })); setIsCreateOpen(true); }} className="mt-2 text-xs text-[#1a67c2] hover:underline">
                   + Criar primeira categoria
                 </button>
               )}
@@ -785,7 +785,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
               <Tag className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">Nenhuma categoria de despesa</p>
               {canWrite && (
-                <button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="mt-2 text-xs text-blue-600 hover:underline">
+                <button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="mt-2 text-xs text-[#1a67c2] hover:underline">
                   + Criar primeira categoria
                 </button>
               )}
@@ -898,7 +898,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
           </div>
           <div className="sticky bottom-0 border-t bg-background px-6 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => { resetForm(); setIsCreateOpen(false); }}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-[#1a67c2] hover:bg-[#1558a8]">
               {createMutation.isPending ? "Criando..." : (creatingSubFor ? "Criar Subcategoria" : "Criar Categoria")}
             </Button>
           </div>
@@ -961,7 +961,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
           </div>
           <div className="sticky bottom-0 border-t bg-background px-6 py-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => { setEditingCategory(null); resetForm(); setIsEditOpen(false); }}>Cancelar</Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-[#1a67c2] hover:bg-[#1558a8]">
               {updateMutation.isPending ? "Atualizando..." : "Salvar"}
             </Button>
           </div>

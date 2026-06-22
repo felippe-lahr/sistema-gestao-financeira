@@ -53,7 +53,7 @@ export default function ForgotPassword() {
               </p>
               <a
                 href="/"
-                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm font-medium hover:underline"
+                className="text-[#1a67c2] hover:text-[#1558a8] dark:text-[#60A5FA] text-sm font-medium hover:underline"
               >
                 ← Voltar para o login
               </a>
@@ -96,14 +96,14 @@ export default function ForgotPassword() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="h-11 pl-10 rounded-xl border-gray-200 dark:border-gray-700 focus:border-blue-500"
+                      className="h-11 pl-10 rounded-xl border-gray-200 dark:border-gray-700 focus:border-[#1a67c2]"
                     />
                   </div>
                 </div>
 
                 <Button
                   type="submit"
-                  className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm"
+                  className="w-full h-11 rounded-xl bg-[#1a67c2] hover:bg-[#1558a8] text-white font-semibold text-sm"
                   disabled={isLoading}
                 >
                   {isLoading ? "Enviando..." : "Enviar link de recuperação"}

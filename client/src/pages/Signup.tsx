@@ -40,9 +40,9 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
                 className={`
                   w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300
                   ${isCompleted
-                    ? "bg-blue-600 border-blue-600 text-white"
+                    ? "bg-[#1a67c2] border-blue-600 text-white"
                     : isCurrent
-                    ? "bg-white border-blue-600 text-blue-600"
+                    ? "bg-white border-blue-600 text-[#1a67c2]"
                     : "bg-white border-gray-200 text-gray-400"
                   }
                 `}
@@ -55,7 +55,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
               </div>
               <span
                 className={`text-xs font-medium whitespace-nowrap ${
-                  isCurrent ? "text-blue-600" : isCompleted ? "text-blue-500" : "text-gray-400"
+                  isCurrent ? "text-[#1a67c2]" : isCompleted ? "text-[#1a67c2]" : "text-gray-400"
                 }`}
               >
                 {step.label}
@@ -64,7 +64,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
             {index < STEPS.length - 1 && (
               <div
                 className={`w-16 h-0.5 mb-5 mx-1 transition-all duration-300 ${
-                  currentStep > step.id ? "bg-blue-600" : "bg-gray-200"
+                  currentStep > step.id ? "bg-[#1a67c2]" : "bg-gray-200"
                 }`}
               />
             )}
@@ -123,7 +123,7 @@ function Step1({
   })();
 
   const strengthLabel = ["", "Fraca", "Razoável", "Boa", "Forte", "Muito forte"][passwordStrength];
-  const strengthColor = ["", "bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-blue-500", "bg-green-500"][passwordStrength];
+  const strengthColor = ["", "bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-[#1a67c2]", "bg-green-500"][passwordStrength];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -287,8 +287,8 @@ function Step2({
         </p>
       </div>
 
-      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 p-4 space-y-2">
-        <p className="text-sm font-medium text-blue-800 dark:text-blue-300">O que você terá acesso:</p>
+      <div className="rounded-lg bg-[#EBF3FC] dark:bg-[#1E2D4A]/30 border border-blue-100 dark:border-blue-900 p-4 space-y-2">
+        <p className="text-sm font-medium text-blue-800 dark:text-[#93C5FD]">O que você terá acesso:</p>
         <ul className="space-y-1.5">
           {[
             "Gestão de transações (créditos e débitos)",
@@ -297,7 +297,7 @@ function Step2({
             "Relatórios financeiros",
             "Compartilhamento com sua equipe",
           ].map((item) => (
-            <li key={item} className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-400">
+            <li key={item} className="flex items-start gap-2 text-xs text-[#1558a8] dark:text-[#60A5FA]">
               <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               {item}
             </li>
@@ -336,8 +336,8 @@ function Step3({
     <div className="space-y-4">
       <div className="rounded-lg border bg-muted/30 divide-y">
         <div className="flex items-center gap-3 p-3">
-          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-            <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div className="w-8 h-8 rounded-full bg-[#DBEAFE] dark:bg-[#1E2D4A] flex items-center justify-center shrink-0">
+            <User className="h-4 w-4 text-[#1a67c2] dark:text-[#60A5FA]" />
           </div>
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">Nome</p>
@@ -345,8 +345,8 @@ function Step3({
           </div>
         </div>
         <div className="flex items-center gap-3 p-3">
-          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-            <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div className="w-8 h-8 rounded-full bg-[#DBEAFE] dark:bg-[#1E2D4A] flex items-center justify-center shrink-0">
+            <Mail className="h-4 w-4 text-[#1a67c2] dark:text-[#60A5FA]" />
           </div>
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">E-mail</p>
@@ -354,8 +354,8 @@ function Step3({
           </div>
         </div>
         <div className="flex items-center gap-3 p-3">
-          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-            <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div className="w-8 h-8 rounded-full bg-[#DBEAFE] dark:bg-[#1E2D4A] flex items-center justify-center shrink-0">
+            <Building2 className="h-4 w-4 text-[#1a67c2] dark:text-[#60A5FA]" />
           </div>
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">Organização</p>
@@ -476,14 +476,14 @@ export default function Signup() {
               <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '200px' }} className="h-auto object-contain hidden dark:block" />
             </div>
             <div className="flex justify-center">
-              <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <Mail className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+              <div className="w-20 h-20 rounded-full bg-[#DBEAFE] dark:bg-[#1E2D4A] flex items-center justify-center">
+                <Mail className="h-10 w-10 text-[#1a67c2] dark:text-[#60A5FA]" />
               </div>
             </div>
             <div className="space-y-2">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Verifique seu e-mail</h2>
               <p className="text-gray-500 dark:text-gray-400 text-sm">Enviamos um link de ativação para</p>
-              <p className="font-semibold text-blue-600 dark:text-blue-400 break-all">{submittedEmail}</p>
+              <p className="font-semibold text-[#1a67c2] dark:text-[#60A5FA] break-all">{submittedEmail}</p>
             </div>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 text-left space-y-2">
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Próximos passos:</p>
@@ -513,7 +513,7 @@ export default function Signup() {
           <div className="relative z-10 text-center text-white max-w-md">
             <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '260px' }} className="h-auto object-contain mx-auto mb-10 brightness-0 invert" />
             <h2 className="text-4xl font-bold mb-6 leading-tight">Gerencie suas finanças com inteligência</h2>
-            <p className="text-blue-100 text-xl leading-relaxed">Controle transações, investimentos e patrimônio de múltiplas entidades em um único lugar.</p>
+            <p className="text-[#DBEAFE] text-xl leading-relaxed">Controle transações, investimentos e patrimônio de múltiplas entidades em um único lugar.</p>
           </div>
         </div>
       </div>
@@ -597,7 +597,7 @@ export default function Signup() {
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold hover:underline transition-colors"
+              className="text-[#1a67c2] hover:text-[#1558a8] dark:text-[#60A5FA] font-semibold hover:underline transition-colors"
             >
               Fazer login
             </button>
@@ -615,7 +615,7 @@ export default function Signup() {
         <div className="relative z-10 text-center text-white max-w-md">
           <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: '260px' }} className="h-auto object-contain mx-auto mb-10 brightness-0 invert" />
           <h2 className="text-4xl font-bold mb-6 leading-tight">Gerencie suas finanças com inteligência</h2>
-          <p className="text-blue-100 text-xl leading-relaxed">Controle transações, investimentos e patrimônio de múltiplas entidades em um único lugar.</p>
+          <p className="text-[#DBEAFE] text-xl leading-relaxed">Controle transações, investimentos e patrimônio de múltiplas entidades em um único lugar.</p>
         </div>
       </div>
     </div>
