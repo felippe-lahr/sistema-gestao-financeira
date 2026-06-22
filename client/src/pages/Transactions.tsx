@@ -1711,7 +1711,7 @@ export default function Transactions() {
 
       {/* Transaction Summary */}
       {!summaryLoading && summary && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-lg p-4 md:p-6 mb-4">
+        <div className="rounded-xl p-4 md:p-6 mb-4" style={{ background: '#F6F6F8' }}>
           {activeTab === "all" ? (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
@@ -1877,7 +1877,7 @@ export default function Transactions() {
               ))}
             </div>
           ) : filteredTransactions && filteredTransactions.length > 0 ? (
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               {/* Grupos de cartão de crédito */}
               {cardGroups.map((group) => {
                 const CARD_TX_PREVIEW = 3;
@@ -1887,7 +1887,7 @@ export default function Transactions() {
                 const visibleTx = (!isExpanded || showingAll) ? group.transactions : group.transactions.slice(0, CARD_TX_PREVIEW);
                 const hasMore = isExpanded && !showingAll && group.transactions.length > CARD_TX_PREVIEW;
                 return (
-                <Card key={`card-group-${group.cardName}`} className="overflow-hidden" style={{ padding: 0 }}>
+                <Card key={`card-group-${group.cardName}`} className="overflow-hidden" style={{ paddingTop: 0, paddingBottom: 0, paddingLeft: 0, paddingRight: 0, gap: 0 }}>
                   <CardContent className="p-0">
                     {/* Header row */}
                     <div
@@ -2058,8 +2058,8 @@ export default function Transactions() {
               })}
               {/* Transações normais (sem cartão de crédito) */}
               {nonCardTransactions.map((transaction) => (
-                <Card key={transaction.id} className="hover:shadow-sm transition-shadow" style={{ padding: 0 }}>
-                  <CardContent className="p-0 px-5 py-4">
+                <Card key={transaction.id} className="hover:shadow-sm transition-shadow" style={{ paddingTop: 0, paddingBottom: 0, paddingLeft: 0, paddingRight: 0, gap: 0 }}>
+                  <CardContent className="px-5 py-4">
                     {/* Desktop Layout */}
                     <div className="hidden md:flex items-center gap-4">
                       {/* Icon */}
