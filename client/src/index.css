@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -44,96 +45,164 @@
 }
 
 :root {
-  /* Primary Colors - Modern Blue */
-  --primary: #2563EB;
+  /* ── Design tokens (UnifiquePro redesign) ── */
+  --bg-page: #F6F6F8;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #FBFBFC;
+
+  --text-primary: #16161A;
+  --text-secondary: #3C3C44;
+  --text-tertiary: #5C5C66;
+  --text-muted: #8A8A92;
+  --text-placeholder: #A6A6AE;
+
+  --border-default: #ECECEF;
+  --border-input: #E4E4E8;
+  --border-strong: #D6D6DC;
+
+  --accent: oklch(0.96 0.028 256);
+  --accent-soft: oklch(0.96 0.028 256);
+
+  --green: oklch(0.52 0.12 158);
+  --green-bg: #EAF6EF;
+  --red: oklch(0.52 0.16 25);
+  --red-bg: #FBECEC;
+  --amber: oklch(0.52 0.10 72);
+  --amber-bg: #FBF3E0;
+  --amber-border: #EFE7CF;
+
+  --surface-dark: #16161A;
+
+  /* Primary Colors — #1a67c2 */
+  --primary: #1a67c2;
   --primary-foreground: #FFFFFF;
-  --sidebar-primary: #1E40AF;
-  --sidebar-primary-foreground: #F0F9FF;
-  
+  --sidebar-primary: #1a67c2;
+  --sidebar-primary-foreground: #FFFFFF;
+
   /* Chart Colors - Pastel palette */
   --chart-1: #93C5FD;  /* Blue pastel */
   --chart-2: #6EE7B7;  /* Emerald pastel */
   --chart-3: #FDE047;  /* Amber pastel */
   --chart-4: #FCA5A5;  /* Red pastel */
   --chart-5: #C4B5FD;  /* Violet pastel */
-  
+
   /* Status Colors */
-  --success: #10B981;
-  --success-foreground: #F0FDF4;
-  --warning: #F59E0B;
-  --warning-foreground: #FFFBEB;
-  
+  --success: oklch(0.52 0.12 158);
+  --success-foreground: #EAF6EF;
+  --warning: oklch(0.52 0.10 72);
+  --warning-foreground: #FBF3E0;
+
   /* Border Radius */
-  --radius: 0.5rem;
-  
+  --radius: 0.75rem;
+
   /* Light Mode Colors */
-  --background: #FFFFFF;
-  --foreground: #1F2937;
+  --background: #F6F6F8;
+  --foreground: #16161A;
   --card: #FFFFFF;
-  --card-foreground: #1F2937;
+  --card-foreground: #16161A;
   --popover: #FFFFFF;
-  --popover-foreground: #1F2937;
-  --secondary: #F3F4F6;
-  --secondary-foreground: #374151;
-  --muted: #F3F4F6;
-  --muted-foreground: #6B7280;
-  --accent: #DBEAFE;
-  --accent-foreground: #1E40AF;
-  --destructive: #EF4444;
+  --popover-foreground: #16161A;
+  --secondary: #F3F3F5;
+  --secondary-foreground: #3C3C44;
+  --muted: #F3F3F5;
+  --muted-foreground: #8A8A92;
+  --accent-foreground: #1a67c2;
+  --destructive: #C0392B;
   --destructive-foreground: #FFFFFF;
-  --border: #E5E7EB;
-  --input: #F3F4F6;
-  --ring: #3B82F6;
+  --border: #ECECEF;
+  --input: #F6F6F8;
+  --ring: #1a67c2;
   --sidebar: #FFFFFF;
-  --sidebar-foreground: #1F2937;
-  --sidebar-accent: #F3F4F6;
-  --sidebar-accent-foreground: #1E40AF;
-  --sidebar-border: #E5E7EB;
-  --sidebar-ring: #3B82F6;
+  --sidebar-foreground: #16161A;
+  --sidebar-accent: #EBF3FC;
+  --sidebar-accent-foreground: #1a67c2;
+  --sidebar-border: #ECECEF;
+  --sidebar-ring: #1a67c2;
 }
 
 .dark {
-  --primary: #60A5FA;
-  --primary-foreground: #0F172A;
+  /* Design tokens */
+  --bg-page: #111118;
+  --bg-surface: #1C1C24;
+  --bg-elevated: #16161F;
+  --text-primary: #F0F0F6;
+  --text-secondary: #C4C4D0;
+  --text-tertiary: #A0A0B8;
+  --text-muted: #80809A;
+  --text-placeholder: #60607A;
+  --border-default: #2C2C3C;
+  --border-input: #333348;
+  --border-strong: #3C3C50;
+  --green-bg: #0D2B1F;
+  --red-bg: #2B0D0D;
+  --amber-bg: #2B210D;
+
+  /* Primary — same brand blue, works on dark bg */
+  --primary: #3B82F6;
+  --primary-foreground: #FFFFFF;
   --sidebar-primary: #3B82F6;
-  --sidebar-primary-foreground: #F0F9FF;
-  --background: #0F172A;
-  --foreground: #F1F5F9;
-  --card: #1E293B;
-  --card-foreground: #F1F5F9;
-  --popover: #1E293B;
-  --popover-foreground: #F1F5F9;
-  --secondary: #334155;
-  --secondary-foreground: #E2E8F0;
-  --muted: #334155;
-  --muted-foreground: #94A3B8;
-  --accent: #1E3A8A;
+  --sidebar-primary-foreground: #FFFFFF;
+
+  /* Backgrounds */
+  --background: #111118;
+  --foreground: #F0F0F6;
+  --card: #1C1C24;
+  --card-foreground: #F0F0F6;
+  --popover: #222230;
+  --popover-foreground: #F0F0F6;
+
+  /* Neutrals */
+  --secondary: #252532;
+  --secondary-foreground: #C4C4D0;
+  --muted: #1E1E2A;
+  --muted-foreground: #80809A;
+
+  /* Accent — hover state in dropdowns/menus */
+  --accent: #1E2D4A;
   --accent-foreground: #93C5FD;
-  --destructive: #F87171;
-  --destructive-foreground: #0F172A;
-  --border: #334155;
-  --input: #1E293B;
-  --ring: #60A5FA;
-  --chart-1: #93C5FD;
-  --chart-2: #6EE7B7;
-  --chart-3: #FDE047;
-  --chart-4: #FCA5A5;
-  --chart-5: #C4B5FD;
-  --sidebar: #1E293B;
-  --sidebar-foreground: #F1F5F9;
-  --sidebar-accent: #334155;
+
+  /* Semantic */
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  /* Borders & Inputs */
+  --border: #2C2C3C;
+  --input: #252532;
+  --ring: #3B82F6;
+
+  /* Charts */
+  --chart-1: #60A5FA;
+  --chart-2: #34D399;
+  --chart-3: #FCD34D;
+  --chart-4: #F87171;
+  --chart-5: #A78BFA;
+
+  /* Sidebar */
+  --sidebar: #16161F;
+  --sidebar-foreground: #E8E8F2;
+  --sidebar-accent: #1E2D4A;
   --sidebar-accent-foreground: #93C5FD;
-  --sidebar-border: #334155;
-  --sidebar-ring: #60A5FA;
+  --sidebar-border: #252535;
+  --sidebar-ring: #3B82F6;
 }
+
+/* Scrollbar styles */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #DBDBE0; border-radius: 8px; border: 3px solid #F6F6F8; }
+::-webkit-scrollbar-thumb:hover { background: #C7C7CE; }
+.dark ::-webkit-scrollbar-thumb { background: #3C3C50; border-color: #111118; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #505068; }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--bg-page);
+    color: var(--text-primary);
     font-weight: 400;
     letter-spacing: -0.01em;
   }
@@ -190,7 +259,8 @@
   }
 
   /* Currency formatting */
-  .currency {
+  .currency,
+  .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 
@@ -403,3 +473,84 @@
     }
   }
 }
+
+/* ===== Global Dark Mode Overrides =====
+ * These override hardcoded Tailwind color classes that lack dark: variants
+ * across all page components. Using !important to beat Tailwind utility specificity.
+ */
+.dark .bg-white { background-color: #1C1C24 !important; }
+.dark .bg-\[\#FFFFFF\] { background-color: #1C1C24 !important; }
+.dark .bg-\[\#ffffff\] { background-color: #1C1C24 !important; }
+.dark .bg-gray-50 { background-color: #16161F !important; }
+.dark .bg-gray-100 { background-color: #1E1E2A !important; }
+.dark .bg-gray-200 { background-color: #252532 !important; }
+.dark .bg-slate-50 { background-color: #16161F !important; }
+.dark .bg-slate-100 { background-color: #1E1E2A !important; }
+
+.dark .text-gray-950 { color: #F0F0F6 !important; }
+.dark .text-gray-900 { color: #F0F0F6 !important; }
+.dark .text-gray-800 { color: #E0E0EC !important; }
+.dark .text-gray-700 { color: #C8C8D8 !important; }
+.dark .text-gray-600 { color: #A0A0B8 !important; }
+.dark .text-gray-500 { color: #80809A !important; }
+.dark .text-gray-400 { color: #60607A !important; }
+.dark .text-slate-900 { color: #F0F0F6 !important; }
+.dark .text-slate-800 { color: #E0E0EC !important; }
+.dark .text-slate-700 { color: #C8C8D8 !important; }
+.dark .text-slate-600 { color: #A0A0B8 !important; }
+.dark .text-slate-500 { color: #80809A !important; }
+
+.dark .border-gray-100 { border-color: #252532 !important; }
+.dark .border-gray-200 { border-color: #2C2C3C !important; }
+.dark .border-gray-300 { border-color: #333348 !important; }
+.dark .border-slate-200 { border-color: #2C2C3C !important; }
+.dark .border-slate-300 { border-color: #333348 !important; }
+
+.dark .divide-gray-100 > * + * { border-color: #252532 !important; }
+.dark .divide-gray-200 > * + * { border-color: #2C2C3C !important; }
+
+.dark .ring-gray-200 { --tw-ring-color: #2C2C3C !important; }
+.dark .ring-gray-300 { --tw-ring-color: #333348 !important; }
+
+/* Hover state overrides */
+.dark .hover\:bg-gray-50:hover { background-color: #1E1E2A !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #252532 !important; }
+.dark .hover\:bg-white:hover { background-color: #252532 !important; }
+
+/* Shadow — lighten shadows in dark mode */
+.dark .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0,0,0,0.4) !important; }
+.dark .shadow { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.5), 0 1px 2px -1px rgba(0,0,0,0.5) !important; }
+.dark .shadow-md { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.5) !important; }
+.dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -4px rgba(0,0,0,0.5) !important; }
+
+/* Light blue accent backgrounds → dark accent in dark mode */
+.dark .bg-blue-50 { background-color: #1E2D4A !important; }
+.dark .bg-blue-100 { background-color: #1E2D4A !important; }
+.dark .bg-indigo-50 { background-color: #1E2A4A !important; }
+.dark .bg-indigo-100 { background-color: #1E2A4A !important; }
+.dark .bg-\[\#EBF3FC\] { background-color: #1E2D4A !important; }
+.dark .bg-\[\#DBEAFE\] { background-color: #1E2D4A !important; }
+
+/* Blue text on light bg → lighter blue in dark mode */
+.dark .text-blue-800 { color: #93C5FD !important; }
+.dark .text-blue-900 { color: #BFDBFE !important; }
+.dark .text-blue-700 { color: #93C5FD !important; }
+.dark .text-indigo-800 { color: #A5B4FC !important; }
+.dark .text-indigo-700 { color: #A5B4FC !important; }
+
+/* Light blue borders */
+.dark .border-blue-200 { border-color: #1E3A5F !important; }
+.dark .border-blue-300 { border-color: #1E3A5F !important; }
+.dark .border-\[\#BFDBFE\] { border-color: #1E3A5F !important; }
+
+/* Hover on light blue */
+.dark .hover\:bg-blue-50:hover { background-color: #1E2D4A !important; }
+.dark .hover\:bg-blue-100:hover { background-color: #253A5A !important; }
+.dark .hover\:bg-\[\#EBF3FC\]:hover { background-color: #1E2D4A !important; }
+.dark .hover\:bg-\[\#DBEAFE\]:hover { background-color: #253A5A !important; }
+
+/* ===== Preserved whites =====
+ * Toggle thumbs and small indicators that must stay light even in dark mode.
+ * Apply .preserve-white to any bg-white element that should not go dark.
+ */
+.dark .preserve-white { background-color: #F0F0F6 !important; }
