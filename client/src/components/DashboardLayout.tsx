@@ -154,7 +154,7 @@ function LoginForm() {
     }
   };
 
-  // Painel direito (dark) reutilizável
+  // Painel direito reutilizável
   const RightPanel = ({ title, subtitle }: { title: string; subtitle?: string }) => (
     <div
       className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden flex-col items-center justify-center p-12"
@@ -172,188 +172,203 @@ function LoginForm() {
       />
 
       {/* Decorative rings */}
-      <div className="absolute pointer-events-none" style={{
-        width: 420, height: 420, borderRadius: '50%',
-        border: '1px solid rgba(255,255,255,0.06)',
-        top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-      }} />
-      <div className="absolute pointer-events-none" style={{
-        width: 620, height: 620, borderRadius: '50%',
-        border: '1px solid rgba(255,255,255,0.035)',
-        top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-      }} />
+      <div className="absolute pointer-events-none" style={{ width: 420, height: 420, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.05)', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+      <div className="absolute pointer-events-none" style={{ width: 640, height: 640, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.03)', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
 
-      {/* Floating icon cards */}
+      {/* ── Floating SVG Widgets ── */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
 
-        {/* Top-left — CreditCard large */}
-        <div className="lf1 absolute" style={{ top: '7%', left: '5%' }}>
-          <div style={{
-            width: 100, height: 100, borderRadius: 26,
-            background: 'rgba(255,255,255,0.11)',
-            backdropFilter: 'blur(14px)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.28)',
-          }}>
-            <CreditCard style={{ width: 52, height: 52, color: 'white', strokeWidth: 1.1 }} />
+        {/* Widget 1 — Transaction list (top-left) */}
+        <div className="lf1 absolute" style={{ top: '6%', left: '3%' }}>
+          <div style={{ width: 200, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.18)', padding: '12px 14px', boxShadow: '0 20px 60px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.25)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Transações</div>
+            {[
+              { icon: '↑', bg: 'rgba(74,222,128,0.25)', color: '#4ADE80', name: 'Salário', cat: 'Renda', amount: '+R$8.500', amtColor: '#4ADE80' },
+              { icon: '↓', bg: 'rgba(248,113,113,0.25)', color: '#F87171', name: 'Aluguel', cat: 'Moradia', amount: '-R$2.200', amtColor: '#F87171' },
+              { icon: '↓', bg: 'rgba(248,113,113,0.25)', color: '#F87171', name: 'Bradesco', cat: 'Cartão', amount: '-R$769,06', amtColor: '#F87171' },
+            ].map((tx, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: i < 2 ? 8 : 0, borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.07)' : 'none', marginBottom: i < 2 ? 8 : 0 }}>
+                <div style={{ width: 26, height: 26, borderRadius: 7, background: tx.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, color: tx.color, fontWeight: 700 }}>{tx.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>{tx.name}</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>{tx.cat}</div>
+                </div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: tx.amtColor, flexShrink: 0 }}>{tx.amount}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Top-right — BarChart2 medium */}
-        <div className="lf3 absolute" style={{ top: '5%', right: '7%' }}>
-          <div style={{
-            width: 84, height: 84, borderRadius: 21,
-            background: 'rgba(255,255,255,0.09)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.16)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 10px 36px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2)',
-          }}>
-            <BarChart2 style={{ width: 42, height: 42, color: 'white', strokeWidth: 1.1 }} />
+        {/* Widget 2 — Bar chart / Monthly spend (top-right) */}
+        <div className="lf3 absolute" style={{ top: '5%', right: '2%' }}>
+          <div style={{ width: 188, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.16)', padding: '12px 14px', boxShadow: '0 16px 50px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Gastos Mensais</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#4ADE80' }}>↑ 12%</div>
+            </div>
+            <svg width="160" height="58" viewBox="0 0 160 58">
+              {[
+                { h: 28, x: 0 }, { h: 44, x: 28 }, { h: 34, x: 56 },
+                { h: 50, x: 84 }, { h: 38, x: 112 }, { h: 54, x: 140 },
+              ].map(({ h, x }, i) => (
+                <rect key={i} x={x} y={58 - h} width="19" height={h} rx="4"
+                  fill={i === 5 ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.22)'} />
+              ))}
+              <line x1="0" y1="57.5" x2="160" y2="57.5" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+            </svg>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+              {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'].map(m => (
+                <span key={m} style={{ fontSize: 8, color: 'rgba(255,255,255,0.28)', width: 19, textAlign: 'center', display: 'block' }}>{m}</span>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Mid-left — TrendingUp small */}
-        <div className="lf5 absolute" style={{ top: '41%', left: '2%' }}>
-          <div style={{
-            width: 70, height: 70, borderRadius: 18,
-            background: 'rgba(255,255,255,0.07)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 8px 28px rgba(0,0,0,0.13)',
-          }}>
-            <TrendingUp style={{ width: 34, height: 34, color: 'rgba(255,255,255,0.9)', strokeWidth: 1.2 }} />
+        {/* Widget 3 — Credit card (mid-left) */}
+        <div className="lf5 absolute" style={{ top: '40%', left: '1%' }}>
+          <div style={{ width: 210, borderRadius: 16, background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.2)', padding: '16px 18px', boxShadow: '0 20px 60px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ width: 32, height: 24, borderRadius: 5, background: 'rgba(255,255,255,0.28)', position: 'relative', overflow: 'hidden' }}>
+                <svg width="32" height="24" viewBox="0 0 32 24" style={{ position: 'absolute', inset: 0 }}>
+                  <line x1="0" y1="8" x2="32" y2="8" stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
+                  <line x1="0" y1="16" x2="32" y2="16" stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
+                  <line x1="11" y1="0" x2="11" y2="24" stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
+                  <line x1="22" y1="0" x2="22" y2="24" stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
+                </svg>
+              </div>
+              <div style={{ display: 'flex' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.32)' }} />
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', marginLeft: -9 }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              {['••••', '••••', '••••', '3452'].map((p, i) => (
+                <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.72)', letterSpacing: '0.08em' }}>{p}</span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Portador</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.88)' }}>DEMO USER</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Validade</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.88)' }}>12/28</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Mid-right — Receipt medium */}
-        <div className="lf2 absolute" style={{ top: '36%', right: '3%' }}>
-          <div style={{
-            width: 80, height: 80, borderRadius: 20,
-            background: 'rgba(255,255,255,0.09)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 10px 34px rgba(0,0,0,0.14)',
-          }}>
-            <Receipt style={{ width: 38, height: 38, color: 'white', strokeWidth: 1.1 }} />
+        {/* Widget 4 — Category donut (mid-right) */}
+        <div className="lf2 absolute" style={{ top: '38%', right: '2%' }}>
+          <div style={{ width: 168, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.15)', padding: '12px 14px', boxShadow: '0 16px 50px rgba(0,0,0,0.18)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Categorias</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {/* Donut — r=22, circ≈138.23 */}
+              <svg width="60" height="60" viewBox="0 0 60 60" style={{ flexShrink: 0 }}>
+                <circle cx="30" cy="30" r="22" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+                <circle cx="30" cy="30" r="22" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth="10"
+                  strokeDasharray="55.29 82.94" strokeDashoffset="0" transform="rotate(-90 30 30)" />
+                <circle cx="30" cy="30" r="22" fill="none" stroke="rgba(74,222,128,0.7)" strokeWidth="10"
+                  strokeDasharray="41.47 96.76" strokeDashoffset="-55.29" transform="rotate(-90 30 30)" />
+                <circle cx="30" cy="30" r="22" fill="none" stroke="rgba(248,113,113,0.6)" strokeWidth="10"
+                  strokeDasharray="41.47 96.76" strokeDashoffset="-96.76" transform="rotate(-90 30 30)" />
+              </svg>
+              <div style={{ flex: 1 }}>
+                {[
+                  { color: 'rgba(255,255,255,0.65)', label: 'Moradia', pct: '40%' },
+                  { color: 'rgba(74,222,128,0.7)', label: 'Renda', pct: '30%' },
+                  { color: 'rgba(248,113,113,0.6)', label: 'Outros', pct: '30%' },
+                ].map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: i < 2 ? 6 : 0 }}>
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', flex: 1 }}>{item.label}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{item.pct}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Bottom-left — Wallet large */}
-        <div className="lf4 absolute" style={{ bottom: '12%', left: '4%' }}>
-          <div style={{
-            width: 94, height: 94, borderRadius: 24,
-            background: 'rgba(255,255,255,0.11)',
-            backdropFilter: 'blur(14px)',
-            border: '1px solid rgba(255,255,255,0.19)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 14px 44px rgba(0,0,0,0.17), inset 0 1px 0 rgba(255,255,255,0.24)',
-          }}>
-            <Wallet style={{ width: 46, height: 46, color: 'white', strokeWidth: 1.1 }} />
+        {/* Widget 5 — Monthly summary / line chart (bottom-left) */}
+        <div className="lf4 absolute" style={{ bottom: '6%', left: '2%' }}>
+          <div style={{ width: 196, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.16)', padding: '12px 14px', boxShadow: '0 20px 60px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Resumo do Mês</div>
+            <svg width="168" height="52" viewBox="0 0 168 52">
+              <defs>
+                <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.28)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </linearGradient>
+              </defs>
+              <path d="M0,48 C24,42 34,34 56,28 C78,22 88,30 112,16 C130,6 148,12 168,9 L168,52 L0,52 Z" fill="url(#lineGrad)" />
+              <path d="M0,48 C24,42 34,34 56,28 C78,22 88,30 112,16 C130,6 148,12 168,9" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="112" cy="16" r="3.5" fill="white" opacity="0.85" />
+              <circle cx="168" cy="9" r="3.5" fill="white" opacity="0.95" />
+            </svg>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
+              <div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)' }}>Receitas</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#4ADE80' }}>+R$12.5k</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)' }}>Despesas</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#F87171' }}>-R$8.3k</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)' }}>Saldo</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'white' }}>+R$4.2k</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Bottom-right — PieChart medium */}
-        <div className="lf6 absolute" style={{ bottom: '8%', right: '6%' }}>
-          <div style={{
-            width: 82, height: 82, borderRadius: 21,
-            background: 'rgba(255,255,255,0.09)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 10px 36px rgba(0,0,0,0.14)',
-          }}>
-            <PieChart style={{ width: 40, height: 40, color: 'white', strokeWidth: 1.1 }} />
+        {/* Widget 6 — Quick stats (bottom-right) */}
+        <div className="lf6 absolute" style={{ bottom: '8%', right: '2%' }}>
+          <div style={{ width: 170, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.15)', padding: '12px 14px', boxShadow: '0 16px 50px rgba(0,0,0,0.18)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Relatório</div>
+            {[
+              { label: 'Contas pagas', value: '14', icon: '✓', color: '#4ADE80' },
+              { label: 'Pendentes', value: '3', icon: '◉', color: '#FBBF24' },
+              { label: 'Vencidas', value: '1', icon: '✕', color: '#F87171' },
+            ].map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: i < 2 ? 7 : 0 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 6, background: `${item.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: item.color }}>{item.icon}</div>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', flex: 1 }}>{item.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{item.value}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Top-center — Landmark small */}
-        <div className="lf7 absolute" style={{ top: '2%', left: '42%' }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 16,
-            background: 'rgba(255,255,255,0.07)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.11)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 6px 22px rgba(0,0,0,0.11)',
-          }}>
-            <Landmark style={{ width: 30, height: 30, color: 'rgba(255,255,255,0.85)', strokeWidth: 1.2 }} />
-          </div>
-        </div>
-
-        {/* Bottom-center — Banknote small */}
-        <div className="lf8 absolute" style={{ bottom: '2%', left: '40%' }}>
-          <div style={{
-            width: 66, height: 66, borderRadius: 17,
-            background: 'rgba(255,255,255,0.07)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 6px 22px rgba(0,0,0,0.11)',
-          }}>
-            <Banknote style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)', strokeWidth: 1.2 }} />
-          </div>
-        </div>
-
-        {/* Left-edge mid-bottom — ArrowUpDown tiny */}
-        <div className="lf5 absolute" style={{ bottom: '33%', left: '1%' }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 14,
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <ArrowUpDown style={{ width: 26, height: 26, color: 'rgba(255,255,255,0.7)', strokeWidth: 1.3 }} />
-          </div>
-        </div>
-
-        {/* Right-edge mid-top — Zap tiny */}
-        <div className="lf3 absolute" style={{ top: '22%', right: '1%' }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 14,
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Zap style={{ width: 26, height: 26, color: 'rgba(255,255,255,0.7)', strokeWidth: 1.3 }} />
-          </div>
-        </div>
       </div>
+      {/* ── / Floating Widgets ── */}
 
-      {/* Main content */}
-      <div className="relative z-10 max-w-md w-full">
-        <div className="mb-10">
-          <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ height: 36, width: 'auto' }} />
+      {/* Main content — centered */}
+      <div className="relative z-10 text-center" style={{ maxWidth: 380 }}>
+        <div className="flex justify-center mb-8">
+          <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: 300, height: 'auto' }} />
         </div>
 
-        <h2 style={{ fontSize: 32, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.25, marginBottom: 16, letterSpacing: '-0.025em' }}>
+        <h2 style={{ fontSize: 30, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.25, marginBottom: 14, letterSpacing: '-0.025em' }}>
           {title}
         </h2>
         {subtitle && (
-          <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: 15, lineHeight: 1.75, marginBottom: 52 }}>
+          <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: 15, lineHeight: 1.75, marginBottom: 44 }}>
             {subtitle}
           </p>
         )}
 
-        <div
-          className="grid grid-cols-3 gap-6"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 36 }}
-        >
+        <div className="grid grid-cols-3 gap-6" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 32 }}>
           {[
             { value: '500+', label: 'empresas' },
             { value: 'R$2M+', label: 'gerenciados' },
             { value: '99.9%', label: 'uptime' },
           ].map((stat) => (
-            <div key={stat.label}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#FFFFFF', fontVariantNumeric: 'tabular-nums' }}>
-                {stat.value}
-              </div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', marginTop: 4 }}>
-                {stat.label}
-              </div>
+            <div key={stat.label} className="text-center">
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#FFFFFF', fontVariantNumeric: 'tabular-nums' }}>{stat.value}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', marginTop: 4 }}>{stat.label}</div>
             </div>
           ))}
         </div>
