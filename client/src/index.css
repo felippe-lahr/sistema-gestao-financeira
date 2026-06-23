@@ -549,6 +549,21 @@
 .dark .hover\:bg-\[\#EBF3FC\]:hover { background-color: #1E2D4A !important; }
 .dark .hover\:bg-\[\#DBEAFE\]:hover { background-color: #253A5A !important; }
 
+/* Transaction icon backgrounds */
+.dark .bg-\[\#EAF6EF\] { background-color: #0D2B1F !important; }
+.dark .bg-\[\#FBECEC\] { background-color: #2B0D0D !important; }
+.dark .bg-\[\#FBF3E0\] { background-color: #2B210D !important; }
+
+/* Surface/subtle backgrounds */
+.dark .bg-\[\#F3F3F5\] { background-color: #252532 !important; }
+.dark .bg-\[\#F9F9FB\] { background-color: #1E1E2A !important; }
+.dark .hover\:bg-\[\#F9F9FB\]:hover { background-color: #1E1E2A !important; }
+
+/* Muted text colors */
+.dark .text-\[\#52525C\] { color: #A0A0B8 !important; }
+.dark .text-\[\#7a5c00\] { color: #FCD34D !important; }
+.dark .text-\[\#5e4600\] { color: #F59E0B !important; }
+
 /* ===== Preserved whites =====
  * Toggle thumbs and small indicators that must stay light even in dark mode.
  * Apply .preserve-white to any bg-white element that should not go dark.

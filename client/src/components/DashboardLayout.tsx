@@ -717,13 +717,13 @@ function DashboardLayoutContent({
                         padding: '0 12px',
                         fontSize: 14,
                         fontWeight: isActive ? 600 : 500,
-                        color: isActive ? '#1a67c2' : '#5C5C66',
-                        background: isActive ? '#EBF3FC' : 'transparent',
+                        color: isActive ? 'var(--primary)' : 'var(--text-tertiary)',
+                        background: isActive ? 'var(--sidebar-accent)' : 'transparent',
                         transition: 'all 0.15s',
                       }}
                     >
                       <item.icon
-                        style={{ width: 17, height: 17, color: isActive ? '#1a67c2' : '#8A8A92', flexShrink: 0 }}
+                        style={{ width: 17, height: 17, color: isActive ? 'var(--primary)' : 'var(--text-muted)', flexShrink: 0 }}
                       />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
@@ -733,7 +733,7 @@ function DashboardLayoutContent({
 
               {/* Divider */}
               {!isCollapsed && (
-                <div style={{ margin: '8px 4px', borderTop: '1px solid #ECECEF' }} />
+                <div style={{ margin: '8px 4px', borderTop: '1px solid var(--border-default)' }} />
               )}
 
               {/* Secondary nav - Plans */}
@@ -748,12 +748,12 @@ function DashboardLayoutContent({
                     padding: '0 12px',
                     fontSize: 14,
                     fontWeight: location === "/planos" ? 600 : 500,
-                    color: location === "/planos" ? '#1a67c2' : '#5C5C66',
-                    background: location === "/planos" ? '#EBF3FC' : 'transparent',
+                    color: location === "/planos" ? 'var(--primary)' : 'var(--text-tertiary)',
+                    background: location === "/planos" ? 'var(--sidebar-accent)' : 'transparent',
                     transition: 'all 0.15s',
                   }}
                 >
-                  <Crown style={{ width: 17, height: 17, color: location === "/planos" ? '#1a67c2' : '#8A8A92', flexShrink: 0 }} />
+                  <Crown style={{ width: 17, height: 17, color: location === "/planos" ? 'var(--primary)' : 'var(--text-muted)', flexShrink: 0 }} />
                   <span>Planos</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -770,12 +770,12 @@ function DashboardLayoutContent({
                       padding: '0 12px',
                       fontSize: 14,
                       fontWeight: location === "/admin" ? 600 : 500,
-                      color: location === "/admin" ? '#1a67c2' : '#5C5C66',
-                      background: location === "/admin" ? '#EBF3FC' : 'transparent',
+                      color: location === "/admin" ? 'var(--primary)' : 'var(--text-tertiary)',
+                      background: location === "/admin" ? 'var(--sidebar-accent)' : 'transparent',
                       transition: 'all 0.15s',
                     }}
                   >
-                    <ShieldCheck style={{ width: 17, height: 17, color: location === "/admin" ? '#1a67c2' : '#8A8A92', flexShrink: 0 }} />
+                    <ShieldCheck style={{ width: 17, height: 17, color: location === "/admin" ? 'var(--primary)' : 'var(--text-muted)', flexShrink: 0 }} />
                     <span>Painel Admin</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
