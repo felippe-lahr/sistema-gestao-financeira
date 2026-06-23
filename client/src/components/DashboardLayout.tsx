@@ -364,7 +364,7 @@ function LoginForm() {
       {/* Main content — centered */}
       <div className="relative z-10 text-center" style={{ maxWidth: 360 }}>
         <div className="flex justify-center mb-8">
-          <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: 300, height: 'auto' }} />
+          <img src="/logo-unifique-pro-white.png" alt="UnifiquePro" style={{ width: 300, height: 'auto' }} />
         </div>
 
         <h2 style={{ fontSize: 30, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.25, marginBottom: 14, letterSpacing: '-0.025em' }}>
