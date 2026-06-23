@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight, ChevronRight, RotateCcw, EyeOff, QrCode, Barcode, ArrowLeftRight, Banknote, Receipt, Globe } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight, ChevronRight, RotateCcw, EyeOff, QrCode, Barcode, ArrowLeftRight, Banknote, Receipt, Globe, GripVertical } from "lucide-react";
 import { toast } from "sonner";
+import { DndContext, DragEndEvent, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/core";
 
 export default function Settings() {
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
@@ -504,6 +505,142 @@ function getContrastColor(hex: string): string {
   return luminance > 0.40 ? "#1e293b" : "#ffffff";
 }
 
+// ---- Subcategory row — draggable ----
+function SubcategoryRow({
+  sub, parentColor, canWrite, canDelete, onEdit, onDelete, onReactivate,
+}: {
+  sub: any; parentColor: string; canWrite: boolean; canDelete: boolean;
+  onEdit: (cat: any) => void; onDelete: (id: number) => void; onReactivate: (id: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `cat-${sub.id}`,
+    data: { categoryId: sub.id, type: sub.type },
+  });
+  const subColor = sub.color || lightenColor(parentColor, 0.35);
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex items-center justify-between px-4 py-2.5 ${!sub.isActive ? "opacity-40" : ""} ${isDragging ? "opacity-20" : ""}`}
+    >
+      <div className="flex items-center gap-2.5">
+        {canWrite && (
+          <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Arrastar para outra categoria pai">
+            <GripVertical className="h-3.5 w-3.5 text-gray-300" />
+          </button>
+        )}
+        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: subColor }} />
+        <span className="text-sm text-gray-700 dark:text-gray-300">{sub.name}</span>
+        {!sub.isActive && <span className="text-xs text-muted-foreground">(inativa)</span>}
+      </div>
+      <div className="flex items-center gap-1">
+        {!sub.isActive ? (
+          canDelete && (
+            <Button variant="ghost" size="icon" className="h-7 w-7" title="Reativar" onClick={() => onReactivate(sub.id)}>
+              <RotateCcw className="h-3 w-3 text-green-600" />
+            </Button>
+          )
+        ) : (
+          <>
+            {canWrite && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(sub)}>
+                <Pencil className="h-3 w-3 text-gray-400" />
+              </Button>
+            )}
+            {canDelete && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" title="Desativar" onClick={() => onDelete(sub.id)}>
+                <EyeOff className="h-3 w-3 text-gray-400" />
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- Parent category card — draggable handle + droppable target ----
+function CategoryCard({
+  category, subs, canWrite, canDelete, onCreateSub, onEdit, onDelete, onReactivate,
+}: {
+  category: any; subs: any[]; canWrite: boolean; canDelete: boolean;
+  onCreateSub: (cat: any) => void; onEdit: (cat: any) => void;
+  onDelete: (id: number) => void; onReactivate: (id: number) => void;
+}) {
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `drop-${category.id}`,
+    data: { categoryId: category.id, type: category.type },
+  });
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: `cat-${category.id}`,
+    data: { categoryId: category.id, type: category.type },
+  });
+  const isInactive = !category.isActive;
+  const bgColor = category.color || COLOR_PALETTE[0];
+  return (
+    <div
+      ref={setDropRef}
+      className={`rounded-xl overflow-hidden border bg-white dark:bg-gray-800 transition-all ${isInactive ? "opacity-40" : ""} ${isDragging ? "opacity-20" : ""} ${
+        isOver ? "border-blue-400 dark:border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800" : "border-gray-200 dark:border-gray-700"
+      }`}
+    >
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3">
+          {canWrite && (
+            <button ref={setDragRef} {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Arrastar para reorganizar">
+              <GripVertical className="h-4 w-4 text-gray-300" />
+            </button>
+          )}
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ background: `linear-gradient(135deg, ${bgColor}dd, ${bgColor}88)` }}>
+            <Tag className="h-3.5 w-3.5 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm leading-tight text-gray-900 dark:text-gray-100">{category.name}</p>
+            {isOver ? (
+              <p className="text-xs text-blue-500 font-medium">Solte para mover aqui</p>
+            ) : subs.length > 0 ? (
+              <p className="text-xs text-gray-500 dark:text-gray-400">{subs.length} subcategoria{subs.length > 1 ? "s" : ""}</p>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          {isInactive ? (
+            canDelete && (
+              <button title="Reativar" onClick={() => onReactivate(category.id)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                <RotateCcw className="h-3.5 w-3.5 text-gray-500" />
+              </button>
+            )
+          ) : (
+            <>
+              {canWrite && (
+                <>
+                  <button title="Nova subcategoria" onClick={() => onCreateSub(category)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <Plus className="h-3.5 w-3.5 text-gray-500" />
+                  </button>
+                  <button title="Editar" onClick={() => onEdit(category)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <Pencil className="h-3.5 w-3.5 text-gray-500" />
+                  </button>
+                </>
+              )}
+              {canDelete && (
+                <button title="Desativar" onClick={() => onDelete(category.id)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                  <EyeOff className="h-3.5 w-3.5 text-gray-500" />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      {subs.length > 0 && (
+        <div className="divide-y dark:divide-gray-700 bg-white dark:bg-gray-800">
+          {subs.map((sub) => (
+            <SubcategoryRow key={sub.id} sub={sub} parentColor={bgColor} canWrite={canWrite} canDelete={canDelete} onEdit={onEdit} onDelete={onDelete} onReactivate={onReactivate} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entityId: number; canWrite?: boolean; canDelete?: boolean }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -517,6 +654,8 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
     color: COLOR_PALETTE[0],
     parentId: "" as string,
   });
+
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
   const utils = trpc.useUtils();
   const { data: categories, isLoading } = trpc.categories.listByEntity.useQuery({ entityId, includeInactive: showInactive });
@@ -569,6 +708,58 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
   const resetForm = () => {
     setFormData({ name: "", type: "EXPENSE", color: COLOR_PALETTE[0], parentId: "" });
     setCreatingSubFor(null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over || !categories) return;
+
+    const draggedId = active.data.current?.categoryId as number;
+    const targetId = over.data.current?.categoryId as number;
+    if (!draggedId || !targetId || draggedId === targetId) return;
+
+    const dragged = categories.find((c) => c.id === draggedId);
+    const target = categories.find((c) => c.id === targetId);
+    if (!dragged || !target) return;
+
+    // Target must be a root category (not a subcategory itself)
+    if (target.parentId !== null) {
+      toast.error("Não é possível mover para uma subcategoria. Escolha uma categoria pai.");
+      return;
+    }
+
+    // Type must match
+    if (dragged.type !== target.type) {
+      toast.error("Não é possível misturar categorias de tipos diferentes (Crédito / Débito).");
+      return;
+    }
+
+    // Already in this parent
+    if (dragged.parentId === targetId) {
+      toast.info("A categoria já é subcategoria desta categoria pai.");
+      return;
+    }
+
+    // Warn if dragging a parent that has subcategories
+    const childCount = categories.filter((c) => c.parentId === draggedId).length;
+    if (childCount > 0) {
+      toast.error(`"${dragged.name}" possui ${childCount} subcategoria(s). Mova-as antes de reorganizar.`);
+      return;
+    }
+
+    updateMutation.mutate(
+      { id: draggedId, parentId: targetId },
+      {
+        onSuccess: () => {
+          utils.categories.listByEntity.invalidate();
+          toast.success(`"${dragged.name}" agora é subcategoria de "${target.name}".`);
+        },
+        onError: (err) => {
+          toast.error("Erro ao mover categoria: " + err.message);
+        },
+      }
+    );
   };
 
   const handleCreate = () => {
@@ -624,105 +815,6 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
     );
   }
 
-  // ===== RENDER HELPER: card de categoria pai com subcategorias embutidas =====
-  const renderCategoryCard = (category: any) => {
-    const subs = getSubcategories(category.id);
-    const isInactive = !category.isActive;
-    const bgColor = category.color || COLOR_PALETTE[0];
-    return (
-      <div key={category.id} className={`rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${isInactive ? "opacity-40" : ""}`}>
-        {/* Cabeçalho da categoria pai — fundo neutro com etiqueta colorida */}
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            {/* Etiqueta colorida com degradê */}
-            <div 
-              className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" 
-              style={{ background: `linear-gradient(135deg, ${bgColor}dd, ${bgColor}88)` }}
-            >
-              <Tag className="h-3.5 w-3.5 text-white" />
-            </div>
-            <div>
-              <p className="font-semibold text-sm leading-tight text-gray-900 dark:text-gray-100">{category.name}</p>
-              {subs.length > 0 && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">{subs.length} subcategoria{subs.length > 1 ? "s" : ""}</p>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            {isInactive ? (
-              canDelete && (
-                <button title="Reativar" onClick={() => reactivateMutation.mutate({ id: category.id })} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                  <RotateCcw className="h-3.5 w-3.5 text-gray-500" />
-                </button>
-              )
-            ) : (
-              <>
-                {canWrite && (
-                  <>
-                    <button
-                      title="Nova subcategoria"
-                      onClick={() => { setCreatingSubFor(category); setFormData({ name: "", type: category.type, color: bgColor, parentId: category.id.toString() }); setIsCreateOpen(true); }}
-                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      <Plus className="h-3.5 w-3.5 text-gray-500" />
-                    </button>
-                    <button title="Editar" onClick={() => handleEdit(category)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                      <Pencil className="h-3.5 w-3.5 text-gray-500" />
-                    </button>
-                  </>
-                )}
-                {canDelete && (
-                  <button title="Desativar" onClick={() => deleteMutation.mutate({ id: category.id })} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                    <EyeOff className="h-3.5 w-3.5 text-gray-500" />
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-        {/* Subcategorias — fundo branco/cinza */}
-        {subs.length > 0 && (
-          <div className="divide-y dark:divide-gray-700 bg-white dark:bg-gray-800">
-            {subs.map((sub) => {
-              const subColor = sub.color || lightenColor(bgColor, 0.35);
-              return (
-                <div key={sub.id} className={`flex items-center justify-between px-4 py-2.5 ${!sub.isActive ? "opacity-40" : ""}`}>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: subColor }} />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{sub.name}</span>
-                    {!sub.isActive && <span className="text-xs text-muted-foreground">(inativa)</span>}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {!sub.isActive ? (
-                      canDelete && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Reativar" onClick={() => reactivateMutation.mutate({ id: sub.id })}>
-                          <RotateCcw className="h-3 w-3 text-green-600" />
-                        </Button>
-                      )
-                    ) : (
-                      <>
-                        {canWrite && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(sub)}>
-                            <Pencil className="h-3 w-3 text-gray-400" />
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Desativar" onClick={() => deleteMutation.mutate({ id: sub.id })}>
-                            <EyeOff className="h-3 w-3 text-gray-400" />
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -751,50 +843,85 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
         )}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Créditos */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 pb-1 border-b">
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-            <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Créditos</h3>
-            <span className="ml-auto text-xs text-muted-foreground">{incomeParents.length}</span>
-          </div>
-          {incomeParents.length === 0 ? (
-            <div className="rounded-xl border border-dashed py-10 text-center">
-              <Tag className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">Nenhuma categoria de receita</p>
-              {canWrite && (
-                <button onClick={() => { resetForm(); setFormData(f => ({ ...f, type: "INCOME" })); setIsCreateOpen(true); }} className="mt-2 text-xs text-blue-600 hover:underline">
-                  + Criar primeira categoria
-                </button>
-              )}
+      <DndContext
+        onDragStart={(e) => setActiveDragId(String(e.active.id))}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveDragId(null)}
+      >
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Créditos */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-1 border-b">
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+              <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Créditos</h3>
+              <span className="ml-auto text-xs text-muted-foreground">{incomeParents.length}</span>
             </div>
-          ) : (
-            <div className="space-y-3">{incomeParents.map(renderCategoryCard)}</div>
-          )}
-        </div>
-        {/* Débitos */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 pb-1 border-b">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-            <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Débitos</h3>
-            <span className="ml-auto text-xs text-muted-foreground">{expenseParents.length}</span>
+            {incomeParents.length === 0 ? (
+              <div className="rounded-xl border border-dashed py-10 text-center">
+                <Tag className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">Nenhuma categoria de receita</p>
+                {canWrite && (
+                  <button onClick={() => { resetForm(); setFormData(f => ({ ...f, type: "INCOME" })); setIsCreateOpen(true); }} className="mt-2 text-xs text-blue-600 hover:underline">
+                    + Criar primeira categoria
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {incomeParents.map((cat) => (
+                  <CategoryCard key={cat.id} category={cat} subs={getSubcategories(cat.id)} canWrite={canWrite} canDelete={canDelete}
+                    onCreateSub={(c) => { setCreatingSubFor(c); setFormData({ name: "", type: c.type, color: c.color || COLOR_PALETTE[0], parentId: c.id.toString() }); setIsCreateOpen(true); }}
+                    onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate({ id })} onReactivate={(id) => reactivateMutation.mutate({ id })}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-          {expenseParents.length === 0 ? (
-            <div className="rounded-xl border border-dashed py-10 text-center">
-              <Tag className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">Nenhuma categoria de despesa</p>
-              {canWrite && (
-                <button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="mt-2 text-xs text-blue-600 hover:underline">
-                  + Criar primeira categoria
-                </button>
-              )}
+          {/* Débitos */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-1 border-b">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+              <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Débitos</h3>
+              <span className="ml-auto text-xs text-muted-foreground">{expenseParents.length}</span>
             </div>
-          ) : (
-            <div className="space-y-3">{expenseParents.map(renderCategoryCard)}</div>
-          )}
+            {expenseParents.length === 0 ? (
+              <div className="rounded-xl border border-dashed py-10 text-center">
+                <Tag className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">Nenhuma categoria de despesa</p>
+                {canWrite && (
+                  <button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="mt-2 text-xs text-blue-600 hover:underline">
+                    + Criar primeira categoria
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {expenseParents.map((cat) => (
+                  <CategoryCard key={cat.id} category={cat} subs={getSubcategories(cat.id)} canWrite={canWrite} canDelete={canDelete}
+                    onCreateSub={(c) => { setCreatingSubFor(c); setFormData({ name: "", type: c.type, color: c.color || COLOR_PALETTE[0], parentId: c.id.toString() }); setIsCreateOpen(true); }}
+                    onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate({ id })} onReactivate={(id) => reactivateMutation.mutate({ id })}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+
+        {/* Overlay — mini badge while dragging */}
+        <DragOverlay>
+          {activeDragId ? (() => {
+            const catId = parseInt(activeDragId.replace("cat-", ""));
+            const cat = categories?.find((c) => c.id === catId);
+            if (!cat) return null;
+            return (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-xl bg-white dark:bg-gray-800 border border-blue-400 text-sm font-medium text-gray-800 dark:text-gray-100 opacity-90">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || COLOR_PALETTE[0] }} />
+                {cat.name}
+              </div>
+            );
+          })() : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* ===== CREATE SHEET ===== */}
       <Sheet open={isCreateOpen} onOpenChange={(open) => { if (!open) { resetForm(); } setIsCreateOpen(open); }}>
