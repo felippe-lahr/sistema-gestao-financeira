@@ -216,7 +216,7 @@ function LoginForm() {
         {/* Painel esquerdo — formulário 2FA */}
         <div
           className="flex-1 flex items-center justify-center p-6 sm:p-10 min-h-screen"
-          style={{ background: '#FFFFFF' }}
+          style={{ background: 'var(--bg-surface)' }}
         >
           <div className="w-full max-w-md">
             {/* Logo mobile */}
@@ -229,16 +229,16 @@ function LoginForm() {
               <div className="flex justify-center mb-4">
                 <div
                   className="p-3 rounded-full"
-                  style={{ background: '#EBF3FC' }}
+                  style={{ background: 'var(--accent-soft)' }}
                 >
-                  <Smartphone style={{ width: 32, height: 32, color: '#1a67c2' }} />
+                  <Smartphone style={{ width: 32, height: 32, color: 'var(--primary)' }} />
                 </div>
               </div>
-              <h1 style={{ fontSize: 24, fontWeight: 700, color: '#16161A', marginBottom: 8 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
                 Verificação em dois fatores
               </h1>
-              <p style={{ fontSize: 14, color: '#8A8A92', lineHeight: 1.6 }}>
-                Abra o <strong style={{ color: '#3C3C44' }}>Google Authenticator</strong> e insira o código de 6 dígitos gerado para o <strong style={{ color: '#3C3C44' }}>UnifiquePro</strong>.
+              <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                Abra o <strong style={{ color: 'var(--text-secondary)' }}>Google Authenticator</strong> e insira o código de 6 dígitos gerado para o <strong style={{ color: 'var(--text-secondary)' }}>UnifiquePro</strong>.
               </p>
             </div>
 
@@ -271,8 +271,8 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={() => { setRequiresTwoFactor(false); setTotpCode(""); }}
-                style={{ width: '100%', fontSize: 14, color: '#8A8A92', background: 'none', border: 'none', cursor: 'pointer' }}
-                className="hover:text-[#3C3C44] transition-colors"
+                style={{ width: '100%', fontSize: 14, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+                className="hover:text-[#3C3C44] dark:hover:text-[#C4C4D0] transition-colors"
               >
                 ← Voltar ao login
               </button>
@@ -290,7 +290,7 @@ function LoginForm() {
       {/* Painel esquerdo — formulário */}
       <div
         className="flex-1 flex items-center justify-center p-6 sm:p-10 min-h-screen"
-        style={{ background: '#FFFFFF' }}
+        style={{ background: 'var(--bg-surface)' }}
       >
         <div className="w-full max-w-md">
           {/* Logo — visível apenas no mobile */}
@@ -301,22 +301,22 @@ function LoginForm() {
 
           {/* Título */}
           <div className="mb-8">
-            <h1 style={{ fontSize: 24, fontWeight: 700, color: '#16161A', marginBottom: 6 }}>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
               Seja bem-vindo
             </h1>
-            <p style={{ fontSize: 14, color: '#8A8A92' }}>Faça seu login ou cadastre-se</p>
+            <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>Faça seu login ou cadastre-se</p>
           </div>
 
           {/* Alerta e-mail não verificado */}
           {emailNotVerified && (
             <div
               className="mb-5 rounded-[12px] p-4 space-y-3"
-              style={{ background: '#FBF3E0', border: '1px solid #EFE7CF' }}
+              style={{ background: 'var(--amber-bg)', border: '1px solid var(--amber-border)' }}
             >
-              <span style={{ color: '#7a5c00', fontSize: 14, fontWeight: 600 }}>
+              <span style={{ color: '#7a5c00', fontSize: 14, fontWeight: 600 }} className="dark:text-amber-300">
                 E-mail não verificado
               </span>
-              <p style={{ fontSize: 13, color: '#5e4600', lineHeight: 1.5 }}>
+              <p style={{ fontSize: 13, lineHeight: 1.5 }} className="text-amber-800 dark:text-amber-400">
                 Verifique sua caixa de entrada e clique no link de ativação enviado para{" "}
                 <strong>{unverifiedEmail}</strong>.
               </p>
@@ -325,7 +325,6 @@ function LoginForm() {
                 variant="outline"
                 size="sm"
                 className="w-full"
-                style={{ borderColor: '#EFE7CF', color: '#7a5c00' }}
                 onClick={handleResendVerification}
                 disabled={resendLoading || resendCooldown > 0}
               >
@@ -337,21 +336,17 @@ function LoginForm() {
           {/* Botão Google */}
           <a
             href="/api/auth/google"
-            className="flex items-center justify-center gap-3 w-full transition-all"
+            className="flex items-center justify-center gap-3 w-full transition-all border border-[#E4E4E8] dark:border-[#2C2C3C] rounded-[12px] hover:bg-[#F6F6F8] dark:hover:bg-[#252532]"
             style={{
               height: 50,
               padding: '0 16px',
-              borderRadius: 12,
-              border: '1px solid #E4E4E8',
-              background: '#FFFFFF',
-              color: '#3C3C44',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-secondary)',
               fontWeight: 500,
               fontSize: 14,
               marginBottom: 20,
               textDecoration: 'none',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#F6F6F8'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#FFFFFF'; }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style={{ width: 20, height: 20, flexShrink: 0 }}>
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -365,10 +360,10 @@ function LoginForm() {
           {/* Divisor */}
           <div className="relative mb-5">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full" style={{ borderTop: '1px solid #ECECEF' }} />
+              <span className="w-full border-t border-[#ECECEF] dark:border-[#2C2C3C]" />
             </div>
             <div className="relative flex justify-center">
-              <span style={{ background: '#FFFFFF', padding: '0 12px', fontSize: 12, color: '#A6A6AE', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span className="px-3 text-[11px] uppercase tracking-widest text-[#A6A6AE] dark:text-[#60607A]" style={{ background: 'var(--bg-surface)' }}>
                 ou entre com e-mail
               </span>
             </div>
@@ -377,7 +372,7 @@ function LoginForm() {
           {/* Formulário */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email" style={{ fontSize: 13, fontWeight: 600, color: '#3C3C44' }}>
+              <Label htmlFor="email" className="text-[13px] font-semibold text-[#3C3C44] dark:text-[#C4C4D0]">
                 E-mail
               </Label>
               <Input
@@ -390,7 +385,7 @@ function LoginForm() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password" style={{ fontSize: 13, fontWeight: 600, color: '#3C3C44' }}>
+              <Label htmlFor="password" className="text-[13px] font-semibold text-[#3C3C44] dark:text-[#C4C4D0]">
                 Senha
               </Label>
               <div className="relative">
@@ -406,10 +401,8 @@ function LoginForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-                  style={{ color: '#A6A6AE', background: 'none', border: 'none', cursor: 'pointer' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#5C5C66'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#A6A6AE'; }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors text-[#A6A6AE] dark:text-[#60607A] hover:text-[#5C5C66] dark:hover:text-[#A0A0B8]"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   {showPassword ? <EyeOff style={{ width: 16, height: 16 }} /> : <Eye style={{ width: 16, height: 16 }} />}
                 </button>
@@ -425,13 +418,13 @@ function LoginForm() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   style={{ width: 16, height: 16, borderRadius: 4, border: '1px solid #E4E4E8', accentColor: '#1a67c2', cursor: 'pointer' }}
                 />
-                <Label htmlFor="rememberMe" style={{ fontSize: 13, fontWeight: 400, color: '#5C5C66', cursor: 'pointer' }}>
+                <Label htmlFor="rememberMe" className="text-[13px] font-normal text-[#5C5C66] dark:text-[#A0A0B8] cursor-pointer">
                   Lembrar-me
                 </Label>
               </div>
               <a
                 href="/recuperar-senha"
-                style={{ fontSize: 13, color: '#1a67c2', fontWeight: 500, textDecoration: 'none' }}
+                style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500, textDecoration: 'none' }}
                 className="hover:underline transition-colors"
               >
                 Esqueci minha senha
@@ -448,11 +441,11 @@ function LoginForm() {
             </Button>
           </form>
 
-          <p className="mt-6 text-center" style={{ fontSize: 14, color: '#8A8A92' }}>
+          <p className="mt-6 text-center text-[14px] text-[#8A8A92] dark:text-[#80809A]">
             Não tem uma conta?{" "}
             <a
               href="/signup"
-              style={{ color: '#1a67c2', fontWeight: 600, textDecoration: 'none' }}
+              style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}
               className="hover:underline transition-colors"
             >
               Cadastre-se gratuitamente
@@ -518,11 +511,11 @@ function LiveClock() {
   }
 
   return (
-    <div className="flex flex-col gap-0.5 px-2 py-1.5 text-center" style={{ borderBottom: '1px solid #ECECEF' }}>
-      <div className="text-xs font-mono" style={{ color: '#A6A6AE' }}>
+    <div className="flex flex-col gap-0.5 px-2 py-1.5 text-center border-b border-[#ECECEF] dark:border-[#2C2C3C]">
+      <div className="text-xs font-mono text-[#A6A6AE] dark:text-[#60607A]">
         {formatDate(time)}
       </div>
-      <div className="text-sm font-mono font-medium tracking-wider" style={{ color: '#5C5C66', fontVariantNumeric: 'tabular-nums' }}>
+      <div className="text-sm font-mono font-medium tracking-wider text-[#5C5C66] dark:text-[#A0A0B8]" style={{ fontVariantNumeric: 'tabular-nums' }}>
         {formatTime(time)}
       </div>
     </div>
@@ -793,7 +786,7 @@ function DashboardLayoutContent({
           <SidebarFooter style={{ padding: '12px 10px 16px' }}>
             {/* Version + date */}
             <div className="group-data-[collapsible=icon]:hidden px-2 mb-2">
-              <p style={{ fontSize: 11, color: '#8A8A92', textAlign: 'center', userSelect: 'none' }}>
+              <p className="text-[11px] text-center select-none text-[#8A8A92] dark:text-[#60607A]">
                 v{__APP_VERSION__}
               </p>
             </div>
@@ -810,30 +803,23 @@ function DashboardLayoutContent({
               <DropdownMenuTrigger asChild>
                 <button
                   data-tour="user-menu"
-                  className="flex items-center gap-3 w-full text-left focus:outline-none transition-all group-data-[collapsible=icon]:justify-center"
-                  style={{
-                    background: '#F6F6F8',
-                    border: '1px solid #EDEDF0',
-                    borderRadius: 12,
-                    padding: '10px 12px',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#D6D6DC'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#EDEDF0'; }}
+                  className="flex items-center gap-3 w-full text-left focus:outline-none transition-all group-data-[collapsible=icon]:justify-center rounded-[12px] border border-[#EDEDF0] dark:border-[#2C2C3C] bg-[#F6F6F8] dark:bg-[#1C1C24] hover:border-[#D6D6DC] dark:hover:border-[#3C3C50]"
+                  style={{ padding: '10px 12px' }}
                 >
                   <Avatar style={{ width: 32, height: 32, flexShrink: 0 }}>
-                    <AvatarFallback style={{ fontSize: 12, fontWeight: 600, background: '#EBF3FC', color: '#1a67c2' }}>
+                    <AvatarFallback className="text-[12px] font-semibold bg-[#EBF3FC] dark:bg-[#1E2D4A] text-[#1a67c2] dark:text-[#93C5FD]">
                       {user?.name?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p style={{ fontSize: 13, fontWeight: 600, color: '#16161A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+                    <p className="text-[13px] font-semibold text-[#16161A] dark:text-[#F0F0F6] overflow-hidden text-ellipsis whitespace-nowrap leading-[1.3]">
                       {user?.name || "-"}
                     </p>
-                    <p style={{ fontSize: 11, color: '#8A8A92', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                    <p className="text-[11px] text-[#8A8A92] dark:text-[#60607A] overflow-hidden text-ellipsis whitespace-nowrap mt-0.5">
                       {user?.email || "-"}
                     </p>
                   </div>
-                  <LogOut style={{ width: 14, height: 14, color: '#A6A6AE', flexShrink: 0 }} className="group-data-[collapsible=icon]:hidden" />
+                  <LogOut className="w-[14px] h-[14px] text-[#A6A6AE] dark:text-[#60607A] shrink-0 group-data-[collapsible=icon]:hidden" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
@@ -871,14 +857,14 @@ function DashboardLayoutContent({
       <SidebarInset style={{ background: 'var(--bg-page)' }}>
         {isMobile && (
           <div
-            className="flex h-14 items-center justify-between px-2 sticky top-0 z-40"
-            style={{ background: 'rgba(246,246,248,0.95)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #ECECEF' }}
+            className="flex h-14 items-center justify-between px-2 sticky top-0 z-40 border-b border-[#ECECEF] dark:border-[#2C2C3C]"
+            style={{ background: 'var(--bg-page)', backdropFilter: 'blur(8px)', opacity: 0.97 }}
           >
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-10 w-10 rounded-lg" />
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
-                  <span style={{ color: '#16161A', fontWeight: 600, fontSize: 15 }}>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 15 }}>
                     {activeMenuItem?.label ?? "Menu"}
                   </span>
                 </div>

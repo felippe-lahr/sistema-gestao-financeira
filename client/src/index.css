@@ -121,6 +121,22 @@
 }
 
 .dark {
+  /* Design tokens */
+  --bg-page: #111118;
+  --bg-surface: #1C1C24;
+  --bg-elevated: #16161F;
+  --text-primary: #F0F0F6;
+  --text-secondary: #C4C4D0;
+  --text-tertiary: #A0A0B8;
+  --text-muted: #80809A;
+  --text-placeholder: #60607A;
+  --border-default: #2C2C3C;
+  --border-input: #333348;
+  --border-strong: #3C3C50;
+  --green-bg: #0D2B1F;
+  --red-bg: #2B0D0D;
+  --amber-bg: #2B210D;
+
   /* Primary — same brand blue, works on dark bg */
   --primary: #3B82F6;
   --primary-foreground: #FFFFFF;
@@ -457,3 +473,76 @@
     }
   }
 }
+
+/* ===== Global Dark Mode Overrides =====
+ * These override hardcoded Tailwind color classes that lack dark: variants
+ * across all page components. Using !important to beat Tailwind utility specificity.
+ */
+.dark .bg-white { background-color: #1C1C24 !important; }
+.dark .bg-gray-50 { background-color: #16161F !important; }
+.dark .bg-gray-100 { background-color: #1E1E2A !important; }
+.dark .bg-gray-200 { background-color: #252532 !important; }
+.dark .bg-slate-50 { background-color: #16161F !important; }
+.dark .bg-slate-100 { background-color: #1E1E2A !important; }
+
+.dark .text-gray-950 { color: #F0F0F6 !important; }
+.dark .text-gray-900 { color: #F0F0F6 !important; }
+.dark .text-gray-800 { color: #E0E0EC !important; }
+.dark .text-gray-700 { color: #C8C8D8 !important; }
+.dark .text-gray-600 { color: #A0A0B8 !important; }
+.dark .text-gray-500 { color: #80809A !important; }
+.dark .text-gray-400 { color: #60607A !important; }
+.dark .text-slate-900 { color: #F0F0F6 !important; }
+.dark .text-slate-800 { color: #E0E0EC !important; }
+.dark .text-slate-700 { color: #C8C8D8 !important; }
+.dark .text-slate-600 { color: #A0A0B8 !important; }
+.dark .text-slate-500 { color: #80809A !important; }
+
+.dark .border-gray-100 { border-color: #252532 !important; }
+.dark .border-gray-200 { border-color: #2C2C3C !important; }
+.dark .border-gray-300 { border-color: #333348 !important; }
+.dark .border-slate-200 { border-color: #2C2C3C !important; }
+.dark .border-slate-300 { border-color: #333348 !important; }
+
+.dark .divide-gray-100 > * + * { border-color: #252532 !important; }
+.dark .divide-gray-200 > * + * { border-color: #2C2C3C !important; }
+
+.dark .ring-gray-200 { --tw-ring-color: #2C2C3C !important; }
+.dark .ring-gray-300 { --tw-ring-color: #333348 !important; }
+
+/* Hover state overrides */
+.dark .hover\:bg-gray-50:hover { background-color: #1E1E2A !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #252532 !important; }
+.dark .hover\:bg-white:hover { background-color: #252532 !important; }
+
+/* Shadow — lighten shadows in dark mode */
+.dark .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0,0,0,0.4) !important; }
+.dark .shadow { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.5), 0 1px 2px -1px rgba(0,0,0,0.5) !important; }
+.dark .shadow-md { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.5) !important; }
+.dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -4px rgba(0,0,0,0.5) !important; }
+
+/* Light blue accent backgrounds → dark accent in dark mode */
+.dark .bg-blue-50 { background-color: #1E2D4A !important; }
+.dark .bg-blue-100 { background-color: #1E2D4A !important; }
+.dark .bg-indigo-50 { background-color: #1E2A4A !important; }
+.dark .bg-indigo-100 { background-color: #1E2A4A !important; }
+.dark .bg-\[\#EBF3FC\] { background-color: #1E2D4A !important; }
+.dark .bg-\[\#DBEAFE\] { background-color: #1E2D4A !important; }
+
+/* Blue text on light bg → lighter blue in dark mode */
+.dark .text-blue-800 { color: #93C5FD !important; }
+.dark .text-blue-900 { color: #BFDBFE !important; }
+.dark .text-blue-700 { color: #93C5FD !important; }
+.dark .text-indigo-800 { color: #A5B4FC !important; }
+.dark .text-indigo-700 { color: #A5B4FC !important; }
+
+/* Light blue borders */
+.dark .border-blue-200 { border-color: #1E3A5F !important; }
+.dark .border-blue-300 { border-color: #1E3A5F !important; }
+.dark .border-\[\#BFDBFE\] { border-color: #1E3A5F !important; }
+
+/* Hover on light blue */
+.dark .hover\:bg-blue-50:hover { background-color: #1E2D4A !important; }
+.dark .hover\:bg-blue-100:hover { background-color: #253A5A !important; }
+.dark .hover\:bg-\[\#EBF3FC\]:hover { background-color: #1E2D4A !important; }
+.dark .hover\:bg-\[\#DBEAFE\]:hover { background-color: #253A5A !important; }
