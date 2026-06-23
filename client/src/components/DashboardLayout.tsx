@@ -324,22 +324,22 @@ function LoginForm() {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 text-center max-w-md">
-        <div className="flex items-center justify-center mb-10">
+      <div className="relative z-10 max-w-md w-full">
+        <div className="mb-10">
           <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ height: 36, width: 'auto' }} />
         </div>
 
-        <h2 style={{ fontSize: 30, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.3, marginBottom: 16, letterSpacing: '-0.02em' }}>
+        <h2 style={{ fontSize: 32, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.25, marginBottom: 16, letterSpacing: '-0.025em' }}>
           {title}
         </h2>
         {subtitle && (
-          <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: 15, lineHeight: 1.75, marginBottom: 48 }}>
+          <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: 15, lineHeight: 1.75, marginBottom: 52 }}>
             {subtitle}
           </p>
         )}
 
         <div
-          className="grid grid-cols-3 gap-4"
+          className="grid grid-cols-3 gap-6"
           style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 36 }}
         >
           {[
@@ -347,7 +347,7 @@ function LoginForm() {
             { value: 'R$2M+', label: 'gerenciados' },
             { value: '99.9%', label: 'uptime' },
           ].map((stat) => (
-            <div key={stat.label} className="text-center">
+            <div key={stat.label}>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#FFFFFF', fontVariantNumeric: 'tabular-nums' }}>
                 {stat.value}
               </div>
