@@ -1988,7 +1988,7 @@ export default function Transactions() {
 
                         {/* Transaction rows */}
                         {visibleTx.map((transaction: any) => (
-                          <div key={transaction.id} className="flex items-center gap-3 px-5 py-5 border-b border-[#F3F3F5] last:border-0 hover:bg-[#F9F9FB] transition-colors">
+                          <div key={transaction.id} className="flex items-center gap-3 px-5 py-6 border-b border-[#F3F3F5] last:border-0 hover:bg-[#F9F9FB] transition-colors">
                             {/* Cart icon */}
                             <div className="flex-shrink-0 flex items-center justify-center rounded-[10px] w-9 h-9 bg-[#F3F3F5]">
                               <svg className="h-4 w-4 text-[#8A8A92]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
