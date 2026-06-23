@@ -2064,7 +2064,7 @@ export default function Transactions() {
                       key={transaction.id}
                       className={`transition-colors hover:bg-[#F9F9FB] ${idx < nonCardTransactions.length - 1 ? 'border-b border-[#ECECEF]' : ''}`}
                     >
-                      <div className="px-5 py-4">
+                      <div className="px-5 py-6">
                     {/* Desktop Layout */}
                     <div className="hidden md:flex items-center gap-4">
                       {/* Icon */}
