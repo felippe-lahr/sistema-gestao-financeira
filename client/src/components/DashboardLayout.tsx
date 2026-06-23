@@ -171,9 +171,9 @@ function LoginForm() {
       {/* ══ FLOATING WIDGETS ══ */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
 
-        {/* ① Line chart — LARGE, top-left, partially off-screen */}
-        <div className="lf2 absolute" style={{ top: '3%', left: '-2%' }}>
-          <div style={{ width: 270, borderRadius: 18, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)', padding: '14px 16px 12px', boxShadow: '0 24px 64px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28)' }}>
+        {/* ① Line chart — LARGE, topo-esquerda */}
+        <div className="lf2 absolute" style={{ top: '2%', left: '1%' }}>
+          <div style={{ width: 270, borderRadius: 18, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', padding: '14px 16px 12px', boxShadow: '0 24px 64px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
               <div>
                 <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Patrimônio Total</div>
@@ -198,9 +198,9 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* ② Bar chart — LARGE, top-right, partially off-right */}
-        <div className="lf4 absolute" style={{ top: '16%', right: '-1%' }}>
-          <div style={{ width: 248, borderRadius: 18, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.16)', padding: '14px 16px 12px', boxShadow: '0 20px 56px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
+        {/* ② Bar chart — LARGE, topo-direita */}
+        <div className="lf4 absolute" style={{ top: '4%', right: '1%' }}>
+          <div style={{ width: 248, borderRadius: 18, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', padding: '14px 16px 12px', boxShadow: '0 20px 56px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.18)' }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>Receitas x Despesas</div>
             <svg width="216" height="72" viewBox="0 0 216 72">
               {[
@@ -225,9 +225,9 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* ③ Credit card — LARGE, mid-left, partially off-left */}
-        <div className="lf1 absolute" style={{ top: '41%', left: '-3%' }}>
-          <div style={{ width: 262, borderRadius: 20, background: 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.07) 100%)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.22)', padding: '18px 20px 16px', boxShadow: '0 24px 64px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.35)' }}>
+        {/* ③ Credit card — LARGE, lado esquerdo do texto */}
+        <div className="lf1 absolute" style={{ top: '35%', left: '0%' }}>
+          <div style={{ width: 250, borderRadius: 20, background: 'linear-gradient(135deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.07) 100%)', backdropFilter: 'blur(20px)', padding: '18px 20px 16px', boxShadow: '0 24px 64px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.25)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <div style={{ width: 36, height: 26, borderRadius: 5, background: 'rgba(218,165,32,0.55)', position: 'relative', overflow: 'hidden' }}>
                 <svg width="36" height="26" viewBox="0 0 36 26" style={{ position: 'absolute', inset: 0 }}>
@@ -260,11 +260,10 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* ④ Donut chart — STANDALONE circular, mid-right */}
-        <div className="lf6 absolute" style={{ top: '44%', right: '6%' }}>
-          <div style={{ width: 128, height: 128, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}>
+        {/* ④ Donut chart — lado direito do texto */}
+        <div className="lf6 absolute" style={{ top: '38%', right: '2%' }}>
+          <div style={{ width: 128, height: 128, borderRadius: '50%', background: 'rgba(255,255,255,0.09)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}>
             <svg width="108" height="108" viewBox="0 0 108 108">
-              {/* r=40, circ=251.33 */}
               <circle cx="54" cy="54" r="40" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="16" />
               <circle cx="54" cy="54" r="40" fill="none" stroke="rgba(74,222,128,0.8)" strokeWidth="16"
                 strokeDasharray="100.53 150.8" strokeDashoffset="0" transform="rotate(-90 54 54)" />
@@ -278,9 +277,9 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* ⑤ Transaction list — LARGE, bottom-left */}
-        <div className="lf3 absolute" style={{ bottom: '3%', left: '2%' }}>
-          <div style={{ width: 248, borderRadius: 18, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.16)', padding: '14px 16px', boxShadow: '0 20px 56px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
+        {/* ⑤ Transaction list — LARGE, base-esquerda */}
+        <div className="lf3 absolute" style={{ bottom: '2%', left: '1%' }}>
+          <div style={{ width: 248, borderRadius: 18, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', padding: '14px 16px', boxShadow: '0 20px 56px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.18)' }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>Últimas Transações</div>
             {[
               { icon: '↑', bg: 'rgba(74,222,128,0.22)', color: '#4ADE80', name: 'Salário', sub: 'Renda · Bradesco', amount: '+R$8.500', ac: '#4ADE80' },
@@ -300,9 +299,9 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* ⑥ Summary card — MEDIUM, bottom-center-right */}
-        <div className="lf5 absolute" style={{ bottom: '26%', right: '4%' }}>
-          <div style={{ width: 150, borderRadius: 16, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.15)', padding: '12px 14px', boxShadow: '0 14px 44px rgba(0,0,0,0.18)' }}>
+        {/* ⑥ Summary — MEDIUM, base-direita superior */}
+        <div className="lf5 absolute" style={{ bottom: '24%', right: '2%' }}>
+          <div style={{ width: 150, borderRadius: 16, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(16px)', padding: '12px 14px', boxShadow: '0 14px 44px rgba(0,0,0,0.18)' }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Resumo</div>
             {[
               { label: 'Receitas', val: '+R$12.5k', color: '#4ADE80' },
@@ -317,9 +316,9 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* ⑦ Report card — SMALL, bottom-right */}
-        <div className="lf8 absolute" style={{ bottom: '8%', right: '3%' }}>
-          <div style={{ width: 122, borderRadius: 14, background: 'rgba(255,255,255,0.09)', backdropFilter: 'blur(14px)', border: '1px solid rgba(255,255,255,0.13)', padding: '10px 12px', boxShadow: '0 10px 34px rgba(0,0,0,0.16)' }}>
+        {/* ⑦ Contas — SMALL, base-direita inferior */}
+        <div className="lf8 absolute" style={{ bottom: '3%', right: '2%' }}>
+          <div style={{ width: 130, borderRadius: 14, background: 'rgba(255,255,255,0.09)', backdropFilter: 'blur(14px)', padding: '10px 12px', boxShadow: '0 10px 34px rgba(0,0,0,0.16)' }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Contas</div>
             {[
               { label: 'Pagas', val: '14', color: '#4ADE80' },
@@ -334,22 +333,22 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* ⑧ Coin badges — scattered */}
-        {[
-          { top: '36%', left: '28%' },
-          { bottom: '18%', left: '56%' },
-          { top: '8%', left: '54%' },
-        ].map((pos, i) => (
+        {/* ⑧ Coin badges — preenchem os espaços entre os widgets e o texto central */}
+        {([
+          { top: '30%', left: '32%' },
+          { bottom: '16%', left: '52%' },
+          { top: '12%', left: '48%' },
+        ] as React.CSSProperties[]).map((pos, i) => (
           <div key={i} className={`lf${i + 1} absolute`} style={pos}>
-            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
+            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
               <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>R$</span>
             </div>
           </div>
         ))}
 
-        {/* ⑨ Lock badge — bottom-right corner */}
-        <div className="lf7 absolute" style={{ bottom: '4%', right: '28%' }}>
-          <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.16)' }}>
+        {/* ⑨ Lock badge */}
+        <div className="lf7 absolute" style={{ bottom: '28%', right: '28%' }}>
+          <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.16)' }}>
             <svg width="20" height="22" viewBox="0 0 20 22" fill="none">
               <rect x="2" y="9" width="16" height="12" rx="3" fill="rgba(255,255,255,0.5)" />
               <path d="M5 9V6a5 5 0 0 1 10 0v3" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" />
