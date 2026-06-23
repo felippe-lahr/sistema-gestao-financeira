@@ -578,6 +578,31 @@
 .dark .border-\[\#F3F3F5\] { border-color: #252532 !important; }
 .dark .border-\[\#E4E4E8\] { border-color: #2C2C3C !important; }
 
+/* ===== Login page floating icon animations ===== */
+@keyframes lf-up {
+  0%, 100% { transform: translateY(0px) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-16px) rotate(var(--r, 0deg)); }
+}
+@keyframes lf-down {
+  0%, 100% { transform: translateY(0px) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(16px) rotate(var(--r, 0deg)); }
+}
+.lf1 { animation: lf-up   5.2s ease-in-out infinite; }
+.lf2 { animation: lf-down 6.8s ease-in-out infinite 1.2s; }
+.lf3 { animation: lf-up   7.4s ease-in-out infinite 0.6s; }
+.lf4 { animation: lf-down 5.8s ease-in-out infinite 2.1s; }
+.lf5 { animation: lf-up   8.1s ease-in-out infinite 1.7s; }
+.lf6 { animation: lf-down 6.3s ease-in-out infinite 0.9s; }
+.lf7 { animation: lf-up   7.0s ease-in-out infinite 3.0s; }
+.lf8 { animation: lf-down 5.5s ease-in-out infinite 2.5s; }
+
+/* Placeholder color for login inputs on blue bg */
+.login-blue-input::placeholder { color: rgba(255,255,255,0.4) !important; }
+.login-blue-input:focus-visible {
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.25) !important;
+  border-color: rgba(255,255,255,0.55) !important;
+}
+
 /* ===== Preserved whites =====
  * Toggle thumbs and small indicators that must stay light even in dark mode.
  * Apply .preserve-white to any bg-white element that should not go dark.
