@@ -559,10 +559,24 @@
 .dark .bg-\[\#F9F9FB\] { background-color: #1E1E2A !important; }
 .dark .hover\:bg-\[\#F9F9FB\]:hover { background-color: #1E1E2A !important; }
 
+/* Primary/dark text → light in dark mode */
+.dark .text-\[\#16161A\] { color: #F0F0F6 !important; }
+.dark .text-\[\#1C1C24\] { color: #F0F0F6 !important; }
+.dark .text-\[\#3C3C44\] { color: #C4C4D0 !important; }
+.dark .text-\[\#5C5C66\] { color: #A0A0B8 !important; }
+.dark .text-\[\#8A8A92\] { color: #60607A !important; }
+.dark .hover\:text-\[\#16161A\]:hover { color: #F0F0F6 !important; }
+
 /* Muted text colors */
 .dark .text-\[\#52525C\] { color: #A0A0B8 !important; }
 .dark .text-\[\#7a5c00\] { color: #FCD34D !important; }
 .dark .text-\[\#5e4600\] { color: #F59E0B !important; }
+
+/* Transaction & card dividers */
+.dark .border-\[\#ECECEF\] { border-color: #2C2C3C !important; }
+.dark .border-\[\#EDEDF0\] { border-color: #2C2C3C !important; }
+.dark .border-\[\#F3F3F5\] { border-color: #252532 !important; }
+.dark .border-\[\#E4E4E8\] { border-color: #2C2C3C !important; }
 
 /* ===== Preserved whites =====
  * Toggle thumbs and small indicators that must stay light even in dark mode.

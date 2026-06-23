@@ -656,7 +656,7 @@ function DashboardLayoutContent({
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"
-          style={{ background: '#FFFFFF', borderRight: '1px solid #ECECEF' }}
+          style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border-default)' }}
           disableTransition={isResizing}
         >
           {/* Sidebar Header - Logo */}
