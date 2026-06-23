@@ -158,37 +158,189 @@ function LoginForm() {
   const RightPanel = ({ title, subtitle }: { title: string; subtitle?: string }) => (
     <div
       className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden flex-col items-center justify-center p-12"
-      style={{ background: '#16161A' }}
+      style={{ background: 'linear-gradient(145deg, #0A3270 0%, #1255A8 38%, #1a67c2 68%, #0E4A99 100%)' }}
     >
-      {/* Background decoration */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        aria-hidden="true"
+      {/* Radial glows */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
         style={{
-          backgroundImage: `radial-gradient(circle at 70% 30%, #1a67c226 0%, transparent 60%),
-            radial-gradient(circle at 20% 80%, #1a6b4519 0%, transparent 50%)`,
+          backgroundImage: `
+            radial-gradient(ellipse at 25% 18%, rgba(255,255,255,0.1) 0%, transparent 52%),
+            radial-gradient(ellipse at 75% 82%, rgba(0,0,0,0.22) 0%, transparent 52%),
+            radial-gradient(ellipse at 55% 45%, rgba(26,103,194,0.25) 0%, transparent 60%)
+          `,
         }}
       />
 
+      {/* Decorative rings */}
+      <div className="absolute pointer-events-none" style={{
+        width: 420, height: 420, borderRadius: '50%',
+        border: '1px solid rgba(255,255,255,0.06)',
+        top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+      }} />
+      <div className="absolute pointer-events-none" style={{
+        width: 620, height: 620, borderRadius: '50%',
+        border: '1px solid rgba(255,255,255,0.035)',
+        top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+      }} />
+
+      {/* Floating icon cards */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+
+        {/* Top-left — CreditCard large */}
+        <div className="lf1 absolute" style={{ top: '7%', left: '5%' }}>
+          <div style={{
+            width: 100, height: 100, borderRadius: 26,
+            background: 'rgba(255,255,255,0.11)',
+            backdropFilter: 'blur(14px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 16px 48px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.28)',
+          }}>
+            <CreditCard style={{ width: 52, height: 52, color: 'white', strokeWidth: 1.1 }} />
+          </div>
+        </div>
+
+        {/* Top-right — BarChart2 medium */}
+        <div className="lf3 absolute" style={{ top: '5%', right: '7%' }}>
+          <div style={{
+            width: 84, height: 84, borderRadius: 21,
+            background: 'rgba(255,255,255,0.09)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.16)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 10px 36px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2)',
+          }}>
+            <BarChart2 style={{ width: 42, height: 42, color: 'white', strokeWidth: 1.1 }} />
+          </div>
+        </div>
+
+        {/* Mid-left — TrendingUp small */}
+        <div className="lf5 absolute" style={{ top: '41%', left: '2%' }}>
+          <div style={{
+            width: 70, height: 70, borderRadius: 18,
+            background: 'rgba(255,255,255,0.07)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.13)',
+          }}>
+            <TrendingUp style={{ width: 34, height: 34, color: 'rgba(255,255,255,0.9)', strokeWidth: 1.2 }} />
+          </div>
+        </div>
+
+        {/* Mid-right — Receipt medium */}
+        <div className="lf2 absolute" style={{ top: '36%', right: '3%' }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: 20,
+            background: 'rgba(255,255,255,0.09)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 10px 34px rgba(0,0,0,0.14)',
+          }}>
+            <Receipt style={{ width: 38, height: 38, color: 'white', strokeWidth: 1.1 }} />
+          </div>
+        </div>
+
+        {/* Bottom-left — Wallet large */}
+        <div className="lf4 absolute" style={{ bottom: '12%', left: '4%' }}>
+          <div style={{
+            width: 94, height: 94, borderRadius: 24,
+            background: 'rgba(255,255,255,0.11)',
+            backdropFilter: 'blur(14px)',
+            border: '1px solid rgba(255,255,255,0.19)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 14px 44px rgba(0,0,0,0.17), inset 0 1px 0 rgba(255,255,255,0.24)',
+          }}>
+            <Wallet style={{ width: 46, height: 46, color: 'white', strokeWidth: 1.1 }} />
+          </div>
+        </div>
+
+        {/* Bottom-right — PieChart medium */}
+        <div className="lf6 absolute" style={{ bottom: '8%', right: '6%' }}>
+          <div style={{
+            width: 82, height: 82, borderRadius: 21,
+            background: 'rgba(255,255,255,0.09)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 10px 36px rgba(0,0,0,0.14)',
+          }}>
+            <PieChart style={{ width: 40, height: 40, color: 'white', strokeWidth: 1.1 }} />
+          </div>
+        </div>
+
+        {/* Top-center — Landmark small */}
+        <div className="lf7 absolute" style={{ top: '2%', left: '42%' }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 16,
+            background: 'rgba(255,255,255,0.07)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.11)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 6px 22px rgba(0,0,0,0.11)',
+          }}>
+            <Landmark style={{ width: 30, height: 30, color: 'rgba(255,255,255,0.85)', strokeWidth: 1.2 }} />
+          </div>
+        </div>
+
+        {/* Bottom-center — Banknote small */}
+        <div className="lf8 absolute" style={{ bottom: '2%', left: '40%' }}>
+          <div style={{
+            width: 66, height: 66, borderRadius: 17,
+            background: 'rgba(255,255,255,0.07)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 6px 22px rgba(0,0,0,0.11)',
+          }}>
+            <Banknote style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)', strokeWidth: 1.2 }} />
+          </div>
+        </div>
+
+        {/* Left-edge mid-bottom — ArrowUpDown tiny */}
+        <div className="lf5 absolute" style={{ bottom: '33%', left: '1%' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 14,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <ArrowUpDown style={{ width: 26, height: 26, color: 'rgba(255,255,255,0.7)', strokeWidth: 1.3 }} />
+          </div>
+        </div>
+
+        {/* Right-edge mid-top — Zap tiny */}
+        <div className="lf3 absolute" style={{ top: '22%', right: '1%' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 14,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Zap style={{ width: 26, height: 26, color: 'rgba(255,255,255,0.7)', strokeWidth: 1.3 }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Main content */}
       <div className="relative z-10 text-center max-w-md">
-        {/* Logo */}
         <div className="flex items-center justify-center mb-10">
           <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ height: 36, width: 'auto' }} />
         </div>
 
-        <h2 style={{ fontSize: 28, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.3, marginBottom: 16 }}>
+        <h2 style={{ fontSize: 30, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.3, marginBottom: 16, letterSpacing: '-0.02em' }}>
           {title}
         </h2>
         {subtitle && (
-          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 1.7, marginBottom: 48 }}>
+          <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: 15, lineHeight: 1.75, marginBottom: 48 }}>
             {subtitle}
           </p>
         )}
 
-        {/* Trust stats */}
         <div
           className="grid grid-cols-3 gap-4"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 36 }}
+          style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 36 }}
         >
           {[
             { value: '500+', label: 'empresas' },
@@ -196,10 +348,10 @@ function LoginForm() {
             { value: '99.9%', label: 'uptime' },
           ].map((stat) => (
             <div key={stat.label} className="text-center">
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#FFFFFF', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#FFFFFF', fontVariantNumeric: 'tabular-nums' }}>
                 {stat.value}
               </div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', marginTop: 4 }}>
                 {stat.label}
               </div>
             </div>
@@ -213,92 +365,50 @@ function LoginForm() {
   if (requiresTwoFactor) {
     return (
       <div className="flex min-h-screen">
-        {/* Painel esquerdo — 2FA com fundo azul */}
+        {/* Painel esquerdo — 2FA limpo */}
         <div
-          className="flex-1 flex items-center justify-center p-6 sm:p-10 min-h-screen relative overflow-hidden"
-          style={{ background: 'linear-gradient(145deg, #0A3270 0%, #1255A8 40%, #1a67c2 75%, #0F4A99 100%)' }}
+          className="flex-1 flex items-center justify-center p-6 sm:p-10 min-h-screen"
+          style={{ background: 'var(--bg-surface)' }}
         >
-          {/* Decorative radial glow */}
-          <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
-            style={{ backgroundImage: 'radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.07) 0%, transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(0,0,0,0.15) 0%, transparent 60%)' }} />
-
-          {/* Floating icons */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="lf1 absolute" style={{ top: '8%', left: '5%', opacity: 0.15 }}><Shield style={{ width: 52, height: 52, color: 'white', strokeWidth: 1.2 }} /></div>
-            <div className="lf3 absolute" style={{ top: '12%', right: '7%', opacity: 0.13 }}><Smartphone style={{ width: 46, height: 46, color: 'white', strokeWidth: 1.2 }} /></div>
-            <div className="lf5 absolute" style={{ bottom: '18%', left: '6%', opacity: 0.14 }}><ShieldCheck style={{ width: 48, height: 48, color: 'white', strokeWidth: 1.2 }} /></div>
-            <div className="lf2 absolute" style={{ bottom: '12%', right: '6%', opacity: 0.13 }}><Zap style={{ width: 42, height: 42, color: 'white', strokeWidth: 1.2 }} /></div>
-            <div className="lf4 absolute" style={{ top: '45%', left: '3%', opacity: 0.11 }}><CreditCard style={{ width: 38, height: 38, color: 'white', strokeWidth: 1.2 }} /></div>
-            <div className="lf6 absolute" style={{ top: '42%', right: '4%', opacity: 0.11 }}><Landmark style={{ width: 38, height: 38, color: 'white', strokeWidth: 1.2 }} /></div>
-          </div>
-
-          <div className="w-full max-w-md relative z-10">
-            {/* Logo branco */}
-            <div className="flex items-center justify-center mb-10">
-              <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ height: 30, width: 'auto' }} />
+          <div className="w-full max-w-md">
+            <div className="mb-8 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="p-3 rounded-full" style={{ background: 'var(--accent-soft)' }}>
+                  <Smartphone style={{ width: 32, height: 32, color: 'var(--primary)' }} />
+                </div>
+              </div>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
+                Verificação em dois fatores
+              </h1>
+              <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                Abra o <strong style={{ color: 'var(--text-secondary)' }}>Google Authenticator</strong> e insira o código de 6 dígitos gerado para o <strong style={{ color: 'var(--text-secondary)' }}>UnifiquePro</strong>.
+              </p>
             </div>
 
-            {/* Glass card */}
-            <div style={{
-              background: 'rgba(255,255,255,0.08)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: 20,
-              padding: '36px 32px',
-            }}>
-              <div className="text-center mb-8">
-                <div className="flex justify-center mb-4">
-                  <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '50%', padding: 14 }}>
-                    <Smartphone style={{ width: 32, height: 32, color: 'white' }} />
-                  </div>
-                </div>
-                <h1 style={{ fontSize: 22, fontWeight: 700, color: '#FFFFFF', marginBottom: 8 }}>
-                  Verificação em dois fatores
-                </h1>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>
-                  Abra o <strong style={{ color: 'rgba(255,255,255,0.9)' }}>Google Authenticator</strong> e insira o código de 6 dígitos.
-                </p>
+            <div className="space-y-6">
+              <div className="flex justify-center">
+                <InputOTP maxLength={6} value={totpCode} onChange={(value) => setTotpCode(value)} onComplete={handleVerify2FA}>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
               </div>
-
-              <div className="space-y-6">
-                <div className="flex justify-center">
-                  <InputOTP maxLength={6} value={totpCode} onChange={(value) => setTotpCode(value)} onComplete={handleVerify2FA}>
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-                <button
-                  onClick={handleVerify2FA}
-                  disabled={twoFaLoading || totpCode.length !== 6}
-                  className="w-full transition-all disabled:opacity-50"
-                  style={{
-                    height: 50,
-                    borderRadius: 12,
-                    background: '#FFFFFF',
-                    color: '#1a67c2',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    border: 'none',
-                    cursor: twoFaLoading || totpCode.length !== 6 ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {twoFaLoading ? "Verificando..." : "Verificar e Entrar"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setRequiresTwoFactor(false); setTotpCode(""); }}
-                  style={{ width: '100%', fontSize: 14, color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', cursor: 'pointer' }}
-                  className="hover:!text-white transition-colors"
-                >
-                  ← Voltar ao login
-                </button>
-              </div>
+              <Button onClick={handleVerify2FA} className="w-full" disabled={twoFaLoading || totpCode.length !== 6} style={{ height: 50 }}>
+                {twoFaLoading ? "Verificando..." : "Verificar e Entrar"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => { setRequiresTwoFactor(false); setTotpCode(""); }}
+                style={{ width: '100%', fontSize: 14, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+                className="hover:text-[#3C3C44] dark:hover:text-[#C4C4D0] transition-colors"
+              >
+                ← Voltar ao login
+              </button>
             </div>
           </div>
         </div>
@@ -310,253 +420,154 @@ function LoginForm() {
 
   return (
     <div className="flex min-h-screen" style={{ fontFamily: "'Manrope', system-ui, sans-serif" }}>
-      {/* Painel esquerdo — design moderno azul */}
+      {/* Painel esquerdo — formulário limpo */}
       <div
-        className="flex-1 flex items-center justify-center p-6 sm:p-10 min-h-screen relative overflow-hidden"
-        style={{ background: 'linear-gradient(145deg, #0A3270 0%, #1255A8 35%, #1a67c2 65%, #0F4A99 100%)' }}
+        className="flex-1 flex items-center justify-center p-6 sm:p-10 min-h-screen"
+        style={{ background: 'var(--bg-surface)' }}
       >
-        {/* Radial glows */}
-        <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
-          style={{
-            backgroundImage: `
-              radial-gradient(ellipse at 20% 15%, rgba(255,255,255,0.08) 0%, transparent 55%),
-              radial-gradient(ellipse at 80% 85%, rgba(0,0,0,0.2) 0%, transparent 55%),
-              radial-gradient(ellipse at 60% 40%, rgba(26,103,194,0.3) 0%, transparent 60%)
-            `,
-          }}
-        />
-
-        {/* Floating icons */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-          <div className="lf1 absolute" style={{ top: '6%', left: '4%', opacity: 0.18 }}>
-            <CreditCard style={{ width: 58, height: 58, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-          <div className="lf2 absolute" style={{ top: '9%', right: '6%', opacity: 0.16 }}>
-            <BarChart2 style={{ width: 50, height: 50, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-          <div className="lf3 absolute" style={{ top: '43%', left: '2%', opacity: 0.14 }}>
-            <TrendingUp style={{ width: 46, height: 46, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-          <div className="lf4 absolute" style={{ top: '38%', right: '3%', opacity: 0.15 }}>
-            <Receipt style={{ width: 42, height: 42, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-          <div className="lf5 absolute" style={{ bottom: '16%', left: '5%', opacity: 0.17 }}>
-            <Wallet style={{ width: 50, height: 50, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-          <div className="lf6 absolute" style={{ bottom: '10%', right: '5%', opacity: 0.15 }}>
-            <PieChart style={{ width: 46, height: 46, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-          <div className="lf7 absolute" style={{ top: '3%', left: '44%', opacity: 0.12 }}>
-            <Landmark style={{ width: 40, height: 40, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-          <div className="lf8 absolute" style={{ bottom: '4%', left: '42%', opacity: 0.12 }}>
-            <ArrowUpDown style={{ width: 36, height: 36, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-          <div className="lf3 absolute" style={{ top: '70%', left: '1%', opacity: 0.10 }}>
-            <Banknote style={{ width: 44, height: 44, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-          <div className="lf5 absolute" style={{ top: '22%', right: '1%', opacity: 0.10 }}>
-            <Banknote style={{ width: 36, height: 36, color: 'white', strokeWidth: 1.1 }} />
-          </div>
-        </div>
-
-        <div className="w-full max-w-md relative z-10">
-          {/* Logo branco */}
-          <div className="flex items-center justify-center mb-8">
-            <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ height: 30, width: 'auto' }} />
-          </div>
-
+        <div className="w-full max-w-md">
           {/* Título */}
-          <div className="mb-6">
-            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#FFFFFF', marginBottom: 6, letterSpacing: '-0.02em' }}>
+          <div className="mb-8">
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
               Seja bem-vindo
             </h1>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>Faça seu login ou cadastre-se</p>
+            <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>Faça seu login ou cadastre-se</p>
           </div>
 
           {/* Alerta e-mail não verificado */}
           {emailNotVerified && (
             <div
-              className="mb-5 rounded-[14px] p-4 space-y-3"
-              style={{ background: 'rgba(255,200,50,0.12)', border: '1px solid rgba(255,200,50,0.3)' }}
+              className="mb-5 rounded-[12px] p-4 space-y-3"
+              style={{ background: 'var(--amber-bg)', border: '1px solid var(--amber-border)' }}
             >
-              <span style={{ color: '#FBBF24', fontSize: 14, fontWeight: 600 }}>
+              <span style={{ color: '#7a5c00', fontSize: 14, fontWeight: 600 }} className="dark:text-amber-300">
                 E-mail não verificado
               </span>
-              <p style={{ fontSize: 13, lineHeight: 1.5, color: 'rgba(255,255,255,0.75)' }}>
+              <p style={{ fontSize: 13, lineHeight: 1.5 }} className="text-amber-800 dark:text-amber-400">
                 Verifique sua caixa de entrada e clique no link de ativação enviado para{" "}
-                <strong style={{ color: 'white' }}>{unverifiedEmail}</strong>.
+                <strong>{unverifiedEmail}</strong>.
               </p>
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
                 onClick={handleResendVerification}
                 disabled={resendLoading || resendCooldown > 0}
-                className="w-full transition-all disabled:opacity-50"
-                style={{
-                  height: 38,
-                  borderRadius: 10,
-                  background: 'rgba(255,255,255,0.15)',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  color: 'white',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: resendLoading || resendCooldown > 0 ? 'not-allowed' : 'pointer',
-                }}
               >
                 {resendLoading ? "Enviando..." : resendCooldown > 0 ? `Reenviar em ${resendCooldown}s` : "Reenviar e-mail de verificação"}
-              </button>
+              </Button>
             </div>
           )}
 
-          {/* Card glassmorphism */}
-          <div style={{
-            background: 'rgba(255,255,255,0.08)',
-            backdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255,255,255,0.14)',
-            borderRadius: 20,
-            padding: '28px 28px 24px',
-          }}>
-            {/* Botão Google */}
-            <a
-              href="/api/auth/google"
-              className="flex items-center justify-center gap-3 w-full transition-all"
-              style={{
-                height: 48,
-                padding: '0 16px',
-                background: 'rgba(255,255,255,0.95)',
-                color: '#1C1C24',
-                fontWeight: 600,
-                fontSize: 14,
-                marginBottom: 20,
-                textDecoration: 'none',
-                borderRadius: 12,
-                border: 'none',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,1)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.95)'; }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style={{ width: 20, height: 20, flexShrink: 0 }}>
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              Entrar com Google
-            </a>
+          {/* Botão Google */}
+          <a
+            href="/api/auth/google"
+            className="flex items-center justify-center gap-3 w-full transition-all border border-[#E4E4E8] dark:border-[#2C2C3C] rounded-[12px] hover:bg-[#F6F6F8] dark:hover:bg-[#252532]"
+            style={{
+              height: 50,
+              padding: '0 16px',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-secondary)',
+              fontWeight: 500,
+              fontSize: 14,
+              marginBottom: 20,
+              textDecoration: 'none',
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style={{ width: 20, height: 20, flexShrink: 0 }}>
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Entrar com Google
+          </a>
 
-            {/* Divisor */}
-            <div className="flex items-center gap-3 mb-5">
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.18)' }} />
-              <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.45)' }}>
+          {/* Divisor */}
+          <div className="relative mb-5">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-[#ECECEF] dark:border-[#2C2C3C]" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="px-3 text-[11px] uppercase tracking-widest text-[#A6A6AE] dark:text-[#60607A]" style={{ background: 'var(--bg-surface)' }}>
                 ou entre com e-mail
               </span>
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.18)' }} />
             </div>
-
-            {/* Formulário */}
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-1.5">
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)', display: 'block' }}>
-                  E-mail
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="login-blue-input"
-                  style={{
-                    background: 'rgba(255,255,255,0.1)',
-                    border: '1px solid rgba(255,255,255,0.22)',
-                    color: 'white',
-                    borderRadius: 12,
-                  }}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)', display: 'block' }}>
-                  Senha
-                </label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Sua senha"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="login-blue-input"
-                    style={{
-                      paddingRight: 48,
-                      background: 'rgba(255,255,255,0.1)',
-                      border: '1px solid rgba(255,255,255,0.22)',
-                      color: 'white',
-                      borderRadius: 12,
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)' }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 hover:!text-white transition-colors"
-                  >
-                    {showPassword ? <EyeOff style={{ width: 16, height: 16 }} /> : <Eye style={{ width: 16, height: 16 }} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="rememberMe"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    style={{ width: 16, height: 16, borderRadius: 4, accentColor: 'white', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="rememberMe" style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', cursor: 'pointer' }}>
-                    Lembrar-me
-                  </label>
-                </div>
-                <a
-                  href="/recuperar-senha"
-                  style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: 500, textDecoration: 'none' }}
-                  className="hover:!text-white transition-colors hover:underline"
-                >
-                  Esqueci minha senha
-                </a>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full transition-all disabled:opacity-60 mt-2"
-                style={{
-                  height: 50,
-                  borderRadius: 12,
-                  background: '#FFFFFF',
-                  color: '#1255A8',
-                  fontWeight: 700,
-                  fontSize: 15,
-                  border: 'none',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  letterSpacing: '-0.01em',
-                }}
-                onMouseEnter={e => { if (!isLoading) (e.currentTarget as HTMLElement).style.background = '#F0F7FF'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#FFFFFF'; }}
-              >
-                {isLoading ? "Entrando..." : "Entrar"}
-              </button>
-            </form>
           </div>
 
-          <p className="mt-5 text-center" style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
+          {/* Formulário */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-[13px] font-semibold text-[#3C3C44] dark:text-[#C4C4D0]">
+                E-mail
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-[13px] font-semibold text-[#3C3C44] dark:text-[#C4C4D0]">
+                Senha
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Sua senha"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  style={{ paddingRight: 48 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors text-[#A6A6AE] dark:text-[#60607A] hover:text-[#5C5C66] dark:hover:text-[#A0A0B8]"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  {showPassword ? <EyeOff style={{ width: 16, height: 16 }} /> : <Eye style={{ width: 16, height: 16 }} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{ width: 16, height: 16, borderRadius: 4, border: '1px solid #E4E4E8', accentColor: '#1a67c2', cursor: 'pointer' }}
+                />
+                <Label htmlFor="rememberMe" className="text-[13px] font-normal text-[#5C5C66] dark:text-[#A0A0B8] cursor-pointer">
+                  Lembrar-me
+                </Label>
+              </div>
+              <a
+                href="/recuperar-senha"
+                style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500, textDecoration: 'none' }}
+                className="hover:underline transition-colors"
+              >
+                Esqueci minha senha
+              </a>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isLoading} style={{ height: 50 }}>
+              {isLoading ? "Entrando..." : "Entrar"}
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-[14px] text-[#8A8A92] dark:text-[#80809A]">
             Não tem uma conta?{" "}
             <a
               href="/signup"
-              style={{ color: 'rgba(255,255,255,0.95)', fontWeight: 600, textDecoration: 'none' }}
+              style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}
               className="hover:underline transition-colors"
             >
               Cadastre-se gratuitamente
