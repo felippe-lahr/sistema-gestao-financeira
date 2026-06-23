@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -98,6 +98,7 @@ type Decision = {
 export default function BankAccounts() {
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
   const [view, setView] = useState<"accounts" | "statement">("accounts");
+  const [openCreate, setOpenCreate] = useState(0);
 
   const { data: entities, isLoading: entitiesLoading } = trpc.entities.list.useQuery(undefined, {
     refetchInterval: 60_000,
@@ -136,43 +137,58 @@ export default function BankAccounts() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Contas Bancárias</h1>
-        <p className="text-sm text-muted-foreground">
-          Gerencie suas contas, importe extratos OFX e acompanhe o saldo da entidade.
-        </p>
+    <div className="container mx-auto py-8 space-y-6">
+      {/* Header — padrão igual a Transações */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Contas Bancárias</h1>
+          <p className="text-muted-foreground">
+            Gerencie suas contas, importe extratos OFX e acompanhe o saldo da entidade.
+          </p>
+        </div>
+        {/* Tabs + botão Nova Conta ficam no header em desktop */}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            {([
+              { key: "accounts", label: "Contas" },
+              { key: "statement", label: "Extrato" },
+            ] as const).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setView(tab.key)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  view === tab.key
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {canWrite && view === "accounts" && selectedEntityId && (
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                /* sinal para BankAccountsList abrir o sheet */
+                setOpenCreate(c => c + 1);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Conta Bancária
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Abas: Contas / Extrato */}
-      <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl w-fit">
-        {([
-          { key: "accounts", label: "Contas" },
-          { key: "statement", label: "Extrato" },
-        ] as const).map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setView(tab.key)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              view === tab.key
-                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Seletor de entidade (se mais de uma) */}
+      {/* Seletor de entidade */}
       {entities.length > 1 && (
-        <div className="flex flex-wrap gap-2 pb-1">
+        <div className="flex flex-wrap gap-2">
           {entities.map((e) => (
             <button
               key={e.id}
               onClick={() => setSelectedEntityId(e.id)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                 selectedEntityId === e.id
                   ? "bg-blue-600 text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -192,6 +208,7 @@ export default function BankAccounts() {
           entities={entities}
           selectedEntityId={selectedEntityId}
           onEntityChange={(id) => setSelectedEntityId(id)}
+          triggerCreate={openCreate}
         />
       )}
 
@@ -211,6 +228,7 @@ function BankAccountsList({
   entities,
   selectedEntityId,
   onEntityChange,
+  triggerCreate,
 }: {
   entityId: number;
   canWrite: boolean;
@@ -218,8 +236,18 @@ function BankAccountsList({
   entities: any[];
   selectedEntityId: number;
   onEntityChange: (id: number) => void;
+  triggerCreate?: number;
 }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  // Abre o sheet quando o botão no header é clicado
+  useEffect(() => {
+    if (triggerCreate && triggerCreate > 0) {
+      resetForm();
+      setIsCreateOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerCreate]);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -333,40 +361,66 @@ function BankAccountsList({
 
   return (
     <div className="space-y-4">
-      {/* Card de resumo */}
+      {/* Card de resumo — padrão igual a Transações */}
       {accounts && accounts.length > 0 && (
-        <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white shadow-lg">
-          <p className="text-blue-100 text-sm font-medium mb-1">Saldo atual em contas</p>
-          <p className="text-3xl font-bold">
-            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalCurrentBalance)}
-          </p>
-          <p className="text-blue-200 text-xs mt-2">
-            {accounts.length} conta{accounts.length !== 1 ? "s" : ""} • Saldo inicial:{" "}
-            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalInitialBalance / 100)}
-          </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-2">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Saldo em contas</span>
+              <Landmark className="h-4 w-4 text-blue-600" />
+            </div>
+            <p className={`text-2xl font-bold ${totalCurrentBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalCurrentBalance)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              {accounts.length} conta{accounts.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Saldo inicial total</span>
+              <Banknote className="h-4 w-4 text-gray-400" />
+            </div>
+            <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalInitialBalance / 100)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">Saldo de abertura</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Conta padrão</span>
+              <Star className="h-4 w-4 text-yellow-500" />
+            </div>
+            {(() => {
+              const def = accounts.find(a => a.isDefault);
+              return def ? (
+                <>
+                  <p className="text-base font-bold text-gray-900 dark:text-white truncate">{def.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{def.bank || "Sem banco definido"}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhuma definida</p>
+              );
+            })()}
+          </div>
         </div>
-      )}
-
-      {/* Botão nova conta */}
-      {canWrite && (
-        <Button
-          onClick={() => { resetForm(); setIsCreateOpen(true); }}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 font-medium"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Nova Conta Bancária
-        </Button>
       )}
 
       {/* Lista de contas */}
       {!accounts || accounts.length === 0 ? (
-        <Card className="rounded-2xl border-dashed">
+        <Card className="border-dashed">
           <CardContent className="py-14 text-center">
             <Landmark className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
             <p className="font-medium text-gray-500 dark:text-gray-400">Nenhuma conta cadastrada</p>
             <p className="text-sm text-muted-foreground mt-1">
               Adicione sua primeira conta para começar a conciliar extratos.
             </p>
+            {canWrite && (
+              <Button className="mt-4 bg-blue-600 hover:bg-blue-700" onClick={() => { resetForm(); setIsCreateOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Conta Bancária
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -374,17 +428,16 @@ function BankAccountsList({
           {accounts.map((account) => (
             <Card
               key={account.id}
-              className="rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all"
+              className="border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all"
             >
               <CardContent className="p-4">
-                {/* Mobile + Desktop layout */}
                 <div className="flex items-start gap-4">
                   {/* Ícone colorido */}
                   <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
+                    className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
                     style={{ backgroundColor: account.color || "#2563EB" }}
                   >
-                    <Banknote className="h-6 w-6 text-white" />
+                    <Banknote className="h-5 w-5 text-white" />
                   </div>
 
                   {/* Informações */}
@@ -408,7 +461,7 @@ function BankAccountsList({
 
                     {/* Saldo + ações */}
                     <div className="flex items-center justify-between mt-3">
-                      <div className="flex gap-4">
+                      <div className="flex gap-6">
                         <div>
                           <p className="text-xs text-muted-foreground">Saldo atual</p>
                           <p className="text-lg font-bold text-gray-900 dark:text-white">
@@ -433,7 +486,7 @@ function BankAccountsList({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-9 w-9 rounded-lg ${account.isDefault ? "text-yellow-500" : "text-gray-300 hover:text-yellow-400"}`}
+                            className={`h-8 w-8 ${account.isDefault ? "text-yellow-500" : "text-gray-300 hover:text-yellow-400"}`}
                             onClick={() => setDefaultMutation.mutate({ id: account.id, entityId })}
                             title={account.isDefault ? "Conta padrão" : "Definir como padrão"}
                           >
@@ -444,7 +497,7 @@ function BankAccountsList({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-9 px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg"
+                            className="h-8 px-2.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
                             onClick={() => setOfxAccountId(account.id)}
                           >
                             <Upload className="h-4 w-4 mr-1.5" />
@@ -452,12 +505,7 @@ function BankAccountsList({
                           </Button>
                         )}
                         {canWrite && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 rounded-lg"
-                            onClick={() => handleEdit(account)}
-                          >
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(account)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
                         )}
@@ -465,7 +513,7 @@ function BankAccountsList({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 rounded-lg text-destructive hover:text-destructive"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
                             onClick={() => setDeleteId(account.id)}
                           >
                             <Trash2 className="h-4 w-4" />
