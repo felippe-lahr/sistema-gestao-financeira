@@ -64,6 +64,8 @@ export default function Transactions() {
   
   // Estado para agrupamento de cartões de crédito (expandir/colapsar)
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  // Estado para mostrar todas as transações de um grupo (sem limite de preview)
+  const [expandedCardsFull, setExpandedCardsFull] = useState<Set<string>>(new Set());
   
   // Estado para anexos da fatura do cartão
   const [invoiceAttachSheet, setInvoiceAttachSheet] = useState<{ open: boolean; cardId: number | null; cardName: string; month: number; year: number; invoiceId: number | null }>({
@@ -1036,7 +1038,7 @@ export default function Transactions() {
                 <Button variant="outline" onClick={() => setIsExportAttachmentsOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleExportAttachments} disabled={exportingAttachments} className="bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleExportAttachments} disabled={exportingAttachments} className="bg-[#1a67c2] hover:bg-[#1558a8]">
                   {exportingAttachments ? (
                     <>
                       <Download className="h-4 w-4 mr-2 animate-spin" />
@@ -1098,7 +1100,7 @@ export default function Transactions() {
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleCreate} disabled={createMutation.isPending} className="bg-[#1a67c2] hover:bg-[#1558a8]">
                   {createMutation.isPending ? "Criando..." : "Criar Transação"}
                 </Button>
               </div>
@@ -1144,7 +1146,7 @@ export default function Transactions() {
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="bg-[#1a67c2] hover:bg-[#1558a8]">
               {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </div>
@@ -1369,7 +1371,7 @@ export default function Transactions() {
             <Filter className="h-4 w-4 mr-2" />
             Filtros
             {activeFiltersCount > 0 && (
-              <Badge className="ml-2 bg-blue-50 dark:bg-blue-900/200 text-white">{activeFiltersCount}</Badge>
+              <Badge className="ml-2 bg-[#EBF3FC] dark:bg-[#1E2D4A]/200 text-white">{activeFiltersCount}</Badge>
             )}
           </Button>
 
@@ -1709,7 +1711,7 @@ export default function Transactions() {
 
       {/* Transaction Summary */}
       {!summaryLoading && summary && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-lg p-4 md:p-6 mb-4">
+        <div className="mb-4">
           {activeTab === "all" ? (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
@@ -1875,411 +1877,366 @@ export default function Transactions() {
               ))}
             </div>
           ) : filteredTransactions && filteredTransactions.length > 0 ? (
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               {/* Grupos de cartão de crédito */}
-              {cardGroups.map((group) => (
-                <Card key={`card-group-${group.cardName}`} className="overflow-hidden border-l-4" style={{ borderLeftColor: group.cardColor }}>
+              {cardGroups.map((group) => {
+                const CARD_TX_PREVIEW = 3;
+                const allPaid = group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length === 0;
+                const isExpanded = expandedCards.has(group.cardName);
+                const showingAll = expandedCardsFull.has(group.cardName);
+                const visibleTx = (!isExpanded || showingAll) ? group.transactions : group.transactions.slice(0, CARD_TX_PREVIEW);
+                const hasMore = isExpanded && !showingAll && group.transactions.length > CARD_TX_PREVIEW;
+                return (
+                <Card key={`card-group-${group.cardName}`} className="overflow-hidden" style={{ paddingTop: 0, paddingBottom: 0, paddingLeft: 0, paddingRight: 0, gap: 0 }}>
                   <CardContent className="p-0">
+                    {/* Header row */}
                     <div
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors hover:bg-[#F9F9FB]"
                       onClick={() => toggleCardExpand(group.cardName)}
                     >
-                      <div className="flex items-center gap-4">
-                        {expandedCards.has(group.cardName) ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <div className="p-3 rounded-full" style={{ backgroundColor: group.cardColor + '20' }}>
-                          <CreditCard className="h-5 w-5" style={{ color: group.cardColor }} />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold">{group.cardName}</h3>
-                          <p className="text-xs text-muted-foreground">
-                            {group.transactions.length} transaç{group.transactions.length === 1 ? 'ão' : 'ões'}
-                            {group.transactions[0]?.dueDate && (
-                              <> · <span className="font-medium">Vence: {format(new Date(group.transactions[0].dueDate), "dd/MM/yyyy", { locale: ptBR })}</span></>
-                            )}
-                          </p>
-                        </div>
+                      {/* Chevron */}
+                      <div className="flex-shrink-0 text-[#8A8A92]">
+                        {isExpanded
+                          ? <ChevronDown className="h-4 w-4" />
+                          : <ChevronRight className="h-4 w-4" />}
                       </div>
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          const pendingCount = group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length;
-                          const allPaid = pendingCount === 0;
-                          return (
-                            <>
-                              {allPaid ? (
-                                <Badge variant="default" className="text-xs">Pago</Badge>
-                              ) : (
-                                <Badge variant="secondary" className="text-xs">Pendente</Badge>
-                              )}
-                            </>
-                          );
-                        })()}
+                      {/* Card icon */}
+                      <div className="flex-shrink-0 flex items-center justify-center rounded-[10px] w-10 h-10" style={{ backgroundColor: group.cardColor + '18' }}>
+                        <CreditCard className="h-5 w-5" style={{ color: group.cardColor }} />
+                      </div>
+                      {/* Name + meta */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[15px] text-[#16161A] leading-tight">{group.cardName}</p>
+                        <p className="text-xs text-[#8A8A92] mt-0.5">
+                          {group.transactions.length} transaç{group.transactions.length === 1 ? 'ão' : 'ões'}
+                          {group.transactions[0]?.dueDate && (
+                            <> · Vence {format(new Date(group.transactions[0].dueDate), "dd/MM/yyyy", { locale: ptBR })}</>
+                          )}
+                        </p>
+                      </div>
+                      {/* Right side */}
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        {/* Status badge */}
+                        <Badge variant={allPaid ? "pago" : "pendente"} className="hidden md:inline-flex">
+                          {allPaid ? "Pago" : "Pendente"}
+                        </Badge>
+                        {/* Amount */}
                         <div className="text-right">
-                          <p className="text-lg font-bold text-red-600">
+                          <p className="text-base font-bold" style={{ color: '#c0392b' }}>
                             -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format((group.invoiceTotal != null ? group.invoiceTotal : group.total) / 100)}
                           </p>
                           {group.invoiceTotal != null && Math.abs(group.invoiceTotal - group.total) >= 10 && (
-                            <p className="text-xs text-muted-foreground">
-                              ({new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(group.total / 100)} calculado)
+                            <p className="text-xs text-[#8A8A92]">
+                              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(group.total / 100)} calculado
                             </p>
                           )}
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 hidden md:flex text-muted-foreground hover:text-foreground"
-                            title="Anexos da fatura"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
-                              if (matchedCard) {
-                                setInvoiceAttachSheet({ open: true, cardId: Number(matchedCard.id), cardName: group.cardName, month: filterMonth, year: filterYear, invoiceId: null });
-                              }
-                            }}
-                          >
-                            <Paperclip className="h-3.5 w-3.5" />
-                          </Button>
+                        {/* Pagar Fatura button */}
                         {canWrite && (
                           <Button
                             variant="outline"
                             size="sm"
-                            className="ml-2 text-xs h-7 hidden md:flex"
+                            className="hidden md:flex text-xs h-8 gap-1.5 px-3"
                             disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
                             onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
                           >
-                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            <CheckCircle2 className="h-3.5 w-3.5" />
                             Pagar Fatura
                           </Button>
                         )}
+                        {/* Paperclip */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 hidden md:flex text-[#8A8A92] hover:text-[#16161A]"
+                          title="Anexos da fatura"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
+                            if (matchedCard) {
+                              setInvoiceAttachSheet({ open: true, cardId: Number(matchedCard.id), cardName: group.cardName, month: filterMonth, year: filterYear, invoiceId: null });
+                            }
+                          }}
+                        >
+                          <Paperclip className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </div>
-                    {expandedCards.has(group.cardName) && (
-                      <div className="border-t divide-y">
-                        {/* Mobile: botões de ação */}
-                        <div className="md:hidden p-3 bg-muted/30 flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 text-xs"
+
+                    {/* Expanded transaction list */}
+                    {isExpanded && (
+                      <div className="border-t border-[#ECECEF]">
+                        {/* Mobile action buttons */}
+                        <div className="md:hidden px-4 py-2.5 bg-[#F9F9FB] flex gap-2 border-b border-[#ECECEF]">
+                          <Button variant="outline" size="sm" className="flex-1 text-xs"
                             onClick={(e) => {
                               e.stopPropagation();
                               const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
-                              if (matchedCard) {
-                                setInvoiceAttachSheet({ open: true, cardId: Number(matchedCard.id), cardName: group.cardName, month: filterMonth, year: filterYear, invoiceId: null });
-                              }
-                            }}
-                          >
-                            <Paperclip className="h-3.5 w-3.5 mr-1" />
-                            Anexos
+                              if (matchedCard) setInvoiceAttachSheet({ open: true, cardId: Number(matchedCard.id), cardName: group.cardName, month: filterMonth, year: filterYear, invoiceId: null });
+                            }}>
+                            <Paperclip className="h-3.5 w-3.5 mr-1" />Anexos
                           </Button>
                           {canWrite && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 text-xs"
+                            <Button variant="outline" size="sm" className="flex-1 text-xs"
                               disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
-                              onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
-                            >
+                              onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}>
                               <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                              {group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")
-                                ? `Pagar Fatura (${group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length} pendentes)`
-                                : "Fatura Paga"}
+                              {group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE") ? "Pagar Fatura" : "Fatura Paga"}
                             </Button>
                           )}
                         </div>
-                        {group.transactions.map((transaction: any) => (
-                          <div key={transaction.id} className="p-3 pl-12 hover:bg-muted/30 transition-colors">
-                            {/* Desktop */}
-                            <div className="hidden md:flex items-center justify-between">
-                              <div className="flex items-center gap-3 flex-1">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="font-medium text-sm">{transaction.description}</h4>
-                                    {transaction.attachmentCount > 0 && <Paperclip className="h-3 w-3 text-muted-foreground" />}
-                                    {getCategoryHierarchyBadge(transaction)}
-                                  </div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {transaction.purchaseDate
-                                      ? <><span className="font-medium">Compra:</span> {format(new Date(transaction.purchaseDate), "dd/MM/yyyy", { locale: ptBR })}</>
-                                      : <><span className="font-medium">Vence:</span> {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}</>}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                {getStatusBadge(transaction.status)}
-                                <p className="text-sm font-semibold text-red-600 min-w-[100px] text-right">
-                                  -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
-                                </p>
-                                {canWrite && (
-                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(transaction); }}>
-                                    <Edit2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                                {canDelete && (
-                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDelete(transaction.id); }}>
-                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                  </Button>
-                                )}
-                              </div>
+
+                        {/* Transaction rows */}
+                        {visibleTx.map((transaction: any) => (
+                          <div key={transaction.id} className="flex items-center gap-3 px-5 py-3 border-b border-[#F3F3F5] last:border-0 hover:bg-[#F9F9FB] transition-colors">
+                            {/* Cart icon */}
+                            <div className="flex-shrink-0 flex items-center justify-center rounded-[10px] w-9 h-9 bg-[#F3F3F5]">
+                              <svg className="h-4 w-4 text-[#8A8A92]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.5 6h13M10 19a1 1 0 11-2 0 1 1 0 012 0zm9 0a1 1 0 11-2 0 1 1 0 012 0z" />
+                              </svg>
                             </div>
-                            {/* Mobile */}
-                            <div className="md:hidden space-y-1">
-                              <div className="flex items-center justify-between">
-                                <h4 className="font-medium text-sm truncate flex-1">{transaction.description}</h4>
-                                <p className="text-sm font-semibold text-red-600">
-                                  -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
-                                </p>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {getCategoryHierarchyBadge(transaction)}
-                                  {getStatusBadge(transaction.status)}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <p className="text-xs text-muted-foreground">
-                                    {transaction.purchaseDate
-                                      ? <><span className="font-medium">Compra:</span> {format(new Date(transaction.purchaseDate), "dd/MM/yyyy", { locale: ptBR })}</>
-                                      : <><span className="font-medium">Vence:</span> {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}</>}
-                                  </p>
-                                  {canWrite && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(transaction); }}>
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                  {canDelete && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDelete(transaction.id); }}>
-                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
+                            {/* Description + date */}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-[#16161A] truncate">{transaction.description}</p>
+                              <p className="text-xs text-[#8A8A92] mt-0.5">
+                                {transaction.purchaseDate
+                                  ? format(new Date(transaction.purchaseDate), "dd/MM", { locale: ptBR })
+                                  : format(new Date(transaction.dueDate), "dd/MM", { locale: ptBR })}
+                                {' · '}{group.cardName}
+                              </p>
+                            </div>
+                            {/* Category + amount + actions */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <div className="hidden md:block">{getCategoryHierarchyBadge(transaction)}</div>
+                              <p className="text-sm font-semibold text-[#16161A] tabular-nums">
+                                -{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
+                              </p>
+                              {canWrite && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(transaction); }}>
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDelete(transaction.id); }}>
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ))}
+
+                        {/* Footer: count + "Ver todas" */}
+                        {hasMore && (
+                          <div className="flex items-center justify-between px-5 py-3">
+                            <span className="text-xs text-[#8A8A92]">
+                              Mostrando {visibleTx.length} de {group.transactions.length} transações
+                            </span>
+                            <button
+                              className="text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-70"
+                              style={{ color: '#1a67c2' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedCardsFull(prev => { const n = new Set(prev); n.add(group.cardName); return n; });
+                              }}
+                            >
+                              Ver todas →
+                            </button>
+                          </div>
+                        )}
+                        {!hasMore && group.transactions.length > 0 && (
+                          <div className="px-5 py-3">
+                            <span className="text-xs text-[#8A8A92]">
+                              {group.transactions.length} transaç{group.transactions.length === 1 ? 'ão' : 'ões'} no total
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
               {/* Transações normais (sem cartão de crédito) */}
-              {nonCardTransactions.map((transaction) => (
-                <Card key={transaction.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
+              {nonCardTransactions.length > 0 && (
+                <Card style={{ paddingTop: 0, paddingBottom: 0, paddingLeft: 0, paddingRight: 0, gap: 0, overflow: 'hidden' }}>
+                  {nonCardTransactions.map((transaction, idx) => (
+                    <div
+                      key={transaction.id}
+                      className={`transition-colors hover:bg-[#F9F9FB] ${idx < nonCardTransactions.length - 1 ? 'border-b border-[#ECECEF]' : ''}`}
+                    >
+                      <div className="px-5 py-4">
                     {/* Desktop Layout */}
-                    <div className="hidden md:flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className={`p-3 rounded-full ${transaction.type === "INCOME" ? "bg-green-100" : "bg-red-100"}`}>
-                          {transaction.type === "INCOME" ? (
-                            <ArrowUpRight className="h-5 w-5 text-green-600" />
+                    <div className="hidden md:flex items-center gap-4">
+                      {/* Icon */}
+                      <div className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-[10px] ${transaction.type === "INCOME" ? "bg-[#EAF6EF]" : "bg-[#FBECEC]"}`}>
+                        {transaction.type === "INCOME" ? (
+                          <ArrowUpRight className="h-5 w-5" style={{ color: '#1a6b45' }} />
+                        ) : (
+                          <ArrowDownRight className="h-5 w-5" style={{ color: '#c0392b' }} />
+                        )}
+                      </div>
+                      {/* Description + meta */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {editingDescriptionId === transaction.id && canWrite ? (
+                            <input
+                              ref={inlineInputRef}
+                              type="text"
+                              value={editingDescriptionValue}
+                              onChange={(e) => setEditingDescriptionValue(e.target.value)}
+                              onBlur={() => handleSaveInlineDescription(transaction.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') { e.preventDefault(); handleSaveInlineDescription(transaction.id); }
+                                if (e.key === 'Escape') { setEditingDescriptionId(null); }
+                              }}
+                              disabled={savingDescriptionId === transaction.id}
+                              className="font-semibold text-sm bg-transparent border-b-2 border-primary outline-none min-w-[120px] max-w-[300px] px-0 py-0.5"
+                              autoFocus
+                            />
                           ) : (
-                            <ArrowDownRight className="h-5 w-5 text-red-600" />
+                            <h3
+                              className={`font-semibold text-[15px] text-[#16161A] ${canWrite ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+                              title={canWrite ? 'Clique para editar o nome' : undefined}
+                              onClick={() => {
+                                if (!canWrite) return;
+                                setEditingDescriptionId(transaction.id);
+                                setEditingDescriptionValue(transaction.description);
+                                setTimeout(() => inlineInputRef.current?.focus(), 50);
+                              }}
+                            >{transaction.description}</h3>
+                          )}
+                          {transaction.attachmentCount > 0 && (
+                            <Paperclip className="h-3.5 w-3.5 text-[#8A8A92]" />
                           )}
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            {/* Edição inline da descrição - clique para editar */}
-                            {editingDescriptionId === transaction.id && canWrite ? (
-                              <input
-                                ref={inlineInputRef}
-                                type="text"
-                                value={editingDescriptionValue}
-                                onChange={(e) => setEditingDescriptionValue(e.target.value)}
-                                onBlur={() => handleSaveInlineDescription(transaction.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') { e.preventDefault(); handleSaveInlineDescription(transaction.id); }
-                                  if (e.key === 'Escape') { setEditingDescriptionId(null); }
-                                }}
-                                disabled={savingDescriptionId === transaction.id}
-                                className="font-semibold text-sm bg-transparent border-b-2 border-primary outline-none min-w-[120px] max-w-[300px] px-0 py-0.5"
-                                autoFocus
-                              />
-                            ) : (
-                              <h3
-                                className={`font-semibold ${canWrite ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
-                                title={canWrite ? 'Clique para editar o nome' : undefined}
-                                onClick={() => {
-                                  if (!canWrite) return;
-                                  setEditingDescriptionId(transaction.id);
-                                  setEditingDescriptionValue(transaction.description);
-                                  setTimeout(() => inlineInputRef.current?.focus(), 50);
-                                }}
-                              >{transaction.description}</h3>
-                            )}
-                            {transaction.attachmentCount > 0 && (
-                              <Paperclip className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            {getCategoryHierarchyBadge(transaction)}
-                            {getCreditCardBadge(transaction)}
-                            {!transaction.categoryId && canWrite && (
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 transition-colors">
-                                    <Tag className="h-3 w-3" />
-                                    Sem categoria
-                                  </button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-64 p-1" align="start">
-                                  <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
-                                  <QuickCategoryList
-                                    categories={categories || []}
-                                    filterType={transaction.type}
-                                    onSelect={(catId) => handleSaveQuickCategory(transaction, catId)}
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            )}
-                            {(transaction as any).importOrigin === "OFX" && (
-                              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
-                                OFX
-                              </span>
-                            )}
-                            {(transaction as any).bankAccountName && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                <Landmark className="h-3 w-3" />
-                                {(transaction as any).bankInstitution || (transaction as any).bankAccountName}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Vencimento: {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
-                            {transaction.paymentDate && ` • Pago em: ${format(new Date(transaction.paymentDate), "dd/MM/yyyy", { locale: ptBR })}`}
-                          </p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {getCategoryHierarchyBadge(transaction)}
+                          {getCreditCardBadge(transaction)}
+                          {!transaction.categoryId && canWrite && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#FBF3E0] text-[#7a5c00] hover:opacity-80 transition-opacity">
+                                  <Tag className="h-3 w-3" />
+                                  Sem categoria
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-1" align="start">
+                                <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
+                                <QuickCategoryList
+                                  categories={categories || []}
+                                  filterType={transaction.type}
+                                  onSelect={(catId) => handleSaveQuickCategory(transaction, catId)}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                          {(transaction as any).importOrigin === "OFX" && (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-[#DBEAFE] text-[#1558a8]">OFX</span>
+                          )}
+                          {(transaction as any).bankAccountName && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#F3F3F5] text-[#52525C]">
+                              <Landmark className="h-3 w-3" />
+                              {(transaction as any).bankInstitution || (transaction as any).bankAccountName}
+                            </span>
+                          )}
+                          <span className="text-xs text-[#8A8A92]">
+                            Venc. {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                            {transaction.paymentDate && ` · Pago ${format(new Date(transaction.paymentDate), "dd/MM/yyyy", { locale: ptBR })}`}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      {/* Right: status + amount + actions */}
+                      <div className="flex items-center gap-3 flex-shrink-0">
                         {getStatusBadge(transaction.status)}
-                        <div className="text-right">
-                          <p className={`text-lg font-bold ${transaction.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                            {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
-                          </p>
-                        </div>
+                        <p className={`text-base font-bold tabular-nums ${transaction.type === "INCOME" ? "" : ""}`}
+                          style={{ color: transaction.type === "INCOME" ? '#1a6b45' : '#c0392b' }}>
+                          {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
+                        </p>
                         {canWrite && (
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(transaction)}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(transaction)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
                         )}
                         {canDelete && (
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(transaction.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(transaction.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         )}
                       </div>
                     </div>
 
                     {/* Mobile Layout */}
-                    <div className="md:hidden space-y-3">
-                      {/* Row 1: Icon + Title + Edit Icon */}
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className={`p-2 rounded-full flex-shrink-0 ${transaction.type === "INCOME" ? "bg-green-100" : "bg-red-100"}`}>
-                            {transaction.type === "INCOME" ? (
-                              <ArrowUpRight className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <ArrowDownRight className="h-4 w-4 text-red-600" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              {/* Edição inline mobile */}
-                              {editingDescriptionId === transaction.id && canWrite ? (
-                                <input
-                                  type="text"
-                                  value={editingDescriptionValue}
-                                  onChange={(e) => setEditingDescriptionValue(e.target.value)}
-                                  onBlur={() => handleSaveInlineDescription(transaction.id)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') { e.preventDefault(); handleSaveInlineDescription(transaction.id); }
-                                    if (e.key === 'Escape') { setEditingDescriptionId(null); }
-                                  }}
-                                  disabled={savingDescriptionId === transaction.id}
-                                  className="font-semibold text-base bg-transparent border-b-2 border-primary outline-none min-w-[100px] w-full px-0 py-0.5"
-                                  autoFocus
-                                />
-                              ) : (
-                                <h3
-                                  className={`font-semibold text-base ${canWrite ? 'cursor-pointer active:text-primary' : ''}`}
-                                  onClick={() => {
-                                    if (!canWrite) return;
-                                    setEditingDescriptionId(transaction.id);
-                                    setEditingDescriptionValue(transaction.description);
-                                  }}
-                                >{transaction.description}</h3>
-                              )}
-                              {transaction.attachmentCount > 0 && (
-                                <Paperclip className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                          </div>
+                    <div className="md:hidden flex items-start gap-3">
+                      <div className={`flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-[10px] mt-0.5 ${transaction.type === "INCOME" ? "bg-[#EAF6EF]" : "bg-[#FBECEC]"}`}>
+                        {transaction.type === "INCOME" ? (
+                          <ArrowUpRight className="h-4 w-4" style={{ color: '#1a6b45' }} />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4" style={{ color: '#c0392b' }} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          {editingDescriptionId === transaction.id && canWrite ? (
+                            <input
+                              type="text"
+                              value={editingDescriptionValue}
+                              onChange={(e) => setEditingDescriptionValue(e.target.value)}
+                              onBlur={() => handleSaveInlineDescription(transaction.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') { e.preventDefault(); handleSaveInlineDescription(transaction.id); }
+                                if (e.key === 'Escape') { setEditingDescriptionId(null); }
+                              }}
+                              disabled={savingDescriptionId === transaction.id}
+                              className="font-semibold text-sm bg-transparent border-b-2 border-primary outline-none min-w-[100px] flex-1 px-0 py-0.5"
+                              autoFocus
+                            />
+                          ) : (
+                            <h3
+                              className={`font-semibold text-sm text-[#16161A] truncate flex-1 ${canWrite ? 'cursor-pointer' : ''}`}
+                              onClick={() => { if (!canWrite) return; setEditingDescriptionId(transaction.id); setEditingDescriptionValue(transaction.description); }}
+                            >{transaction.description}</h3>
+                          )}
+                          <p className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color: transaction.type === "INCOME" ? '#1a6b45' : '#c0392b' }}>
+                            {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
+                          </p>
                         </div>
-                        {canWrite && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleEdit(transaction)}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        )}
-                      </div>
-
-                      {/* Row 2: Category Badge + OFX Badge */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {getCategoryHierarchyBadge(transaction)}
-                        {getCreditCardBadge(transaction)}
-                        {!transaction.categoryId && canWrite && (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 active:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 transition-colors">
-                                <Tag className="h-3 w-3" />
-                                Sem categoria
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-64 p-1" align="start" side="top">
-                              <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
-                              <QuickCategoryList
-                                categories={categories || []}
-                                filterType={transaction.type}
-                                onSelect={(catId) => handleSaveQuickCategory(transaction, catId)}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                        {(transaction as any).importOrigin === "OFX" && (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
-                            OFX
-                          </span>
-                        )}
-                        {(transaction as any).bankAccountName && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                            <Landmark className="h-3 w-3" />
-                            {(transaction as any).bankInstitution || (transaction as any).bankAccountName}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Row 3: Dates */}
-                      <p className="text-xs text-muted-foreground">
-                        Vencimento: {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}
-                        {transaction.paymentDate && ` • Pago em: ${format(new Date(transaction.paymentDate), "dd/MM/yyyy", { locale: ptBR })}`}
-                      </p>
-
-                      {/* Row 4: Status + Amount + Delete */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           {getStatusBadge(transaction.status)}
+                          {getCategoryHierarchyBadge(transaction)}
+                          {!transaction.categoryId && canWrite && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#FBF3E0] text-[#7a5c00]">
+                                  <Tag className="h-3 w-3" />Sem categoria
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-1" align="start" side="top">
+                                <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
+                                <QuickCategoryList categories={categories || []} filterType={transaction.type} onSelect={(catId) => handleSaveQuickCategory(transaction, catId)} />
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                          <span className="text-xs text-[#8A8A92]">Venc. {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}</span>
                         </div>
-                        <p className={`text-base font-bold ${transaction.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                          {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
-                        </p>
-                        {canDelete && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleDelete(transaction.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                        )}
+                        <div className="flex items-center gap-1 mt-1">
+                          {canWrite && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}>
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(transaction.id)}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </CardContent>
+                      </div>
+                    </div>
+                  ))}
                 </Card>
-              ))}
+              )}
             </div>
           ) : (
             <Card>
@@ -2348,7 +2305,7 @@ export default function Transactions() {
             <Button
               onClick={handleSaveBulkCategory}
               disabled={bulkCategorySaving || Object.values(bulkCategoryAssignments).every(v => v === '')}
-              className="bg-blue-600 hover:bg-blue-700 w-full"
+              className="bg-[#1a67c2] hover:bg-[#1558a8] w-full"
             >
               {bulkCategorySaving ? "Salvando..." : (
                 <>
@@ -2442,7 +2399,7 @@ export default function Transactions() {
                       : previewAttachment.blobUrl,
                     'PDFViewer', 'width=900,height=700,scrollbars=yes,resizable=yes'
                   )}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-6 py-3 bg-[#1a67c2] text-white rounded-lg hover:bg-[#1558a8] transition-colors"
                 >
                   Abrir PDF em nova janela
                 </button>
@@ -2620,17 +2577,17 @@ function TransactionForm({
               type="button"
               onClick={() => setFormData({ ...formData, creditCardId: formData.creditCardId ? "" : creditCards[0].id.toString(), bankAccountId: "", installments: "1", purchaseDate: "" })}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                formData.creditCardId ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
+                formData.creditCardId ? "bg-[#1a67c2]" : "bg-gray-200 dark:bg-gray-700"
               }`}
             >
-              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white preserve-white shadow transition-transform ${
                 formData.creditCardId ? "translate-x-4" : "translate-x-1"
               }`} />
             </button>
           </div>
 
           {formData.creditCardId ? (
-            <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="space-y-3 p-3 bg-[#EBF3FC] dark:bg-[#1E2D4A]/20 rounded-lg border border-[#BFDBFE] dark:border-[#1E2D4A]">
               {/* Seletor do cartão */}
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Cartão</Label>
@@ -2722,7 +2679,7 @@ function TransactionForm({
               </div>
 
               {/* Info sobre a Data de Vencimento */}
-              <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-300">
+              <div className="flex items-start gap-2 text-xs text-[#1558a8] dark:text-[#93C5FD]">
                 <span>ℹ️</span>
                 <span>
                   A <strong>Data de Vencimento</strong> acima é quando a fatura vence (impacto no caixa).
