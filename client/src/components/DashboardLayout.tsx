@@ -160,193 +160,209 @@ function LoginForm() {
       className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden flex-col items-center justify-center p-12"
       style={{ background: 'linear-gradient(145deg, #0A3270 0%, #1255A8 38%, #1a67c2 68%, #0E4A99 100%)' }}
     >
-      {/* Radial glows */}
-      <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
-        style={{
-          backgroundImage: `
-            radial-gradient(ellipse at 25% 18%, rgba(255,255,255,0.1) 0%, transparent 52%),
-            radial-gradient(ellipse at 75% 82%, rgba(0,0,0,0.22) 0%, transparent 52%),
-            radial-gradient(ellipse at 55% 45%, rgba(26,103,194,0.25) 0%, transparent 60%)
-          `,
-        }}
-      />
+      {/* Large background blobs */}
+      <div className="absolute pointer-events-none" style={{ width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(100,120,255,0.22) 0%, transparent 70%)', top: '-8%', right: '-5%' }} />
+      <div className="absolute pointer-events-none" style={{ width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(80,40,180,0.2) 0%, transparent 70%)', bottom: '-6%', left: '-4%' }} />
+      <div className="absolute pointer-events-none" style={{ width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 70%)', top: '40%', left: '20%' }} />
 
       {/* Decorative rings */}
-      <div className="absolute pointer-events-none" style={{ width: 420, height: 420, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.05)', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
-      <div className="absolute pointer-events-none" style={{ width: 640, height: 640, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.03)', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+      <div className="absolute pointer-events-none" style={{ width: 500, height: 500, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.04)', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
 
-      {/* ── Floating SVG Widgets ── */}
+      {/* ══ FLOATING WIDGETS ══ */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
 
-        {/* Widget 1 — Transaction list (top-left) */}
-        <div className="lf1 absolute" style={{ top: '6%', left: '3%' }}>
-          <div style={{ width: 200, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.18)', padding: '12px 14px', boxShadow: '0 20px 60px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.25)' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Transações</div>
-            {[
-              { icon: '↑', bg: 'rgba(74,222,128,0.25)', color: '#4ADE80', name: 'Salário', cat: 'Renda', amount: '+R$8.500', amtColor: '#4ADE80' },
-              { icon: '↓', bg: 'rgba(248,113,113,0.25)', color: '#F87171', name: 'Aluguel', cat: 'Moradia', amount: '-R$2.200', amtColor: '#F87171' },
-              { icon: '↓', bg: 'rgba(248,113,113,0.25)', color: '#F87171', name: 'Bradesco', cat: 'Cartão', amount: '-R$769,06', amtColor: '#F87171' },
-            ].map((tx, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: i < 2 ? 8 : 0, borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.07)' : 'none', marginBottom: i < 2 ? 8 : 0 }}>
-                <div style={{ width: 26, height: 26, borderRadius: 7, background: tx.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, color: tx.color, fontWeight: 700 }}>{tx.icon}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>{tx.name}</div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>{tx.cat}</div>
-                </div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: tx.amtColor, flexShrink: 0 }}>{tx.amount}</div>
+        {/* ① Line chart — LARGE, top-left, partially off-screen */}
+        <div className="lf2 absolute" style={{ top: '3%', left: '-2%' }}>
+          <div style={{ width: 270, borderRadius: 18, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)', padding: '14px 16px 12px', boxShadow: '0 24px 64px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Patrimônio Total</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'white', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>R$142.580</div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Widget 2 — Bar chart / Monthly spend (top-right) */}
-        <div className="lf3 absolute" style={{ top: '5%', right: '2%' }}>
-          <div style={{ width: 188, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.16)', padding: '12px 14px', boxShadow: '0 16px 50px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Gastos Mensais</div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#4ADE80' }}>↑ 12%</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(74,222,128,0.2)', borderRadius: 20, padding: '3px 8px' }}>
+                <span style={{ fontSize: 10, color: '#4ADE80', fontWeight: 700 }}>↑ 8,4%</span>
+              </div>
             </div>
-            <svg width="160" height="58" viewBox="0 0 160 58">
-              {[
-                { h: 28, x: 0 }, { h: 44, x: 28 }, { h: 34, x: 56 },
-                { h: 50, x: 84 }, { h: 38, x: 112 }, { h: 54, x: 140 },
-              ].map(({ h, x }, i) => (
-                <rect key={i} x={x} y={58 - h} width="19" height={h} rx="4"
-                  fill={i === 5 ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.22)'} />
-              ))}
-              <line x1="0" y1="57.5" x2="160" y2="57.5" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+            <svg width="238" height="64" viewBox="0 0 238 64">
+              <defs>
+                <linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.25)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </linearGradient>
+              </defs>
+              <path d="M0,58 C30,52 45,42 75,36 C100,30 118,44 148,24 C168,10 198,18 238,8 L238,64 L0,64 Z" fill="url(#lg1)" />
+              <path d="M0,58 C30,52 45,42 75,36 C100,30 118,44 148,24 C168,10 198,18 238,8" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="148" cy="24" r="4" fill="white" opacity="0.9" />
+              <circle cx="238" cy="8" r="4" fill="white" />
             </svg>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-              {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'].map(m => (
-                <span key={m} style={{ fontSize: 8, color: 'rgba(255,255,255,0.28)', width: 19, textAlign: 'center', display: 'block' }}>{m}</span>
+          </div>
+        </div>
+
+        {/* ② Bar chart — LARGE, top-right, partially off-right */}
+        <div className="lf4 absolute" style={{ top: '16%', right: '-1%' }}>
+          <div style={{ width: 248, borderRadius: 18, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.16)', padding: '14px 16px 12px', boxShadow: '0 20px 56px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>Receitas x Despesas</div>
+            <svg width="216" height="72" viewBox="0 0 216 72">
+              {[
+                { h: 32, x: 0, g: false }, { h: 48, x: 30, g: false }, { h: 38, x: 60, g: false },
+                { h: 56, x: 90, g: false }, { h: 44, x: 120, g: true }, { h: 62, x: 150, g: true }, { h: 52, x: 180, g: true },
+              ].map(({ h, x, g }, i) => (
+                <rect key={i} x={x} y={72 - h} width="22" height={h} rx="5"
+                  fill={g ? 'rgba(74,222,128,0.75)' : 'rgba(255,255,255,0.22)'} />
               ))}
+              <line x1="0" y1="71.5" x2="216" y2="71.5" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+            </svg>
+            <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(255,255,255,0.3)' }} />
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Despesas</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(74,222,128,0.75)' }} />
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Receitas</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Widget 3 — Credit card (mid-left) */}
-        <div className="lf5 absolute" style={{ top: '40%', left: '1%' }}>
-          <div style={{ width: 210, borderRadius: 16, background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.2)', padding: '16px 18px', boxShadow: '0 20px 60px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ width: 32, height: 24, borderRadius: 5, background: 'rgba(255,255,255,0.28)', position: 'relative', overflow: 'hidden' }}>
-                <svg width="32" height="24" viewBox="0 0 32 24" style={{ position: 'absolute', inset: 0 }}>
-                  <line x1="0" y1="8" x2="32" y2="8" stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
-                  <line x1="0" y1="16" x2="32" y2="16" stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
-                  <line x1="11" y1="0" x2="11" y2="24" stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
-                  <line x1="22" y1="0" x2="22" y2="24" stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
+        {/* ③ Credit card — LARGE, mid-left, partially off-left */}
+        <div className="lf1 absolute" style={{ top: '41%', left: '-3%' }}>
+          <div style={{ width: 262, borderRadius: 20, background: 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.07) 100%)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.22)', padding: '18px 20px 16px', boxShadow: '0 24px 64px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.35)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <div style={{ width: 36, height: 26, borderRadius: 5, background: 'rgba(218,165,32,0.55)', position: 'relative', overflow: 'hidden' }}>
+                <svg width="36" height="26" viewBox="0 0 36 26" style={{ position: 'absolute', inset: 0 }}>
+                  <line x1="0" y1="9" x2="36" y2="9" stroke="rgba(0,0,0,0.15)" strokeWidth="1" />
+                  <line x1="0" y1="17" x2="36" y2="17" stroke="rgba(0,0,0,0.15)" strokeWidth="1" />
+                  <line x1="12" y1="0" x2="12" y2="26" stroke="rgba(0,0,0,0.15)" strokeWidth="1" />
+                  <line x1="24" y1="0" x2="24" y2="26" stroke="rgba(0,0,0,0.15)" strokeWidth="1" />
                 </svg>
               </div>
               <div style={{ display: 'flex' }}>
-                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.32)' }} />
-                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', marginLeft: -9 }} />
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(220,50,50,0.7)' }} />
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,140,0,0.6)', marginLeft: -10 }} />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
               {['••••', '••••', '••••', '3452'].map((p, i) => (
-                <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.72)', letterSpacing: '0.08em' }}>{p}</span>
+                <span key={i} style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.08em' }}>{p}</span>
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Portador</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.88)' }}>DEMO USER</div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>Portador</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>DEMO USER</div>
               </div>
               <div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Validade</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.88)' }}>12/28</div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>Validade</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>12/28</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Widget 4 — Category donut (mid-right) */}
-        <div className="lf2 absolute" style={{ top: '38%', right: '2%' }}>
-          <div style={{ width: 168, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.15)', padding: '12px 14px', boxShadow: '0 16px 50px rgba(0,0,0,0.18)' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Categorias</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {/* Donut — r=22, circ≈138.23 */}
-              <svg width="60" height="60" viewBox="0 0 60 60" style={{ flexShrink: 0 }}>
-                <circle cx="30" cy="30" r="22" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
-                <circle cx="30" cy="30" r="22" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth="10"
-                  strokeDasharray="55.29 82.94" strokeDashoffset="0" transform="rotate(-90 30 30)" />
-                <circle cx="30" cy="30" r="22" fill="none" stroke="rgba(74,222,128,0.7)" strokeWidth="10"
-                  strokeDasharray="41.47 96.76" strokeDashoffset="-55.29" transform="rotate(-90 30 30)" />
-                <circle cx="30" cy="30" r="22" fill="none" stroke="rgba(248,113,113,0.6)" strokeWidth="10"
-                  strokeDasharray="41.47 96.76" strokeDashoffset="-96.76" transform="rotate(-90 30 30)" />
-              </svg>
-              <div style={{ flex: 1 }}>
-                {[
-                  { color: 'rgba(255,255,255,0.65)', label: 'Moradia', pct: '40%' },
-                  { color: 'rgba(74,222,128,0.7)', label: 'Renda', pct: '30%' },
-                  { color: 'rgba(248,113,113,0.6)', label: 'Outros', pct: '30%' },
-                ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: i < 2 ? 6 : 0 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', flex: 1 }}>{item.label}</span>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{item.pct}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Widget 5 — Monthly summary / line chart (bottom-left) */}
-        <div className="lf4 absolute" style={{ bottom: '6%', left: '2%' }}>
-          <div style={{ width: 196, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.16)', padding: '12px 14px', boxShadow: '0 20px 60px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Resumo do Mês</div>
-            <svg width="168" height="52" viewBox="0 0 168 52">
-              <defs>
-                <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.28)" />
-                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-                </linearGradient>
-              </defs>
-              <path d="M0,48 C24,42 34,34 56,28 C78,22 88,30 112,16 C130,6 148,12 168,9 L168,52 L0,52 Z" fill="url(#lineGrad)" />
-              <path d="M0,48 C24,42 34,34 56,28 C78,22 88,30 112,16 C130,6 148,12 168,9" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="112" cy="16" r="3.5" fill="white" opacity="0.85" />
-              <circle cx="168" cy="9" r="3.5" fill="white" opacity="0.95" />
+        {/* ④ Donut chart — STANDALONE circular, mid-right */}
+        <div className="lf6 absolute" style={{ top: '44%', right: '6%' }}>
+          <div style={{ width: 128, height: 128, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}>
+            <svg width="108" height="108" viewBox="0 0 108 108">
+              {/* r=40, circ=251.33 */}
+              <circle cx="54" cy="54" r="40" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="16" />
+              <circle cx="54" cy="54" r="40" fill="none" stroke="rgba(74,222,128,0.8)" strokeWidth="16"
+                strokeDasharray="100.53 150.8" strokeDashoffset="0" transform="rotate(-90 54 54)" />
+              <circle cx="54" cy="54" r="40" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="16"
+                strokeDasharray="75.4 175.93" strokeDashoffset="-100.53" transform="rotate(-90 54 54)" />
+              <circle cx="54" cy="54" r="40" fill="none" stroke="rgba(248,113,113,0.65)" strokeWidth="16"
+                strokeDasharray="75.4 175.93" strokeDashoffset="-175.93" transform="rotate(-90 54 54)" />
+              <text x="54" y="50" textAnchor="middle" fill="white" fontSize="13" fontWeight="800">68%</text>
+              <text x="54" y="63" textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize="8">pago</text>
             </svg>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-              <div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)' }}>Receitas</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#4ADE80' }}>+R$12.5k</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)' }}>Despesas</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#F87171' }}>-R$8.3k</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)' }}>Saldo</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'white' }}>+R$4.2k</div>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Widget 6 — Quick stats (bottom-right) */}
-        <div className="lf6 absolute" style={{ bottom: '8%', right: '2%' }}>
-          <div style={{ width: 170, borderRadius: 14, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.15)', padding: '12px 14px', boxShadow: '0 16px 50px rgba(0,0,0,0.18)' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Relatório</div>
+        {/* ⑤ Transaction list — LARGE, bottom-left */}
+        <div className="lf3 absolute" style={{ bottom: '3%', left: '2%' }}>
+          <div style={{ width: 248, borderRadius: 18, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.16)', padding: '14px 16px', boxShadow: '0 20px 56px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>Últimas Transações</div>
             {[
-              { label: 'Contas pagas', value: '14', icon: '✓', color: '#4ADE80' },
-              { label: 'Pendentes', value: '3', icon: '◉', color: '#FBBF24' },
-              { label: 'Vencidas', value: '1', icon: '✕', color: '#F87171' },
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: i < 2 ? 7 : 0 }}>
-                <div style={{ width: 22, height: 22, borderRadius: 6, background: `${item.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: item.color }}>{item.icon}</div>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', flex: 1 }}>{item.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{item.value}</span>
+              { icon: '↑', bg: 'rgba(74,222,128,0.22)', color: '#4ADE80', name: 'Salário', sub: 'Renda · Bradesco', amount: '+R$8.500', ac: '#4ADE80' },
+              { icon: '↓', bg: 'rgba(248,113,113,0.22)', color: '#F87171', name: 'Aluguel', sub: 'Moradia · Itaú', amount: '-R$2.200', ac: '#F87171' },
+              { icon: '↓', bg: 'rgba(248,113,113,0.22)', color: '#F87171', name: 'Fatura Cartão', sub: 'Cartão · Bradesco', amount: '-R$769,06', ac: '#F87171' },
+              { icon: '↑', bg: 'rgba(74,222,128,0.22)', color: '#4ADE80', name: 'Freelance', sub: 'Renda · Nubank', amount: '+R$3.200', ac: '#4ADE80' },
+            ].map((tx, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, paddingBottom: i < 3 ? 9 : 0, borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.06)' : 'none', marginBottom: i < 3 ? 9 : 0 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: tx.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 13, color: tx.color, fontWeight: 700 }}>{tx.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.88)' }}>{tx.name}</div>
+                  <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>{tx.sub}</div>
+                </div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: tx.ac, flexShrink: 0 }}>{tx.amount}</div>
               </div>
             ))}
           </div>
         </div>
 
+        {/* ⑥ Summary card — MEDIUM, bottom-center-right */}
+        <div className="lf5 absolute" style={{ bottom: '26%', right: '4%' }}>
+          <div style={{ width: 150, borderRadius: 16, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.15)', padding: '12px 14px', boxShadow: '0 14px 44px rgba(0,0,0,0.18)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Resumo</div>
+            {[
+              { label: 'Receitas', val: '+R$12.5k', color: '#4ADE80' },
+              { label: 'Despesas', val: '-R$8.3k', color: '#F87171' },
+              { label: 'Saldo', val: '+R$4.2k', color: 'white' },
+            ].map((s, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: i < 2 ? 6 : 0 }}>
+                <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.5)' }}>{s.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: s.color }}>{s.val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ⑦ Report card — SMALL, bottom-right */}
+        <div className="lf8 absolute" style={{ bottom: '8%', right: '3%' }}>
+          <div style={{ width: 122, borderRadius: 14, background: 'rgba(255,255,255,0.09)', backdropFilter: 'blur(14px)', border: '1px solid rgba(255,255,255,0.13)', padding: '10px 12px', boxShadow: '0 10px 34px rgba(0,0,0,0.16)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Contas</div>
+            {[
+              { label: 'Pagas', val: '14', color: '#4ADE80' },
+              { label: 'Pendentes', val: '3', color: '#FBBF24' },
+              { label: 'Vencidas', val: '1', color: '#F87171' },
+            ].map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: i < 2 ? 5 : 0 }}>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{r.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: r.color }}>{r.val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ⑧ Coin badges — scattered */}
+        {[
+          { top: '36%', left: '28%' },
+          { bottom: '18%', left: '56%' },
+          { top: '8%', left: '54%' },
+        ].map((pos, i) => (
+          <div key={i} className={`lf${i + 1} absolute`} style={pos}>
+            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
+              <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>R$</span>
+            </div>
+          </div>
+        ))}
+
+        {/* ⑨ Lock badge — bottom-right corner */}
+        <div className="lf7 absolute" style={{ bottom: '4%', right: '28%' }}>
+          <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.16)' }}>
+            <svg width="20" height="22" viewBox="0 0 20 22" fill="none">
+              <rect x="2" y="9" width="16" height="12" rx="3" fill="rgba(255,255,255,0.5)" />
+              <path d="M5 9V6a5 5 0 0 1 10 0v3" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="10" cy="15" r="2" fill="rgba(255,255,255,0.9)" />
+            </svg>
+          </div>
+        </div>
+
       </div>
-      {/* ── / Floating Widgets ── */}
+      {/* ══ / FLOATING WIDGETS ══ */}
 
       {/* Main content — centered */}
-      <div className="relative z-10 text-center" style={{ maxWidth: 380 }}>
+      <div className="relative z-10 text-center" style={{ maxWidth: 360 }}>
         <div className="flex justify-center mb-8">
           <img src="/logo-unifique-pro-dark.png" alt="UnifiquePro" style={{ width: 300, height: 'auto' }} />
         </div>
