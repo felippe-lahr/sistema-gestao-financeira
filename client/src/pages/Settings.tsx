@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight, ChevronRight, RotateCcw, EyeOff, QrCode, Barcode, ArrowLeftRight, Banknote, Receipt, Globe, GripVertical } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, Tag, X, Landmark, ArrowRight, ChevronRight, RotateCcw, EyeOff, QrCode, Barcode, ArrowLeftRight, Banknote, Receipt, Globe, GripVertical, Unlink } from "lucide-react";
 import { toast } from "sonner";
 import { DndContext, DragEndEvent, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/core";
 
@@ -507,10 +507,11 @@ function getContrastColor(hex: string): string {
 
 // ---- Subcategory row — draggable ----
 function SubcategoryRow({
-  sub, parentColor, canWrite, canDelete, onEdit, onDelete, onReactivate,
+  sub, parentColor, canWrite, canDelete, onEdit, onDelete, onReactivate, onDetach,
 }: {
   sub: any; parentColor: string; canWrite: boolean; canDelete: boolean;
-  onEdit: (cat: any) => void; onDelete: (id: number) => void; onReactivate: (id: number) => void;
+  onEdit: (cat: any) => void; onDelete: (id: number) => void;
+  onReactivate: (id: number) => void; onDetach: (id: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `cat-${sub.id}`,
@@ -542,9 +543,14 @@ function SubcategoryRow({
         ) : (
           <>
             {canWrite && (
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(sub)}>
-                <Pencil className="h-3 w-3 text-gray-400" />
-              </Button>
+              <>
+                <Button variant="ghost" size="icon" className="h-7 w-7" title="Remover da categoria pai" onClick={() => onDetach(sub.id)}>
+                  <Unlink className="h-3 w-3 text-gray-400 hover:text-orange-500" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(sub)}>
+                  <Pencil className="h-3 w-3 text-gray-400" />
+                </Button>
+              </>
             )}
             {canDelete && (
               <Button variant="ghost" size="icon" className="h-7 w-7" title="Desativar" onClick={() => onDelete(sub.id)}>
@@ -560,11 +566,11 @@ function SubcategoryRow({
 
 // ---- Parent category card — draggable handle + droppable target ----
 function CategoryCard({
-  category, subs, canWrite, canDelete, onCreateSub, onEdit, onDelete, onReactivate,
+  category, subs, canWrite, canDelete, onCreateSub, onEdit, onDelete, onReactivate, onDetach,
 }: {
   category: any; subs: any[]; canWrite: boolean; canDelete: boolean;
   onCreateSub: (cat: any) => void; onEdit: (cat: any) => void;
-  onDelete: (id: number) => void; onReactivate: (id: number) => void;
+  onDelete: (id: number) => void; onReactivate: (id: number) => void; onDetach: (id: number) => void;
 }) {
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `drop-${category.id}`,
@@ -633,7 +639,7 @@ function CategoryCard({
       {subs.length > 0 && (
         <div className="divide-y dark:divide-gray-700 bg-white dark:bg-gray-800">
           {subs.map((sub) => (
-            <SubcategoryRow key={sub.id} sub={sub} parentColor={bgColor} canWrite={canWrite} canDelete={canDelete} onEdit={onEdit} onDelete={onDelete} onReactivate={onReactivate} />
+            <SubcategoryRow key={sub.id} sub={sub} parentColor={bgColor} canWrite={canWrite} canDelete={canDelete} onEdit={onEdit} onDelete={onDelete} onReactivate={onReactivate} onDetach={onDetach} />
           ))}
         </div>
       )}
@@ -762,6 +768,23 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
     );
   };
 
+  const handleDetach = (subId: number) => {
+    const sub = categories?.find((c) => c.id === subId);
+    if (!sub) return;
+    updateMutation.mutate(
+      { id: subId, parentId: null },
+      {
+        onSuccess: () => {
+          utils.categories.listByEntity.invalidate();
+          toast.success(`"${sub.name}" removida da categoria pai e agora é categoria principal.`);
+        },
+        onError: (err) => {
+          toast.error("Erro ao remover subcategoria: " + err.message);
+        },
+      }
+    );
+  };
+
   const handleCreate = () => {
     if (!formData.name.trim()) { toast.error("O nome da categoria é obrigatório"); return; }
     // Se for subcategoria, gera cor automaticamente como tonalidade da categoria pai
@@ -871,7 +894,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
                 {incomeParents.map((cat) => (
                   <CategoryCard key={cat.id} category={cat} subs={getSubcategories(cat.id)} canWrite={canWrite} canDelete={canDelete}
                     onCreateSub={(c) => { setCreatingSubFor(c); setFormData({ name: "", type: c.type, color: c.color || COLOR_PALETTE[0], parentId: c.id.toString() }); setIsCreateOpen(true); }}
-                    onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate({ id })} onReactivate={(id) => reactivateMutation.mutate({ id })}
+                    onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate({ id })} onReactivate={(id) => reactivateMutation.mutate({ id })} onDetach={handleDetach}
                   />
                 ))}
               </div>
@@ -899,7 +922,7 @@ function CategoriesTab({ entityId, canWrite = true, canDelete = true }: { entity
                 {expenseParents.map((cat) => (
                   <CategoryCard key={cat.id} category={cat} subs={getSubcategories(cat.id)} canWrite={canWrite} canDelete={canDelete}
                     onCreateSub={(c) => { setCreatingSubFor(c); setFormData({ name: "", type: c.type, color: c.color || COLOR_PALETTE[0], parentId: c.id.toString() }); setIsCreateOpen(true); }}
-                    onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate({ id })} onReactivate={(id) => reactivateMutation.mutate({ id })}
+                    onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate({ id })} onReactivate={(id) => reactivateMutation.mutate({ id })} onDetach={handleDetach}
                   />
                 ))}
               </div>
