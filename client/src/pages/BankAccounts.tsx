@@ -168,7 +168,7 @@ export default function BankAccounts() {
           </div>
           {canWrite && view === "accounts" && selectedEntityId && (
             <Button
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-[#1a67c2] hover:bg-[#155fa0]"
               onClick={() => {
                 /* sinal para BankAccountsList abrir o sheet */
                 setOpenCreate(c => c + 1);
@@ -190,7 +190,7 @@ export default function BankAccounts() {
               onClick={() => setSelectedEntityId(e.id)}
               className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                 selectedEntityId === e.id
-                  ? "bg-blue-600 text-white shadow-sm"
+                  ? "bg-[#1a67c2] text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               }`}
             >
@@ -416,7 +416,7 @@ function BankAccountsList({
               Adicione sua primeira conta para começar a conciliar extratos.
             </p>
             {canWrite && (
-              <Button className="mt-4 bg-blue-600 hover:bg-blue-700" onClick={() => { resetForm(); setIsCreateOpen(true); }}>
+              <Button className="mt-4 bg-[#1a67c2] hover:bg-[#155fa0]" onClick={() => { resetForm(); setIsCreateOpen(true); }}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Conta Bancária
               </Button>
@@ -766,7 +766,7 @@ function AccountSheet({
             Cancelar
           </Button>
           <Button
-            className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl"
+            className="flex-1 bg-[#1a67c2] hover:bg-[#155fa0] rounded-xl"
             onClick={onSubmit}
             disabled={isPending}
           >
@@ -1174,7 +1174,7 @@ function OfxImportSheet({
                             onClick={() => setDecisionAction(tx.ofxId, "MATCH")}
                             className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
                               action === "MATCH"
-                                ? "bg-blue-600 text-white"
+                                ? "bg-[#1a67c2] text-white"
                                 : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-950 hover:text-blue-700"
                             }`}
                           >
@@ -1263,7 +1263,7 @@ function OfxImportSheet({
                 Voltar
               </Button>
               <Button
-                className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl"
+                className="flex-1 bg-[#1a67c2] hover:bg-[#155fa0] rounded-xl"
                 onClick={handleImport}
                 disabled={importing || decisions.every((d) => d.action === "IGNORE")}
               >
@@ -1282,7 +1282,7 @@ function OfxImportSheet({
             </div>
           )}
           {step === "done" && (
-            <Button className="w-full bg-blue-600 hover:bg-blue-700 rounded-xl" onClick={onClose}>
+            <Button className="w-full bg-[#1a67c2] hover:bg-[#155fa0] rounded-xl" onClick={onClose}>
               Concluir
             </Button>
           )}
