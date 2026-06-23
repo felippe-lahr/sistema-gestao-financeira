@@ -431,7 +431,7 @@ function PaymentMethodsTab({ entityId, canWrite = true, canDelete = true }: { en
                       style={{ background: `linear-gradient(135deg, ${color}dd, ${color}88)` }}
                       onClick={() => setFormData({ ...formData, color })}
                     >
-                      {formData.color === color && <div className="w-2 h-2 rounded-full bg-white shadow-sm" />}
+                      {formData.color === color && <div className="w-2 h-2 rounded-full bg-white preserve-white shadow-sm" />}
                     </button>
                   ))}
                 </div>

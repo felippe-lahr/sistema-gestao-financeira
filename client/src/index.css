@@ -546,3 +546,9 @@
 .dark .hover\:bg-blue-100:hover { background-color: #253A5A !important; }
 .dark .hover\:bg-\[\#EBF3FC\]:hover { background-color: #1E2D4A !important; }
 .dark .hover\:bg-\[\#DBEAFE\]:hover { background-color: #253A5A !important; }
+
+/* ===== Preserved whites =====
+ * Toggle thumbs and small indicators that must stay light even in dark mode.
+ * Apply .preserve-white to any bg-white element that should not go dark.
+ */
+.dark .preserve-white { background-color: #F0F0F6 !important; }
