@@ -479,6 +479,8 @@
  * across all page components. Using !important to beat Tailwind utility specificity.
  */
 .dark .bg-white { background-color: #1C1C24 !important; }
+.dark .bg-\[\#FFFFFF\] { background-color: #1C1C24 !important; }
+.dark .bg-\[\#ffffff\] { background-color: #1C1C24 !important; }
 .dark .bg-gray-50 { background-color: #16161F !important; }
 .dark .bg-gray-100 { background-color: #1E1E2A !important; }
 .dark .bg-gray-200 { background-color: #252532 !important; }

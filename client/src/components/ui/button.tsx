@@ -12,13 +12,13 @@ const buttonVariants = cva(
         default:
           "rounded-[11px] bg-[#1a67c2] text-white py-[10px] px-[17px] hover:brightness-[0.93]",
         destructive:
-          "rounded-[11px] bg-transparent border border-[#E4E4E8] text-[#3C3C44] hover:bg-[#FBECEC] hover:text-[#c0392b] focus-visible:ring-destructive/20",
+          "rounded-[11px] bg-transparent border border-[#E4E4E8] dark:border-[#2C2C3C] text-[#3C3C44] dark:text-[#C4C4D0] hover:bg-[#FBECEC] dark:hover:bg-[#2B0D0D] hover:text-[#c0392b] focus-visible:ring-destructive/20",
         outline:
-          "rounded-[11px] bg-white border border-[#E4E4E8] text-[#3C3C44] py-[10px] px-[15px] hover:bg-[#F6F6F8] hover:border-[#D6D6DC]",
+          "rounded-[11px] bg-white dark:bg-[#252532] border border-[#E4E4E8] dark:border-[#2C2C3C] text-[#3C3C44] dark:text-[#C4C4D0] py-[10px] px-[15px] hover:bg-[#F6F6F8] dark:hover:bg-[#2E2E3E] hover:border-[#D6D6DC] dark:hover:border-[#3C3C50]",
         secondary:
-          "rounded-[11px] bg-[#F3F3F5] text-[#3C3C44] py-[10px] px-[15px] hover:bg-[#ECECEF]",
+          "rounded-[11px] bg-[#F3F3F5] dark:bg-[#252532] text-[#3C3C44] dark:text-[#C4C4D0] py-[10px] px-[15px] hover:bg-[#ECECEF] dark:hover:bg-[#2E2E3E]",
         ghost:
-          "rounded-[11px] py-[10px] px-[15px] hover:bg-[#F1F1F4] hover:text-[#3C3C44]",
+          "rounded-[11px] py-[10px] px-[15px] hover:bg-[#F1F1F4] dark:hover:bg-[#252532] hover:text-[#3C3C44] dark:hover:text-[#C4C4D0]",
         link: "text-[#1a67c2] underline-offset-4 hover:underline",
       },
       size: {
