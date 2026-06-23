@@ -1891,7 +1891,7 @@ export default function Transactions() {
                   <CardContent className="p-0">
                     {/* Header row */}
                     <div
-                      className="flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors hover:bg-[#F9F9FB]"
+                      className="flex items-center gap-3 px-5 py-[25px] cursor-pointer transition-colors hover:bg-[#F9F9FB]"
                       onClick={() => toggleCardExpand(group.cardName)}
                     >
                       {/* Chevron */}
@@ -2064,7 +2064,7 @@ export default function Transactions() {
                       key={transaction.id}
                       className={`transition-colors hover:bg-[#F9F9FB] ${idx < nonCardTransactions.length - 1 ? 'border-b border-[#ECECEF]' : ''}`}
                     >
-                      <div className="px-5 py-[30px]">
+                      <div className="px-5 py-[25px]">
                     {/* Desktop Layout */}
                     <div className="hidden md:flex items-center gap-4">
                       {/* Icon */}
