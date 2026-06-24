@@ -1,2 +1,5 @@
 [phases.setup]
 aptPkgs = ["poppler-utils", "ffmpeg"]
+
+[phases.build]
+cmds = ["rm -rf dist client/.vite && pnpm build"]
