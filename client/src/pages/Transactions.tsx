@@ -1882,6 +1882,9 @@ export default function Transactions() {
               {cardGroups.map((group) => {
                 const CARD_TX_PREVIEW = 3;
                 const allPaid = group.transactions.filter((t: any) => t.status === "PENDING" || t.status === "OVERDUE").length === 0;
+                const hasOverdue = group.transactions.some((t: any) => t.status === "OVERDUE");
+                const cardGroupStatus = allPaid ? "default" : (hasOverdue ? "destructive" : "secondary");
+                const cardGroupLabel = allPaid ? "Pago" : (hasOverdue ? "Vencido" : "Pendente");
                 const isExpanded = expandedCards.has(group.cardName);
                 const showingAll = expandedCardsFull.has(group.cardName);
                 const visibleTx = (!isExpanded || showingAll) ? group.transactions : group.transactions.slice(0, CARD_TX_PREVIEW);
@@ -1917,8 +1920,8 @@ export default function Transactions() {
                       {/* Right side */}
                       <div className="flex items-center gap-3 flex-shrink-0">
                         {/* Status badge */}
-                        <Badge variant={allPaid ? "pago" : "pendente"} className="hidden md:inline-flex">
-                          {allPaid ? "Pago" : "Pendente"}
+                        <Badge variant={cardGroupStatus} className="hidden md:inline-flex">
+                          {cardGroupLabel}
                         </Badge>
                         {/* Amount */}
                         <div className="text-right">
