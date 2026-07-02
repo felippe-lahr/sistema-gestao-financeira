@@ -351,6 +351,22 @@ export async function getTransactionById(transactionId: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * Retorna todas as transações de uma mesma série (parcelas ou recorrência),
+ * identificadas pelo mesmo `parentTransactionId` (o pai aponta para si mesmo
+ * e os filhos apontam para o pai). Ordenadas por data de vencimento.
+ */
+export async function getTransactionSeries(rootId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.parentTransactionId, rootId))
+    .orderBy(transactions.dueDate);
+}
+
 export async function createTransaction(transaction: InsertTransaction) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

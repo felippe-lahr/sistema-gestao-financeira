@@ -706,6 +706,9 @@ export const appRouter = router({
           isRecurring: z.boolean().optional(),
           recurrenceCount: z.number().positive().optional(),
           recurrenceFrequency: z.enum(["DAY", "WEEK", "MONTH", "YEAR"]).optional(),
+          // Escopo da alteração de valor em séries (parcelas/recorrências):
+          // single = só esta | future = esta e as próximas | all = todas
+          updateScope: z.enum(["single", "future", "all"]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -787,7 +790,32 @@ export const appRouter = router({
         }
 
         await db.updateTransaction(input.id, updateData);
-        
+
+        // Propagação do NOVO VALOR para a série (parcelas/recorrência).
+        // "future" = esta e as próximas | "all" = todas. Parcelas já PAGAS
+        // não são alteradas (preserva o histórico do que foi efetivamente pago).
+        if (
+          input.amount !== undefined &&
+          input.updateScope &&
+          input.updateScope !== "single" &&
+          transaction.parentTransactionId != null
+        ) {
+          const newAmountCents = Math.round(input.amount * 100);
+          const currentDue = new Date(transaction.dueDate).getTime();
+          const series = await db.getTransactionSeries(transaction.parentTransactionId);
+          for (const t of series) {
+            if (t.id === input.id) continue; // já atualizada acima
+            if (t.status === "PAID") continue; // não altera parcelas pagas
+            if (
+              input.updateScope === "future" &&
+              new Date(t.dueDate).getTime() < currentDue
+            ) {
+              continue; // "future": apenas vencimentos a partir da atual
+            }
+            await db.updateTransaction(t.id, { amount: newAmountCents });
+          }
+        }
+
         // Se o status foi alterado para PAID, marcar tarefas relacionadas como concluídas
         if (input.status === "PAID") {
           const relatedTasks = await db.getTasksByTransactionId(input.id);
@@ -797,7 +825,7 @@ export const appRouter = router({
             }
           }
         }
-        
+
         return { success: true };
       }),
 

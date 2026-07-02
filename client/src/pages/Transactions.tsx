@@ -33,7 +33,9 @@ export default function Transactions() {
   const [activeTab, setActiveTab] = useState<"all" | "income" | "expense">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
-  
+  // Escopo da edição de valor em séries (parcelas/recorrência)
+  const [updateScope, setUpdateScope] = useState<"single" | "future" | "all">("single");
+
   // Filter states — initialize with current month by default for performance
   const [filterPeriod, setFilterPeriod] = useState<"all" | "month" | "year" | "custom">("month");
   const [filterStartDate, setFilterStartDate] = useState("");
@@ -554,6 +556,7 @@ export default function Transactions() {
   };
   const handleEdit = async (transaction: any) => {
     setEditingTransaction(transaction);
+    setUpdateScope("single");
     setFormData({
       type: transaction.type,
       description: transaction.description,
@@ -610,6 +613,7 @@ export default function Transactions() {
       isRecurring: formData.isRecurring,
       recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
       recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
+      updateScope: editingTransaction.parentTransactionId != null ? updateScope : undefined,
     });
   };
   // Categorizaação rápida inline via Popover — recebe transação e categoryId diretamente
@@ -1139,6 +1143,48 @@ export default function Transactions() {
               utils={utils}
               setPreviewAttachment={setPreviewAttachment}
             />
+
+            {/* Seletor de escopo — só para transações que fazem parte de uma série (parcelas/recorrência) */}
+            {editingTransaction?.parentTransactionId != null && (
+              <div className="mt-6 rounded-lg border border-[#ECECEF] dark:border-gray-700 bg-[#F9F9FB] dark:bg-gray-900/40 p-4">
+                <p className="text-sm font-semibold text-[#16161A] dark:text-gray-100">
+                  Esta transação faz parte de uma série
+                </p>
+                <p className="text-xs text-[#8A8A92] mt-0.5 mb-3">
+                  Ao alterar o valor, aplicar a:
+                </p>
+                <div className="flex flex-col gap-2">
+                  {([
+                    { key: "single", label: "Somente esta", desc: "Altera apenas esta parcela" },
+                    { key: "future", label: "Esta e as próximas", desc: "Ideal para reajustes — não mexe nas já pagas" },
+                    { key: "all", label: "Todas as parcelas", desc: "Aplica a toda a série (exceto as já pagas)" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setUpdateScope(opt.key)}
+                      className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
+                        updateScope === opt.key
+                          ? "border-[#1a67c2] bg-[#EBF3FC] dark:bg-[#1E2D4A]"
+                          : "border-[#ECECEF] dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-[#F9F9FB]"
+                      }`}
+                    >
+                      <span
+                        className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${
+                          updateScope === opt.key ? "border-[#1a67c2]" : "border-[#D6D6DC]"
+                        }`}
+                      >
+                        {updateScope === opt.key && <span className="h-2 w-2 rounded-full bg-[#1a67c2]" />}
+                      </span>
+                      <span className="flex flex-col">
+                        <span className="text-sm font-medium text-[#16161A] dark:text-gray-100">{opt.label}</span>
+                        <span className="text-xs text-[#8A8A92]">{opt.desc}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Fixo */}
