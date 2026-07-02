@@ -797,12 +797,11 @@ export const appRouter = router({
         if (
           input.amount !== undefined &&
           input.updateScope &&
-          input.updateScope !== "single" &&
-          transaction.parentTransactionId != null
+          input.updateScope !== "single"
         ) {
           const newAmountCents = Math.round(input.amount * 100);
           const currentDue = new Date(transaction.dueDate).getTime();
-          const series = await db.getTransactionSeries(transaction.parentTransactionId);
+          const series = await db.getTransactionSeries(transaction);
           for (const t of series) {
             if (t.id === input.id) continue; // já atualizada acima
             if (t.status === "PAID") continue; // não altera parcelas pagas

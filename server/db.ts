@@ -352,18 +352,59 @@ export async function getTransactionById(transactionId: number) {
 }
 
 /**
- * Retorna todas as transações de uma mesma série (parcelas ou recorrência),
- * identificadas pelo mesmo `parentTransactionId` (o pai aponta para si mesmo
- * e os filhos apontam para o pai). Ordenadas por data de vencimento.
+ * Remove o sufixo de numeração de parcela de uma descrição.
+ * Ex: "Plano de saúde (7/12)" → "Plano de saúde"
+ *     "Plano de saúde - Parcela 7/12" → "Plano de saúde"
  */
-export async function getTransactionSeries(rootId: number) {
+export function stripInstallmentSuffix(description: string): string {
+  return description
+    .replace(/\s*\(\d+\/\d+\)\s*$/, "")
+    .replace(/\s*-\s*Parcela\s+\d+\/\d+\s*$/i, "")
+    .trim();
+}
+
+/**
+ * Retorna todas as transações de uma mesma série (parcelas ou recorrência),
+ * ordenadas por data de vencimento.
+ *
+ * Estratégia de agrupamento (robusta para dados legados):
+ *  1. Se houver vínculo explícito via `parentTransactionId`, usa ele.
+ *  2. Caso contrário, cai para correspondência por descrição base
+ *     (mesma entidade + tipo), igual ao fluxo de exclusão de recorrências.
+ */
+export async function getTransactionSeries(transaction: {
+  id: number;
+  entityId: number;
+  type: "INCOME" | "EXPENSE";
+  description: string;
+  parentTransactionId: number | null;
+}) {
   const db = await getDb();
   if (!db) return [];
 
+  // 1. Vínculo explícito
+  if (transaction.parentTransactionId != null) {
+    const byParent = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.parentTransactionId, transaction.parentTransactionId))
+      .orderBy(transactions.dueDate);
+    if (byParent.length > 1) return byParent;
+  }
+
+  // 2. Fallback por descrição base
+  const base = stripInstallmentSuffix(transaction.description);
+  if (!base) return [];
   return db
     .select()
     .from(transactions)
-    .where(eq(transactions.parentTransactionId, rootId))
+    .where(
+      and(
+        eq(transactions.entityId, transaction.entityId),
+        eq(transactions.type, transaction.type),
+        sql`${transactions.description} LIKE ${base + "%"}`
+      )
+    )
     .orderBy(transactions.dueDate);
 }
 

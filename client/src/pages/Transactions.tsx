@@ -592,6 +592,16 @@ export default function Transactions() {
     setIsEditOpen(true);
   };
 
+  // Detecta se a transação faz parte de uma série (parcela/recorrência):
+  // via vínculo explícito (parentTransactionId) ou pelo padrão de numeração
+  // na descrição — ex: "Plano de saúde (7/12)" ou "... - Parcela 7/12".
+  const isPartOfSeries = (t: any): boolean => {
+    if (!t) return false;
+    if (t.parentTransactionId != null) return true;
+    const desc: string = t.description || "";
+    return /\(\d+\/\d+\)\s*$/.test(desc) || / - Parcela \d+\/\d+\s*$/i.test(desc);
+  };
+
   const handleUpdate = () => {
     if (!editingTransaction) return;
 
@@ -613,7 +623,7 @@ export default function Transactions() {
       isRecurring: formData.isRecurring,
       recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
       recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
-      updateScope: editingTransaction.parentTransactionId != null ? updateScope : undefined,
+      updateScope: isPartOfSeries(editingTransaction) ? updateScope : undefined,
     });
   };
   // Categorizaação rápida inline via Popover — recebe transação e categoryId diretamente
@@ -1145,7 +1155,7 @@ export default function Transactions() {
             />
 
             {/* Seletor de escopo — só para transações que fazem parte de uma série (parcelas/recorrência) */}
-            {editingTransaction?.parentTransactionId != null && (
+            {isPartOfSeries(editingTransaction) && (
               <div className="mt-6 rounded-lg border border-[#ECECEF] dark:border-gray-700 bg-[#F9F9FB] dark:bg-gray-900/40 p-4">
                 <p className="text-sm font-semibold text-[#16161A] dark:text-gray-100">
                   Esta transação faz parte de uma série
