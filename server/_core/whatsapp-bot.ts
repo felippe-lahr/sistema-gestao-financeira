@@ -1909,13 +1909,18 @@ async function processIncomingMessage(
     const mimeType = msg.mimeType || mediaData.mimeType;
     const ext = mimeType.includes("png") ? "png" : mimeType.includes("pdf") ? "pdf" : "jpg";
     const filename = msg.filename || `whatsapp-doc-${Date.now()}.${ext}`;
+    // Nome ÚNICO no storage para evitar que dois documentos com o mesmo nome
+    // original (ex: "comprovante.pdf") colidam na mesma chave S3 e um
+    // sobrescreva o outro. O `filename` original é mantido apenas para exibição.
+    const safeName = filename.replace(/[^\w.\-]+/g, "_");
+    const storageFilename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
     let docUrl: string | null = null;
     try {
       if (isS3Configured()) {
-        docUrl = await uploadToS3(mediaData.buffer, filename, mimeType, "whatsapp");
+        docUrl = await uploadToS3(mediaData.buffer, storageFilename, mimeType, "whatsapp");
       } else {
         const { storagePut } = await import("../storage");
-        const { url } = await storagePut(`whatsapp/${filename}`, mediaData.buffer, mimeType);
+        const { url } = await storagePut(`whatsapp/${storageFilename}`, mediaData.buffer, mimeType);
         docUrl = url;
       }
     } catch (uploadError) {
