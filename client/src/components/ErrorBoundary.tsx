@@ -27,6 +27,21 @@ function isTransientDOMError(error: Error): boolean {
   );
 }
 
+/**
+ * Detecta falha ao carregar um chunk JS lazy-loaded. Acontece quando um
+ * novo deploy gera assets com hashes diferentes e o navegador ainda tem o
+ * index.html antigo em cache apontando para arquivos que já não existem.
+ */
+function isChunkLoadError(error: Error): boolean {
+  const msg = error?.message || "";
+  return (
+    msg.includes("Failed to fetch dynamically imported module") ||
+    msg.includes("error loading dynamically imported module") ||
+    msg.includes("Importing a module script failed") ||
+    /Loading chunk \d+ failed/.test(msg)
+  );
+}
+
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -41,7 +56,26 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  componentDidMount() {
+    // Se a app montou sem erro de chunk, limpa o flag para que um futuro
+    // deploy possa novamente recarregar automaticamente.
+    if (!this.state.hasError) {
+      sessionStorage.removeItem("chunk-reload-attempt");
+    }
+  }
+
   componentDidCatch(error: Error) {
+    // Chunk desatualizado após novo deploy: recarregar 1x para pegar o
+    // index.html novo. Guarda em sessionStorage para evitar loop infinito.
+    if (isChunkLoadError(error)) {
+      const RELOAD_FLAG = "chunk-reload-attempt";
+      if (!sessionStorage.getItem(RELOAD_FLAG)) {
+        sessionStorage.setItem(RELOAD_FLAG, "1");
+        window.location.reload();
+        return;
+      }
+    }
+
     // Se for erro de DOM transiente, limpar resíduos do driver.js e forçar re-render
     if (isTransientDOMError(error)) {
       // Remover overlays do driver.js que possam ter ficado no DOM
