@@ -643,6 +643,18 @@ export default function Transactions() {
     }
   };
 
+  // Categoria do cartão de crédito como um todo (dimensão separada da
+  // categoria de cada transação). Usada para relatórios de gasto por cartão.
+  const handleSaveCardCategory = async (cardId: number, categoryId: number) => {
+    try {
+      await utils.client.creditCards.update.mutate({ id: cardId, categoryId });
+      utils.creditCards.listByEntity.invalidate();
+      toast.success("Categoria do cartão atualizada!");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao atualizar categoria do cartão");
+    }
+  };
+
   // Função para salvar a descrição editada inline
   const handleSaveInlineDescription = async (transactionId: number) => {
     const newDescription = editingDescriptionValue.trim();
@@ -1972,6 +1984,44 @@ export default function Transactions() {
                             <> · Vence {format(new Date(group.transactions[0].dueDate), "dd/MM/yyyy", { locale: ptBR })}</>
                           )}
                         </p>
+                        {/* Categoria do cartão (dimensão do cartão como um todo) */}
+                        {group.cardId && (() => {
+                          const cardObj = creditCards?.find((c: any) => c.id === group.cardId);
+                          const cardCat = cardObj?.categoryId ? categories?.find((c: any) => c.id === cardObj.categoryId) : null;
+                          return (
+                            <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                              {canWrite ? (
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-80 ${cardCat ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300' : 'bg-[#FBF3E0] text-[#7a5c00]'}`}>
+                                      {cardCat ? (
+                                        <>
+                                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cardCat.color || '#6B7280' }} />
+                                          {cardCat.name}
+                                        </>
+                                      ) : (
+                                        <><Tag className="h-3 w-3" />Definir categoria do cartão</>
+                                      )}
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-64 p-1" align="start">
+                                    <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Categoria do cartão</p>
+                                    <QuickCategoryList
+                                      categories={categories || []}
+                                      filterType="EXPENSE"
+                                      onSelect={(catId) => handleSaveCardCategory(group.cardId, catId)}
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              ) : cardCat ? (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cardCat.color || '#6B7280' }} />
+                                  {cardCat.name}
+                                </span>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
                       </div>
                       {/* Right side */}
                       <div className="flex items-center gap-3 flex-shrink-0">

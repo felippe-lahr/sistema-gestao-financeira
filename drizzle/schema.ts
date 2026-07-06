@@ -794,6 +794,10 @@ export const creditCards = pgTable("credit_cards", {
   name: varchar("name", { length: 255 }).notNull(),
   brand: cardBrandEnum("brand").default("OTHER").notNull(),
   lastFourDigits: varchar("lastFourDigits", { length: 4 }),
+  // Categoria (geralmente pai, ex: "Cartão de Crédito") atribuída ao cartão
+  // como um todo — permite relatórios de gasto por cartão sem alterar a
+  // categoria individual de cada transação.
+  categoryId: integer("categoryId"),
   creditLimit: integer("creditLimit").default(0).notNull(),
   closingDay: integer("closingDay").default(1).notNull(),
   dueDay: integer("dueDay").default(10).notNull(),

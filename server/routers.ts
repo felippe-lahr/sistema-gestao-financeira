@@ -2639,6 +2639,7 @@ export const appRouter = router({
         closingDay: z.number().min(1).max(31).default(1),
         dueDay: z.number().min(1).max(31).default(10),
         color: z.string().default("#7C3AED"),
+        categoryId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
@@ -2652,6 +2653,7 @@ export const appRouter = router({
           name: input.name,
           brand: input.brand,
           lastFourDigits: input.lastFourDigits,
+          categoryId: input.categoryId ?? null,
           creditLimit: Math.round(input.creditLimit * 100),
           closingDay: input.closingDay,
           dueDay: input.dueDay,
@@ -2670,6 +2672,7 @@ export const appRouter = router({
         closingDay: z.number().min(1).max(31).optional(),
         dueDay: z.number().min(1).max(31).optional(),
         color: z.string().optional(),
+        categoryId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input }) => {
         const dbInstance = await getDb();
@@ -2684,6 +2687,7 @@ export const appRouter = router({
         if (input.closingDay !== undefined) updates.closingDay = input.closingDay;
         if (input.dueDay !== undefined) updates.dueDay = input.dueDay;
         if (input.color !== undefined) updates.color = input.color;
+        if (input.categoryId !== undefined) updates.categoryId = input.categoryId;
         const [updated] = await dbInstance.update(creditCards).set(updates).where(eq(creditCards.id, input.id)).returning();
         return updated;
       }),

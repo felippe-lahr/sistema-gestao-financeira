@@ -182,7 +182,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   const [pdfPassword, setPdfPassword] = useState<string>("");
   const [pdfPasswordRequired, setPdfPasswordRequired] = useState(false);
   const [pdfWrongPassword, setPdfWrongPassword] = useState(false);
-  const { data: categories } = trpc.categories.listByEntity.useQuery({ entityId }, { enabled: pdfSheetOpen });
+  const { data: categories } = trpc.categories.listByEntity.useQuery({ entityId }, { enabled: pdfSheetOpen || sheetOpen });
   const [form, setForm] = useState({
     name: "",
     brand: "OTHER" as string,
@@ -191,6 +191,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     closingDay: "1",
     dueDay: "10",
     color: "#7C3AED",
+    categoryId: "",
   });
   const { data: cards, isLoading } = trpc.creditCards.listByEntity.useQuery({ entityId });
   const createMutation = trpc.creditCards.create.useMutation({
@@ -225,7 +226,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
     deactivateMutation.mutate({ id: deleteDialog.cardId, deleteTransactions });
   }
   function resetForm() {
-    setForm({ name: "", brand: "OTHER", lastFourDigits: "", creditLimit: "", closingDay: "1", dueDay: "10", color: "#7C3AED" });
+    setForm({ name: "", brand: "OTHER", lastFourDigits: "", creditLimit: "", closingDay: "1", dueDay: "10", color: "#7C3AED", categoryId: "" });
   }
   function openCreate() {
     setEditingCard(null);
@@ -242,6 +243,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
       closingDay: String(card.closingDay),
       dueDay: String(card.dueDay),
       color: card.color ?? "#7C3AED",
+      categoryId: card.categoryId ? String(card.categoryId) : "",
     });
     setSheetOpen(true);
   }
@@ -258,6 +260,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
         closingDay: Number(form.closingDay),
         dueDay: Number(form.dueDay),
         color: form.color,
+        categoryId: form.categoryId ? Number(form.categoryId) : null,
       });
     } else {
       createMutation.mutate({
@@ -269,6 +272,7 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
         closingDay: Number(form.closingDay),
         dueDay: Number(form.dueDay),
         color: form.color,
+        categoryId: form.categoryId ? Number(form.categoryId) : null,
       });
     }
   }
@@ -671,6 +675,17 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
                   />
                 ))}
               </div>
+            </div>
+            {/* Categoria do cartão (dimensão do cartão como um todo, p/ relatórios) */}
+            <div className="space-y-1.5">
+              <Label>Categoria do Cartão <span className="text-xs text-muted-foreground font-normal">(opcional)</span></Label>
+              <CategorySelect
+                categories={(categories || []).filter((c: any) => c.type === "EXPENSE" && c.isActive !== false)}
+                value={form.categoryId || ""}
+                onValueChange={(v) => setForm({ ...form, categoryId: v })}
+                placeholder="Ex: Cartão de Crédito"
+              />
+              <p className="text-xs text-muted-foreground">Usada para agrupar o gasto total do cartão nos relatórios. Não altera a categoria de cada transação.</p>
             </div>
             </div>
             {/* Footer Fixo */}
