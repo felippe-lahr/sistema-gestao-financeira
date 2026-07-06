@@ -817,7 +817,7 @@ export default function Transactions() {
   // Mutation para pagar fatura do cartão
   const payInvoiceMutation = trpc.creditCards.payInvoice.useMutation({
     onSuccess: (data) => {
-      toast.success(`Fatura paga com sucesso! ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(data.totalAmount / 100)} debitados da conta.`);
+      toast.success(`Fatura marcada como paga! ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(data.totalAmount / 100)} — transações do cartão atualizadas.`);
       setPayInvoiceSheet({ open: false, cardName: "", cardId: null, total: 0, pendingCount: 0, invoiceTotal: null });
       setPayInvoiceBankAccountId("");
       utils.transactions.listByEntity.invalidate();

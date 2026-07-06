@@ -2861,24 +2861,11 @@ export const appRouter = router({
           .limit(1);
         const savedInvoiceTotal = existingInvoiceForTotal[0]?.invoiceTotal;
         const totalAmount = savedInvoiceTotal != null ? savedInvoiceTotal : calculatedTotal;
-        const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-        // Criar transação de despesa na conta bancária
-        const paymentDescription = `Pagamento Fatura ${card.name} - ${MONTH_NAMES[input.month - 1]}/${input.year}`;
-        const paymentTxId = await db.createTransaction({
-          entityId: card.entityId,
-          type: "EXPENSE",
-          description: paymentDescription,
-          amount: totalAmount,
-          dueDate: new Date(),
-          paymentDate: new Date(),
-          status: "PAID",
-          bankAccountId: input.bankAccountId,
-          categoryId: null,
-          paymentMethodId: null,
-          isRecurring: false,
-          recurrencePattern: null,
-          notes: `Pagamento automático de fatura do cartão ${card.name}`,
-        });
+        // NÃO cria transação avulsa de pagamento na conta bancária: o débito
+        // real da fatura é trazido pela conciliação do extrato OFX (importado
+        // como nova transação ou conciliado com uma existente). Criar aqui
+        // geraria uma duplicata. Registramos apenas de qual conta a fatura foi
+        // paga (paidFromAccountId) para apoiar a conciliação.
         // Marcar todas as transações do cartão naquele mês como PAID
         await dbInstance.execute(
           sqlTag`UPDATE transactions SET status = 'PAID', "paymentDate" = NOW(), "updatedAt" = NOW() WHERE "creditCardId" = ${input.cardId} AND "dueDate" >= ${startDate} AND "dueDate" <= ${endDate} AND status IN ('PENDING', 'OVERDUE')`
@@ -2905,7 +2892,7 @@ export const appRouter = router({
             paidFromAccountId: input.bankAccountId,
           });
         }
-        return { success: true, paymentTxId, totalAmount };
+        return { success: true, totalAmount };
       }),
 
     getInvoiceGroups: protectedProcedure

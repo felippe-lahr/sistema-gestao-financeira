@@ -1099,7 +1099,7 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
   const [payBankAccountId, setPayBankAccountId] = useState<string>("");
   const payInvoiceMutation = trpc.creditCards.payInvoice.useMutation({
     onSuccess: (data) => {
-      toast.success(`Fatura paga com sucesso! ${formatCurrency(data.totalAmount)} debitados da conta.`);
+      toast.success(`Fatura marcada como paga! ${formatCurrency(data.totalAmount)} — transações do cartão atualizadas.`);
       setPaySheet({ open: false, invoice: null });
       setPayBankAccountId("");
       utils.creditCards.getSummary.invalidate({ cardId: card.id });
