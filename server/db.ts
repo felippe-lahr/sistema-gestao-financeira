@@ -1194,6 +1194,67 @@ export async function getCreditCardSpending(entityId: number, startDate?: Date, 
     .sort((a, b) => b.total - a.total);
 }
 
+/**
+ * Encontra grupos de parcelas DUPLICADAS de cartão de crédito na entidade.
+ * Uma duplicata = mesmo cartão + descrição base + parcela (X/Y) + valor.
+ * (Datas diferentes atribuídas pela IA não impedem a detecção.)
+ * Mantém a transação mais antiga (menor id) e sugere remover as demais.
+ * Apenas LISTA — não remove nada.
+ */
+export async function findDuplicateInstallments(entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT t.id, t.description, t.amount, t."dueDate", t.status, t."createdAt",
+           t."creditCardId" AS "cardId", cc.name AS "cardName", cc.color AS "cardColor"
+    FROM transactions t
+    LEFT JOIN credit_cards cc ON cc.id = t."creditCardId"
+    WHERE t."entityId" = ${entityId} AND t."creditCardId" IS NOT NULL
+    ORDER BY t.id ASC
+  `);
+  const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+
+  const groups = new Map<string, any>();
+  for (const r of rows) {
+    const m = String(r.description || "").match(/\((\d+)\/(\d+)\)\s*$/);
+    if (!m) continue;
+    const base = String(r.description).replace(/\s*\(\d+\/\d+\)\s*$/, "").trim();
+    const key = `${r.cardId}|${base.toLowerCase()}|${m[1]}/${m[2]}|${r.amount}`;
+    const g = groups.get(key) || {
+      key,
+      cardId: Number(r.cardId),
+      cardName: r.cardName || `Cartão ${r.cardId}`,
+      cardColor: r.cardColor || "#7C3AED",
+      baseName: base,
+      installment: `${m[1]}/${m[2]}`,
+      amount: Number(r.amount),
+      transactions: [] as any[],
+    };
+    g.transactions.push({
+      id: Number(r.id),
+      description: r.description,
+      amount: Number(r.amount),
+      dueDate: r.dueDate,
+      status: r.status,
+      createdAt: r.createdAt,
+    });
+    groups.set(key, g);
+  }
+
+  return Array.from(groups.values())
+    .filter((g) => g.transactions.length > 1)
+    .map((g) => {
+      const sorted = [...g.transactions].sort((a, b) => a.id - b.id);
+      return {
+        ...g,
+        transactions: sorted,
+        keepId: sorted[0].id,
+        removeIds: sorted.slice(1).map((t) => t.id),
+      };
+    });
+}
+
 export async function getCategoryExpensesByStatus(entityId: number, startDate?: Date, endDate?: Date) {
   const db = await getDb();
   if (!db) return [];

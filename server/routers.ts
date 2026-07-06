@@ -2737,6 +2737,31 @@ export const appRouter = router({
         const count = rows[0] ? Number(rows[0].count) : 0;
         return { count };
       }),
+
+    // Lista grupos de parcelas duplicadas (mesmo cartão + base + X/Y + valor).
+    // Apenas lista — não remove nada.
+    findDuplicates: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        // Valores retornados em centavos (o frontend usa formatCurrency, que divide por 100)
+        return db.findDuplicateInstallments(input.entityId);
+      }),
+
+    // Remove transações duplicadas por id (após confirmação do usuário).
+    removeDuplicates: protectedProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1) }))
+      .mutation(async ({ input, ctx }) => {
+        let removed = 0;
+        for (const id of input.ids) {
+          const t = await db.getTransactionById(id);
+          if (!t) continue;
+          await requireEntityAccess(t.entityId, ctx.user.id, "EDITOR");
+          await db.deleteTransaction(id);
+          removed++;
+        }
+        return { removed };
+      }),
     getSummary: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {

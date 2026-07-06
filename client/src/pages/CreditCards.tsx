@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import {
   Upload,
   Check,
   Star,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -182,6 +183,29 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   const [pdfPassword, setPdfPassword] = useState<string>("");
   const [pdfPasswordRequired, setPdfPasswordRequired] = useState(false);
   const [pdfWrongPassword, setPdfWrongPassword] = useState(false);
+  // Revisão de duplicatas de parcelas
+  const [dupSheetOpen, setDupSheetOpen] = useState(false);
+  const [selectedRemoveIds, setSelectedRemoveIds] = useState<Set<number>>(new Set());
+  const { data: duplicateGroups, isLoading: dupLoading } = trpc.creditCards.findDuplicates.useQuery(
+    { entityId },
+    { enabled: dupSheetOpen }
+  );
+  useEffect(() => {
+    if (duplicateGroups) {
+      // Pré-selecionar todas as sugestões de remoção
+      setSelectedRemoveIds(new Set(duplicateGroups.flatMap((g: any) => g.removeIds)));
+    }
+  }, [duplicateGroups]);
+  const removeDuplicatesMutation = trpc.creditCards.removeDuplicates.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.removed} transação(ões) duplicada(s) removida(s).`);
+      utils.creditCards.findDuplicates.invalidate({ entityId });
+      utils.creditCards.listByEntity.invalidate({ entityId });
+      setDupSheetOpen(false);
+    },
+    onError: (err) => toast.error(err.message || "Erro ao remover duplicatas"),
+  });
+
   const { data: categories } = trpc.categories.listByEntity.useQuery({ entityId }, { enabled: pdfSheetOpen || sheetOpen });
   const [form, setForm] = useState({
     name: "",
@@ -550,8 +574,17 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   }
   return (
     <>
-      {/* Botão de importar fatura */}
-      <div className="flex justify-end mb-2">
+      {/* Botões de ação */}
+      <div className="flex justify-end gap-2 mb-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDupSheetOpen(true)}
+          className="flex items-center gap-2"
+        >
+          <Copy className="h-4 w-4" />
+          Verificar duplicatas
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -1099,6 +1132,105 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Sheet de revisão de duplicatas */}
+      <Sheet open={dupSheetOpen} onOpenChange={setDupSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0">
+          <div className="px-6 py-5 border-b">
+            <SheetTitle className="text-xl font-bold flex items-center gap-2">
+              <Copy className="h-5 w-5" /> Verificar duplicatas
+            </SheetTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Parcelas repetidas (mesma parcela e valor no mesmo cartão). Revise antes de remover — nada é apagado sem sua confirmação.
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            {dupLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
+              </div>
+            ) : !duplicateGroups || duplicateGroups.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <CheckCircle2 className="h-12 w-12 text-green-500 mb-3" />
+                <p className="font-medium">Nenhuma duplicata encontrada</p>
+                <p className="text-sm text-muted-foreground">Suas parcelas de cartão estão sem repetições.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {duplicateGroups.map((g: any) => (
+                  <div key={g.key} className="rounded-lg border border-border overflow-hidden">
+                    <div className="px-3 py-2 bg-muted/40 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: g.cardColor }} />
+                        <span className="text-sm font-semibold truncate">{g.baseName} ({g.installment})</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{g.cardName}</span>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {g.transactions.map((t: any) => {
+                        const isKeep = t.id === g.keepId;
+                        const checked = selectedRemoveIds.has(t.id);
+                        return (
+                          <label
+                            key={t.id}
+                            className={`flex items-center gap-3 px-3 py-2.5 text-sm ${isKeep ? "bg-green-50/50 dark:bg-green-900/10" : "cursor-pointer hover:bg-muted/30"}`}
+                          >
+                            {isKeep ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-green-600 dark:text-green-400 w-16 flex-shrink-0">
+                                <Check className="h-3 w-3" /> Manter
+                              </span>
+                            ) : (
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setSelectedRemoveIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(t.id)) next.delete(t.id); else next.add(t.id);
+                                    return next;
+                                  });
+                                }}
+                                className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 flex-shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate">{t.description}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Venc. {t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy", { locale: ptBR }) : "-"}
+                              </p>
+                            </div>
+                            <span className="text-sm font-semibold tabular-nums flex-shrink-0">{formatCurrency(t.amount)}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {duplicateGroups && duplicateGroups.length > 0 && (
+            <div className="border-t px-6 py-4 flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">
+                {selectedRemoveIds.size} selecionada(s) para remover
+              </span>
+              <Button
+                variant="destructive"
+                disabled={selectedRemoveIds.size === 0 || removeDuplicatesMutation.isPending}
+                onClick={() => removeDuplicatesMutation.mutate({ ids: Array.from(selectedRemoveIds) })}
+              >
+                {removeDuplicatesMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Removendo...</>
+                ) : (
+                  <><Trash2 className="h-4 w-4 mr-2" /> Remover selecionadas</>
+                )}
+              </Button>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
