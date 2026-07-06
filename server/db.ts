@@ -1118,6 +1118,53 @@ export async function getCategoryDistribution(entityId: number, startDate?: Date
   }));
 }
 
+/**
+ * Gasto por cartão de crédito no período, com a categoria atribuída ao cartão.
+ * Inclui todas as transações do cartão no período (por dueDate), independente
+ * do status — reflete o gasto real da fatura, mesmo antes de paga.
+ * O agrupamento por categoria do cartão é feito no frontend.
+ */
+export async function getCreditCardSpending(entityId: number, startDate?: Date, endDate?: Date) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const now = new Date();
+  const start = startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  const result = await db.execute(sql`
+    SELECT
+      t."creditCardId" AS "cardId",
+      cc.name AS "cardName",
+      cc.color AS "cardColor",
+      cc."categoryId" AS "categoryId",
+      cat.name AS "categoryName",
+      cat.color AS "categoryColor",
+      COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN -t.amount ELSE t.amount END), 0) AS "total"
+    FROM transactions t
+    LEFT JOIN credit_cards cc ON cc.id = t."creditCardId"
+    LEFT JOIN categories cat ON cat.id = cc."categoryId"
+    WHERE t."entityId" = ${entityId}
+      AND t."creditCardId" IS NOT NULL
+      AND t."dueDate" >= ${start.toISOString()}
+      AND t."dueDate" <= ${end.toISOString()}
+    GROUP BY t."creditCardId", cc.name, cc.color, cc."categoryId", cat.name, cat.color
+    ORDER BY "total" DESC
+  `);
+  const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+  return rows
+    .map((r) => ({
+      cardId: Number(r.cardId),
+      cardName: r.cardName || `Cartão ${r.cardId}`,
+      cardColor: r.cardColor || "#7C3AED",
+      categoryId: r.categoryId != null ? Number(r.categoryId) : null,
+      categoryName: r.categoryName || null,
+      categoryColor: r.categoryColor || null,
+      total: Number(r.total),
+    }))
+    .filter((r) => r.total !== 0);
+}
+
 export async function getCategoryExpensesByStatus(entityId: number, startDate?: Date, endDate?: Date) {
   const db = await getDb();
   if (!db) return [];

@@ -4,7 +4,8 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Clock, Calendar, Filter, FileSpreadsheet, FileText, Download, X } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Clock, Calendar, Filter, FileSpreadsheet, FileText, Download, X, CreditCard } from "lucide-react";
+import { motion } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +109,26 @@ export default function EntityDashboard() {
     { entityId: entityId!, startDate, endDate },
     { enabled: !!entityId }
   );
+
+  const { data: creditCardSpending, isLoading: creditCardSpendingLoading } = trpc.dashboard.creditCardSpending.useQuery(
+    { entityId: entityId!, startDate, endDate },
+    { enabled: !!entityId }
+  );
+
+  // Derivados do gasto por cartão de crédito
+  const ccTotal = (creditCardSpending || []).reduce((s: number, c: any) => s + c.total, 0);
+  const ccMax = Math.max(1, ...(creditCardSpending || []).map((c: any) => c.total));
+  const ccByCategory = (() => {
+    const map = new Map<string, { name: string; color: string; total: number }>();
+    for (const c of creditCardSpending || []) {
+      const key = c.categoryName || "Sem categoria do cartão";
+      const color = c.categoryColor || c.cardColor || "#7C3AED";
+      const cur = map.get(key) || { name: key, color, total: 0 };
+      cur.total += c.total;
+      map.set(key, cur);
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  })();
   
   const { data: recentTransactions, isLoading: transactionsLoading } = trpc.dashboard.recentTransactions.useQuery(
     { entityId: entityId!, limit: 10, startDate, endDate },
@@ -757,6 +778,117 @@ export default function EntityDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gastos por Cartão de Crédito */}
+      {(creditCardSpendingLoading || (creditCardSpending && creditCardSpending.length > 0)) && (
+        <Card className="flex flex-col overflow-hidden">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="flex items-center justify-center h-8 w-8 rounded-lg bg-[#EBF3FC] dark:bg-[#1E2D4A]">
+                    <CreditCard className="h-4 w-4 text-[#1a67c2] dark:text-[#93C5FD]" />
+                  </span>
+                  Gastos por Cartão de Crédito
+                </CardTitle>
+                <CardDescription>{getPeriodDescription()}</CardDescription>
+              </div>
+              <div className="text-left sm:text-right">
+                <p className="text-xs text-muted-foreground">Total no período</p>
+                <p className="text-2xl font-bold tabular-nums" style={{ color: "#c0392b" }}>{formatCurrency(ccTotal)}</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {creditCardSpendingLoading ? (
+              <Skeleton className="h-64 w-full" />
+            ) : (
+              <div className="grid gap-6 lg:grid-cols-5 items-center">
+                {/* Donut por categoria do cartão */}
+                <div className="lg:col-span-2 relative h-[240px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={ccByCategory}
+                        dataKey="total"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="62%"
+                        outerRadius="90%"
+                        paddingAngle={ccByCategory.length > 1 ? 3 : 0}
+                        stroke="none"
+                        animationBegin={0}
+                        animationDuration={900}
+                      >
+                        {ccByCategory.map((entry, index) => (
+                          <Cell key={`cc-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload[0]) {
+                            const d: any = payload[0].payload;
+                            const pct = ccTotal > 0 ? ((d.total / ccTotal) * 100).toFixed(1) : "0";
+                            return (
+                              <div className="bg-card border border-border rounded-lg px-3 py-2 text-sm shadow-md">
+                                <p className="font-semibold">{d.name}</p>
+                                <p className="tabular-nums" style={{ color: d.color }}>{formatCurrency(d.total)}</p>
+                                <p className="text-muted-foreground text-xs">{pct}% do total</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Centro do donut */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-xs text-muted-foreground">Cartões</span>
+                    <span className="text-lg font-bold tabular-nums">{creditCardSpending?.length ?? 0}</span>
+                  </div>
+                </div>
+
+                {/* Barras animadas por cartão */}
+                <div className="lg:col-span-3 space-y-3">
+                  {[...(creditCardSpending || [])].map((c: any, i: number) => (
+                    <motion.div
+                      key={c.cardId}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.06, duration: 0.35, ease: "easeOut" }}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.cardColor }} />
+                          <span className="text-sm font-medium truncate">{c.cardName}</span>
+                          {c.categoryName && (
+                            <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex-shrink-0">
+                              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: c.categoryColor || c.cardColor }} />
+                              {c.categoryName}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold tabular-nums flex-shrink-0">{formatCurrency(c.total)}</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full"
+                          style={{ backgroundColor: c.cardColor }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.max(2, (c.total / ccMax) * 100)}%` }}
+                          transition={{ delay: 0.15 + i * 0.06, duration: 0.6, ease: "easeOut" }}
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Débitos Mensais por Categoria */}
       <Card className="flex flex-col">

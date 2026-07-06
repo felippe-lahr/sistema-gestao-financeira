@@ -959,8 +959,20 @@ export const appRouter = router({
         }));
       }),
 
+    creditCardSpending: protectedProcedure
+      .input(z.object({
+        entityId: z.number(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
+        const data = await db.getCreditCardSpending(input.entityId, input.startDate, input.endDate);
+        return data.map((d) => ({ ...d, total: d.total / 100 }));
+      }),
+
     monthlyCategoryExpenses: protectedProcedure
-      .input(z.object({ 
+      .input(z.object({
         entityId: z.number(),
         startDate: z.date().optional(),
         endDate: z.date().optional(),
