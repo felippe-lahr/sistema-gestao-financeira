@@ -1120,8 +1120,11 @@ export async function getCategoryDistribution(entityId: number, startDate?: Date
 
 /**
  * Gasto por cartão de crédito no período, com a categoria atribuída ao cartão.
- * Inclui todas as transações do cartão no período (por dueDate), independente
- * do status — reflete o gasto real da fatura, mesmo antes de paga.
+ *
+ * Valor considerado: SEMPRE o total real da fatura (invoiceTotal, extraído do
+ * PDF/CSV) quando disponível para aquele mês/ano; só cai para a soma calculada
+ * das transações quando não há invoiceTotal salvo. Isso evita que duplicatas
+ * de parcelas recorrentes (datas divergentes da IA) inflem o relatório.
  * O agrupamento por categoria do cartão é feito no frontend.
  */
 export async function getCreditCardSpending(entityId: number, startDate?: Date, endDate?: Date) {
@@ -1132,7 +1135,8 @@ export async function getCreditCardSpending(entityId: number, startDate?: Date, 
   const start = startDate || new Date(now.getFullYear(), now.getMonth(), 1);
   const end = endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-  const result = await db.execute(sql`
+  // 1. Soma calculada por cartão + mês/ano (fallback quando não há total do PDF)
+  const perMonth = await db.execute(sql`
     SELECT
       t."creditCardId" AS "cardId",
       cc.name AS "cardName",
@@ -1140,7 +1144,9 @@ export async function getCreditCardSpending(entityId: number, startDate?: Date, 
       cc."categoryId" AS "categoryId",
       cat.name AS "categoryName",
       cat.color AS "categoryColor",
-      COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN -t.amount ELSE t.amount END), 0) AS "total"
+      CAST(EXTRACT(YEAR FROM t."dueDate") AS INTEGER) AS "yr",
+      CAST(EXTRACT(MONTH FROM t."dueDate") AS INTEGER) AS "mo",
+      COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN -t.amount ELSE t.amount END), 0) AS "calculated"
     FROM transactions t
     LEFT JOIN credit_cards cc ON cc.id = t."creditCardId"
     LEFT JOIN categories cat ON cat.id = cc."categoryId"
@@ -1148,21 +1154,44 @@ export async function getCreditCardSpending(entityId: number, startDate?: Date, 
       AND t."creditCardId" IS NOT NULL
       AND t."dueDate" >= ${start.toISOString()}
       AND t."dueDate" <= ${end.toISOString()}
-    GROUP BY t."creditCardId", cc.name, cc.color, cc."categoryId", cat.name, cat.color
-    ORDER BY "total" DESC
+    GROUP BY t."creditCardId", cc.name, cc.color, cc."categoryId", cat.name, cat.color, "yr", "mo"
   `);
-  const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
-  return rows
-    .map((r) => ({
-      cardId: Number(r.cardId),
+  const monthRows = (Array.isArray(perMonth) ? perMonth : ((perMonth as any).rows ?? [])) as any[];
+
+  // 2. invoiceTotal salvo (valor real do PDF/CSV) por cartão + mês/ano
+  const invRes = await db.execute(sql`
+    SELECT "creditCardId" AS "cardId", year AS "yr", month AS "mo", "invoiceTotal"
+    FROM credit_card_invoices
+    WHERE "invoiceTotal" IS NOT NULL
+  `);
+  const invRows = (Array.isArray(invRes) ? invRes : ((invRes as any).rows ?? [])) as any[];
+  const invMap = new Map<string, number>();
+  for (const r of invRows) {
+    invMap.set(`${r.cardId}-${r.yr}-${r.mo}`, Number(r.invoiceTotal));
+  }
+
+  // 3. Agregar por cartão, preferindo o invoiceTotal do PDF quando existir
+  const cardMap = new Map<number, any>();
+  for (const r of monthRows) {
+    const cardId = Number(r.cardId);
+    const invTotal = invMap.get(`${r.cardId}-${r.yr}-${r.mo}`);
+    const effective = invTotal != null ? invTotal : Number(r.calculated);
+    const cur = cardMap.get(cardId) || {
+      cardId,
       cardName: r.cardName || `Cartão ${r.cardId}`,
       cardColor: r.cardColor || "#7C3AED",
       categoryId: r.categoryId != null ? Number(r.categoryId) : null,
       categoryName: r.categoryName || null,
       categoryColor: r.categoryColor || null,
-      total: Number(r.total),
-    }))
-    .filter((r) => r.total !== 0);
+      total: 0,
+    };
+    cur.total += effective;
+    cardMap.set(cardId, cur);
+  }
+
+  return Array.from(cardMap.values())
+    .filter((c) => c.total !== 0)
+    .sort((a, b) => b.total - a.total);
 }
 
 export async function getCategoryExpensesByStatus(entityId: number, startDate?: Date, endDate?: Date) {

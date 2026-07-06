@@ -141,6 +141,21 @@ function normalizeDate(date: string | Date | null | undefined): string {
   }
 }
 
+/**
+ * Gera a chave de deduplicação por PARCELA a partir de uma descrição que
+ * contenha o padrão "(X/Y)" (ex: "IPHONE PRA SEMPRE (13/21)"). Ignora a data
+ * — que a IA atribui de forma inconsistente entre PDFs — e inclui o valor,
+ * para não mesclar cobranças distintas da mesma parcela (titular vs adicional).
+ * Retorna null quando a descrição não é uma parcela.
+ */
+function installmentDedupKey(description: string | null | undefined, amount: number): string | null {
+  const desc = String(description || "");
+  const m = desc.match(/\((\d+)\/(\d+)\)\s*$/);
+  if (!m) return null;
+  const base = desc.replace(/\s*\(\d+\/\d+\)\s*$/, "").trim().toLowerCase();
+  return `INST|${base}|${m[1]}/${m[2]}|${amount}`;
+}
+
 export function registerCreditCardImportRoutes(app: Express) {
   try {
     execSync("which pdftotext", { encoding: "utf-8" });
@@ -288,7 +303,12 @@ Regras CRÍTICAS:
         const invoiceYear: number = extractedData.invoice_year ?? null;
 
         // ── Verificar duplicatas no banco se creditCardId foi fornecido ─────────
-        // Chave de conciliação: amount (centavos) + purchase_date (YYYY-MM-DD)
+        // Duas chaves de conciliação:
+        //  1) amount + purchase_date (YYYY-MM-DD) — compras avulsas
+        //  2) INST|base|X/Y|amount — parcelas: identifica a MESMA parcela
+        //     independente da data (a IA atribui datas diferentes em cada PDF,
+        //     o que causava duplicidade). Inclui o valor para não mesclar
+        //     cobranças distintas de mesma parcela (ex: titular vs adicional).
         let existingKeys: Set<string> = new Set();
         if (creditCardId) {
           try {
@@ -296,9 +316,8 @@ Regras CRÍTICAS:
             if (dbInstance) {
               const { sql: sqlTag } = await import("drizzle-orm");
               // Buscar TODAS as transações do cartão (sem filtro de mês)
-              // para conciliar por valor + data da compra
               const result = await dbInstance.execute(
-                sqlTag`SELECT amount, "purchaseDate", "dueDate", notes FROM transactions 
+                sqlTag`SELECT amount, description, "purchaseDate", "dueDate", notes FROM transactions
                        WHERE "creditCardId" = ${creditCardId}`
               );
               const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
@@ -318,10 +337,12 @@ Regras CRÍTICAS:
                 if (!purchaseDateStr && row.dueDate) {
                   purchaseDateStr = normalizeDate(row.dueDate);
                 }
-                const key = `${row.amount}|${purchaseDateStr}`;
-                existingKeys.add(key);
+                existingKeys.add(`${row.amount}|${purchaseDateStr}`);
+                // Chave por parcela (ignora data)
+                const ik = installmentDedupKey(row.description, Number(row.amount));
+                if (ik) existingKeys.add(ik);
               }
-              console.log(`[CreditCardImport] ${existingKeys.size} transações existentes no cartão para conciliação`);
+              console.log(`[CreditCardImport] ${existingKeys.size} chaves existentes no cartão para conciliação`);
             }
           } catch (dbErr: any) {
             console.error("[CreditCardImport] Error checking duplicates:", dbErr?.message);
@@ -374,7 +395,14 @@ Regras CRÍTICAS:
             }
             const purchaseDateNorm = normalizeDate(tx.purchase_date);
             const key = `${amountCents}|${purchaseDateNorm}`;
-            const isDuplicate = existingKeys.has(key);
+            // Chave por parcela (ignora data): usa a descrição ou os campos
+            // installment_current/total extraídos pela IA.
+            let instKey = installmentDedupKey(tx.description, amountCents);
+            if (!instKey && tx.installment_current && tx.installment_total) {
+              const base = String(tx.description || "").replace(/\s*\(\d+\/\d+\)\s*$/, "").trim().toLowerCase();
+              instKey = `INST|${base}|${Number(tx.installment_current)}/${Number(tx.installment_total)}|${amountCents}`;
+            }
+            const isDuplicate = existingKeys.has(key) || (instKey != null && existingKeys.has(instKey));
 
             return {
               description: String(tx.description || "").trim(),
@@ -619,7 +647,7 @@ Regras CRÍTICAS:
             if (dbInstance) {
               const { sql: sqlTag } = await import("drizzle-orm");
               const result = await dbInstance.execute(
-                sqlTag`SELECT amount, "purchaseDate", "dueDate", notes FROM transactions
+                sqlTag`SELECT amount, description, "purchaseDate", "dueDate", notes FROM transactions
                        WHERE "creditCardId" = ${creditCardId}`
               );
               const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
@@ -638,6 +666,9 @@ Regras CRÍTICAS:
                   purchaseDateStr = normalizeDate(row.dueDate);
                 }
                 existingKeys.add(`${row.amount}|${purchaseDateStr}`);
+                // Chave por parcela (ignora data)
+                const ik = installmentDedupKey(row.description, Number(row.amount));
+                if (ik) existingKeys.add(ik);
               }
             }
           } catch (dbErr: any) {
@@ -648,7 +679,12 @@ Regras CRÍTICAS:
         // ── Montar resposta com mesma estrutura do PDF ────────────────────────
         const transactions = filteredTransactions.map((tx) => {
           const key = `${tx.amount}|${normalizeDate(tx.purchase_date)}`;
-          const isDuplicate = existingKeys.has(key);
+          let instKey = installmentDedupKey(tx.description, tx.amount);
+          if (!instKey && tx.installment_current && tx.installment_total) {
+            const base = String(tx.description || "").replace(/\s*\(\d+\/\d+\)\s*$/, "").trim().toLowerCase();
+            instKey = `INST|${base}|${Number(tx.installment_current)}/${Number(tx.installment_total)}|${tx.amount}`;
+          }
+          const isDuplicate = existingKeys.has(key) || (instKey != null && existingKeys.has(instKey));
           return {
             description: tx.description,
             amount: tx.amount,
