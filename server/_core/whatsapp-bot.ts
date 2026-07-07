@@ -905,22 +905,63 @@ async function showPendingTransactionsList(
   }
 
   const now = new Date();
+  const isOverdue = (t: any) => t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now);
 
-  // Separar vencidas (status OVERDUE ou dueDate passado) das futuras
-  const overdue = filtered.filter((t: any) => t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now));
-  const upcoming = filtered.filter((t: any) => t.status !== "OVERDUE" && (!t.dueDate || new Date(t.dueDate) >= now));
-  overdue.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  upcoming.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  // Transações de cartão de crédito NÃO são listadas individualmente:
+  // agrupamos numa única entrada por cartão (a fatura). O documento é anexado
+  // à fatura do cartão, não à compra interna.
+  const nonCard = filtered.filter((t: any) => !t.creditCardId);
+  const cardTx = filtered.filter((t: any) => t.creditCardId);
 
-  const combined = [...overdue, ...upcoming].slice(0, 10);
+  const cardMap = new Map<number, any>();
+  for (const t of cardTx) {
+    const cid = Number(t.creditCardId);
+    const g = cardMap.get(cid) || {
+      isCreditCard: true,
+      creditCardId: cid,
+      invoiceMonth: month,
+      invoiceYear: year,
+      description: t.creditCardName || `Cartão ${cid}`,
+      amount: 0,
+      dueDateRaw: t.dueDate || null,
+      overdue: false,
+    };
+    g.amount += t.type === "INCOME" ? -t.amount : t.amount;
+    if (isOverdue(t)) g.overdue = true;
+    if (t.dueDate && (!g.dueDateRaw || new Date(t.dueDate) < new Date(g.dueDateRaw))) g.dueDateRaw = t.dueDate;
+    cardMap.set(cid, g);
+  }
 
-  const txForList = combined.map((t: any) => ({
+  // Itens unificados (transações avulsas + faturas de cartão)
+  const cardItems = Array.from(cardMap.values()).map((g: any) => ({
+    isCreditCard: true,
+    creditCardId: g.creditCardId,
+    invoiceMonth: g.invoiceMonth,
+    invoiceYear: g.invoiceYear,
+    description: `💳 ${g.description} (fatura)`,
+    amount: g.amount,
+    dueDate: g.dueDateRaw ? new Date(g.dueDateRaw).toLocaleDateString("pt-BR") : null,
+    dueDateRaw: g.dueDateRaw,
+    overdue: g.overdue,
+  }));
+  const nonCardItems = nonCard.map((t: any) => ({
     id: t.id,
     description: t.description,
     amount: t.amount,
     dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("pt-BR") : null,
-    overdue: t.status === "OVERDUE" || (t.dueDate && new Date(t.dueDate) < now),
+    dueDateRaw: t.dueDate || null,
+    overdue: isOverdue(t),
   }));
+
+  const txForList = [...cardItems, ...nonCardItems]
+    .sort((a: any, b: any) => {
+      // Vencidas primeiro, depois por data de vencimento
+      if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+      const ta = a.dueDateRaw ? new Date(a.dueDateRaw).getTime() : Infinity;
+      const tb = b.dueDateRaw ? new Date(b.dueDateRaw).getTime() : Infinity;
+      return ta - tb;
+    })
+    .slice(0, 10);
 
   const listStr = txForList.map((t, i) => {
     const flag = t.overdue ? "🔴" : "🟡";
