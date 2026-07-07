@@ -838,6 +838,118 @@ export const appRouter = router({
       return { success: true };
     }),
 
+    // Sugere categorias em lote via IA, usando o histórico já categorizado do
+    // usuário como exemplos (aprende o padrão dele). Só sugere quando confiante
+    // e NÃO aplica nada — o frontend pré-preenche e o usuário revisa/confirma.
+    suggestCategoriesAI: protectedProcedure
+      .input(z.object({ entityId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await requireEntityAccess(input.entityId, ctx.user.id, "EDITOR");
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { sql: sqlTag } = await import("drizzle-orm");
+        const { invokeLLM } = await import("./_core/llm");
+        const asRows = (r: any) => (Array.isArray(r) ? r : (r?.rows ?? [])) as any[];
+        const extractJsonArray = (text: string): any[] => {
+          try {
+            const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+            const start = cleaned.indexOf("[");
+            const end = cleaned.lastIndexOf("]");
+            if (start === -1 || end === -1) return [];
+            return JSON.parse(cleaned.slice(start, end + 1));
+          } catch { return []; }
+        };
+
+        // Transações sem categoria
+        const uncRes = await dbInstance.execute(sqlTag`
+          SELECT id, description, type FROM transactions
+          WHERE "entityId" = ${input.entityId} AND "categoryId" IS NULL
+          ORDER BY id DESC LIMIT 500`);
+        const uncategorized = asRows(uncRes);
+        if (uncategorized.length === 0) return { suggestions: [], historyCount: 0, insufficientHistory: false };
+
+        // Histórico já categorizado (exemplos do padrão do usuário)
+        const histRes = await dbInstance.execute(sqlTag`
+          SELECT t.description, t.type, c.name AS "categoryName"
+          FROM transactions t JOIN categories c ON c.id = t."categoryId"
+          WHERE t."entityId" = ${input.entityId} AND t."categoryId" IS NOT NULL AND c."isActive" = true
+          ORDER BY t.id DESC LIMIT 400`);
+        const history = asRows(histRes);
+        if (history.length < 20) {
+          return { suggestions: [], historyCount: history.length, insufficientHistory: true };
+        }
+
+        const cats = await db.getCategoriesByEntityId(input.entityId, ctx.user.id);
+        const suggestions: { transactionId: number; categoryId: number }[] = [];
+
+        for (const txType of ["EXPENSE", "INCOME"] as const) {
+          const typeCats = cats.filter((c: any) => c.type === txType && c.isActive !== false);
+          if (typeCats.length === 0) continue;
+          const nameToId = new Map<string, number>();
+          for (const c of typeCats) nameToId.set(c.name.toLowerCase(), c.id);
+          const catListStr = typeCats.map((c: any) => `- ${c.name}`).join("\n");
+
+          // Exemplos deduplicados por descrição
+          const seen = new Set<string>();
+          const examples: string[] = [];
+          for (const h of history.filter((h: any) => h.type === txType)) {
+            const key = String(h.description || "").trim().toLowerCase();
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            examples.push(`"${h.description}" => ${h.categoryName}`);
+            if (examples.length >= 120) break;
+          }
+
+          const items = uncategorized.filter((u: any) => u.type === txType);
+          const BATCH = 40;
+          for (let i = 0; i < items.length; i += BATCH) {
+            const batch = items.slice(i, i + BATCH);
+            const batchStr = batch
+              .map((b: any) => `{"id": ${b.id}, "descricao": ${JSON.stringify(String(b.description || ""))}}`)
+              .join("\n");
+            try {
+              const result = await invokeLLM({
+                messages: [
+                  {
+                    role: "system",
+                    content: `Você classifica ${txType === "EXPENSE" ? "despesas" : "receitas"} escolhendo a categoria mais adequada dentre as disponíveis.
+
+Categorias disponíveis:
+${catListStr}
+
+Exemplos de como ESTE usuário já categorizou (aprenda o padrão dele):
+${examples.length ? examples.join("\n") : "(sem exemplos)"}
+
+Regras:
+- Para cada transação, retorne a categoria EXATA da lista (mesmo nome) ou null se não tiver confiança.
+- Só sugira quando tiver confiança razoável; na dúvida, retorne null.
+- Responda APENAS com um array JSON: [{"id": <id>, "categoria": "<nome exato ou null>"}]
+- Não explique nada.`,
+                  },
+                  { role: "user", content: `Transações a classificar:\n${batchStr}` },
+                ],
+                maxRetries: 1,
+                maxRetryDelayMs: 3000,
+              });
+              const content = result.choices?.[0]?.message?.content;
+              if (!content || typeof content !== "string") continue;
+              for (const p of extractJsonArray(content)) {
+                const catName = p?.categoria;
+                if (!catName || String(catName).toLowerCase() === "null") continue;
+                const catId = nameToId.get(String(catName).trim().toLowerCase());
+                if (catId && batch.some((b: any) => Number(b.id) === Number(p.id))) {
+                  suggestions.push({ transactionId: Number(p.id), categoryId: catId });
+                }
+              }
+            } catch (e: any) {
+              console.error("[suggestCategoriesAI] batch error:", e?.message);
+            }
+          }
+        }
+
+        return { suggestions, historyCount: history.length, insufficientHistory: false };
+      }),
+
     deleteRecurring: protectedProcedure
       .input(
         z.object({

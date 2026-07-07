@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight, FileUp, Eye, Trash, RotateCcw } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight, FileUp, Eye, Trash, RotateCcw, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -717,6 +717,31 @@ export default function Transactions() {
       toast.error(error.message || "Erro ao categorizar transações");
     } finally {
       setBulkCategorySaving(false);
+    }
+  };
+
+  // Sugestão de categorias com IA (aprende do histórico já categorizado)
+  const suggestCategoriesMutation = trpc.transactions.suggestCategoriesAI.useMutation();
+  const handleSuggestWithAI = async () => {
+    if (!selectedEntityId) return;
+    try {
+      const res = await suggestCategoriesMutation.mutateAsync({ entityId: selectedEntityId });
+      if (res.insufficientHistory) {
+        toast.info("Categorize algumas transações primeiro (ao menos 20) para a IA aprender seu padrão.");
+        return;
+      }
+      if (!res.suggestions || res.suggestions.length === 0) {
+        toast.info("A IA não teve confiança para sugerir categorias desta vez.");
+        return;
+      }
+      setBulkCategoryAssignments((prev) => {
+        const next = { ...prev };
+        for (const s of res.suggestions) next[s.transactionId] = String(s.categoryId);
+        return next;
+      });
+      toast.success(`${res.suggestions.length} sugestão(ões) preenchida(s). Revise e salve.`);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao sugerir categorias com IA");
     }
   };
 
@@ -2416,6 +2441,19 @@ export default function Transactions() {
             <p className="text-sm text-muted-foreground mt-1">
               {uncategorizedTransactions.length} transação{uncategorizedTransactions.length > 1 ? "ões" : ""} sem categoria. Atribua categorias e clique em Salvar.
             </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full gap-2 border-[#1a67c2]/40 text-[#1a67c2] hover:bg-[#EBF3FC] dark:hover:bg-[#1E2D4A]"
+              onClick={handleSuggestWithAI}
+              disabled={suggestCategoriesMutation.isPending}
+            >
+              {suggestCategoriesMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Analisando seu histórico...</>
+              ) : (
+                <><Sparkles className="h-4 w-4" /> Sugerir com IA</>
+              )}
+            </Button>
           </div>
           {/* Lista de transações */}
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
