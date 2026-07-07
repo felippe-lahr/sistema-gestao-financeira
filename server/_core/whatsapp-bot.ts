@@ -884,18 +884,16 @@ async function showPendingTransactionsList(
   const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   const monthLabel = `${MONTH_NAMES[month - 1]}/${year}`;
 
-  const [pendingTx, overdueTx] = await Promise.all([
-    db.getTransactionsByEntityId(entityId, { status: "PENDING", limit: 200 }),
-    db.getTransactionsByEntityId(entityId, { status: "OVERDUE", limit: 200 }),
+  // Buscar pelo intervalo do mês (por dueDate) — evita truncamento do limit
+  // quando há muitas parcelas futuras pendentes.
+  const startOfMonth = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+  const endOfMonth = new Date(Date.UTC(year, month, 0, 23, 59, 59));
+  const [pendingTx, overdueTx, invoiceTotals] = await Promise.all([
+    db.getTransactionsByEntityId(entityId, { status: "PENDING", startDate: startOfMonth, endDate: endOfMonth }),
+    db.getTransactionsByEntityId(entityId, { status: "OVERDUE", startDate: startOfMonth, endDate: endOfMonth }),
+    db.getCreditCardInvoiceTotalsForMonth(month, year),
   ]);
-  const allTx = [...(pendingTx as any[]), ...(overdueTx as any[])];
-
-  // Filtrar pelo mês/ano informado
-  const filtered = (allTx as any[]).filter((t: any) => {
-    if (!t.dueDate) return false;
-    const d = new Date(t.dueDate);
-    return d.getUTCMonth() + 1 === month && d.getUTCFullYear() === year;
-  });
+  const filtered = [...(pendingTx as any[]), ...(overdueTx as any[])];
 
   if (filtered.length === 0) {
     // Manter no stage awaiting_month para tentar outro mês
@@ -933,13 +931,15 @@ async function showPendingTransactionsList(
   }
 
   // Itens unificados (transações avulsas + faturas de cartão)
+  // Valor da fatura = mesmo da frente do card no app: invoiceTotal do PDF
+  // quando salvo, senão a soma calculada das transações do cartão no mês.
   const cardItems = Array.from(cardMap.values()).map((g: any) => ({
     isCreditCard: true,
     creditCardId: g.creditCardId,
     invoiceMonth: g.invoiceMonth,
     invoiceYear: g.invoiceYear,
     description: `💳 ${g.description} (fatura)`,
-    amount: g.amount,
+    amount: invoiceTotals.get(g.creditCardId) ?? g.amount,
     dueDate: g.dueDateRaw ? new Date(g.dueDateRaw).toLocaleDateString("pt-BR") : null,
     dueDateRaw: g.dueDateRaw,
     overdue: g.overdue,

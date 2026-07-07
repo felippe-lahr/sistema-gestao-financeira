@@ -1195,6 +1195,24 @@ export async function getCreditCardSpending(entityId: number, startDate?: Date, 
 }
 
 /**
+ * Retorna um mapa cardId → invoiceTotal (centavos) das faturas com total do
+ * PDF salvo para o mês/ano informado. Usado para exibir o valor real da fatura.
+ */
+export async function getCreditCardInvoiceTotalsForMonth(month: number, year: number): Promise<Map<number, number>> {
+  const db = await getDb();
+  const map = new Map<number, number>();
+  if (!db) return map;
+  const result = await db.execute(sql`
+    SELECT "creditCardId" AS "cardId", "invoiceTotal"
+    FROM credit_card_invoices
+    WHERE month = ${month} AND year = ${year} AND "invoiceTotal" IS NOT NULL
+  `);
+  const rows = (Array.isArray(result) ? result : ((result as any).rows ?? [])) as any[];
+  for (const r of rows) map.set(Number(r.cardId), Number(r.invoiceTotal));
+  return map;
+}
+
+/**
  * Encontra grupos de parcelas DUPLICADAS de cartão de crédito na entidade.
  * Uma duplicata = mesmo cartão + descrição base + parcela (X/Y) + valor.
  * (Datas diferentes atribuídas pela IA não impedem a detecção.)
