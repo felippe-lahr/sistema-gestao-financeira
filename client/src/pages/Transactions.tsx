@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight, FileUp, Eye, Trash } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight, FileUp, Eye, Trash, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -838,6 +838,25 @@ export default function Transactions() {
     },
     onError: (err: any) => toast.error(err.message || "Erro ao pagar fatura"),
   });
+
+  const revertInvoiceMutation = trpc.creditCards.revertInvoicePayment.useMutation({
+    onSuccess: () => {
+      toast.success("Pagamento da fatura estornado. Transações voltaram para pendente.");
+      utils.transactions.listByEntity.invalidate();
+      utils.transactions.summary.invalidate();
+      utils.dashboard.metrics.invalidate();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao estornar fatura"),
+  });
+
+  function handleRevertInvoice(group: any) {
+    const matchedCard = creditCards?.find((c: any) => c.name === group.cardName);
+    if (!matchedCard) {
+      toast.error("Não foi possível identificar o cartão.");
+      return;
+    }
+    revertInvoiceMutation.mutate({ cardId: Number(matchedCard.id), month: filterMonth, year: filterYear });
+  }
 
   function openPayInvoiceSheet(group: any) {
     // Find the cardId by matching card name from the creditCards list
@@ -2040,18 +2059,31 @@ export default function Transactions() {
                             </p>
                           )}
                         </div>
-                        {/* Pagar Fatura button */}
+                        {/* Pagar / Estornar Fatura button (toggle) */}
                         {canWrite && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="hidden md:flex text-xs h-8 gap-1.5 px-3"
-                            disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
-                            onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Pagar Fatura
-                          </Button>
+                          allPaid ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="hidden md:flex text-xs h-8 gap-1.5 px-3 text-[#8A8A92] hover:text-[#c0392b]"
+                              disabled={revertInvoiceMutation.isPending}
+                              onClick={(e) => { e.stopPropagation(); handleRevertInvoice(group); }}
+                              title="Estornar pagamento (voltar para não pago)"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Estornar Fatura
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="hidden md:flex text-xs h-8 gap-1.5 px-3"
+                              onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Pagar Fatura
+                            </Button>
+                          )
                         )}
                         {/* Paperclip */}
                         <Button
@@ -2086,12 +2118,20 @@ export default function Transactions() {
                             <Paperclip className="h-3.5 w-3.5 mr-1" />Anexos
                           </Button>
                           {canWrite && (
-                            <Button variant="outline" size="sm" className="flex-1 text-xs"
-                              disabled={!group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE")}
-                              onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}>
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                              {group.transactions.some((t: any) => t.status === "PENDING" || t.status === "OVERDUE") ? "Pagar Fatura" : "Fatura Paga"}
-                            </Button>
+                            allPaid ? (
+                              <Button variant="outline" size="sm" className="flex-1 text-xs"
+                                disabled={revertInvoiceMutation.isPending}
+                                onClick={(e) => { e.stopPropagation(); handleRevertInvoice(group); }}>
+                                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                                Estornar Fatura
+                              </Button>
+                            ) : (
+                              <Button variant="outline" size="sm" className="flex-1 text-xs"
+                                onClick={(e) => { e.stopPropagation(); openPayInvoiceSheet(group); }}>
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                Pagar Fatura
+                              </Button>
+                            )
                           )}
                         </div>
 

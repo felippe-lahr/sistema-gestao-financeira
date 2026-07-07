@@ -2936,6 +2936,51 @@ export const appRouter = router({
         return { success: true, totalAmount };
       }),
 
+    // Estorna o pagamento de uma fatura: volta as transações do cartão naquele
+    // mês para PENDING e marca a fatura como não paga. Inverso de payInvoice.
+    revertInvoicePayment: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        month: z.number().min(1).max(12),
+        year: z.number().min(2000).max(2100),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditCards, creditCardInvoices } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const { sql: sqlTag } = await import("drizzle-orm");
+        const [card] = await dbInstance.select().from(creditCards).where(eq(creditCards.id, input.cardId));
+        if (!card) throw new TRPCError({ code: "NOT_FOUND", message: "Cartão não encontrado" });
+        await requireEntityAccess(card.entityId, ctx.user.id, "EDITOR");
+
+        const startDate = new Date(input.year, input.month - 1, 1).toISOString();
+        const endDate = new Date(input.year, input.month, 0, 23, 59, 59).toISOString();
+
+        // Voltar transações PAID do cartão naquele mês para PENDING
+        await dbInstance.execute(
+          sqlTag`UPDATE transactions SET status = 'PENDING', "paymentDate" = NULL, "updatedAt" = NOW()
+                 WHERE "creditCardId" = ${input.cardId}
+                   AND "dueDate" >= ${startDate}
+                   AND "dueDate" <= ${endDate}
+                   AND status = 'PAID'`
+        );
+
+        // Marcar a fatura como não paga (mantém invoiceTotal salvo)
+        const existing = await dbInstance
+          .select()
+          .from(creditCardInvoices)
+          .where(and(eq(creditCardInvoices.creditCardId, input.cardId), eq(creditCardInvoices.month, input.month), eq(creditCardInvoices.year, input.year)))
+          .limit(1);
+        if (existing.length > 0) {
+          await dbInstance.update(creditCardInvoices)
+            .set({ status: "OPEN", paidAt: null, paidFromAccountId: null, updatedAt: new Date() })
+            .where(eq(creditCardInvoices.id, existing[0].id));
+        }
+
+        return { success: true };
+      }),
+
     getInvoiceGroups: protectedProcedure
       .input(z.object({
         entityId: z.number(),
