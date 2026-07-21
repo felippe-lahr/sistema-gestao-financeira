@@ -13,10 +13,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Edit2, X, Calendar, RefreshCw, CheckCircle2 } from "lucide-react";
 import { useLocation } from "wouter";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isBefore, startOfWeek, endOfWeek, parseISO, addDays, differenceInDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isBefore, startOfWeek, endOfWeek, parseISO, addDays, subDays, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
+import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 
 const PRIORITY_COLORS = {
   LOW: "bg-blue-500",
@@ -36,10 +37,74 @@ const PRIORITY_LABELS = {
   HIGH: "Alta",
 };
 
+// Chip de tarefa arrastável (usado na visão semanal)
+function DraggableTaskChip({ task, onOpen }: { task: any; onOpen: (t: any) => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `task-${task.id}`,
+    data: { taskId: task.id },
+  });
+  const done = task.status === "COMPLETED";
+  const dotColor = task.color || undefined;
+  const priorityClass = (PRIORITY_COLORS as any)[task.priority] || "bg-gray-400";
+  return (
+    <button
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={() => onOpen(task)}
+      className={`w-full text-left rounded-md border px-2 py-1.5 mb-1.5 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors touch-none cursor-grab active:cursor-grabbing ${isDragging ? "opacity-40" : ""} ${done ? "opacity-60" : ""}`}
+    >
+      <div className="flex items-center gap-1.5">
+        {dotColor
+          ? <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
+          : <span className={`h-2 w-2 rounded-full flex-shrink-0 ${priorityClass}`} />}
+        <span className={`text-xs font-medium truncate ${done ? "line-through text-gray-400" : "text-gray-800 dark:text-gray-200"}`}>
+          {task.title}
+        </span>
+      </div>
+      {(task.allDay || task.dueTime) && (
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 pl-3.5 block">
+          {task.allDay ? "Dia inteiro" : task.dueTime}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// Coluna de um dia (área de soltar) na visão semanal
+function WeekDayColumn({ day, tasks, onOpen, onCreate }: { day: Date; tasks: any[]; onOpen: (t: any) => void; onCreate: (d: Date) => void }) {
+  const dayKey = format(day, "yyyy-MM-dd");
+  const { setNodeRef, isOver } = useDroppable({ id: `day-${dayKey}`, data: { day: dayKey } });
+  const today = isToday(day);
+  return (
+    <div className="flex flex-col min-w-[150px] sm:min-w-0 flex-1">
+      <div className={`text-center py-2 border-b ${today ? "border-blue-500" : "border-gray-200 dark:border-gray-700"}`}>
+        <div className="text-[11px] uppercase text-gray-500 dark:text-gray-400 capitalize">{format(day, "EEE", { locale: ptBR })}</div>
+        <div className={`text-sm font-semibold ${today ? "text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-200"}`}>{format(day, "dd/MM")}</div>
+      </div>
+      <div
+        ref={setNodeRef}
+        className={`flex-1 min-h-[320px] p-1.5 rounded-b-md transition-colors ${isOver ? "bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-400 ring-inset" : today ? "bg-blue-50/40 dark:bg-blue-900/10" : "bg-gray-50/50 dark:bg-gray-800/30"}`}
+      >
+        {tasks.map((t) => <DraggableTaskChip key={t.id} task={t} onOpen={onOpen} />)}
+        <button
+          onClick={() => onCreate(day)}
+          className="w-full text-[11px] text-gray-400 hover:text-blue-600 py-1 rounded hover:bg-white dark:hover:bg-gray-800 transition-colors"
+        >
+          + Adicionar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Agenda() {
   const [, setLocation] = useLocation();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [viewMode, setViewMode] = useState<"month" | "week">("month");
+  const [weekAnchor, setWeekAnchor] = useState<Date>(new Date());
+  const [activeDragTask, setActiveDragTask] = useState<any>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
@@ -145,6 +210,60 @@ export default function Agenda() {
       toast.error("Erro ao atualizar tarefa: " + error.message);
     },
   });
+
+  // Reagendamento por arrastar (visão semanal) — update otimista + sync Google Calendar
+  const utils = trpc.useUtils();
+  const rescheduleTask = trpc.tasks.update.useMutation({
+    onMutate: async (vars: any) => {
+      await utils.tasks.list.cancel();
+      const previous = utils.tasks.list.getData();
+      utils.tasks.list.setData(undefined, (old: any) =>
+        (old || []).map((t: any) =>
+          t.id === vars.id ? { ...t, dueDate: vars.dueDate, ...(vars.endDate !== undefined ? { endDate: vars.endDate } : {}) } : t
+        )
+      );
+      return { previous };
+    },
+    onError: (err: any, _vars, ctx: any) => {
+      if (ctx?.previous) utils.tasks.list.setData(undefined, ctx.previous);
+      toast.error("Erro ao reagendar: " + err.message);
+    },
+    onSuccess: () => { toast.success("Tarefa reagendada."); },
+    onSettled: () => { utils.tasks.list.invalidate(); },
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+  );
+
+  const handleDragStart = (e: DragStartEvent) => {
+    const taskId = (e.active.data.current as any)?.taskId;
+    const t = tasks.find((x: any) => x.id === taskId);
+    setActiveDragTask(t || null);
+  };
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    setActiveDragTask(null);
+    const taskId = (e.active.data.current as any)?.taskId;
+    const dayKey = (e.over?.data.current as any)?.day as string | undefined;
+    if (!taskId || !dayKey) return;
+    const task = tasks.find((x: any) => x.id === taskId);
+    if (!task) return;
+    const [y, m, d] = dayKey.split("-").map(Number);
+    const oldStart = toDate(task.dueDate);
+    // mesma data-alvo ao meio-dia (padrão do app p/ evitar timezone); horário fica em dueTime
+    const newDue = new Date(y, m - 1, d, 12, 0, 0);
+    const oldStartDay = new Date(oldStart.getFullYear(), oldStart.getMonth(), oldStart.getDate());
+    if (oldStartDay.getTime() === new Date(y, m - 1, d).getTime()) return; // mesmo dia, nada a fazer
+    const vars: any = { id: taskId, dueDate: newDue };
+    // Deslocar endDate pelo mesmo número de dias
+    if (task.endDate) {
+      const delta = differenceInDays(new Date(y, m - 1, d), oldStartDay);
+      vars.endDate = addDays(toDate(task.endDate), delta);
+    }
+    rescheduleTask.mutate(vars);
+  };
 
   const deleteTask = trpc.tasks.delete.useMutation({
     onSuccess: () => {
@@ -313,6 +432,12 @@ export default function Agenda() {
     
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [currentMonth]);
+
+  // Dias da semana atual (segunda a domingo) para a visão semanal
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(weekAnchor, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end: addDays(start, 6) });
+  }, [weekAnchor]);
 
   // Processar tarefas para exibição no calendário (incluindo barras contínuas)
   const processedTasks = useMemo(() => {
@@ -485,24 +610,65 @@ export default function Agenda() {
       {/* Calendário - Largura total */}
       <Card className="mb-6">
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="text-xl capitalize">
-              {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
+              {viewMode === "month"
+                ? format(currentMonth, "MMMM yyyy", { locale: ptBR })
+                : `${format(weekDays[0], "dd/MM")} – ${format(weekDays[6], "dd/MM/yyyy")}`}
             </CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+            <div className="flex items-center gap-2">
+              {/* Toggle de visão */}
+              <div className="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 p-0.5">
+                <button
+                  onClick={() => setViewMode("month")}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${viewMode === "month" ? "bg-[#1a67c2] text-white" : "text-gray-600 dark:text-gray-300"}`}
+                >Mês</button>
+                <button
+                  onClick={() => setViewMode("week")}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${viewMode === "week" ? "bg-[#1a67c2] text-white" : "text-gray-600 dark:text-gray-300"}`}
+                >Semana</button>
+              </div>
+              {/* Navegação (view-aware) */}
+              <Button variant="outline" size="icon" onClick={() => viewMode === "month" ? setCurrentMonth(subMonths(currentMonth, 1)) : setWeekAnchor(subDays(weekAnchor, 7))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())}>
+              <Button variant="outline" size="sm" onClick={() => { setCurrentMonth(new Date()); setWeekAnchor(new Date()); }}>
                 Hoje
               </Button>
-              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+              <Button variant="outline" size="icon" onClick={() => viewMode === "month" ? setCurrentMonth(addMonths(currentMonth, 1)) : setWeekAnchor(addDays(weekAnchor, 7))}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
+          {viewMode === "week" ? (
+            /* ===== Visão semanal com drag-and-drop ===== */
+            <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+              <p className="text-xs text-muted-foreground mb-2">Arraste uma tarefa para outro dia para reagendá-la{currentUser?.googleCalendarRefreshToken ? " (sincroniza com o Google Calendar)" : ""}.</p>
+              <div className="overflow-x-auto">
+                <div className="flex gap-1.5 min-w-[900px] sm:min-w-0">
+                  {weekDays.map((day) => (
+                    <WeekDayColumn
+                      key={day.toISOString()}
+                      day={day}
+                      tasks={getTasksForDay(day)}
+                      onOpen={openEditSheet}
+                      onCreate={openCreateSheet}
+                    />
+                  ))}
+                </div>
+              </div>
+              <DragOverlay>
+                {activeDragTask ? (
+                  <div className="rounded-md border border-blue-400 bg-white dark:bg-gray-800 px-2 py-1.5 shadow-lg">
+                    <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{activeDragTask.title}</span>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          ) : (
+          <>
           {/* Dias da semana */}
           <div className="grid grid-cols-7 mb-2">
             {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
@@ -585,6 +751,8 @@ export default function Agenda() {
               );
             })}
           </div>
+          </>
+          )}
         </CardContent>
       </Card>
 
