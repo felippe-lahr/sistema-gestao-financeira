@@ -453,38 +453,7 @@ export default function Agenda() {
   }, [weekAnchor]);
 
   // Layout das barras da semana: tarefas que intersectam a semana viram barras
-  // contínuas (start→end), com coluna, span e linha (row) para não sobrepor.
-  const weekLayout = useMemo(() => {
-    const weekStart = startOfDay(weekDays[0]);
-    const weekEnd = startOfDay(weekDays[6]);
-    const items = processedTasks
-      .filter((t) => startOfDay(t.endDate) >= weekStart && startOfDay(t.startDate) <= weekEnd)
-      .map((t) => {
-        const s = startOfDay(t.startDate);
-        const e = startOfDay(t.endDate);
-        const startCol = Math.max(0, differenceInDays(s, weekStart));
-        const endCol = Math.min(6, differenceInDays(e, weekStart));
-        return {
-          task: t,
-          startCol,
-          endCol,
-          span: endCol - startCol + 1,
-          clipLeft: s < weekStart,
-          clipRight: e > weekEnd,
-          row: 0,
-        };
-      });
-    // Alocar linhas (greedy) para evitar sobreposição
-    items.sort((a, b) => a.startCol - b.startCol || b.span - a.span);
-    const rowsLastCol: number[] = [];
-    for (const it of items) {
-      let row = 0;
-      while (rowsLastCol[row] !== undefined && rowsLastCol[row] >= it.startCol) row++;
-      rowsLastCol[row] = it.endCol;
-      it.row = row;
-    }
-    return { items, maxRow: rowsLastCol.length };
-  }, [processedTasks, weekDays]);
+  // contínuas (start→end) — definido após processedTasks (abaixo).
 
   // Processar tarefas para exibição no calendário (incluindo barras contínuas)
   const processedTasks = useMemo(() => {
@@ -548,6 +517,40 @@ export default function Agenda() {
       return dayStart >= taskStart && dayStart <= taskEnd;
     }).sort((a, b) => a.row - b.row); // Ordenar por linha para manter posição consistente
   };
+
+  // Layout das barras da semana: tarefas que intersectam a semana viram barras
+  // contínuas (start→end), com coluna, span e linha (row) para não sobrepor.
+  const weekLayout = useMemo(() => {
+    const weekStart = startOfDay(weekDays[0]);
+    const weekEnd = startOfDay(weekDays[6]);
+    const items = processedTasks
+      .filter((t) => startOfDay(t.endDate) >= weekStart && startOfDay(t.startDate) <= weekEnd)
+      .map((t) => {
+        const s = startOfDay(t.startDate);
+        const e = startOfDay(t.endDate);
+        const startCol = Math.max(0, differenceInDays(s, weekStart));
+        const endCol = Math.min(6, differenceInDays(e, weekStart));
+        return {
+          task: t,
+          startCol,
+          endCol,
+          span: endCol - startCol + 1,
+          clipLeft: s < weekStart,
+          clipRight: e > weekEnd,
+          row: 0,
+        };
+      });
+    // Alocar linhas (greedy) para evitar sobreposição
+    items.sort((a, b) => a.startCol - b.startCol || b.span - a.span);
+    const rowsLastCol: number[] = [];
+    for (const it of items) {
+      let row = 0;
+      while (rowsLastCol[row] !== undefined && rowsLastCol[row] >= it.startCol) row++;
+      rowsLastCol[row] = it.endCol;
+      it.row = row;
+    }
+    return { items, maxRow: rowsLastCol.length };
+  }, [processedTasks, weekDays]);
 
   // Verificar se é o primeiro dia de uma tarefa
   const isTaskStart = (task: any, day: Date) => {
