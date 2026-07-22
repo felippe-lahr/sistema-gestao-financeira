@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +13,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Edit2, X, Calendar, RefreshCw, CheckCircle2 } from "lucide-react";
 import { useLocation } from "wouter";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isBefore, startOfWeek, endOfWeek, parseISO, addDays, subDays, differenceInDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isBefore, startOfWeek, endOfWeek, parseISO, addDays, subDays, differenceInDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
-import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
+import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type DragOverEvent } from "@dnd-kit/core";
 
 const PRIORITY_COLORS = {
   LOW: "bg-blue-500",
@@ -37,14 +37,15 @@ const PRIORITY_LABELS = {
   HIGH: "Alta",
 };
 
-// Chip de tarefa arrastável (usado na visão semanal)
-function DraggableTaskChip({ task, onOpen }: { task: any; onOpen: (t: any) => void }) {
+// Barra de tarefa (contínua, pode ocupar vários dias) na visão semanal
+function TaskBar({ item, onOpen }: { item: any; onOpen: (t: any) => void }) {
+  const task = item.task;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `task-${task.id}`,
     data: { taskId: task.id },
   });
   const done = task.status === "COMPLETED";
-  const dotColor = task.color || undefined;
+  const bg = task.color || undefined;
   const priorityClass = (PRIORITY_COLORS as any)[task.priority] || "bg-gray-400";
   return (
     <button
@@ -52,48 +53,49 @@ function DraggableTaskChip({ task, onOpen }: { task: any; onOpen: (t: any) => vo
       {...listeners}
       {...attributes}
       onClick={() => onOpen(task)}
-      className={`w-full text-left rounded-md border px-2 py-1.5 mb-1.5 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors touch-none cursor-grab active:cursor-grabbing ${isDragging ? "opacity-40" : ""} ${done ? "opacity-60" : ""}`}
+      style={{
+        gridColumn: `${item.startCol + 1} / span ${item.span}`,
+        gridRow: item.row + 1,
+        ...(bg ? { backgroundColor: bg } : {}),
+      }}
+      title={task.title}
+      className={`pointer-events-auto self-start text-left rounded-md px-2 py-1 text-xs font-medium truncate text-white touch-none cursor-grab active:cursor-grabbing ${bg ? "" : priorityClass} ${isDragging ? "opacity-40" : ""} ${done ? "opacity-60 line-through" : ""} ${item.clipLeft ? "rounded-l-none" : ""} ${item.clipRight ? "rounded-r-none" : ""}`}
     >
-      <div className="flex items-center gap-1.5">
-        {dotColor
-          ? <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
-          : <span className={`h-2 w-2 rounded-full flex-shrink-0 ${priorityClass}`} />}
-        <span className={`text-xs font-medium truncate ${done ? "line-through text-gray-400" : "text-gray-800 dark:text-gray-200"}`}>
-          {task.title}
-        </span>
-      </div>
-      {(task.allDay || task.dueTime) && (
-        <span className="text-[10px] text-gray-400 dark:text-gray-500 pl-3.5 block">
-          {task.allDay ? "Dia inteiro" : task.dueTime}
-        </span>
-      )}
+      {task.title}{!task.allDay && task.dueTime ? ` · ${task.dueTime}` : ""}
     </button>
   );
 }
 
 // Coluna de um dia (área de soltar) na visão semanal
-function WeekDayColumn({ day, tasks, onOpen, onCreate }: { day: Date; tasks: any[]; onOpen: (t: any) => void; onCreate: (d: Date) => void }) {
+function WeekDropColumn({ day, barsHeight, onCreate }: { day: Date; barsHeight: number; onCreate: (d: Date) => void }) {
   const dayKey = format(day, "yyyy-MM-dd");
   const { setNodeRef, isOver } = useDroppable({ id: `day-${dayKey}`, data: { day: dayKey } });
   const today = isToday(day);
   return (
-    <div className="flex flex-col min-w-[150px] sm:min-w-0 flex-1">
-      <div className={`text-center py-2 border-b ${today ? "border-blue-500" : "border-gray-200 dark:border-gray-700"}`}>
-        <div className="text-[11px] uppercase text-gray-500 dark:text-gray-400 capitalize">{format(day, "EEE", { locale: ptBR })}</div>
-        <div className={`text-sm font-semibold ${today ? "text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-200"}`}>{format(day, "dd/MM")}</div>
-      </div>
-      <div
-        ref={setNodeRef}
-        className={`flex-1 min-h-[320px] p-1.5 rounded-b-md transition-colors ${isOver ? "bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-400 ring-inset" : today ? "bg-blue-50/40 dark:bg-blue-900/10" : "bg-gray-50/50 dark:bg-gray-800/30"}`}
+    <div
+      ref={setNodeRef}
+      className={`rounded-md border min-h-[340px] transition-colors ${isOver ? "bg-blue-50 dark:bg-blue-900/20 border-blue-400" : today ? "bg-blue-50/40 dark:bg-blue-900/10 border-transparent" : "bg-gray-50/50 dark:bg-gray-800/30 border-transparent"}`}
+      style={{ paddingTop: barsHeight }}
+    >
+      <button
+        onClick={() => onCreate(day)}
+        className="w-full text-[11px] text-gray-400 hover:text-blue-600 py-1 transition-colors"
       >
-        {tasks.map((t) => <DraggableTaskChip key={t.id} task={t} onOpen={onOpen} />)}
-        <button
-          onClick={() => onCreate(day)}
-          className="w-full text-[11px] text-gray-400 hover:text-blue-600 py-1 rounded hover:bg-white dark:hover:bg-gray-800 transition-colors"
-        >
-          + Adicionar
-        </button>
-      </div>
+        + Adicionar
+      </button>
+    </div>
+  );
+}
+
+// Zona lateral: ao arrastar sobre ela, navega para a semana anterior/próxima
+function EdgeDropZone({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex items-center justify-center w-7 flex-shrink-0 rounded-md border border-dashed transition-colors ${isOver ? "bg-blue-100 dark:bg-blue-900/40 border-blue-400 text-blue-600" : "border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-600"}`}
+    >
+      {children}
     </div>
   );
 }
@@ -237,10 +239,21 @@ export default function Agenda() {
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
   );
 
+  const lastWeekNavRef = useRef(0);
   const handleDragStart = (e: DragStartEvent) => {
     const taskId = (e.active.data.current as any)?.taskId;
     const t = tasks.find((x: any) => x.id === taskId);
     setActiveDragTask(t || null);
+  };
+
+  // Ao arrastar sobre as zonas laterais, navega para a semana anterior/próxima
+  const handleDragOver = (e: DragOverEvent) => {
+    const overId = e.over?.id;
+    if (overId !== "week-prev" && overId !== "week-next") return;
+    const now = Date.now();
+    if (now - lastWeekNavRef.current < 650) return; // debounce
+    lastWeekNavRef.current = now;
+    setWeekAnchor((prev) => (overId === "week-prev" ? subDays(prev, 7) : addDays(prev, 7)));
   };
 
   const handleDragEnd = (e: DragEndEvent) => {
@@ -438,6 +451,40 @@ export default function Agenda() {
     const start = startOfWeek(weekAnchor, { weekStartsOn: 1 });
     return eachDayOfInterval({ start, end: addDays(start, 6) });
   }, [weekAnchor]);
+
+  // Layout das barras da semana: tarefas que intersectam a semana viram barras
+  // contínuas (start→end), com coluna, span e linha (row) para não sobrepor.
+  const weekLayout = useMemo(() => {
+    const weekStart = startOfDay(weekDays[0]);
+    const weekEnd = startOfDay(weekDays[6]);
+    const items = processedTasks
+      .filter((t) => startOfDay(t.endDate) >= weekStart && startOfDay(t.startDate) <= weekEnd)
+      .map((t) => {
+        const s = startOfDay(t.startDate);
+        const e = startOfDay(t.endDate);
+        const startCol = Math.max(0, differenceInDays(s, weekStart));
+        const endCol = Math.min(6, differenceInDays(e, weekStart));
+        return {
+          task: t,
+          startCol,
+          endCol,
+          span: endCol - startCol + 1,
+          clipLeft: s < weekStart,
+          clipRight: e > weekEnd,
+          row: 0,
+        };
+      });
+    // Alocar linhas (greedy) para evitar sobreposição
+    items.sort((a, b) => a.startCol - b.startCol || b.span - a.span);
+    const rowsLastCol: number[] = [];
+    for (const it of items) {
+      let row = 0;
+      while (rowsLastCol[row] !== undefined && rowsLastCol[row] >= it.startCol) row++;
+      rowsLastCol[row] = it.endCol;
+      it.row = row;
+    }
+    return { items, maxRow: rowsLastCol.length };
+  }, [processedTasks, weekDays]);
 
   // Processar tarefas para exibição no calendário (incluindo barras contínuas)
   const processedTasks = useMemo(() => {
@@ -644,25 +691,59 @@ export default function Agenda() {
         <CardContent>
           {viewMode === "week" ? (
             /* ===== Visão semanal com drag-and-drop ===== */
-            <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-              <p className="text-xs text-muted-foreground mb-2">Arraste uma tarefa para outro dia para reagendá-la{currentUser?.googleCalendarRefreshToken ? " (sincroniza com o Google Calendar)" : ""}.</p>
+            <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+              <p className="text-xs text-muted-foreground mb-2">Arraste uma tarefa para outro dia para reagendá-la. Arraste até as bordas ‹ › para mudar de semana{currentUser?.googleCalendarRefreshToken ? " · sincroniza com o Google Calendar" : ""}.</p>
               <div className="overflow-x-auto">
-                <div className="flex gap-1.5 min-w-[900px] sm:min-w-0">
-                  {weekDays.map((day) => (
-                    <WeekDayColumn
-                      key={day.toISOString()}
-                      day={day}
-                      tasks={getTasksForDay(day)}
-                      onOpen={openEditSheet}
-                      onCreate={openCreateSheet}
-                    />
-                  ))}
+                <div className="flex items-stretch gap-1.5 min-w-[900px] lg:min-w-0">
+                  {/* Zona: semana anterior */}
+                  <EdgeDropZone id="week-prev"><ChevronLeft className="h-4 w-4" /></EdgeDropZone>
+
+                  <div className="flex-1 min-w-0">
+                    {/* Cabeçalhos dos dias */}
+                    <div className="grid grid-cols-7 gap-1.5 mb-1">
+                      {weekDays.map((day) => {
+                        const today = isToday(day);
+                        return (
+                          <div key={day.toISOString()} className={`text-center py-1.5 rounded-md ${today ? "bg-blue-50 dark:bg-blue-900/30" : ""}`}>
+                            <div className="text-[11px] uppercase text-gray-500 dark:text-gray-400 capitalize">{format(day, "EEE", { locale: ptBR })}</div>
+                            <div className={`text-sm font-semibold ${today ? "text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-200"}`}>{format(day, "dd/MM")}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Colunas (drop) + overlay de barras contínuas */}
+                    <div className="relative">
+                      <div className="grid grid-cols-7 gap-1.5">
+                        {weekDays.map((day) => (
+                          <WeekDropColumn
+                            key={day.toISOString()}
+                            day={day}
+                            barsHeight={weekLayout.maxRow * 32 + 8}
+                            onCreate={openCreateSheet}
+                          />
+                        ))}
+                      </div>
+                      {/* Overlay das barras */}
+                      <div
+                        className="grid grid-cols-7 gap-1.5 absolute top-0 left-0 right-0 pt-1 pointer-events-none"
+                        style={{ gridAutoRows: "26px" }}
+                      >
+                        {weekLayout.items.map((item) => (
+                          <TaskBar key={item.task.id} item={item} onOpen={openEditSheet} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Zona: próxima semana */}
+                  <EdgeDropZone id="week-next"><ChevronRight className="h-4 w-4" /></EdgeDropZone>
                 </div>
               </div>
               <DragOverlay>
                 {activeDragTask ? (
-                  <div className="rounded-md border border-blue-400 bg-white dark:bg-gray-800 px-2 py-1.5 shadow-lg">
-                    <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{activeDragTask.title}</span>
+                  <div className="rounded-md bg-[#1a67c2] text-white px-2 py-1 shadow-lg">
+                    <span className="text-xs font-medium">{activeDragTask.title}</span>
                   </div>
                 ) : null}
               </DragOverlay>
