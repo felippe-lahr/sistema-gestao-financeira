@@ -1131,6 +1131,31 @@ export default function Agenda() {
                       </Select>
                     </div>
                   </div>
+                  {/* Preview / aviso da recorrência */}
+                  {(() => {
+                    const n = parseInt(formData.recurrenceCount) || 0;
+                    if (n < 2) {
+                      return (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          ⚠️ Com <strong>Repetir por = {n}</strong>, nenhuma repetição será criada. Informe <strong>2 ou mais</strong> (é a quantidade total de vezes).
+                        </p>
+                      );
+                    }
+                    const freqLabel: Record<string, string> = { DAY: "diárias", WEEK: "semanais", MONTH: "mensais", YEAR: "anuais" };
+                    let previewText = `Serão criadas ${n} tarefas ${freqLabel[formData.recurrenceFrequency]}`;
+                    if (formData.dueDate) {
+                      const [y, m, d] = formData.dueDate.split("-").map(Number);
+                      const start = new Date(y, m - 1, d, 12, 0, 0);
+                      const last = new Date(start);
+                      const k = n - 1;
+                      if (formData.recurrenceFrequency === "DAY") last.setDate(last.getDate() + k);
+                      else if (formData.recurrenceFrequency === "WEEK") last.setDate(last.getDate() + k * 7);
+                      else if (formData.recurrenceFrequency === "MONTH") last.setMonth(last.getMonth() + k);
+                      else last.setFullYear(last.getFullYear() + k);
+                      previewText += `, de ${format(start, "dd/MM/yyyy")} a ${format(last, "dd/MM/yyyy")}`;
+                    }
+                    return <p className="text-xs text-muted-foreground">{previewText}.</p>;
+                  })()}
                 </div>
               )}
             </div>
