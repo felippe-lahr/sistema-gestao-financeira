@@ -387,6 +387,13 @@ export default function Agenda() {
     });
   };
 
+  // Marcar/reabrir a tarefa em edição direto pelo drawer
+  const handleToggleCompleteEditing = () => {
+    if (!editingTask) return;
+    toggleComplete.mutate({ id: editingTask.id });
+    setEditingTask({ ...editingTask, status: editingTask.status === "COMPLETED" ? "PENDING" : "COMPLETED" });
+  };
+
   const handleUpdateTask = () => {
     if (!editingTask || !formData.title || !formData.dueDate) {
       toast.error("Preencha o título e a data de início");
@@ -729,15 +736,20 @@ export default function Agenda() {
                   <EdgeDropZone id="week-prev"><ChevronLeft className="h-4 w-4" /></EdgeDropZone>
 
                   <div className="flex-1 min-w-0">
-                    {/* Cabeçalhos dos dias */}
+                    {/* Cabeçalhos dos dias (clicáveis: selecionam o dia p/ o painel abaixo) */}
                     <div className="grid grid-cols-7 gap-1.5 mb-1">
                       {weekDays.map((day) => {
                         const today = isToday(day);
+                        const selected = selectedDate && isSameDay(day, selectedDate);
                         return (
-                          <div key={day.toISOString()} className={`text-center py-1.5 rounded-md ${today ? "bg-blue-50 dark:bg-blue-900/30" : ""}`}>
+                          <button
+                            key={day.toISOString()}
+                            onClick={() => setSelectedDate(day)}
+                            className={`text-center py-1.5 rounded-md transition-colors cursor-pointer ${selected ? "ring-2 ring-blue-500 ring-inset" : ""} ${today ? "bg-blue-50 dark:bg-blue-900/30" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+                          >
                             <div className="text-[11px] uppercase text-gray-500 dark:text-gray-400 capitalize">{format(day, "EEE", { locale: ptBR })}</div>
                             <div className={`text-sm font-semibold ${today ? "text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-200"}`}>{format(day, "dd/MM")}</div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -1249,6 +1261,20 @@ export default function Agenda() {
             </div>
           </div>
           
+          {/* Ação de concluir / reabrir */}
+          {editingTask && (
+            <div className="px-6 pb-1">
+              <Button
+                variant="outline"
+                className={`w-full ${editingTask.status === "COMPLETED" ? "" : "border-green-500 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"}`}
+                onClick={handleToggleCompleteEditing}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                {editingTask.status === "COMPLETED" ? "Reabrir tarefa" : "Marcar como concluída"}
+              </Button>
+            </div>
+          )}
+
           {/* Footer Fixo */}
           <div className="sticky bottom-0 z-10 border dark:border-gray-700-t bg-white dark:bg-gray-800 px-6 py-4 flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setIsEditOpen(false)}>
