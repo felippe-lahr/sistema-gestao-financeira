@@ -87,6 +87,22 @@ function WeekDropColumn({ day, barsHeight, onCreate }: { day: Date; barsHeight: 
   );
 }
 
+// Mantém o draggable da tarefa arrastada montado mesmo quando ela sai da
+// semana visível (ao navegar durante o arraste). Sem isso, o dnd-kit cancela
+// o arraste quando o elemento de origem desmonta, e o drop não é aplicado.
+function KeepAliveDraggable({ taskId }: { taskId: number }) {
+  const { setNodeRef, listeners, attributes } = useDraggable({ id: `task-${taskId}`, data: { taskId } });
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      aria-hidden
+      style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none", overflow: "hidden" }}
+    />
+  );
+}
+
 // Zona lateral: ao arrastar sobre ela, navega para a semana anterior/próxima
 function EdgeDropZone({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id });
@@ -754,6 +770,10 @@ export default function Agenda() {
                   <EdgeDropZone id="week-next"><ChevronRight className="h-4 w-4" /></EdgeDropZone>
                 </div>
               </div>
+              {/* Mantém o item arrastado registrado ao navegar entre semanas */}
+              {activeDragTask && !weekLayout.items.some((it) => it.task.id === activeDragTask.id) && (
+                <KeepAliveDraggable taskId={activeDragTask.id} />
+              )}
               <DragOverlay>
                 {activeDragTask ? (
                   <div className="rounded-md bg-[#1a67c2] text-white px-2 py-1 shadow-lg">
