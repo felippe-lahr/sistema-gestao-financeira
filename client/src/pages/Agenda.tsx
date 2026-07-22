@@ -17,7 +17,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
-import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type DragOverEvent } from "@dnd-kit/core";
+import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin, type DragEndEvent, type DragStartEvent, type DragOverEvent } from "@dnd-kit/core";
 
 const PRIORITY_COLORS = {
   LOW: "bg-blue-500",
@@ -240,26 +240,37 @@ export default function Agenda() {
   );
 
   const lastWeekNavRef = useRef(0);
+  const hoverDayRef = useRef<string | null>(null); // último dia sob o cursor (fallback do drop)
   const handleDragStart = (e: DragStartEvent) => {
     const taskId = (e.active.data.current as any)?.taskId;
     const t = tasks.find((x: any) => x.id === taskId);
     setActiveDragTask(t || null);
+    hoverDayRef.current = null;
   };
 
-  // Ao arrastar sobre as zonas laterais, navega para a semana anterior/próxima
   const handleDragOver = (e: DragOverEvent) => {
     const overId = e.over?.id;
-    if (overId !== "week-prev" && overId !== "week-next") return;
-    const now = Date.now();
-    if (now - lastWeekNavRef.current < 650) return; // debounce
-    lastWeekNavRef.current = now;
-    setWeekAnchor((prev) => (overId === "week-prev" ? subDays(prev, 7) : addDays(prev, 7)));
+    // Zonas laterais: navega para a semana anterior/próxima (debounced)
+    if (overId === "week-prev" || overId === "week-next") {
+      const now = Date.now();
+      if (now - lastWeekNavRef.current < 650) return;
+      lastWeekNavRef.current = now;
+      setWeekAnchor((prev) => (overId === "week-prev" ? subDays(prev, 7) : addDays(prev, 7)));
+      return;
+    }
+    // Sobre uma coluna de dia: guarda como alvo de drop (fallback)
+    const day = (e.over?.data.current as any)?.day;
+    if (day) hoverDayRef.current = day;
   };
 
   const handleDragEnd = (e: DragEndEvent) => {
     setActiveDragTask(null);
     const taskId = (e.active.data.current as any)?.taskId;
-    const dayKey = (e.over?.data.current as any)?.day as string | undefined;
+    // Preferir o alvo do evento; se vazio (ex.: origem desmontou ao trocar de
+    // semana), usar a última coluna sob o cursor.
+    const overDay = (e.over?.data.current as any)?.day as string | undefined;
+    const dayKey = overDay || hoverDayRef.current || undefined;
+    hoverDayRef.current = null;
     if (!taskId || !dayKey) return;
     const task = tasks.find((x: any) => x.id === taskId);
     if (!task) return;
@@ -694,7 +705,7 @@ export default function Agenda() {
         <CardContent>
           {viewMode === "week" ? (
             /* ===== Visão semanal com drag-and-drop ===== */
-            <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+            <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
               <p className="text-xs text-muted-foreground mb-2">Arraste uma tarefa para outro dia para reagendá-la. Arraste até as bordas ‹ › para mudar de semana{currentUser?.googleCalendarRefreshToken ? " · sincroniza com o Google Calendar" : ""}.</p>
               <div className="overflow-x-auto">
                 <div className="flex items-stretch gap-1.5 min-w-[900px] lg:min-w-0">
