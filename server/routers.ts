@@ -2301,24 +2301,43 @@ Regras:
           throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         
+        // Remover o(s) evento(s) do Google Calendar antes de apagar do banco
+        const user = await db.getUserById(ctx.user.id);
+        const refreshToken = user?.googleCalendarRefreshToken;
+        const removeFromGCal = async (t: any) => {
+          if (!refreshToken || !t?.googleCalendarEventId) return;
+          try {
+            const { deleteTaskFromGoogleCalendar } = await import("./services/google-calendar");
+            await deleteTaskFromGoogleCalendar(t.googleCalendarEventId, refreshToken);
+          } catch (e) { console.error("[Google Calendar] Erro ao remover evento no delete:", e); }
+        };
+
         // Se deleteAll = true e a tarefa tem parentTaskId ou é pai, deletar todas
         if (input.deleteAll && (task.parentTaskId || task.isRecurring)) {
           const parentId = task.parentTaskId || task.id;
           // Buscar todas as tarefas relacionadas
           const relatedTasks = await db.getTasksByParentId(parentId);
-          
+          const parentTask = await db.getTaskById(parentId);
+
+          // Remover eventos do Google Calendar
+          await removeFromGCal(parentTask);
+          for (const relatedTask of relatedTasks) {
+            await removeFromGCal(relatedTask);
+          }
+
           // Deletar tarefa pai
           await db.deleteTask(parentId);
-          
+
           // Deletar todas as tarefas filhas
           for (const relatedTask of relatedTasks) {
             await db.deleteTask(relatedTask.id);
           }
         } else {
-          // Deletar apenas a tarefa atual
+          // Remover evento e deletar apenas a tarefa atual
+          await removeFromGCal(task);
           await db.deleteTask(input.id);
         }
-        
+
         return { success: true };
       }),
 
