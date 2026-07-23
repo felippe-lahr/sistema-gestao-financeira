@@ -136,6 +136,27 @@ const pendingAttachments = new Map<string, {
   expiresAt: number;
 }>();
 
+// ─── Estado para agendamento (compromisso) por voz/texto — confirmação ───────
+type AgendaTaskDraft = {
+  title: string;
+  dueDate: string;                 // YYYY-MM-DD
+  dueTime: string | null;          // HH:MM
+  endDate: string | null;          // YYYY-MM-DD
+  endTime: string | null;          // HH:MM
+  entityId: number | null;
+  entityName: string | null;
+  priority: "LOW" | "MEDIUM" | "HIGH";
+  isRecurring: boolean;
+  recurrenceCount: number;
+  recurrenceFrequency: "DAY" | "WEEK" | "MONTH" | "YEAR" | null;
+};
+const pendingAgenda = new Map<string, {
+  userId: number;
+  organizationId: number | null;
+  draft: AgendaTaskDraft;
+  expiresAt: number;
+}>();
+
 const ATTACHMENT_TYPE_LABELS: Record<string, string> = {
   COMPROVANTE_PAGAMENTO: "Comprovante de Pagamento",
   BOLETO: "Boleto",
@@ -354,6 +375,191 @@ Retorne APENAS o JSON, sem texto adicional.`,
     console.error("[WhatsApp Bot] Erro ao extrair transação:", error);
     return { ok: false as const, reason: "llm_error" as const };
   }
+}
+
+/**
+ * Detecta se a fala/texto é uma intenção de AGENDAMENTO (compromisso) e não
+ * uma transação financeira. Baseado em palavras-gatilho.
+ */
+function isAgendaIntent(text: string): boolean {
+  const t = (text || "").toLowerCase();
+  // Gatilhos claramente de agenda (evita conflito com "lembrar de pagar", etc.)
+  return /\b(agendar|agende|agendamento|compromisso|lembrete|na agenda|marcar (?:na agenda|compromisso|reuni[aã]o)|marque (?:na agenda|compromisso|reuni[aã]o)|adicionar na agenda|colocar na agenda)\b/.test(t);
+}
+
+/**
+ * Extrai um compromisso de agenda (tarefa) a partir de texto/voz via IA.
+ * Retorna um rascunho com data/hora, entidade, prioridade e recorrência.
+ */
+async function extractAgendaTask(
+  text: string,
+  userEntities: { id: number; name: string }[],
+): Promise<AgendaTaskDraft | null> {
+  const entitiesStr = userEntities.map(e => e.name).join(", ") || "nenhuma";
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  const weekday = now.toLocaleDateString("pt-BR", { weekday: "long" });
+
+  try {
+    const result = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: `Você extrai um COMPROMISSO DE AGENDA a partir do texto do usuário.
+
+Data de hoje: ${today} (${weekday})
+Entidades disponíveis: ${entitiesStr}
+
+Retorne APENAS um JSON com os campos:
+- title: título curto do compromisso (string) — obrigatório
+- dueDate: data de início no formato YYYY-MM-DD. Resolva datas relativas ("amanhã", "sexta", "próxima segunda") com base na data de hoje. Use hoje se não informado.
+- dueTime: horário de início "HH:MM" (24h) ou null se não informado
+- endDate: data de término YYYY-MM-DD ou null
+- endTime: horário de término "HH:MM" ou null (ex: "das 14h às 15h" → dueTime 14:00, endTime 15:00)
+- entityName: nome da entidade citada, escolhendo EXATAMENTE um da lista, ou null
+- priority: "LOW", "MEDIUM" ou "HIGH" (baixa/média/alta). Use "MEDIUM" se não informado
+- isRecurring: true se houver repetição
+- recurrenceCount: número TOTAL de ocorrências (ex: "por 4 semanas" → 4), ou null
+- recurrenceFrequency: "DAY", "WEEK", "MONTH" ou "YEAR" (apenas se isRecurring=true)
+
+Se não houver título, retorne null. Retorne SOMENTE o JSON.`,
+        },
+        { role: "user", content: text },
+      ],
+      responseFormat: { type: "json_object" },
+      maxRetries: 0,
+      maxRetryDelayMs: 3000,
+    });
+
+    const content = result.choices?.[0]?.message?.content;
+    if (!content || typeof content !== "string") return null;
+    const cleaned = content.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
+    const parsed = JSON.parse(cleaned) as any;
+    if (!parsed || !parsed.title || !parsed.dueDate) return null;
+
+    // Resolver entidade por nome (fuzzy)
+    let entityId: number | null = null;
+    let entityName: string | null = parsed.entityName || null;
+    if (entityName) {
+      const norm = String(entityName).toLowerCase().trim();
+      const match = userEntities.find(e =>
+        e.name.toLowerCase() === norm ||
+        e.name.toLowerCase().includes(norm) ||
+        norm.includes(e.name.toLowerCase())
+      );
+      if (match) { entityId = match.id; entityName = match.name; }
+      else { entityName = null; }
+    }
+
+    const prio = String(parsed.priority || "MEDIUM").toUpperCase();
+    const priority = (["LOW", "MEDIUM", "HIGH"].includes(prio) ? prio : "MEDIUM") as "LOW" | "MEDIUM" | "HIGH";
+
+    const freqRaw = parsed.recurrenceFrequency ? String(parsed.recurrenceFrequency).toUpperCase() : null;
+    const recurrenceFrequency = (freqRaw && ["DAY", "WEEK", "MONTH", "YEAR"].includes(freqRaw) ? freqRaw : null) as AgendaTaskDraft["recurrenceFrequency"];
+    const recurrenceCount = parsed.recurrenceCount ? Math.max(1, parseInt(String(parsed.recurrenceCount), 10) || 1) : 1;
+    const isRecurring = !!parsed.isRecurring && recurrenceCount >= 2 && !!recurrenceFrequency;
+
+    return {
+      title: String(parsed.title).trim(),
+      dueDate: String(parsed.dueDate),
+      dueTime: parsed.dueTime || null,
+      endDate: parsed.endDate || null,
+      endTime: parsed.endTime || null,
+      entityId,
+      entityName,
+      priority,
+      isRecurring,
+      recurrenceCount: isRecurring ? recurrenceCount : 1,
+      recurrenceFrequency: isRecurring ? recurrenceFrequency : null,
+    };
+  } catch (error) {
+    console.error("[WhatsApp Bot] Erro ao extrair compromisso:", error);
+    return null;
+  }
+}
+
+/**
+ * Formata um rascunho de compromisso para a mensagem de confirmação.
+ */
+function formatAgendaDraft(d: AgendaTaskDraft): string {
+  const prioLabel = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta" }[d.priority];
+  const freqLabel = { DAY: "diárias", WEEK: "semanais", MONTH: "mensais", YEAR: "anuais" } as const;
+  const [y, m, day] = d.dueDate.split("-");
+  let when = `${day}/${m}/${y}`;
+  if (d.dueTime) when += ` ${d.dueTime}`;
+  if (d.endTime) when += `–${d.endTime}`;
+  else if (d.endDate && d.endDate !== d.dueDate) {
+    const [ey, em, ed] = d.endDate.split("-");
+    when += ` até ${ed}/${em}/${ey}`;
+  }
+  const lines = [`🗓️ *${d.title}*`, `📅 ${when}`];
+  if (d.entityName) lines.push(`🏷️ ${d.entityName}`);
+  lines.push(`⭐ Prioridade: ${prioLabel}`);
+  if (d.isRecurring) lines.push(`🔁 Repete ${d.recurrenceCount}x ${freqLabel[d.recurrenceFrequency!]}`);
+  return lines.join("\n");
+}
+
+/** Sincroniza uma tarefa com o Google Calendar (se o usuário estiver conectado). */
+async function syncTaskGCalSafe(taskId: number, userId: number): Promise<void> {
+  try {
+    const user = await db.getUserById(userId);
+    if (user?.googleCalendarRefreshToken) {
+      const { syncTaskToGoogleCalendar } = await import("./services/google-calendar");
+      const task = await db.getTaskById(taskId);
+      if (task) await syncTaskToGoogleCalendar(task, user.googleCalendarRefreshToken);
+    }
+  } catch (e) {
+    console.error("[WhatsApp Bot] Erro sync Google Calendar (tarefa):", e);
+  }
+}
+
+/**
+ * Cria o(s) compromisso(s) a partir do rascunho, replicando a lógica de
+ * recorrência do router (pai + ocorrências). Retorna a quantidade criada.
+ */
+async function createAgendaTasks(draft: AgendaTaskDraft, userId: number): Promise<number> {
+  const toNoon = (s: string) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); };
+  const dueDate = toNoon(draft.dueDate);
+  const endDate = draft.endDate ? toNoon(draft.endDate) : undefined;
+  const base = {
+    userId,
+    entityId: draft.entityId ?? undefined,
+    title: draft.title,
+    dueTime: draft.dueTime ?? undefined,
+    endTime: draft.endTime ?? undefined,
+    allDay: !draft.dueTime,
+    priority: draft.priority,
+    status: "PENDING" as const,
+  };
+  const count = draft.isRecurring ? draft.recurrenceCount : 1;
+
+  const parentId = await db.createTask({
+    ...base,
+    dueDate,
+    endDate,
+    isRecurring: draft.isRecurring,
+    recurrencePattern: draft.isRecurring ? JSON.stringify({ frequency: draft.recurrenceFrequency, interval: 1, count }) : null,
+    parentTaskId: null,
+  } as any);
+  await syncTaskGCalSafe(parentId, userId);
+
+  if (draft.isRecurring && draft.recurrenceFrequency) {
+    for (let i = 1; i < count; i++) {
+      const nd = new Date(dueDate);
+      const ne = endDate ? new Date(endDate) : undefined;
+      switch (draft.recurrenceFrequency) {
+        case "DAY": nd.setDate(nd.getDate() + i); if (ne) ne.setDate(ne.getDate() + i); break;
+        case "WEEK": nd.setDate(nd.getDate() + i * 7); if (ne) ne.setDate(ne.getDate() + i * 7); break;
+        case "MONTH": nd.setMonth(nd.getMonth() + i); if (ne) ne.setMonth(ne.getMonth() + i); break;
+        case "YEAR": nd.setFullYear(nd.getFullYear() + i); if (ne) ne.setFullYear(ne.getFullYear() + i); break;
+      }
+      const childId = await db.createTask({
+        ...base, dueDate: nd, endDate: ne, isRecurring: false, recurrencePattern: null, parentTaskId: parentId,
+      } as any);
+      await syncTaskGCalSafe(childId, userId);
+    }
+  }
+  return count;
 }
 
 /**
@@ -1518,6 +1724,31 @@ async function processIncomingMessage(
     }
   }
 
+  // 2d. Confirmação de agendamento (compromisso)
+  const agendaPending = pendingAgenda.get(fromPhone);
+  if (agendaPending && Date.now() < agendaPending.expiresAt) {
+    const t = msg.text.trim();
+    if (t === "0" || t.toLowerCase().includes("cancel")) {
+      pendingAgenda.delete(fromPhone);
+      await sendReply(`❌ Agendamento cancelado.`);
+      return;
+    }
+    if (t === "1" || t.toLowerCase() === "sim" || t.toLowerCase().includes("confirm")) {
+      pendingAgenda.delete(fromPhone);
+      try {
+        const n = await createAgendaTasks(agendaPending.draft, agendaPending.userId);
+        const extra = n > 1 ? ` (${n} ocorrências)` : "";
+        await sendReply(`✅ *Compromisso agendado!*${extra}\n\n${formatAgendaDraft(agendaPending.draft)}`);
+      } catch (e: any) {
+        console.error("[WhatsApp Bot] Erro ao criar compromisso:", e);
+        await sendReply(`❌ Erro ao agendar. Tente novamente.`);
+      }
+      return;
+    }
+    await sendReply(`❓ Responda *1* para confirmar ou *0* para cancelar.`);
+    return;
+  }
+
   // 3. Verificar se é uma resposta de confirmação pendente
   const text = msg.text;
 
@@ -2006,6 +2237,27 @@ async function processIncomingMessage(
   if (!extractedText) return;
 
   await sendReply(`🤔 Processando...`);
+
+  // Intenção de AGENDAMENTO (compromisso) — antes da transação
+  if (isAgendaIntent(extractedText)) {
+    const draft = await extractAgendaTask(extractedText, userEntities);
+    if (!draft) {
+      await sendReply(
+        `❌ Não consegui entender o compromisso.\n\nTente algo como:\n_"Agendar reunião com o contador sexta das 14h às 15h, prioridade alta"_`
+      );
+      return;
+    }
+    pendingAgenda.set(fromPhone, {
+      userId: user.id,
+      organizationId: org?.id ?? null,
+      draft,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+    await sendReply(
+      `📌 *Confirmar agendamento?*\n\n${formatAgendaDraft(draft)}\n\n*1* — Confirmar\n*0* — Cancelar`
+    );
+    return;
+  }
 
   const extractionResult = await extractTransactionFromText(extractedText, userEntities, categoriesList, creditCardsList);
 
