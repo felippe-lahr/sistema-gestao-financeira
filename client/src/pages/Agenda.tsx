@@ -586,6 +586,35 @@ export default function Agenda() {
     return { items, maxRow: rowsLastCol.length };
   }, [processedTasks, weekDays]);
 
+  // Linhas COMPACTAS por semana para a visão mensal — evita que a linha global
+  // (esparsa) faça a barra vazar da célula e sobrepor outra tarefa.
+  // Chave: `${weekIdx}-${taskId}` → row. Barras multi-dia ficam na mesma linha
+  // dentro da semana (continuidade preservada).
+  const monthWeekRows = useMemo(() => {
+    const map = new Map<string, number>();
+    const weeks = Math.ceil(calendarDays.length / 7);
+    for (let w = 0; w < weeks; w++) {
+      const weekStart = startOfDay(calendarDays[w * 7]);
+      const weekEnd = startOfDay(calendarDays[w * 7 + 6]);
+      const items = processedTasks
+        .filter((t) => startOfDay(t.endDate) >= weekStart && startOfDay(t.startDate) <= weekEnd)
+        .map((t) => ({
+          id: t.id,
+          startCol: Math.max(0, differenceInDays(startOfDay(t.startDate), weekStart)),
+          endCol: Math.min(6, differenceInDays(startOfDay(t.endDate), weekStart)),
+        }))
+        .sort((a, b) => a.startCol - b.startCol || (b.endCol - b.startCol) - (a.endCol - a.startCol));
+      const rowsLastCol: number[] = [];
+      for (const it of items) {
+        let row = 0;
+        while (rowsLastCol[row] !== undefined && rowsLastCol[row] >= it.startCol) row++;
+        rowsLastCol[row] = it.endCol;
+        map.set(`${w}-${it.id}`, row);
+      }
+    }
+    return map;
+  }, [processedTasks, calendarDays]);
+
   // Verificar se é o primeiro dia de uma tarefa
   const isTaskStart = (task: any, day: Date) => {
     return isSameDay(task.startDate, day);
@@ -809,6 +838,9 @@ export default function Agenda() {
           <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700">
             {calendarDays.map((day, index) => {
               const dayTasks = getTasksForDay(day);
+              const weekIdx = Math.floor(index / 7);
+              const rowOf = (t: any) => monthWeekRows.get(`${weekIdx}-${t.id}`) ?? 0;
+              const maxRow = dayTasks.length ? Math.max(...dayTasks.map(rowOf)) : 0;
               const isCurrentMonth = isSameMonth(day, currentMonth);
               const isSelected = selectedDate && isSameDay(day, selectedDate);
               const isPast = isBefore(day, new Date()) && !isToday(day);
@@ -835,7 +867,7 @@ export default function Agenda() {
                   </div>
                   
                   {/* Tarefas do dia */}
-                  <div className="overflow-visible relative" style={{ minHeight: `${Math.max(dayTasks.length, 1) * 22 + 4}px` }}>
+                  <div className="overflow-visible relative" style={{ minHeight: `${(maxRow + 1) * 22 + 4}px` }}>
                     {dayTasks.map((task) => {
                       const isStart = isTaskStart(task, day);
                       const isEnd = isTaskEnd(task, day);
@@ -864,7 +896,7 @@ export default function Agenda() {
                           `}
                           style={{
                             width: span > 1 ? `calc(${span * 100}% + ${(span - 1) * 1}px)` : "calc(100% - 4px)",
-                            top: `${task.row * 22}px`,
+                            top: `${rowOf(task) * 22}px`,
                             zIndex: 10,
                           }}
                           title={`${task.title}${task.duration > 1 ? ` (${format(task.startDate, "dd/MM")} - ${format(task.endDate, "dd/MM")})` : ""}`}
