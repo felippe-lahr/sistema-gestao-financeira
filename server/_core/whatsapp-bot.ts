@@ -504,7 +504,7 @@ async function syncTaskGCalSafe(taskId: number, userId: number): Promise<void> {
   try {
     const user = await db.getUserById(userId);
     if (user?.googleCalendarRefreshToken) {
-      const { syncTaskToGoogleCalendar } = await import("./services/google-calendar");
+      const { syncTaskToGoogleCalendar } = await import("../services/google-calendar");
       const task = await db.getTaskById(taskId);
       if (task) await syncTaskToGoogleCalendar(task, user.googleCalendarRefreshToken);
     }
