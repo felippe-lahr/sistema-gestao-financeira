@@ -72,6 +72,32 @@ function parseOfxType(trnType: string, amount: string): "INCOME" | "EXPENSE" {
 /**
  * Faz o parse de um arquivo OFX e retorna as transações estruturadas
  */
+/**
+ * Busca recursivamente o nó do extrato (statement) na árvore do OFX.
+ * Identifica pelo conteúdo (BANKTRANLIST / BANKACCTFROM / CCACCTFROM / LEDGERBAL),
+ * cobrindo variações de aninhamento e arrays (ex.: STMTTRNRS como lista) que
+ * alguns bancos brasileiros usam (Bradesco, etc.).
+ */
+function findStatementNode(node: any, depth = 0): any {
+  if (!node || typeof node !== "object" || depth > 10) return null;
+  if (node.BANKTRANLIST || node.BANKACCTFROM || node.CCACCTFROM || node.LEDGERBAL) {
+    return node;
+  }
+  for (const key of Object.keys(node)) {
+    const child = (node as any)[key];
+    if (Array.isArray(child)) {
+      for (const c of child) {
+        const found = findStatementNode(c, depth + 1);
+        if (found) return found;
+      }
+    } else if (child && typeof child === "object") {
+      const found = findStatementNode(child, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 export async function parseOfxFile(content: string): Promise<ParsedOfxFile> {
   try {
     const parsed = await ofxJs.parse(content);
@@ -104,11 +130,15 @@ export async function parseOfxFile(content: string): Promise<ParsedOfxFile> {
       bankMsg.INVSTMTRS ||
       // Alguns bancos colocam direto no nível do bankMsg
       (bankMsg.STMTTRNRS?.STMTRS) ||
-      (bankMsg.STMTTRNRS?.CCSTMTRS);
+      (bankMsg.STMTTRNRS?.CCSTMTRS) ||
+      // Fallback robusto: busca recursiva pelo nó do extrato (cobre arrays e
+      // aninhamentos não-padrão, ex.: STMTTRNRS como lista no Bradesco)
+      findStatementNode(bankMsg) ||
+      findStatementNode(ofxData);
 
     if (!stmtrs) {
       const keys = Object.keys(bankMsg).join(", ");
-      throw new Error(`Arquivo OFX inválido: STMTRS não encontrado. Chaves encontradas: ${keys}`);
+      throw new Error(`Arquivo OFX inválido: extrato (STMTRS) não encontrado. Chaves encontradas: ${keys}`);
     }
 
     // Dados da conta
