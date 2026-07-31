@@ -35,10 +35,10 @@ function parseOfxDate(dateStr: string): Date {
   const year = parseInt(clean.substring(0, 4));
   const month = parseInt(clean.substring(4, 6)) - 1;
   const day = parseInt(clean.substring(6, 8));
-  const hour = clean.length >= 10 ? parseInt(clean.substring(8, 10)) : 0;
-  const min = clean.length >= 12 ? parseInt(clean.substring(10, 12)) : 0;
-  const sec = clean.length >= 14 ? parseInt(clean.substring(12, 14)) : 0;
-  return new Date(year, month, day, hour, min, sec);
+  // Datas de extrato OFX são efetivamente por DIA (hora 000000). Usar meio-dia
+  // evita que deslocamentos de fuso (servidor UTC ↔ exibição -03) empurrem a
+  // data para o dia anterior. Ex.: "20260703000000[-03]" precisa exibir 03/07.
+  return new Date(year, month, day, 12, 0, 0);
 }
 
 /**
