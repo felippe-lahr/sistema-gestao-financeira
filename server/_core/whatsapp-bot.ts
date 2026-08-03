@@ -1089,6 +1089,8 @@ async function showPendingTransactionsList(
 ): Promise<void> {
   const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   const monthLabel = `${MONTH_NAMES[month - 1]}/${year}`;
+  const entity = await db.getEntityById(entityId).catch(() => null);
+  const entityLabel = entity?.name ? ` da entidade *${entity.name}*` : "";
 
   // Buscar pelo intervalo do mês (por dueDate) — evita truncamento do limit
   // quando há muitas parcelas futuras pendentes.
@@ -1104,7 +1106,7 @@ async function showPendingTransactionsList(
   if (filtered.length === 0) {
     // Manter no stage awaiting_month para tentar outro mês
     pendingAttachments.set(replyJid, { ...pendingAttach, entityId, stage: "awaiting_month" });
-    await sendReply(`⚠️ Nenhuma transação pendente ou vencida em *${monthLabel}*.\n\nInforme outro mês ou *0* para cancelar.`);
+    await sendReply(`⚠️ Nenhuma transação pendente ou vencida${entityLabel} em *${monthLabel}*.\n\nInforme outro mês ou *0* para cancelar.`);
     return;
   }
 
@@ -1501,7 +1503,7 @@ async function processIncomingMessage(
       }
 
       pendingAttachments.set(fromPhone, { ...pendingAttach, stage: "awaiting_month", entityId: chosenEntity.id });
-      await sendReply(`📅 *Qual o mês de vencimento?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
+      await sendReply(`✅ Entidade: *${chosenEntity.name}*\n\n📅 *Qual o mês de vencimento?*\n\nEx: _junho_, _jul/2026_, _07/26_`);
       return;
     }
 
