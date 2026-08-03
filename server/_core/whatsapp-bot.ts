@@ -1694,6 +1694,7 @@ async function processIncomingMessage(
         return;
       }
       pendingTxSetup.delete(fromPhone);
+      await sendReply(`✅ Entidade: *${chosen.name}*`);
       await resolvePaymentMethodStep(
         fromPhone, txSetup.extracted, txSetup.userId, txSetup.organizationId,
         chosen.id, txSetup.messageId, sendReply, txSetup.pendingFile
