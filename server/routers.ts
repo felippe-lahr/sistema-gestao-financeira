@@ -2235,6 +2235,7 @@ Regras:
           status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
           color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
           reminderMinutes: z.number().optional().nullable(),
+          checklist: z.array(z.object({ id: z.string(), text: z.string(), done: z.boolean() })).optional().nullable(),
           updateAll: z.boolean().optional(), // Atualizar todas as tarefas recorrentes
         })
       )
@@ -2246,8 +2247,19 @@ Regras:
         if (input.entityId) {
           await requireEntityAccess(input.entityId, ctx.user.id, "EDITOR");
         }
-        
-        const { id, updateAll, ...updateData } = input;
+
+        const { id, updateAll, checklist, ...rest } = input;
+        const updateData: any = { ...rest };
+        // Checklist: serializa em JSON e deriva o status quando não foi passado
+        // status explícito. 100% → concluída; desmarcou algum → reabre.
+        if (checklist !== undefined) {
+          updateData.checklist = checklist ? JSON.stringify(checklist) : null;
+          if (input.status === undefined && checklist && checklist.length > 0) {
+            const allDone = checklist.every((i) => i.done);
+            updateData.status = allDone ? "COMPLETED" : "PENDING";
+            updateData.completedAt = allDone ? new Date() : null;
+          }
+        }
         
         // Se updateAll = true e a tarefa tem parentTaskId ou é pai, atualizar todas
         if (updateAll && (task.parentTaskId || task.isRecurring)) {

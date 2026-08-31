@@ -589,7 +589,11 @@ export const tasks = pgTable("tasks", {
   
   // Lembrete
   reminderMinutes: integer("reminderMinutes"), // Minutos antes para lembrar
-  
+
+  // Checklist de ações (JSON string): [{ id, text, done }]. Ao completar 100%,
+  // a tarefa é concluída automaticamente.
+  checklist: text("checklist"),
+
   // Google Calendar sync
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }), // ID do evento no Google Calendar
   

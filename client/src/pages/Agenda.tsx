@@ -37,9 +37,21 @@ const PRIORITY_LABELS = {
   HIGH: "Alta",
 };
 
+// Progresso do checklist de uma tarefa (ou null se não houver itens)
+function getChecklistProgress(task: any): { done: number; total: number } | null {
+  try {
+    const cl = task?.checklist ? JSON.parse(task.checklist) : [];
+    if (Array.isArray(cl) && cl.length > 0) {
+      return { done: cl.filter((i: any) => i.done).length, total: cl.length };
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 // Barra de tarefa (contínua, pode ocupar vários dias) na visão semanal
 function TaskBar({ item, onOpen }: { item: any; onOpen: (t: any) => void }) {
   const task = item.task;
+  const cp = getChecklistProgress(task);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `task-${task.id}`,
     data: { taskId: task.id },
@@ -61,7 +73,7 @@ function TaskBar({ item, onOpen }: { item: any; onOpen: (t: any) => void }) {
       title={task.title}
       className={`pointer-events-auto self-start text-left rounded-md px-2 py-1 text-xs font-medium truncate text-white touch-none cursor-grab active:cursor-grabbing ${bg ? "" : priorityClass} ${isDragging ? "opacity-40" : ""} ${done ? "opacity-60 line-through" : ""} ${item.clipLeft ? "rounded-l-none" : ""} ${item.clipRight ? "rounded-r-none" : ""}`}
     >
-      {task.title}{!task.allDay && task.dueTime ? ` · ${task.dueTime}` : ""}
+      {cp ? `☑ ${cp.done}/${cp.total} ` : ""}{task.title}{!task.allDay && task.dueTime ? ` · ${task.dueTime}` : ""}
     </button>
   );
 }
@@ -126,6 +138,8 @@ export default function Agenda() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [checklistItems, setChecklistItems] = useState<{ id: string; text: string; done: boolean }[]>([]);
+  const [newChecklistText, setNewChecklistText] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<number | null>(null);
   const [taskToDeleteIsRecurring, setTaskToDeleteIsRecurring] = useState(false);
@@ -456,7 +470,42 @@ export default function Agenda() {
       entityId: task.entityId?.toString() || "",
       color: task.color || "",
     });
+    // Carregar checklist (JSON string → array)
+    let cl: any[] = [];
+    try { cl = task.checklist ? JSON.parse(task.checklist) : []; } catch { cl = []; }
+    setChecklistItems(Array.isArray(cl) ? cl : []);
+    setNewChecklistText("");
     setIsEditOpen(true);
+  };
+
+  // Persiste o checklist e deixa o servidor derivar o status (100% conclui;
+  // desmarcar reabre). Atualiza o status local para o botão refletir.
+  const persistChecklist = async (items: { id: string; text: string; done: boolean }[]) => {
+    if (!editingTask) return;
+    setChecklistItems(items);
+    try {
+      await utils.client.tasks.update.mutate({ id: editingTask.id, checklist: items } as any);
+      refetchTasks();
+      if (items.length > 0) {
+        const allDone = items.every((i) => i.done);
+        setEditingTask({ ...editingTask, status: allDone ? "COMPLETED" : "PENDING" });
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao atualizar checklist");
+    }
+  };
+  const addChecklistItem = () => {
+    const text = newChecklistText.trim();
+    if (!text) return;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    persistChecklist([...checklistItems, { id, text, done: false }]);
+    setNewChecklistText("");
+  };
+  const toggleChecklistItem = (id: string) => {
+    persistChecklist(checklistItems.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
+  };
+  const deleteChecklistItem = (id: string) => {
+    persistChecklist(checklistItems.filter((i) => i.id !== id));
   };
 
   const openCreateSheet = (date?: Date) => {
@@ -901,7 +950,7 @@ export default function Agenda() {
                           }}
                           title={`${task.title}${task.duration > 1 ? ` (${format(task.startDate, "dd/MM")} - ${format(task.endDate, "dd/MM")})` : ""}`}
                         >
-                          {task.title}
+                          {(() => { const cp = getChecklistProgress(task); return cp ? `☑${cp.done}/${cp.total} ` : ""; })()}{task.title}
                         </div>
                       );
                     })}
@@ -1315,9 +1364,57 @@ export default function Agenda() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Checklist de ações — 100% conclui a tarefa automaticamente */}
+              <div>
+                <Label className="mb-2 block">Checklist de ações</Label>
+                {checklistItems.length > 0 && (() => {
+                  const done = checklistItems.filter((i) => i.done).length;
+                  const pct = Math.round((done / checklistItems.length) * 100);
+                  return (
+                    <div className="mb-2">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>{done}/{checklistItems.length} concluídos</span>
+                        <span>{pct}%</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                        <div className="h-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div className="space-y-1.5">
+                  {checklistItems.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 group">
+                      <Checkbox checked={item.done} onCheckedChange={() => toggleChecklistItem(item.id)} />
+                      <span className={`flex-1 text-sm ${item.done ? "line-through text-gray-400" : ""}`}>{item.text}</span>
+                      <button
+                        type="button"
+                        onClick={() => deleteChecklistItem(item.id)}
+                        className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    value={newChecklistText}
+                    onChange={(e) => setNewChecklistText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addChecklistItem(); } }}
+                    placeholder="Adicionar item..."
+                    className="h-9"
+                  />
+                  <Button type="button" variant="outline" className="h-9" onClick={addChecklistItem}>Adicionar</Button>
+                </div>
+                {checklistItems.length > 0 && checklistItems.every((i) => i.done) && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-2">✅ Todos os itens concluídos — tarefa marcada como concluída.</p>
+                )}
+              </div>
             </div>
           </div>
-          
+
           {/* Ação de concluir / reabrir */}
           {editingTask && (
             <div className="px-6 pb-1">

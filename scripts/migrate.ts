@@ -142,6 +142,10 @@ const migrations: { name: string; sql: string }[] = [
     name: "add_categoryId_to_credit_cards",
     sql: `ALTER TABLE credit_cards ADD COLUMN IF NOT EXISTS "categoryId" integer`,
   },
+  {
+    name: "add_checklist_to_tasks",
+    sql: `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS "checklist" text`,
+  },
 ];
 
 async function runMigrations() {
