@@ -49,3 +49,20 @@ Transformar a aplicação em PWA instalável no celular, com notificações push
 ### Consideração estratégica
 Canal complementar ao bot do WhatsApp: WhatsApp para interação, push para
 lembretes rápidos sem depender do WhatsApp.
+
+---
+
+## Checklist de ações nas tarefas da Agenda
+
+**Status:** ✅ Concluído (2026-08-04) · **Prioridade:** Média
+
+Checklist de subtarefas dentro do card de uma tarefa da Agenda; ao completar
+100% dos itens, a tarefa é finalizada automaticamente.
+
+- [x] Coluna `checklist` (JSON) na tabela `tasks` + migração idempotente
+- [x] Seção de checklist no drawer da tarefa com barra de progresso e %
+- [x] Adicionar / marcar / remover itens
+- [x] 100% dos itens → tarefa concluída automaticamente
+- [x] Desmarcar um item → tarefa reaberta automaticamente (status derivado no
+      servidor em `tasks.update`)
+- [x] Indicador de progresso `☑ N/M` nas visões mês e semana
