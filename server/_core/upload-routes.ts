@@ -1,10 +1,30 @@
 import { Express, Request, Response, NextFunction } from "express";
 import { upload, uploadFile, deleteFile } from "./upload";
-import { getPresignedUrl, getS3Stream } from "./s3";
+import { getPresignedUrl, getS3Stream, isS3Configured } from "./s3";
 import { getDb, getEntityById } from "../db";
 import { attachments, transactions } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { sdk } from "./sdk";
+
+/**
+ * Traduz um erro do S3/AWS numa mensagem acionável para o usuário/diagnóstico.
+ */
+function describeUploadError(error: any): string {
+  const name = error?.name || error?.Code || error?.code || "";
+  const map: Record<string, string> = {
+    CredentialsProviderError: "Credenciais AWS ausentes ou inválidas no servidor",
+    InvalidAccessKeyId: "AWS Access Key inválida",
+    SignatureDoesNotMatch: "AWS Secret Key inválida",
+    ExpiredToken: "Credenciais AWS expiradas",
+    ExpiredTokenException: "Credenciais AWS expiradas",
+    AccessDenied: "Sem permissão no bucket S3 (AccessDenied) — verifique a policy do IAM",
+    NoSuchBucket: "Bucket S3 não existe (verifique AWS_S3_BUCKET)",
+    PermanentRedirect: "Região do bucket S3 incorreta (verifique AWS_REGION)",
+    NetworkingError: "Falha de rede ao acessar a AWS S3",
+    TimeoutError: "Timeout ao acessar a AWS S3",
+  };
+  return map[name] || error?.message || "erro desconhecido";
+}
 
 /**
  * Middleware de autenticação para rotas de upload
@@ -71,6 +91,11 @@ export function registerUploadRoutes(app: Express) {
           return res.status(403).json({ error: "Access denied" });
         }
 
+        if (!isS3Configured()) {
+          console.error("[Upload] S3 não configurado (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_S3_BUCKET)");
+          return res.status(500).json({ error: "Armazenamento (S3) não configurado no servidor" });
+        }
+
         // Fazer upload para S3
         // Organizar por userId para isolamento multi-tenant
         const s3Url = await uploadFile(req.file, `users/${userId}/attachments`);
@@ -96,7 +121,7 @@ export function registerUploadRoutes(app: Express) {
         return res.json({ success: true, attachment: result[0] });
       } catch (error) {
         console.error("[Upload] Error:", error);
-        return res.status(500).json({ error: "Erro ao fazer upload" });
+        return res.status(500).json({ error: `Falha no upload: ${describeUploadError(error)}` });
       }
     }
   );
@@ -293,13 +318,18 @@ export function registerUploadRoutes(app: Express) {
           return res.status(401).json({ error: "Unauthorized" });
         }
 
+        if (!isS3Configured()) {
+          console.error("[Upload] S3 não configurado (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_S3_BUCKET)");
+          return res.status(500).json({ error: "Armazenamento (S3) não configurado no servidor" });
+        }
+
         // Organizar por userId para isolamento multi-tenant
         const s3Url = await uploadFile(req.file, `users/${userId}/attachments/temp`);
 
         return res.json({ success: true, s3Url });
       } catch (error) {
         console.error("[Upload] Temp upload error:", error);
-        return res.status(500).json({ error: "Erro ao fazer upload" });
+        return res.status(500).json({ error: `Falha no upload: ${describeUploadError(error)}` });
       }
     }
   );
