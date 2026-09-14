@@ -11,7 +11,7 @@ export function LegalFooter({ className = "" }: { className?: string }) {
   return (
     <footer className={`w-full border-t border-gray-200/70 dark:border-gray-800 py-5 px-4 ${className}`}>
       {/* Linha 1 — links legais */}
-      <nav className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[13px] font-medium">
+      <nav className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[12px] font-medium">
         <a href="/termos" className={link}>Termos de Uso</a>
         <span className="text-gray-300 dark:text-gray-700" aria-hidden>·</span>
         <a href="/privacidade" className={link}>Política de Privacidade</a>
@@ -22,7 +22,7 @@ export function LegalFooter({ className = "" }: { className?: string }) {
       </nav>
 
       {/* Linha 2 — identificação da empresa */}
-      <p className="mt-2 text-center text-[12px] text-gray-400 dark:text-gray-500">
+      <p className="mt-2 text-center text-[11px] text-gray-400 dark:text-gray-500">
         © {new Date().getFullYear()} {COMPANY.product} · {COMPANY.legalName} · CNPJ {COMPANY.cnpj}
       </p>
     </footer>
