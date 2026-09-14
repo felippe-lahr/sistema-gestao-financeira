@@ -1,24 +1,29 @@
 import { COMPANY } from "@/lib/legal";
 
 /**
- * Rodapé institucional com identificação da empresa e links legais.
- * Usado nas telas públicas (login, cadastro) e nas páginas legais —
- * transparência exigida pelas diretrizes do Google e pela LGPD.
+ * Rodapé institucional — duas linhas:
+ *  1) links legais;  2) identificação da empresa.
+ * Usado nas páginas legais e na tela de login (transparência exigida pelas
+ * diretrizes do Google e pela LGPD).
  */
 export function LegalFooter({ className = "" }: { className?: string }) {
+  const link = "text-gray-500 dark:text-gray-400 hover:text-[#1a67c2] dark:hover:text-[#4d94e0] transition-colors";
   return (
-    <footer className={`w-full text-center text-xs text-gray-500 dark:text-gray-400 py-6 px-4 ${className}`}>
-      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mb-2">
-        <a href="/termos" className="hover:underline hover:text-gray-700 dark:hover:text-gray-200">Termos de Uso</a>
-        <span aria-hidden>·</span>
-        <a href="/privacidade" className="hover:underline hover:text-gray-700 dark:hover:text-gray-200">Política de Privacidade</a>
-        <span aria-hidden>·</span>
-        <a href="/exclusao-de-dados" className="hover:underline hover:text-gray-700 dark:hover:text-gray-200">Exclusão de Dados</a>
-        <span aria-hidden>·</span>
-        <a href={`mailto:${COMPANY.email}`} className="hover:underline hover:text-gray-700 dark:hover:text-gray-200">Contato</a>
-      </div>
-      <p>
-        © {new Date().getFullYear()} {COMPANY.product} — {COMPANY.legalName} · CNPJ {COMPANY.cnpj}
+    <footer className={`w-full border-t border-gray-200/70 dark:border-gray-800 py-5 px-4 ${className}`}>
+      {/* Linha 1 — links legais */}
+      <nav className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[13px] font-medium">
+        <a href="/termos" className={link}>Termos de Uso</a>
+        <span className="text-gray-300 dark:text-gray-700" aria-hidden>·</span>
+        <a href="/privacidade" className={link}>Política de Privacidade</a>
+        <span className="text-gray-300 dark:text-gray-700" aria-hidden>·</span>
+        <a href="/exclusao-de-dados" className={link}>Exclusão de Dados</a>
+        <span className="text-gray-300 dark:text-gray-700" aria-hidden>·</span>
+        <a href={`mailto:${COMPANY.email}`} className={link}>Contato</a>
+      </nav>
+
+      {/* Linha 2 — identificação da empresa */}
+      <p className="mt-2 text-center text-[12px] text-gray-400 dark:text-gray-500">
+        © {new Date().getFullYear()} {COMPANY.product} · {COMPANY.legalName} · CNPJ {COMPANY.cnpj}
       </p>
     </footer>
   );
