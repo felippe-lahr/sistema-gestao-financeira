@@ -31,6 +31,10 @@ const BankAccounts = lazy(() => import("@/pages/BankAccounts"));
 const CreditCards = lazy(() => import("@/pages/CreditCards"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const Termos = lazy(() => import("@/pages/Termos"));
+const Privacidade = lazy(() => import("@/pages/Privacidade"));
+const ExclusaoDados = lazy(() => import("@/pages/ExclusaoDados"));
+const CookieConsent = lazy(() => import("@/components/CookieConsent"));
 
 // Loading fallback - minimal spinner
 function PageLoader() {
@@ -68,6 +72,9 @@ function Router() {
         <Route path="/billing/success" component={BillingSuccess} />
         <Route path="/recuperar-senha" component={ForgotPassword} />
         <Route path="/redefinir-senha" component={ResetPassword} />
+        <Route path="/termos" component={Termos} />
+        <Route path="/privacidade" component={Privacidade} />
+        <Route path="/exclusao-de-dados" component={ExclusaoDados} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
@@ -82,6 +89,9 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <Suspense fallback={null}>
+            <CookieConsent />
+          </Suspense>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

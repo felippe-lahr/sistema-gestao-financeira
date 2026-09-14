@@ -332,6 +332,7 @@ function Step3({
   onSubmit: () => void;
   isLoading: boolean;
 }) {
+  const [accepted, setAccepted] = useState(false);
   return (
     <div className="space-y-4">
       <div className="rounded-lg border bg-muted/30 divide-y">
@@ -372,12 +373,27 @@ function Step3({
         </p>
       </div>
 
+      <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer select-none px-1">
+        <input
+          type="checkbox"
+          checked={accepted}
+          onChange={(e) => setAccepted(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#1a67c2] focus:ring-[#1a67c2]"
+        />
+        <span>
+          Li e concordo com os{" "}
+          <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-[#1a67c2] hover:underline">Termos de Uso</a>{" "}
+          e a{" "}
+          <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-[#1a67c2] hover:underline">Política de Privacidade</a>.
+        </span>
+      </label>
+
       <div className="flex gap-3 mt-2">
         <Button type="button" variant="outline" onClick={onBack} className="flex-1" disabled={isLoading}>
           <ArrowLeft className="h-4 w-4 mr-1" />
           Voltar
         </Button>
-        <Button onClick={onSubmit} className="flex-1" disabled={isLoading}>
+        <Button onClick={onSubmit} className="flex-1" disabled={isLoading || !accepted}>
           {isLoading ? (
             <span className="flex items-center gap-2">
               <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

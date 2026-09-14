@@ -21,6 +21,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
+import { LegalFooter } from "@/components/LegalFooter";
 import { useIsMobile } from "@/hooks/useMobile";
 import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark, CreditCard, Smartphone, TrendingUp, Shield, Zap, BarChart2, PieChart, ArrowUpDown, Wallet, Banknote } from "lucide-react";
 import { Input } from "./ui/input";
@@ -603,6 +604,8 @@ function LoginForm() {
               Cadastre-se gratuitamente
             </a>
           </p>
+
+          <LegalFooter className="mt-8" />
         </div>
       </div>
 
