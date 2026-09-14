@@ -453,9 +453,10 @@ function LoginForm() {
     <div className="flex min-h-screen" style={{ fontFamily: "'Manrope', system-ui, sans-serif" }}>
       {/* Painel esquerdo — formulário limpo */}
       <div
-        className="flex-1 flex items-center justify-center p-6 sm:p-10 min-h-screen"
+        className="flex-1 flex flex-col min-h-screen"
         style={{ background: 'var(--bg-surface)' }}
       >
+        <div className="flex-1 flex items-center justify-center p-6 sm:p-10 w-full">
         <div className="w-full max-w-md">
           {/* Título */}
           <div className="mb-8">
@@ -604,9 +605,10 @@ function LoginForm() {
               Cadastre-se gratuitamente
             </a>
           </p>
-
-          <LegalFooter className="mt-8" />
         </div>
+        </div>
+
+        <LegalFooter />
       </div>
 
       <RightPanel
