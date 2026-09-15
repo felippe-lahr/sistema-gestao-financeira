@@ -66,3 +66,29 @@ Checklist de subtarefas dentro do card de uma tarefa da Agenda; ao completar
 - [x] Desmarcar um item → tarefa reaberta automaticamente (status derivado no
       servidor em `tasks.update`)
 - [x] Indicador de progresso `☑ N/M` nas visões mês e semana
+
+---
+
+## Conformidade legal & segurança (Google Safe Browsing / LGPD)
+
+**Status:** ✅ Concluído (2026-09-15) · **Prioridade:** Alta
+
+O domínio `app.unifiquepro.com.br` havia sido sinalizado pelo Google como
+"página enganosa" (Social Engineering), bloqueando o acesso no Chrome.
+Resolvido com adequação às diretrizes do Google e à LGPD, e revisão aprovada
+no Search Console ("Nenhum problema foi detectado").
+
+- [x] Verificação da propriedade no Google Search Console (arquivo HTML servido em `client/public/`)
+- [x] Página pública de **Termos de Uso** (`/termos`) — inclui direito de arrependimento (CDC) e cláusula de que o app não é aconselhamento financeiro
+- [x] Página pública de **Política de Privacidade** (`/privacidade`) — LGPD, com as integrações reais (Google, AWS S3, Stripe, IA, WhatsApp/Meta, e-mail)
+- [x] Página pública de **Exclusão de Dados** (`/exclusao-de-dados`) — LGPD
+- [x] Identificação da empresa (Studio44 / CNPJ 23.192.161/0001-20) e contato `contato@unifiquepro.com.br` em `client/src/lib/legal.ts`
+- [x] Rodapé institucional (links legais + identificação) na tela de login
+- [x] Aceite obrigatório dos Termos/Privacidade no cadastro
+- [x] Banner de cookies (LGPD)
+- [x] Redesign profissional das páginas legais (header da marca + logo branco)
+- [x] Pedido de revisão ao Google **aprovado** — alerta "Dangerous site" removido
+
+**Atenção (risco de reincidência):** o gatilho provável do flag foi a
+semelhança do nome "UnifiquePro" com a marca "Unifique" (Unifique
+Telecomunicações). Se o alerta reincidir, avaliar diferenciação de marca/domínio.
