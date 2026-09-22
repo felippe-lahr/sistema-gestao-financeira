@@ -38,22 +38,35 @@ export async function createContext(
           
           if (expiresInSeconds > 0) {
             let maxAge: number;
-            
+            let cookieValue = sessionCookie;
+
             if (session.rememberMe === true) {
-              // SESSÃO FIXA (24h): Renovar cookie mas manter expiração original
+              // SESSÃO FIXA (24h): mantém a expiração original do login.
               maxAge = expiresInSeconds * 1000;
-              const hoursRemaining = (expiresInSeconds / 3600).toFixed(2);
-              console.log(`[Auth] Cookie renewed (FIXED 24h) for user ${user.id} - expires in ${hoursRemaining}h`);
             } else {
-              // SESSÃO DESLIZANTE (30min inatividade): Renovar cookie com 30min completos
-              const THIRTY_MINUTES_MS = 30 * 60 * 1000;
-              maxAge = THIRTY_MINUTES_MS;
-              console.log(`[Auth] Cookie renewed (SLIDING 30min) for user ${user.id} - 30min from now`);
+              // SESSÃO DESLIZANTE (30min de INATIVIDADE): re-emite o token com
+              // 30min completos a partir de agora, para que a sessão só expire
+              // após 30min SEM atividade — e não 30min após o login.
+              // Throttle: só re-emite se passou > 5min desde a última emissão,
+              // evitando gerar token/Set-Cookie a cada requisição.
+              const THIRTY_MINUTES_S = 30 * 60;
+              const elapsedSeconds = THIRTY_MINUTES_S - expiresInSeconds;
+              if (elapsedSeconds > 300) {
+                cookieValue = await sdk.createSessionToken(user.openId, {
+                  expiresInMs: THIRTY_MINUTES_S * 1000,
+                  name: (session as any).name || user.name || "",
+                  rememberMe: false,
+                });
+                maxAge = THIRTY_MINUTES_S * 1000;
+              } else {
+                // Token ainda "fresco" — só acompanha o tempo restante.
+                maxAge = expiresInSeconds * 1000;
+              }
             }
-            
-            opts.res.cookie(COOKIE_NAME, sessionCookie, { 
-              ...cookieOptions, 
-              maxAge 
+
+            opts.res.cookie(COOKIE_NAME, cookieValue, {
+              ...cookieOptions,
+              maxAge,
             });
           }
         }
