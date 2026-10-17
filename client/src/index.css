@@ -253,6 +253,14 @@
     padding-right: 1rem;
   }
 
+  /* Dentro do app no celular o <main> já dá a borda de 16px. */
+  @media (max-width: 767px) {
+    .app-main .container {
+      padding-left: 0;
+      padding-right: 0;
+    }
+  }
+
   .flex {
     min-height: 0;
     min-width: 0;

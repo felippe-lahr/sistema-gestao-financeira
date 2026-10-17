@@ -17,7 +17,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
@@ -1016,24 +1015,31 @@ function DashboardLayoutContent({
 
       <SidebarInset style={{ background: 'var(--bg-page)' }}>
         {isMobile && (
+          // Fundo sólido (sem opacity): o conteúdo rolado não pode aparecer por trás.
           <div
-            className="flex h-14 items-center justify-between px-2 sticky top-0 z-40 border-b border-[#ECECEF] dark:border-[#2C2C3C]"
-            style={{ background: 'var(--bg-page)', backdropFilter: 'blur(8px)', opacity: 0.97 }}
+            className="flex h-14 items-center justify-between gap-2 px-3 sticky top-0 z-40 border-b border-[#ECECEF] dark:border-[#2C2C3C]"
+            style={{ background: 'var(--bg-page)', paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}
           >
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="h-10 w-10 rounded-lg" />
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 15 }}>
-                    {activeMenuItem?.label ?? "Menu"}
-                  </span>
-                </div>
-              </div>
+            <div className="flex min-w-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                aria-label="Abrir menu"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl active:bg-black/5 dark:active:bg-white/10"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+              <span className="truncate" style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 17 }}>
+                {activeMenuItem?.label ?? "Menu"}
+              </span>
             </div>
             <ModeToggle />
           </div>
         )}
-        <main className="flex-1" style={{ padding: '30px 38px 56px' }}>{children}</main>
+        {/* Mobile: borda única de 16px aqui; páginas não somam a delas (ver
+            `.app-main .container` em index.css e os wrappers `py-4 md:p-6`). */}
+        <main className="app-main flex-1 px-4 pt-1 pb-10 md:px-[38px] md:pt-[30px] md:pb-14">{children}</main>
       </SidebarInset>
       <OnboardingTour />
     </>

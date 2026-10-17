@@ -91,7 +91,7 @@ export default function CreditCards() {
   }
   if (entitiesLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="py-4 md:p-6 space-y-4">
         <Skeleton className="h-8 w-48" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48 rounded-2xl" />)}
@@ -108,7 +108,7 @@ export default function CreditCards() {
     );
   }
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="py-4 md:p-6 space-y-6">
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>

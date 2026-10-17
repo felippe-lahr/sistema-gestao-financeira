@@ -34,7 +34,7 @@ export default function Settings() {
 
   if (entitiesLoading) {
     return (
-      <div className="container py-8">
+      <div className="container py-4 md:py-8">
         <Skeleton className="h-8 w-64 mb-6" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -43,7 +43,7 @@ export default function Settings() {
 
   if (!entities || entities.length === 0) {
     return (
-      <div className="container py-8">
+      <div className="container py-4 md:py-8">
         <Card>
           <CardHeader>
             <CardTitle>Nenhuma entidade cadastrada</CardTitle>
@@ -57,7 +57,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="container py-8 space-y-8">
+    <div className="container py-4 md:py-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

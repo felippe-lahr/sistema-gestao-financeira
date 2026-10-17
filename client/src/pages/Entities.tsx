@@ -202,7 +202,7 @@ export default function Entities() {
 
   if (isLoading) {
     return (
-      <div className="container py-8">
+      <div className="container py-4 md:py-8">
         <Skeleton className="h-8 w-64 mb-6" />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -218,7 +218,7 @@ export default function Entities() {
   const sharedEntities = localEntities.filter((e) => e.sharedRole);
 
   return (
-    <div className="container py-8 space-y-8">
+    <div className="container py-4 md:py-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

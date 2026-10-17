@@ -322,7 +322,7 @@ export default function EntityDashboard() {
 
   if (!entityId || !entity) {
     return (
-      <div className="container py-8">
+      <div className="container py-4 md:py-8">
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">Entidade não encontrada</p>
@@ -338,7 +338,7 @@ export default function EntityDashboard() {
   const COLORS = ["#93C5FD", "#6EE7B7", "#FDE047", "#FCA5A5", "#C4B5FD", "#FBCFE8"];
 
   return (
-    <div className="container py-8 space-y-8">
+    <div className="container py-4 md:py-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4">
         {/* Linha 1: Botao Voltar + Titulo + Botao Investimentos (Desktop) */}

@@ -35,7 +35,7 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="container py-8">
+      <div className="container py-4 md:py-8">
         <Skeleton className="h-10 w-64 mb-8" />
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
@@ -48,7 +48,7 @@ export default function Home() {
 
   if (!entities || entities.length === 0) {
     return (
-      <div className="container py-8">
+      <div className="container py-4 md:py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Minhas Entidades</h1>
@@ -77,35 +77,32 @@ export default function Home() {
   }
 
   return (
-    <div className="container py-8">
-      <div className="flex flex-col gap-4 mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Minhas Entidades</h1>
-            <p className="text-muted-foreground">
+    <div className="container py-4 md:py-8">
+      <div className="flex flex-col gap-3 mb-5 md:gap-4 md:mb-8">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Minhas Entidades</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               {entities.length} {entities.length === 1 ? "entidade cadastrada" : "entidades cadastradas"}
             </p>
           </div>
-          <Button variant="outline" size="icon" onClick={toggleShowValues} title={showValues ? "Esconder valores" : "Mostrar valores"} className="hidden sm:flex">
-            {showValues ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          <Button variant="outline" size="icon" onClick={toggleShowValues} title={showValues ? "Esconder valores" : "Mostrar valores"} className="h-11 w-11 md:h-9 md:w-9 shrink-0">
+            {showValues ? <Eye className="h-5 w-5 md:h-4 md:w-4" /> : <EyeOff className="h-5 w-5 md:h-4 md:w-4" />}
           </Button>
         </div>
-        <div className="flex gap-2 flex-col sm:flex-row">
-          <Button variant="outline" size="icon" onClick={toggleShowValues} title={showValues ? "Esconder valores" : "Mostrar valores"} className="sm:hidden">
-            {showValues ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+        <div className="grid grid-cols-2 gap-2 sm:flex">
+          <Button onClick={() => setLocation("/overall-dashboard")} variant="outline" className="h-11 md:h-9 sm:w-auto">
+            <BarChart3 className="mr-1 h-4 w-4" />
+            Visão geral
           </Button>
-          <Button onClick={() => setLocation("/overall-dashboard")} variant="outline" className="w-full sm:w-auto">
-            <BarChart3 className="mr-2 h-4 w-4" />
-            Dashboard Overall
-          </Button>
-          <Button onClick={() => setLocation("/entities")} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
+          <Button onClick={() => setLocation("/entities")} className="h-11 md:h-9 sm:w-auto">
+            <Plus className="mr-1 h-4 w-4" />
             Nova Entidade
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 md:gap-6 md:grid-cols-2 lg:grid-cols-3">
         {entities.map((entity) => (
           <EntityCard key={entity.id} entity={entity} showValues={showValues} />
         ))}
@@ -137,19 +134,19 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
 
   return (
     <Card
-      className="cursor-pointer hover:shadow-lg transition-shadow"
+      className="cursor-pointer hover:shadow-lg transition-shadow gap-3 p-4 md:gap-6 md:py-5 md:px-[22px]"
       onClick={() => setLocation(`/dashboard/${entity.id}`)}
     >
       <CardHeader>
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-3 md:mb-2">
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center shadow-md"
+            className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-full flex items-center justify-center shadow-md"
             style={{ backgroundColor: entity.color || "#2563EB" }}
           >
-            <Building2 className="h-6 w-6 text-white" />
+            <Building2 className="h-5 w-5 md:h-6 md:w-6 text-white" />
           </div>
-          <div className="flex-1">
-            <CardTitle className="text-lg font-bold">{entity.name}</CardTitle>
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base md:text-lg font-bold leading-tight">{entity.name}</CardTitle>
             {entity.description && (
               <CardDescription className="line-clamp-1 text-xs">{entity.description}</CardDescription>
             )}
@@ -163,9 +160,9 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
             <Skeleton className="h-4 w-3/4" />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2 md:space-y-4">
             {/* Saldo */}
-            <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border dark:border-gray-700-blue-200 dark:border dark:border-gray-700-blue-800">
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 md:p-4 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border dark:border-gray-700-blue-200 dark:border dark:border-gray-700-blue-800">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">Saldo</span>
@@ -176,8 +173,8 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
             </div>
 
             {/* Créditos e Débitos */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border dark:border-gray-700-emerald-200 dark:border dark:border-gray-700-emerald-800">
+            <div className="grid grid-cols-2 gap-2 md:gap-3">
+              <div className="px-3 py-2 md:p-3 rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border dark:border-gray-700-emerald-200 dark:border dark:border-gray-700-emerald-800">
                 <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 font-semibold mb-1">
                   <TrendingUp className="h-3 w-3" />
                   <span>Créditos</span>
@@ -186,7 +183,7 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
                   {maskValue(metrics.monthIncome)}
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border dark:border-gray-700-red-200 dark:border dark:border-gray-700-red-800">
+              <div className="px-3 py-2 md:p-3 rounded-lg bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border dark:border-gray-700-red-200 dark:border dark:border-gray-700-red-800">
                 <div className="flex items-center gap-1 text-xs text-red-700 dark:text-red-300 font-semibold mb-1">
                   <TrendingDown className="h-3 w-3" />
                   <span>Débitos</span>
@@ -198,7 +195,7 @@ function EntityCard({ entity, showValues }: { entity: any; showValues: boolean }
             </div>
 
             {metrics.pendingExpenses > 0 && (
-              <div className="p-3 rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border border dark:border-gray-700-amber-200 dark:border dark:border-gray-700-amber-800">
+              <div className="px-3 py-2 md:p-3 rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border border dark:border-gray-700-amber-200 dark:border dark:border-gray-700-amber-800">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Débitos pendentes</span>
                   <span className="font-bold text-amber-600 dark:text-amber-400">

@@ -115,7 +115,7 @@ export default function BankAccounts() {
 
   if (entitiesLoading) {
     return (
-      <div className="p-4 md:p-6 space-y-4">
+      <div className="py-4 md:p-6 space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-32 w-full" />
@@ -125,7 +125,7 @@ export default function BankAccounts() {
 
   if (!entities || entities.length === 0) {
     return (
-      <div className="p-4 md:p-6">
+      <div className="py-4 md:p-6">
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Building2 className="h-10 w-10 mx-auto mb-3 opacity-30" />

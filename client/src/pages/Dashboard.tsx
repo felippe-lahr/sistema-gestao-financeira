@@ -97,7 +97,7 @@ export default function Dashboard() {
 
   if (entitiesLoading) {
     return (
-      <div className="container py-8">
+      <div className="container py-4 md:py-8">
         <Skeleton className="h-8 w-64 mb-6" />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
@@ -110,7 +110,7 @@ export default function Dashboard() {
 
   if (!entities || entities.length === 0) {
     return (
-      <div className="container py-8">
+      <div className="container py-4 md:py-8">
         <Card>
           <CardHeader>
             <CardTitle>Bem-vindo ao Sistema de Gestão Financeira</CardTitle>
@@ -130,7 +130,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container py-8 space-y-8">
+    <div className="container py-4 md:py-8 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

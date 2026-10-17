@@ -132,7 +132,7 @@ export default function TreasurySelix() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4 p-6">
+      <div className="space-y-4 py-4 md:p-6">
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -154,7 +154,7 @@ export default function TreasurySelix() {
     : 0;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 py-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

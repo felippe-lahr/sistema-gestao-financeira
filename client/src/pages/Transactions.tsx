@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight, FileUp, Eye, Trash, RotateCcw, Sparkles, Loader2 } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, Filter, Search, Edit2, Calendar, Trash2, Paperclip, Download, FileArchive, X, Tag, Tags, CheckCircle2, Building2, Landmark, CreditCard, ChevronDown, ChevronRight, FileUp, Eye, Trash, RotateCcw, Sparkles, Loader2, MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -2238,7 +2239,7 @@ export default function Transactions() {
                       key={transaction.id}
                       className={`transition-colors hover:bg-[#F9F9FB] ${idx < nonCardTransactions.length - 1 ? 'border-b border-[#ECECEF]' : ''}`}
                     >
-                      <div className="px-5 py-[25px]">
+                      <div className="px-3 py-3 md:px-5 md:py-[25px]">
                     {/* Desktop Layout */}
                     <div className="hidden md:flex items-center gap-4">
                       {/* Icon */}
@@ -2339,72 +2340,86 @@ export default function Transactions() {
                       </div>
                     </div>
 
-                    {/* Mobile Layout */}
-                    <div className="md:hidden flex items-start gap-3">
-                      <div className={`flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-[10px] mt-0.5 ${transaction.type === "INCOME" ? "bg-[#EAF6EF]" : "bg-[#FBECEC]"}`}>
+                    {/* Mobile Layout — linha compacta de 2 linhas (estilo app de banco).
+                        Tocar na linha abre a edição; excluir fica no menu "⋯". */}
+                    <div
+                      className={`md:hidden flex items-center gap-3 ${canWrite ? 'cursor-pointer' : ''}`}
+                      onClick={() => { if (canWrite) handleEdit(transaction); }}
+                    >
+                      <div className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full ${transaction.type === "INCOME" ? "bg-[#EAF6EF]" : "bg-[#FBECEC]"}`}>
                         {transaction.type === "INCOME" ? (
-                          <ArrowUpRight className="h-4 w-4" style={{ color: '#1a6b45' }} />
+                          <ArrowUpRight className="h-5 w-5" style={{ color: '#1a6b45' }} />
                         ) : (
-                          <ArrowDownRight className="h-4 w-4" style={{ color: '#c0392b' }} />
+                          <ArrowDownRight className="h-5 w-5" style={{ color: '#c0392b' }} />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          {editingDescriptionId === transaction.id && canWrite ? (
-                            <input
-                              type="text"
-                              value={editingDescriptionValue}
-                              onChange={(e) => setEditingDescriptionValue(e.target.value)}
-                              onBlur={() => handleSaveInlineDescription(transaction.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') { e.preventDefault(); handleSaveInlineDescription(transaction.id); }
-                                if (e.key === 'Escape') { setEditingDescriptionId(null); }
-                              }}
-                              disabled={savingDescriptionId === transaction.id}
-                              className="font-semibold text-sm bg-transparent border-b-2 border-primary outline-none min-w-[100px] flex-1 px-0 py-0.5"
-                              autoFocus
-                            />
-                          ) : (
-                            <h3
-                              className={`font-semibold text-sm text-[#16161A] truncate flex-1 ${canWrite ? 'cursor-pointer' : ''}`}
-                              onClick={() => { if (!canWrite) return; setEditingDescriptionId(transaction.id); setEditingDescriptionValue(transaction.description); }}
-                            >{transaction.description}</h3>
-                          )}
-                          <p className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color: transaction.type === "INCOME" ? '#1a6b45' : '#c0392b' }}>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <h3 className="font-semibold text-[15px] leading-5 text-[#16161A] dark:text-gray-100 truncate">{transaction.description}</h3>
+                          <p className="text-[15px] leading-5 font-bold tabular-nums flex-shrink-0" style={{ color: transaction.type === "INCOME" ? '#1a6b45' : '#c0392b' }}>
                             {transaction.type === "INCOME" ? "+" : "-"}{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount / 100)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          {getStatusBadge(transaction.status)}
-                          {getCategoryHierarchyBadge(transaction)}
-                          {!transaction.categoryId && canWrite && (
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#FBF3E0] text-[#7a5c00]">
-                                  <Tag className="h-3 w-3" />Sem categoria
-                                </button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-64 p-1" align="start" side="top">
-                                <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
-                                <QuickCategoryList categories={categories || []} filterType={transaction.type} onSelect={(catId) => handleSaveQuickCategory(transaction, catId)} />
-                              </PopoverContent>
-                            </Popover>
-                          )}
-                          <span className="text-xs text-[#8A8A92]">Venc. {format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR })}</span>
-                        </div>
-                        <div className="flex items-center gap-1 mt-1">
-                          {canWrite && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}>
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {canDelete && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(transaction.id)}>
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
-                          )}
+                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                          <div className="flex items-center gap-1.5 min-w-0 text-[13px] text-[#6B6B75] dark:text-gray-400">
+                            {transaction.categoryId ? (
+                              <>
+                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: (transaction as any).categoryColor || categories?.find((c: any) => c.id === transaction.categoryId)?.color || "#9CA3AF" }} />
+                                <span className="truncate">{(transaction as any).categoryName || categories?.find((c: any) => c.id === transaction.categoryId)?.name}</span>
+                              </>
+                            ) : canWrite ? (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#FBF3E0] text-[#7a5c00] flex-shrink-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Tag className="h-3 w-3" />Sem categoria
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 p-1" align="start" side="top" onClick={(e) => e.stopPropagation()}>
+                                  <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Selecionar categoria</p>
+                                  <QuickCategoryList categories={categories || []} filterType={transaction.type} onSelect={(catId) => handleSaveQuickCategory(transaction, catId)} />
+                                </PopoverContent>
+                              </Popover>
+                            ) : null}
+                            <span className="flex-shrink-0">· {format(new Date(transaction.dueDate), "dd/MM", { locale: ptBR })}</span>
+                          </div>
+                          <span
+                            className="flex items-center gap-1 text-[12px] font-medium flex-shrink-0"
+                            style={{ color: transaction.status === "PAID" ? '#1a6b45' : transaction.status === "OVERDUE" ? '#c0392b' : '#8A6A00' }}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
+                            {transaction.status === "PENDING" ? "Pendente" : transaction.status === "PAID" ? "Pago" : "Vencido"}
+                          </span>
                         </div>
                       </div>
+                      {(canWrite || canDelete) && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="Ações"
+                              className="-mr-2 flex h-10 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[#8A8A92] active:bg-black/5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-5 w-5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            {canWrite && (
+                              <DropdownMenuItem onClick={() => handleEdit(transaction)}>
+                                <Edit2 className="h-4 w-4 mr-2" />Editar
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(transaction.id)}>
+                                <Trash2 className="h-4 w-4 mr-2" />Excluir
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                       </div>
                     </div>
