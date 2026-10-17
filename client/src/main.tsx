@@ -72,11 +72,17 @@ createRoot(document.getElementById("root")!).render(
   </ThemeProvider>
 );
 
-// PWA: registra o service worker. Nova versão nunca recarrega sozinha —
-// o usuário confirma no aviso (evita perder um formulário em edição).
+// PWA: registra o service worker. Se a nova versão for detectada logo ao
+// abrir o app (nada em edição ainda), aplica na hora; depois disso nunca
+// recarrega sozinha — o usuário confirma no aviso (evita perder formulário).
 if ("serviceWorker" in navigator) {
+  const openedAt = Date.now();
   const updateSW = registerSW({
     onNeedRefresh() {
+      if (Date.now() - openedAt < 10_000) {
+        updateSW(true);
+        return;
+      }
       toast("Nova versão disponível", {
         description: "Atualize para usar a versão mais recente do UnifiquePro.",
         duration: Infinity,

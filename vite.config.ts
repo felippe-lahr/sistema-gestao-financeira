@@ -20,7 +20,7 @@ const plugins = [
   VitePWA({
     registerType: "prompt",
     injectRegister: false, // registro manual em main.tsx (virtual:pwa-register)
-    includeAssets: ["favicon.ico", "apple-touch-icon.png"],
+    includeAssets: ["favicon.ico", "icons/apple-touch-icon-180-v2.png"],
     manifest: {
       id: "/",
       name: "UnifiquePro — Gestão Financeira",
@@ -34,10 +34,10 @@ const plugins = [
       theme_color: BRAND_COLOR,
       background_color: "#ffffff",
       icons: [
-        { src: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/android-chrome-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-192-v2.png", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-512-v2.png", sizes: "512x512", type: "image/png", purpose: "any" },
         // Android recorta em círculo/squircle: fundo cheio e marca na zona segura.
-        { src: "/maskable-icon-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: "/icons/maskable-512-v2.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ],
     },
     workbox: {
