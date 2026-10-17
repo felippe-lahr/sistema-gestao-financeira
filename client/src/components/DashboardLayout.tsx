@@ -53,8 +53,12 @@ function LoginForm() {
   const [totpCode, setTotpCode] = useState("");
   const [twoFaLoading, setTwoFaLoading] = useState(false);
 
-  const handleVerify2FA = async () => {
-    if (totpCode.length !== 6) {
+  // Recebe o código explicitamente: o onComplete do InputOTP dispara antes do
+  // re-render, quando `totpCode` ainda tem só 5 dígitos (ou vazio, no Safari
+  // ao colar/preencher automaticamente).
+  const handleVerify2FA = async (codeArg?: string) => {
+    const code = typeof codeArg === "string" ? codeArg : totpCode;
+    if (code.length !== 6) {
       toast.error("Digite o código de 6 dígitos do aplicativo");
       return;
     }
@@ -63,7 +67,7 @@ function LoginForm() {
       const response = await fetch("/api/auth/2fa/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ openId: twoFactorOpenId, code: totpCode, rememberMe }),
+        body: JSON.stringify({ openId: twoFactorOpenId, code, rememberMe }),
       });
       const data = await response.json();
       if (response.ok && data.success) {
@@ -418,7 +422,7 @@ function LoginForm() {
 
             <div className="space-y-6">
               <div className="flex justify-center">
-                <InputOTP maxLength={6} value={totpCode} onChange={(value) => setTotpCode(value)} onComplete={handleVerify2FA}>
+                <InputOTP maxLength={6} value={totpCode} onChange={(value) => setTotpCode(value)} onComplete={(value: string) => handleVerify2FA(value)} autoFocus inputMode="numeric" autoComplete="one-time-code">
                   <InputOTPGroup>
                     <InputOTPSlot index={0} />
                     <InputOTPSlot index={1} />
@@ -429,7 +433,7 @@ function LoginForm() {
                   </InputOTPGroup>
                 </InputOTP>
               </div>
-              <Button onClick={handleVerify2FA} className="w-full" disabled={twoFaLoading || totpCode.length !== 6} style={{ height: 50 }}>
+              <Button onClick={() => handleVerify2FA()} className="w-full" disabled={twoFaLoading || totpCode.length !== 6} style={{ height: 50 }}>
                 {twoFaLoading ? "Verificando..." : "Verificar e Entrar"}
               </Button>
               <button

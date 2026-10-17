@@ -18,16 +18,23 @@ const APP_NAME = "UnifiquePro";
 
 /**
  * Verifica um código TOTP contra uma chave secreta.
- * Usa window=1 para tolerar até ~30s de diferença de clock.
+ * Aceita o código da janela anterior/seguinte (±30s): o padrão do otplib v13
+ * é tolerância 0, o que recusava códigos digitados no fim da janela de 30s ou
+ * com pequena diferença de relógio do celular.
  * O verifySync do otplib v13 retorna { valid: boolean }, não um booleano direto.
  */
 function verifyTotpCode(token: string, secret: string): boolean {
-  const result = verifySync({ token, secret, strategy: "totp" });
+  const result = verifySync({ token, secret, strategy: "totp", epochTolerance: 30 });
   // otplib v13 retorna { valid: boolean } ou boolean dependendo da versão
   if (typeof result === "object" && result !== null && "valid" in result) {
     return (result as { valid: boolean }).valid;
   }
   return !!result;
+}
+
+/** Remove espaços/traços que o colar ou o preenchimento automático inserem. */
+function normalizeCode(code: unknown): string | null {
+  return typeof code === "string" ? code.replace(/[\s-]/g, "") : null;
 }
 
 /**
@@ -141,7 +148,7 @@ export function registerTotpRoutes(app: Express) {
         return;
       }
 
-      const { code } = req.body;
+      const code = normalizeCode(req.body?.code);
       if (!code || typeof code !== "string" || code.length !== 6) {
         res.status(400).json({ error: "Código inválido. Informe os 6 dígitos do aplicativo." });
         return;
@@ -179,7 +186,7 @@ export function registerTotpRoutes(app: Express) {
         return;
       }
 
-      const { code } = req.body;
+      const code = normalizeCode(req.body?.code);
       if (!code || typeof code !== "string" || code.length !== 6) {
         res.status(400).json({ error: "Código inválido. Informe os 6 dígitos do aplicativo para confirmar." });
         return;
@@ -212,7 +219,8 @@ export function registerTotpRoutes(app: Express) {
   // Verifica o código TOTP durante o fluxo de login (etapa 2)
   app.post("/api/auth/2fa/verify", async (req: Request, res: Response) => {
     try {
-      const { openId, code, rememberMe } = req.body;
+      const { openId, rememberMe } = req.body;
+      const code = normalizeCode(req.body?.code);
 
       if (!openId || !code) {
         res.status(400).json({ error: "openId e código são obrigatórios" });
