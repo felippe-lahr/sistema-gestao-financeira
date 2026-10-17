@@ -53,11 +53,10 @@ function LoginForm() {
   const [totpCode, setTotpCode] = useState("");
   const [twoFaLoading, setTwoFaLoading] = useState(false);
 
-  // Recebe o código explicitamente: o onComplete do InputOTP dispara antes do
-  // re-render, quando `totpCode` ainda tem só 5 dígitos (ou vazio, no Safari
-  // ao colar/preencher automaticamente).
-  const handleVerify2FA = async (codeArg?: string) => {
-    const code = typeof codeArg === "string" ? codeArg : totpCode;
+  // Validação só pelo botão "Verificar" (ou Enter) — colar o código não
+  // dispara o login sozinho.
+  const handleVerify2FA = async () => {
+    const code = totpCode;
     if (code.length !== 6) {
       toast.error("Digite o código de 6 dígitos do aplicativo");
       return;
@@ -422,7 +421,7 @@ function LoginForm() {
 
             <div className="space-y-6">
               <div className="flex justify-center">
-                <InputOTP maxLength={6} value={totpCode} onChange={(value) => setTotpCode(value)} onComplete={(value: string) => handleVerify2FA(value)} autoFocus inputMode="numeric" autoComplete="one-time-code">
+                <InputOTP maxLength={6} value={totpCode} onChange={(value) => setTotpCode(value)} autoFocus inputMode="numeric" autoComplete="one-time-code" onKeyDown={(e) => { if (e.key === "Enter" && totpCode.length === 6 && !twoFaLoading) handleVerify2FA(); }}>
                   <InputOTPGroup>
                     <InputOTPSlot index={0} />
                     <InputOTPSlot index={1} />
@@ -433,7 +432,7 @@ function LoginForm() {
                   </InputOTPGroup>
                 </InputOTP>
               </div>
-              <Button onClick={() => handleVerify2FA()} className="w-full" disabled={twoFaLoading || totpCode.length !== 6} style={{ height: 50 }}>
+              <Button onClick={handleVerify2FA} className="w-full" disabled={twoFaLoading || totpCode.length !== 6} style={{ height: 50 }}>
                 {twoFaLoading ? "Verificando..." : "Verificar e Entrar"}
               </Button>
               <button
