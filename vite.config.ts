@@ -81,6 +81,9 @@ export default defineConfig({
   publicDir: path.resolve(process.cwd(), "client", "public"),
   define: {
     __APP_VERSION__: JSON.stringify(process.env.VITE_APP_VERSION ?? "0.5.0-beta"),
+    // Commit publicado (Railway injeta RAILWAY_GIT_COMMIT_SHA no build) —
+    // aparece ao lado da versão para conferir qual deploy está no ar.
+    __APP_BUILD__: JSON.stringify((process.env.RAILWAY_GIT_COMMIT_SHA ?? "dev").slice(0, 7)),
   },
   build: {
     outDir: path.resolve(process.cwd(), "dist/public"),

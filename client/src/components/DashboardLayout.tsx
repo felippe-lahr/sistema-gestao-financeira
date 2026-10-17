@@ -946,7 +946,7 @@ function DashboardLayoutContent({
             {/* Version + date */}
             <div className="group-data-[collapsible=icon]:hidden px-2 mb-2">
               <p className="text-[11px] text-center select-none text-[#8A8A92] dark:text-[#60607A]">
-                v{__APP_VERSION__}
+                v{__APP_VERSION__} · {__APP_BUILD__}
               </p>
             </div>
 
