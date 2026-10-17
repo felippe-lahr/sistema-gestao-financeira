@@ -1,3 +1,8 @@
+# Node 22: Vite 7 exige Node 20.19+ e o build do PWA (workbox/terser) quebra
+# no Node 18 ("crypto is not defined").
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+
 [phases.setup]
 aptPkgs = ["poppler-utils", "ffmpeg"]
 
