@@ -8,6 +8,8 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { toast } from "sonner";
+import { registerSW } from "virtual:pwa-register";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,3 +71,23 @@ createRoot(document.getElementById("root")!).render(
     </trpc.Provider>
   </ThemeProvider>
 );
+
+// PWA: registra o service worker. Nova versão nunca recarrega sozinha —
+// o usuário confirma no aviso (evita perder um formulário em edição).
+if ("serviceWorker" in navigator) {
+  const updateSW = registerSW({
+    onNeedRefresh() {
+      toast("Nova versão disponível", {
+        description: "Atualize para usar a versão mais recente do UnifiquePro.",
+        duration: Infinity,
+        action: { label: "Atualizar", onClick: () => updateSW(true) },
+      });
+    },
+    onRegisteredSW(_url, registration) {
+      // Verifica atualizações a cada hora em sessões longas (app instalado).
+      if (registration) {
+        setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
+      }
+    },
+  });
+}

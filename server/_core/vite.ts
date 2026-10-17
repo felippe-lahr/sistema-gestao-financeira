@@ -61,7 +61,14 @@ export function serveStatic(app: Express) {
   app.use(
     express.static(distPath, {
       setHeaders: (res, filePath) => {
-        if (filePath.endsWith("index.html")) {
+        // Service worker e manifest do PWA também precisam ser revalidados
+        // sempre, senão o app instalado demora a enxergar novos deploys.
+        if (
+          filePath.endsWith("index.html") ||
+          filePath.endsWith("sw.js") ||
+          filePath.endsWith("registerSW.js") ||
+          filePath.endsWith("manifest.webmanifest")
+        ) {
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
           res.setHeader("Cache-Control", "public, max-age=31536000, immutable");

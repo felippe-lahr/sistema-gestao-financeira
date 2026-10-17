@@ -7,7 +7,7 @@ entregues, ver `todo.md`.
 
 ## PWA Mobile + Notificações Push
 
-**Status:** Planejado · **Prioridade:** Média-alta · **Viabilidade:** Alta
+**Status:** Em andamento (Fase 1 concluída em 2026-10-17) · **Prioridade:** Média-alta · **Viabilidade:** Alta
 
 Transformar a aplicação em PWA instalável no celular, com notificações push.
 
@@ -19,12 +19,12 @@ Transformar a aplicação em PWA instalável no celular, com notificações push
 - [x] Servidor Node persistente no Railway (pode disparar push direto)
 
 ### Fase 1 — PWA instalável (~meio dia)
-- [ ] Adicionar `vite-plugin-pwa` (Workbox) para gerar o service worker
-- [ ] Cache offline do app shell
-- [ ] Instalação na Tela de Início + splash screen
-- [ ] Auto-update do service worker (`skipWaiting`/`clientsClaim`) com prompt
+- [x] Adicionar `vite-plugin-pwa` (Workbox) para gerar o service worker
+- [x] Cache offline do app shell
+- [x] Instalação na Tela de Início + splash screen
+- [x] Auto-update do service worker (`skipWaiting`/`clientsClaim`) com prompt
       de "nova versão disponível"
-- [ ] ⚠️ Garantir que o cache do SW não reintroduza o bug de chunk/asset
+- [x] ⚠️ Garantir que o cache do SW não reintroduza o bug de chunk/asset
       obsoleto (ver fix de `no-cache` no `index.html`)
 
 ### Fase 2 — Push ponta a ponta (~1–2 dias)
