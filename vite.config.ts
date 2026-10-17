@@ -50,7 +50,8 @@ const plugins = [
       navigateFallback: "/index.html",
       // NUNCA servir o shell para rotas do backend (OAuth callback, uploads,
       // downloads, webhooks) — senão o login com Google quebra.
-      navigateFallbackDenylist: [/^\/api\//, /^\/google[0-9a-f]+\.html$/],
+      // Arquivos (ex.: /icons/x.png aberto direto na barra) vão para a rede.
+      navigateFallbackDenylist: [/^\/api\//, /^\/google[0-9a-f]+\.html$/, /\/[^/?]+\.[a-z0-9]+$/i],
       runtimeCaching: [
         {
           urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
