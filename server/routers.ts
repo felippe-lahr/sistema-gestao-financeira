@@ -12,6 +12,7 @@ import { requireEntityAccess } from "./_core/entity-auth";
 import { eq } from "drizzle-orm";
 import { treasurySelic } from "../drizzle/schema";
 import { getDb } from "./db";
+import * as push from "./services/push-notifications";
 
 export const appRouter = router({
   system: systemRouter,
@@ -3458,6 +3459,56 @@ Regras:
           .where(eq(creditCardInvoiceAttachments.id, input.id));
         return { success: true };
       }),
+  }),
+
+  // ─── Notificações push (PWA) ──────────────────────────────────────────────
+  notifications: router({
+    vapidPublicKey: protectedProcedure.query(async () => {
+      return { publicKey: await push.getVapidPublicKey() };
+    }),
+
+    status: protectedProcedure.query(async ({ ctx }) => {
+      return { devices: await push.countSubscriptions(ctx.user.id) };
+    }),
+
+    subscribe: protectedProcedure
+      .input(z.object({
+        endpoint: z.string().url().max(2048),
+        keys: z.object({ p256dh: z.string().min(1).max(512), auth: z.string().min(1).max(512) }),
+        userAgent: z.string().max(512).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await push.saveSubscription(ctx.user.id, input, input.userAgent);
+        return { success: true };
+      }),
+
+    unsubscribe: protectedProcedure
+      .input(z.object({ endpoint: z.string().max(2048) }))
+      .mutation(async ({ ctx, input }) => {
+        await push.removeSubscription(ctx.user.id, input.endpoint);
+        return { success: true };
+      }),
+
+    getPreferences: protectedProcedure.query(async ({ ctx }) => {
+      return await push.getPreferences(ctx.user.id);
+    }),
+
+    // Validação/normalização em normalizeNotificationPreferences (shared/notifications.ts)
+    updatePreferences: protectedProcedure
+      .input(z.any())
+      .mutation(async ({ ctx, input }) => {
+        return await push.savePreferences(ctx.user.id, input);
+      }),
+
+    sendTest: protectedProcedure.mutation(async ({ ctx }) => {
+      const delivered = await push.sendToUser(ctx.user.id, {
+        title: "🔔 Notificações ativadas",
+        body: "Tudo certo! Você vai receber os avisos que escolheu no UnifiquePro.",
+        url: "/notificacoes",
+        tag: "test",
+      });
+      return { delivered };
+    }),
   }),
 });
 export type AppRouter = typeof appRouter;

@@ -20,6 +20,7 @@ const OverallDashboard = lazy(() => import("@/pages/OverallDashboard"));
 const Agenda = lazy(() => import("@/pages/Agenda"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
+const Notifications = lazy(() => import("@/pages/Notifications"));
 const AcceptInvite = lazy(() => import("@/pages/AcceptInvite"));
 const Signup = lazy(() => import("@/pages/Signup"));
 const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
@@ -63,6 +64,7 @@ function Router() {
         <Route path="/credit-cards" component={() => <DashboardLayout><CreditCards /></DashboardLayout>} />
         <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
         <Route path="/profile" component={() => <DashboardLayout><UserProfile /></DashboardLayout>} />
+        <Route path="/notificacoes" component={() => <DashboardLayout><Notifications /></DashboardLayout>} />
         <Route path="/convite/:token" component={AcceptInvite} />
         <Route path="/signup" component={Signup} />
         <Route path="/verificar-email" component={VerifyEmail} />

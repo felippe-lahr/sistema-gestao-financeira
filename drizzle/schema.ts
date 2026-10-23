@@ -854,3 +854,48 @@ export const creditCardInvoiceAttachments = pgTable("credit_card_invoice_attachm
 });
 export type CreditCardInvoiceAttachment = typeof creditCardInvoiceAttachments.$inferSelect;
 export type InsertCreditCardInvoiceAttachment = typeof creditCardInvoiceAttachments.$inferInsert;
+
+// ─── Notificações push (PWA) ──────────────────────────────────────────────
+
+/**
+ * Push Subscriptions - um registro por aparelho/navegador inscrito
+ */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: varchar("userAgent", { length: 512 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastSuccessAt: timestamp("lastSuccessAt"),
+});
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+
+/**
+ * Notification Preferences - quais avisos receber e de quais entidades (JSON)
+ */
+export const notificationPreferences = pgTable("notification_preferences", {
+  userId: integer("userId").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  settings: text("settings").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+/**
+ * Notification Log - evita enviar o mesmo aviso duas vezes (userId + dedupeKey)
+ */
+export const notificationLog = pgTable("notification_log", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  dedupeKey: varchar("dedupeKey", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/**
+ * App Settings - chave/valor de configuração do servidor (ex.: chaves VAPID geradas)
+ */
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});

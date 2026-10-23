@@ -22,7 +22,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { LegalFooter } from "@/components/LegalFooter";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark, CreditCard, Smartphone, TrendingUp, Shield, Zap, BarChart2, PieChart, ArrowUpDown, Wallet, Banknote } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Building2, Receipt, Settings, Clock, User, Eye, EyeOff, Calendar, ShieldCheck, Crown, Landmark, CreditCard, Smartphone, TrendingUp, Shield, Zap, BarChart2, PieChart, ArrowUpDown, Wallet, Banknote, Bell } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -628,6 +628,7 @@ const menuItems = [
   { icon: Landmark, label: "Contas Bancárias", path: "/bank-accounts" },
   { icon: CreditCard, label: "Cartões", path: "/credit-cards" },
   { icon: Calendar, label: "Agenda", path: "/agenda" },
+  { icon: Bell, label: "Notificações", path: "/notificacoes" },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];
 

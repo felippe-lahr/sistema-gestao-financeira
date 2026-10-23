@@ -146,6 +146,50 @@ const migrations: { name: string; sql: string }[] = [
     name: "add_checklist_to_tasks",
     sql: `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS "checklist" text`,
   },
+  // ─── Notificações push (PWA) ──────────────────────────────────────────────
+  {
+    name: "create_push_subscriptions_table",
+    sql: `CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id SERIAL PRIMARY KEY,
+      "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      "userAgent" VARCHAR(512),
+      "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+      "lastSuccessAt" TIMESTAMP
+    )`,
+  },
+  {
+    name: "create_push_subscriptions_user_index",
+    sql: `CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx ON push_subscriptions ("userId")`,
+  },
+  {
+    name: "create_notification_preferences_table",
+    sql: `CREATE TABLE IF NOT EXISTS notification_preferences (
+      "userId" INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      settings TEXT NOT NULL,
+      "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL
+    )`,
+  },
+  {
+    name: "create_notification_log_table",
+    sql: `CREATE TABLE IF NOT EXISTS notification_log (
+      id SERIAL PRIMARY KEY,
+      "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "dedupeKey" VARCHAR(255) NOT NULL,
+      "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+      UNIQUE ("userId", "dedupeKey")
+    )`,
+  },
+  {
+    name: "create_app_settings_table",
+    sql: `CREATE TABLE IF NOT EXISTS app_settings (
+      key VARCHAR(100) PRIMARY KEY,
+      value TEXT NOT NULL,
+      "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL
+    )`,
+  },
 ];
 
 async function runMigrations() {

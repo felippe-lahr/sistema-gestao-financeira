@@ -7,7 +7,7 @@ entregues, ver `todo.md`.
 
 ## PWA Mobile + Notificações Push
 
-**Status:** Em andamento (Fase 1 concluída em 2026-10-17) · **Prioridade:** Média-alta · **Viabilidade:** Alta
+**Status:** Concluído (Fase 1 em 2026-10-17, Fases 2–3 em 2026-10-23) · **Prioridade:** Média-alta · **Viabilidade:** Alta
 
 Transformar a aplicação em PWA instalável no celular, com notificações push.
 
@@ -27,18 +27,23 @@ Transformar a aplicação em PWA instalável no celular, com notificações push
 - [x] ⚠️ Garantir que o cache do SW não reintroduza o bug de chunk/asset
       obsoleto (ver fix de `no-cache` no `index.html`)
 
-### Fase 2 — Push ponta a ponta (~1–2 dias)
-- [ ] Gerar par de chaves VAPID
-- [ ] Adicionar lib `web-push` no backend Express
-- [ ] Tabela de push subscriptions por usuário (endpoint + chaves p256dh/auth)
-- [ ] Handlers `push` e `notificationclick` no service worker
-- [ ] UI de permissão + inscrição (`PushManager`) no frontend
-- [ ] Onboarding no iOS orientando "Adicionar à Tela de Início"
+### Fase 2 — Push ponta a ponta ✅ (2026-10-23)
+- [x] Chaves VAPID (env `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` ou geradas e
+      salvas em `app_settings`)
+- [x] Lib `web-push` no backend Express
+- [x] Tabela `push_subscriptions` por usuário/aparelho (endpoint + p256dh/auth)
+- [x] Handlers `push` e `notificationclick` no service worker (`push-sw.js`)
+- [x] Tela **Notificações** (`/notificacoes`): ativar no aparelho, teste,
+      preferências por tipo e por entidade
+- [x] Orientação no iOS: push só pelo app instalado na Tela de Início
 
-### Fase 3 — Gatilhos + agendador (~1 dia)
-- [ ] Gatilhos a partir de `upcomingTransactions`, Agenda/tarefas e
-      vencimentos de fatura (ex: "Fatura do Nubank vence amanhã")
-- [ ] Agendador de lembretes diários (cron do Railway ou node-cron)
+### Fase 3 — Gatilhos + agendador ✅ (2026-10-23)
+- [x] Agendador `node-cron` a cada 5 min com deduplicação (`notification_log`)
+- [x] Lembrete de compromissos da agenda (antecedência configurável)
+- [x] Resumo diário às 7h (São Paulo): agenda do dia, contas a pagar e a
+      receber por entidade (no dia / X dias antes)
+- [x] Reservas: nova reserva (criada por outro membro) e check-in/check-out
+- [ ] Vencimento de fatura de cartão (ex: "Fatura do Nubank vence amanhã")
 
 ### Ressalvas de plataforma
 - **Android (Chrome/Edge):** push total.

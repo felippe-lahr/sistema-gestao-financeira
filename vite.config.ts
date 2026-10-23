@@ -47,6 +47,8 @@ const plugins = [
       globIgnores: ["**/login-bg-illustration_original.png", "**/google*.html"],
       maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       cleanupOutdatedCaches: true,
+      // Handlers de push/notificationclick (client/public/push-sw.js).
+      importScripts: ["/push-sw.js"],
       navigateFallback: "/index.html",
       // NUNCA servir o shell para rotas do backend (OAuth callback, uploads,
       // downloads, webhooks) — senão o login com Google quebra.
