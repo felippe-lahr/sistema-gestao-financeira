@@ -73,13 +73,15 @@ createRoot(document.getElementById("root")!).render(
 );
 
 // PWA: registra o service worker. Se a nova versão for detectada logo ao
-// abrir o app (nada em edição ainda), aplica na hora; depois disso nunca
-// recarrega sozinha — o usuário confirma no aviso (evita perder formulário).
+// abrir o app ou ao voltar para ele (iOS só "acorda" o app, sem recarregar) e
+// não houver formulário/painel aberto, aplica na hora. Caso contrário mostra o
+// aviso "Atualizar" — nunca recarrega no meio de uma edição.
 if ("serviceWorker" in navigator) {
-  const openedAt = Date.now();
+  let activeAt = Date.now();
+  const isEditing = () => !!document.querySelector('[role="dialog"], [data-state="open"][data-slot="sheet-content"]');
   const updateSW = registerSW({
     onNeedRefresh() {
-      if (Date.now() - openedAt < 10_000) {
+      if (Date.now() - activeAt < 15_000 && !isEditing()) {
         updateSW(true);
         return;
       }
@@ -90,10 +92,15 @@ if ("serviceWorker" in navigator) {
       });
     },
     onRegisteredSW(_url, registration) {
-      // Verifica atualizações a cada hora em sessões longas (app instalado).
-      if (registration) {
-        setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
-      }
+      if (!registration) return;
+      // Sessões longas (app instalado): verifica a cada hora...
+      setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
+      // ...e sempre que o app volta para a tela.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") return;
+        activeAt = Date.now();
+        registration.update().catch(() => {});
+      });
     },
   });
 }
