@@ -67,7 +67,12 @@ function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ openId: twoFactorOpenId, code, rememberMe }),
       });
-      const data = await response.json();
+      // Respostas de erro podem não ser JSON (ex.: 429 do rate limit).
+      const data = await response.json().catch(() => ({} as any));
+      if (response.status === 429) {
+        toast.error(data.error || "Muitas tentativas. Aguarde alguns minutos e tente novamente.");
+        return;
+      }
       if (response.ok && data.success) {
         toast.success("Login realizado com sucesso!");
         localStorage.setItem('showFinancialValues', JSON.stringify(false));
@@ -98,7 +103,10 @@ function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, rememberMe }),
       });
-      const data = await response.json();
+      // O rate limit de login responde texto puro, não JSON.
+      const raw = await response.text();
+      let data: any;
+      try { data = JSON.parse(raw); } catch { data = { error: raw }; }
       if (response.ok) {
         // Verificar se o 2FA é necessário
         if (data.requiresTwoFactor) {

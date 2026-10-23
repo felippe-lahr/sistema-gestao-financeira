@@ -128,11 +128,14 @@ async function startServer() {
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 500, // 500 req por IP a cada 15 min (suficiente para uso normal)
-    message: 'Too many requests from this IP, please try again later.',
+    message: { error: 'Muitas requisições. Aguarde alguns minutos e tente novamente.' },
     standardHeaders: true,
     legacyHeaders: false,
   });
-  app.use(limiter);
+  // Só a API: arquivos estáticos (JS/CSS/ícones) não contam. A cada versão nova o
+  // PWA baixa ~140 arquivos de uma vez para o cache — contando isso, poucos deploys
+  // seguidos estouravam o limite e bloqueavam login e carregamento do app (429).
+  app.use('/api', limiter);
 
   // Rate limit para login (proteção contra brute force)
   const loginLimiter = rateLimit({
