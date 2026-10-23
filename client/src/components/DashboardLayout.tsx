@@ -1027,7 +1027,8 @@ function DashboardLayoutContent({
         />
       </div>
 
-      <SidebarInset style={{ background: 'var(--bg-page)' }}>
+      {/* min-w-0: conteúdo largo (ex.: grade da agenda) rola dentro dele, sem alargar a página */}
+      <SidebarInset className="min-w-0" style={{ background: 'var(--bg-page)' }}>
         {isMobile && (
           // Fundo sólido (sem opacity): o conteúdo rolado não pode aparecer por trás.
           <div
@@ -1051,7 +1052,7 @@ function DashboardLayoutContent({
         )}
         {/* Mobile: borda única de 16px aqui; páginas não somam a delas (ver
             `.app-main .container` em index.css e os wrappers `py-4 md:p-6`). */}
-        <main className="app-main flex-1 px-4 pt-1 pb-10 md:px-[38px] md:pt-[30px] md:pb-14">{children}</main>
+        <main className="app-main flex-1 min-w-0 px-4 pt-1 pb-10 md:px-[38px] md:pt-[30px] md:pb-14">{children}</main>
       </SidebarInset>
       <OnboardingTour />
     </>

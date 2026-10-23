@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Edit2, X, Calendar, RefreshCw, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Edit2, X, Calendar, RefreshCw, CheckCircle2, MoreVertical, CalendarDays, ListChecks } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useIsMobile } from "@/hooks/useMobile";
 import { useLocation } from "wouter";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isBefore, startOfWeek, endOfWeek, parseISO, addDays, subDays, differenceInDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -36,6 +38,91 @@ const PRIORITY_LABELS = {
   MEDIUM: "Média",
   HIGH: "Alta",
 };
+
+// Mesmas cores de PRIORITY_COLORS, em hex (para bordas/realces inline)
+const PRIORITY_HEX: Record<string, string> = {
+  LOW: "#3B82F6",
+  MEDIUM: "#EAB308",
+  HIGH: "#EF4444",
+};
+
+type AgendaView = "day" | "week" | "month";
+const VIEW_STORAGE_KEY = "agenda-view";
+
+/** Linha de tarefa da visão Dia / lista do dia: horário, cor, título e meta. */
+function DayTaskRow({
+  task,
+  entityName,
+  entityColor,
+  onOpen,
+  onToggle,
+}: {
+  task: any;
+  entityName: string | null;
+  entityColor: string;
+  onOpen: (t: any) => void;
+  onToggle: (t: any) => void;
+}) {
+  const done = task.status === "COMPLETED";
+  const cp = getChecklistProgress(task);
+  const accent = task.color || PRIORITY_HEX[task.priority] || "#9CA3AF";
+  const multiDay = task.duration > 1;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(task)}
+      onKeyDown={(e) => { if (e.key === "Enter") onOpen(task); }}
+      className={`flex items-stretch gap-3 rounded-2xl border border-[#ECECEF] dark:border-[#2C2C3C] bg-white dark:bg-[#1C1C24] px-3 py-3 transition-colors active:bg-[#F6F6F8] dark:active:bg-[#252532] cursor-pointer ${done ? "opacity-60" : ""}`}
+    >
+      <div className="w-[52px] shrink-0 pt-0.5 text-right">
+        {task.allDay || !task.dueTime ? (
+          <span className="whitespace-nowrap text-[12px] font-medium leading-5 text-[#8A8A92]">Dia todo</span>
+        ) : (
+          <>
+            <span className="block text-[15px] font-semibold tabular-nums leading-5 text-[#16161A] dark:text-gray-100">{task.dueTime}</span>
+            {task.endTime && <span className="block text-[12px] tabular-nums text-[#8A8A92]">{task.endTime}</span>}
+          </>
+        )}
+      </div>
+      <div className="w-1 shrink-0 rounded-full" style={{ background: accent }} />
+      <div className="min-w-0 flex-1">
+        <p className={`text-[15px] font-semibold leading-5 text-[#16161A] dark:text-gray-100 ${done ? "line-through" : ""}`}>{task.title}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[#6B6B75] dark:text-gray-400">
+          {entityName && (
+            <span className="inline-flex items-center gap-1.5 min-w-0">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: entityColor }} />
+              <span className="truncate">{entityName}</span>
+            </span>
+          )}
+          {cp && (
+            <span className="inline-flex items-center gap-1">
+              <ListChecks className="h-3.5 w-3.5" />{cp.done}/{cp.total}
+            </span>
+          )}
+          {multiDay && (
+            <span className="inline-flex items-center gap-1">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {format(task.startDate, "dd/MM")} – {format(task.endDate, "dd/MM")}
+            </span>
+          )}
+        </div>
+      </div>
+      <button
+        type="button"
+        aria-label={done ? "Reabrir tarefa" : "Concluir tarefa"}
+        onClick={(e) => { e.stopPropagation(); onToggle(task); }}
+        className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-full"
+      >
+        <span
+          className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors ${done ? "border-[#1a6b45] bg-[#1a6b45] text-white" : "border-[#C9C9CF] dark:border-[#4A4A58]"}`}
+        >
+          {done && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+        </span>
+      </button>
+    </div>
+  );
+}
 
 // Progresso do checklist de uma tarefa (ou null se não houver itens)
 function getChecklistProgress(task: any): { done: number; total: number } | null {
@@ -132,7 +219,20 @@ export default function Agenda() {
   const [, setLocation] = useLocation();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
-  const [viewMode, setViewMode] = useState<"month" | "week">("month");
+  const isMobile = useIsMobile();
+  // Visão Dia é o padrão no celular; a escolha do usuário fica lembrada.
+  const [viewMode, setViewModeState] = useState<AgendaView>(() => {
+    try {
+      const saved = localStorage.getItem(VIEW_STORAGE_KEY) as AgendaView | null;
+      if (saved === "day" || saved === "week" || saved === "month") return saved;
+    } catch {}
+    return typeof window !== "undefined" && window.innerWidth < 768 ? "day" : "month";
+  });
+  const setViewMode = (v: AgendaView) => {
+    setViewModeState(v);
+    try { localStorage.setItem(VIEW_STORAGE_KEY, v); } catch {}
+  };
+  const swipeStartX = useRef<number | null>(null);
   const [weekAnchor, setWeekAnchor] = useState<Date>(new Date());
   const [activeDragTask, setActiveDragTask] = useState<any>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -688,6 +788,35 @@ export default function Agenda() {
     return getTasksForDay(selectedDate);
   }, [selectedDate, processedTasks]);
 
+  // ── Visão Dia ──
+  const dayViewDate = selectedDate ?? new Date();
+  const stripDays = useMemo(() => {
+    const start = startOfWeek(dayViewDate, { weekStartsOn: 0 });
+    return eachDayOfInterval({ start, end: addDays(start, 6) });
+  }, [dayViewDate.toDateString()]);
+  // Dia inteiro primeiro, depois por horário; concluídas ao final
+  const dayViewTasks = useMemo(() => {
+    return [...getTasksForDay(dayViewDate)].sort((a, b) => {
+      const doneDiff = Number(a.status === "COMPLETED") - Number(b.status === "COMPLETED");
+      if (doneDiff !== 0) return doneDiff;
+      const ta = a.allDay || !a.dueTime ? "" : a.dueTime;
+      const tb = b.allDay || !b.dueTime ? "" : b.dueTime;
+      return ta.localeCompare(tb);
+    });
+  }, [dayViewDate.toDateString(), processedTasks]);
+
+  const navigate = (dir: 1 | -1) => {
+    if (viewMode === "month") setCurrentMonth(dir > 0 ? addMonths(currentMonth, 1) : subMonths(currentMonth, 1));
+    else if (viewMode === "week") setWeekAnchor(addDays(weekAnchor, 7 * dir));
+    else setSelectedDate(addDays(dayViewDate, dir));
+  };
+  const goToday = () => {
+    const now = new Date();
+    setCurrentMonth(now);
+    setWeekAnchor(now);
+    setSelectedDate(now);
+  };
+
   const getEntityName = (entityId: number | null) => {
     if (!entityId) return null;
     const entity = entities.find(e => e.id === entityId);
@@ -701,23 +830,47 @@ export default function Agenda() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 md:p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 pb-28 md:p-6">
       {/* Header */}
       <div className="mb-4">
         <Button
           variant="ghost"
           onClick={() => setLocation("/")}
-          className="mb-2"
+          className="mb-2 hidden md:inline-flex"
         >
           <ChevronLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Agenda</h1>
-            <p className="text-gray-600 dark:text-gray-400">Gerencie suas tarefas e compromissos</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Agenda</h1>
+            <p className="text-sm md:text-base text-gray-600 dark:text-gray-400">Gerencie suas tarefas e compromissos</p>
           </div>
-          <div className="flex gap-2">
+          {/* Mobile: Google Agenda num menu "⋯"; "Nova tarefa" vira botão flutuante */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-11 w-11 shrink-0 md:hidden" aria-label="Mais opções">
+                {syncGoogleCalendar.isPending ? <RefreshCw className="h-5 w-5 animate-spin" /> : <MoreVertical className="h-5 w-5" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {calendarConnected ? (
+                <>
+                  <DropdownMenuItem onClick={() => syncGoogleCalendar.mutate()} disabled={syncGoogleCalendar.isPending}>
+                    <img src="/google-calendar-logo.png" alt="" className="h-4 w-4 mr-2" />Sincronizar Google Agenda
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => disconnectGoogleCalendar.mutate()}>
+                    <X className="h-4 w-4 mr-2" />Desconectar Google Agenda
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem onClick={() => getGoogleCalendarAuthUrl.mutate()}>
+                  <img src="/google-calendar-logo.png" alt="" className="h-4 w-4 mr-2" />Conectar Google Agenda
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <div className="hidden md:flex flex-wrap justify-end gap-2">
             {calendarConnected ? (
               <>
                 <Button
@@ -761,7 +914,7 @@ export default function Agenda() {
                 Conectar Google Agenda
               </Button>
             )}
-            <Button onClick={() => openCreateSheet()}>
+            <Button onClick={() => openCreateSheet(viewMode === "day" ? dayViewDate : undefined)}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Tarefa
             </Button>
@@ -769,42 +922,131 @@ export default function Agenda() {
         </div>
       </div>
 
+      {/* Mobile: botão flutuante de nova tarefa */}
+      <button
+        type="button"
+        onClick={() => openCreateSheet(viewMode !== "month" ? dayViewDate : selectedDate ?? undefined)}
+        aria-label="Nova tarefa"
+        className="md:hidden fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_8px_24px_rgba(22,97,181,0.45)] active:scale-95 transition-transform"
+        style={{ background: "#1661B5", bottom: "calc(20px + env(safe-area-inset-bottom))" }}
+      >
+        <Plus className="h-7 w-7" />
+      </button>
+
       {/* Calendário - Largura total */}
-      <Card className="mb-6">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <CardTitle className="text-xl capitalize">
-              {viewMode === "month"
-                ? format(currentMonth, "MMMM yyyy", { locale: ptBR })
-                : `${format(weekDays[0], "dd/MM")} – ${format(weekDays[6], "dd/MM/yyyy")}`}
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              {/* Toggle de visão */}
-              <div className="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 p-0.5">
+      <Card className="mb-6 gap-3 p-3 md:gap-6 md:py-5 md:px-[22px]">
+        <CardHeader className="px-0 pb-0 md:pb-4">
+          <div className="flex flex-col gap-3 lg:flex-row-reverse lg:items-center lg:justify-between">
+            {/* Toggle de visão — linha inteira no celular */}
+            <div className="grid grid-cols-3 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 lg:w-[270px]">
+              {([["day", "Dia"], ["week", "Semana"], ["month", "Mês"]] as const).map(([v, label]) => (
                 <button
-                  onClick={() => setViewMode("month")}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${viewMode === "month" ? "bg-[#1a67c2] text-white" : "text-gray-600 dark:text-gray-300"}`}
-                >Mês</button>
-                <button
-                  onClick={() => setViewMode("week")}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${viewMode === "week" ? "bg-[#1a67c2] text-white" : "text-gray-600 dark:text-gray-300"}`}
-                >Semana</button>
-              </div>
+                  key={v}
+                  onClick={() => setViewMode(v)}
+                  className={`h-9 md:h-8 text-sm font-medium rounded-lg transition-colors ${viewMode === v ? "bg-white dark:bg-gray-700 text-[#1661B5] dark:text-white shadow-sm" : "text-gray-600 dark:text-gray-300"}`}
+                >{label}</button>
+              ))}
+            </div>
+            <div className="flex items-center justify-between gap-2 lg:justify-start lg:gap-4">
+              <CardTitle className="min-w-0 truncate text-lg md:text-xl first-letter:uppercase">
+                {viewMode === "month"
+                  ? format(currentMonth, "MMMM yyyy", { locale: ptBR })
+                  : viewMode === "week"
+                    ? `${format(weekDays[0], "dd/MM")} – ${format(weekDays[6], "dd/MM/yyyy")}`
+                    : format(dayViewDate, isMobile ? "EEEE, d MMM" : "EEEE, d 'de' MMMM", { locale: ptBR })}
+              </CardTitle>
               {/* Navegação (view-aware) */}
-              <Button variant="outline" size="icon" onClick={() => viewMode === "month" ? setCurrentMonth(subMonths(currentMonth, 1)) : setWeekAnchor(subDays(weekAnchor, 7))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => { setCurrentMonth(new Date()); setWeekAnchor(new Date()); }}>
-                Hoje
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => viewMode === "month" ? setCurrentMonth(addMonths(currentMonth, 1)) : setWeekAnchor(addDays(weekAnchor, 7))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <div className="flex shrink-0 items-center gap-1.5 lg:order-first">
+                <Button variant="outline" size="icon" className="h-10 w-10 md:h-9 md:w-9" aria-label="Anterior" onClick={() => navigate(-1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" className="h-10 md:h-9 px-3" onClick={goToday}>
+                  Hoje
+                </Button>
+                <Button variant="outline" size="icon" className="h-10 w-10 md:h-9 md:w-9" aria-label="Próximo" onClick={() => navigate(1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {viewMode === "week" ? (
+        <CardContent className="px-0">
+          {viewMode === "day" ? (
+            /* ===== Visão diária ===== */
+            <div
+              onTouchStart={(e) => { swipeStartX.current = e.touches[0].clientX; }}
+              onTouchEnd={(e) => {
+                if (swipeStartX.current === null) return;
+                const dx = e.changedTouches[0].clientX - swipeStartX.current;
+                swipeStartX.current = null;
+                if (Math.abs(dx) > 70) navigate(dx < 0 ? 1 : -1);
+              }}
+            >
+              {/* Faixa da semana: toque escolhe o dia; ponto = tem tarefa */}
+              <div className="grid grid-cols-7 gap-1 mb-4">
+                {stripDays.map((day) => {
+                  const selected = isSameDay(day, dayViewDate);
+                  const today = isToday(day);
+                  const count = getTasksForDay(day).filter((t) => t.status !== "COMPLETED").length;
+                  return (
+                    <button
+                      key={day.toISOString()}
+                      onClick={() => setSelectedDate(day)}
+                      className={`flex flex-col items-center gap-0.5 rounded-2xl py-2 transition-colors ${selected ? "bg-[#1661B5] text-white shadow-[0_4px_12px_rgba(22,97,181,0.35)]" : today ? "bg-[#E8F0FB] text-[#1661B5] dark:bg-blue-900/30 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"}`}
+                    >
+                      <span className={`text-[11px] font-medium uppercase ${selected ? "text-white/80" : "text-gray-500 dark:text-gray-400"}`}>
+                        {format(day, "EEEEEE", { locale: ptBR })}
+                      </span>
+                      <span className="text-[17px] font-semibold tabular-nums leading-6">{format(day, "d")}</span>
+                      <span className={`h-1.5 w-1.5 rounded-full ${count > 0 ? (selected ? "bg-white" : "bg-[#1661B5]") : "bg-transparent"}`} />
+                    </button>
+                  );
+                })}
+              </div>
+
+              {dayViewTasks.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 py-10 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#E8F0FB] text-[#1661B5] dark:bg-blue-900/30">
+                    <Calendar className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">Dia livre</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma tarefa para {isToday(dayViewDate) ? "hoje" : "este dia"}.</p>
+                  </div>
+                  <Button variant="outline" className="h-11 md:h-9" onClick={() => openCreateSheet(dayViewDate)}>
+                    <Plus className="h-4 w-4 mr-2" />Adicionar tarefa
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {(() => {
+                      const pending = dayViewTasks.filter((t) => t.status !== "COMPLETED").length;
+                      const done = dayViewTasks.length - pending;
+                      return `${pending} ${pending === 1 ? "pendente" : "pendentes"} · ${done} ${done === 1 ? "concluída" : "concluídas"}`;
+                    })()}
+                  </p>
+                  {dayViewTasks.map((task) => (
+                    <DayTaskRow
+                      key={task.id}
+                      task={task}
+                      entityName={getEntityName(task.entityId)}
+                      entityColor={getEntityColor(task.entityId)}
+                      onOpen={openEditSheet}
+                      onToggle={(t) => toggleComplete.mutate({ id: t.id })}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => openCreateSheet(dayViewDate)}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[#C9C9CF] dark:border-[#3A3A48] text-sm font-medium text-gray-500 dark:text-gray-400 active:bg-[#F6F6F8]"
+                  >
+                    <Plus className="h-4 w-4" />Adicionar tarefa
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : viewMode === "week" ? (
             /* ===== Visão semanal com drag-and-drop ===== */
             <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
               <p className="text-xs text-muted-foreground mb-2">Arraste uma tarefa para outro dia para reagendá-la. Arraste até as bordas ‹ › para mudar de semana{currentUser?.googleCalendarRefreshToken ? " · sincroniza com o Google Calendar" : ""}.</p>
@@ -899,7 +1141,7 @@ export default function Agenda() {
                   key={index}
                   onClick={() => setSelectedDate(day)}
                   className={`
-                    min-h-[100px] p-1 cursor-pointer transition-colors bg-white dark:bg-gray-800
+                    min-h-[56px] md:min-h-[100px] p-1 cursor-pointer transition-colors bg-white dark:bg-gray-800
                     ${!isCurrentMonth ? "bg-gray-50 dark:bg-gray-700" : ""}
                     ${isSelected ? "ring-2 ring-blue-500 ring-inset" : ""}
                     ${isToday(day) ? "bg-blue-50 dark:bg-blue-900/30" : ""}
@@ -907,16 +1149,28 @@ export default function Agenda() {
                   `}
                 >
                   <div className={`
-                    text-sm font-medium mb-1
+                    text-center md:text-left text-sm font-medium mb-1
                     ${!isCurrentMonth ? "text-gray-400" : ""}
                     ${isPast && isCurrentMonth ? "text-gray-400" : ""}
                     ${isToday(day) ? "text-blue-600 font-bold" : ""}
                   `}>
                     {format(day, "d")}
                   </div>
-                  
+
+                  {/* Mobile: pontos (até 3) em vez das barras de texto */}
+                  <div className="flex flex-wrap justify-center gap-0.5 md:hidden">
+                    {dayTasks.slice(0, 3).map((t) => (
+                      <span
+                        key={t.id}
+                        className={`h-1.5 w-1.5 rounded-full ${t.status === "COMPLETED" ? "opacity-40" : ""}`}
+                        style={{ background: t.color || PRIORITY_HEX[t.priority] || "#9CA3AF" }}
+                      />
+                    ))}
+                    {dayTasks.length > 3 && <span className="text-[9px] leading-none text-gray-500">+{dayTasks.length - 3}</span>}
+                  </div>
+
                   {/* Tarefas do dia */}
-                  <div className="overflow-visible relative" style={{ minHeight: `${(maxRow + 1) * 22 + 4}px` }}>
+                  <div className="overflow-visible relative hidden md:block" style={{ minHeight: `${(maxRow + 1) * 22 + 4}px` }}>
                     {dayTasks.map((task) => {
                       const isStart = isTaskStart(task, day);
                       const isEnd = isTaskEnd(task, day);
@@ -964,7 +1218,8 @@ export default function Agenda() {
         </CardContent>
       </Card>
 
-      {/* Painel de Tarefas do Dia Selecionado - Abaixo do calendário */}
+      {/* Painel de Tarefas do Dia Selecionado - Abaixo do calendário (a visão Dia já é a lista) */}
+      {viewMode !== "day" && (
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -993,73 +1248,22 @@ export default function Agenda() {
           {selectedDayTasks.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-center py-4">Nenhuma tarefa para este dia</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {selectedDayTasks.map((task) => (
-                <div
+                <DayTaskRow
                   key={task.id}
-                  className={`p-3 rounded-lg border dark:border-gray-700 ${task.status === "COMPLETED" ? "bg-gray-50 dark:bg-gray-700 opacity-70" : "bg-white dark:bg-gray-800"}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2 flex-1">
-                      <Checkbox
-                        checked={task.status === "COMPLETED"}
-                        onCheckedChange={() => toggleComplete.mutate({ id: task.id })}
-                        className="mt-1"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-medium ${task.status === "COMPLETED" ? "line-through text-gray-500" : ""}`}>
-                          {task.title}
-                        </p>
-                        {task.entityId && (
-                          <Badge 
-                            variant="outline" 
-                            className="mt-1 text-xs"
-                            style={{ 
-                              borderColor: getEntityColor(task.entityId),
-                              color: getEntityColor(task.entityId)
-                            }}
-                          >
-                            {getEntityName(task.entityId)}
-                          </Badge>
-                        )}
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <Badge className={PRIORITY_BADGE_COLORS[task.priority as keyof typeof PRIORITY_BADGE_COLORS]}>
-                            {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS]}
-                          </Badge>
-                          {task.endDate && task.endDate !== task.dueDate && (
-                            <Badge variant="secondary" className="text-xs">
-                              {format(task.startDate, "dd/MM")} - {format(task.endDate, "dd/MM")}
-                            </Badge>
-                          )}
-                        </div>
-                        {task.description && (
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{task.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEditSheet(task)}>
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => {
-                          setTaskToDelete(task.id);
-                          setTaskToDeleteIsRecurring(task.isRecurring || !!task.parentTaskId);
-                          setDeleteConfirmOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                  task={task}
+                  entityName={getEntityName(task.entityId)}
+                  entityColor={getEntityColor(task.entityId)}
+                  onOpen={openEditSheet}
+                  onToggle={(t) => toggleComplete.mutate({ id: t.id })}
+                />
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Sheet de Criar Tarefa - Estilo igual aos demais */}
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
