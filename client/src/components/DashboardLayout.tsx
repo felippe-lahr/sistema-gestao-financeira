@@ -629,6 +629,16 @@ function LoginForm() {
   );
 }
 
+/** Logo do cabeçalho: claro = símbolo #1661B5 + texto preto; escuro = todo branco. */
+function BrandLogo({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <>
+      <img src="/logo-unifique-pro-header-light.png" alt="UnifiquePro" className={`w-auto dark:hidden ${className}`} style={style} />
+      <img src="/logo-unifique-pro-white.png" alt="UnifiquePro" className={`w-auto hidden dark:block ${className}`} style={style} />
+    </>
+  );
+}
+
 const menuItems = [
   { icon: LayoutDashboard, label: "Início", path: "/" },
   { icon: Building2, label: "Entidades", path: "/entities" },
@@ -780,7 +790,6 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -842,18 +851,7 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed && (
                 <div className="flex items-center min-w-0">
-                  <img
-                    src="/logo-unifique-pro.png"
-                    alt="UnifiquePro"
-                    className="h-8 w-auto dark:hidden"
-                    style={{ maxWidth: 160 }}
-                  />
-                  <img
-                    src="/logo-unifique-pro-dark.png"
-                    alt="UnifiquePro"
-                    className="h-8 w-auto hidden dark:block"
-                    style={{ maxWidth: 160 }}
-                  />
+                  <BrandLogo className="h-8" style={{ maxWidth: 160 }} />
                 </div>
               )}
             </div>
@@ -1039,9 +1037,8 @@ function DashboardLayoutContent({
               >
                 <Menu className="h-6 w-6" />
               </button>
-              <span className="truncate" style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 17 }}>
-                {activeMenuItem?.label ?? "Menu"}
-              </span>
+              {/* Cada página já tem seu título (h1); no topo fica a marca. */}
+              <BrandLogo className="h-7" style={{ maxWidth: 150 }} />
             </div>
             <ModeToggle />
           </div>
