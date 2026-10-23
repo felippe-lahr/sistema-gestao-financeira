@@ -7,7 +7,7 @@ import { defineConfig } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 import { VitePWA } from "vite-plugin-pwa";
 
-const BRAND_COLOR = "#1a67c2";
+const BRAND_COLOR = "#1661B5";
 
 const plugins = [
   react(),

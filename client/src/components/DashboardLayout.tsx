@@ -629,8 +629,17 @@ function LoginForm() {
   );
 }
 
-/** Logo do cabeçalho: claro = símbolo #1661B5 + texto preto; escuro = todo branco. */
-function BrandLogo({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
+/** Cor da faixa superior (topo mobile e cabeçalho do menu lateral). */
+const BRAND_BAR = "#1661B5";
+
+/**
+ * Logo da marca. `onBrand`: sobre a faixa azul, sempre todo branco.
+ * Caso contrário: claro = símbolo #1661B5 + texto preto; escuro = todo branco.
+ */
+function BrandLogo({ className = "", style, onBrand = false }: { className?: string; style?: React.CSSProperties; onBrand?: boolean }) {
+  if (onBrand) {
+    return <img src="/logo-unifique-pro-white.png" alt="UnifiquePro" className={`w-auto ${className}`} style={style} />;
+  }
   return (
     <>
       <img src="/logo-unifique-pro-header-light.png" alt="UnifiquePro" className={`w-auto dark:hidden ${className}`} style={style} />
@@ -837,21 +846,19 @@ function DashboardLayoutContent({
           disableTransition={isResizing}
         >
           {/* Sidebar Header - Logo */}
-          <SidebarHeader style={{ padding: '22px 16px 16px' }}>
+          <SidebarHeader style={{ padding: '18px 16px 16px', background: BRAND_BAR, marginBottom: 8 }}>
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleSidebar}
-                className="flex items-center justify-center rounded-[10px] transition-colors focus:outline-none"
+                className="flex items-center justify-center rounded-[10px] transition-colors focus:outline-none hover:bg-white/15"
                 style={{ width: 36, height: 36 }}
                 aria-label="Toggle navigation"
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#F4F4F6'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
               >
-                <Menu style={{ width: 18, height: 18, color: '#8A8A92' }} />
+                <Menu style={{ width: 20, height: 20, color: '#FFFFFF' }} />
               </button>
               {!isCollapsed && (
                 <div className="flex items-center min-w-0">
-                  <BrandLogo className="h-8" style={{ maxWidth: 160 }} />
+                  <BrandLogo onBrand className="h-8" style={{ maxWidth: 160 }} />
                 </div>
               )}
             </div>
@@ -1024,23 +1031,22 @@ function DashboardLayoutContent({
         {isMobile && (
           // Fundo sólido (sem opacity): o conteúdo rolado não pode aparecer por trás.
           <div
-            className="flex h-14 items-center justify-between gap-2 px-3 sticky top-0 z-40 border-b border-[#ECECEF] dark:border-[#2C2C3C]"
-            style={{ background: 'var(--bg-page)', paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}
+            className="flex h-14 items-center justify-between gap-2 px-3 sticky top-0 z-40"
+            style={{ background: BRAND_BAR, paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}
           >
             <div className="flex min-w-0 items-center gap-1">
               <button
                 type="button"
                 onClick={toggleSidebar}
                 aria-label="Abrir menu"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl active:bg-black/5 dark:active:bg-white/10"
-                style={{ color: 'var(--text-primary)' }}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white active:bg-white/15"
               >
                 <Menu className="h-6 w-6" />
               </button>
               {/* Cada página já tem seu título (h1); no topo fica a marca. */}
-              <BrandLogo className="h-7" style={{ maxWidth: 150 }} />
+              <BrandLogo onBrand className="h-8" style={{ maxWidth: 170 }} />
             </div>
-            <ModeToggle />
+            <ModeToggle className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white dark:border-white/30 dark:bg-white/10" />
           </div>
         )}
         {/* Mobile: borda única de 16px aqui; páginas não somam a delas (ver
