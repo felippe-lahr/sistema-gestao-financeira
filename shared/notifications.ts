@@ -24,6 +24,8 @@ export type NotificationPreferences = {
   rentals: NotificationTypePrefs;
   /** Exibir valores em R$ no texto da notificação. */
   showValues: boolean;
+  /** Horário (São Paulo, "HH:MM") do resumo diário. */
+  summaryTime: string;
 };
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
@@ -32,10 +34,20 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   income: { enabled: true, entityIds: null, leadDays: 0 },
   rentals: { enabled: true, entityIds: null },
   showValues: true,
+  summaryTime: "07:00",
 };
 
-/** Horário (São Paulo) do resumo diário de vencimentos, recebimentos e reservas. */
-export const DAILY_SUMMARY_HOUR = 7;
+/** Horários oferecidos para o resumo diário (de 30 em 30 min, 05:00–22:00). */
+export const SUMMARY_TIME_OPTIONS = Array.from({ length: 35 }, (_, i) => {
+  const minutes = 5 * 60 + i * 30;
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+});
+
+/** "07:00" → "7h", "07:30" → "7h30". */
+export function formatSummaryTime(time: string): string {
+  const [h, m] = time.split(":");
+  return `${Number(h)}h${m === "00" ? "" : m}`;
+}
 
 /** Mescla o JSON salvo com os padrões (tolera campos ausentes de versões antigas). */
 export function normalizeNotificationPreferences(raw: unknown): NotificationPreferences {
@@ -69,5 +81,7 @@ export function normalizeNotificationPreferences(raw: unknown): NotificationPref
       entityIds: ids(r.rentals?.entityIds),
     },
     showValues: bool(r.showValues, d.showValues),
+    summaryTime:
+      typeof r.summaryTime === "string" && SUMMARY_TIME_OPTIONS.includes(r.summaryTime) ? r.summaryTime : d.summaryTime,
   };
 }

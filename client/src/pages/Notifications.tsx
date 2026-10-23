@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Bell, BellOff, Calendar, Home as HomeIcon, Loader2, Send, TrendingDown, TrendingUp, Smartphone } from "lucide-react";
 import {
-  DAILY_SUMMARY_HOUR,
+  SUMMARY_TIME_OPTIONS,
+  formatSummaryTime,
   type NotificationPreferences,
   type NotificationTypePrefs,
 } from "@shared/notifications";
@@ -136,6 +137,7 @@ export default function Notifications() {
     rental: !!e.temporaryRentalEnabled,
   }));
   const rentalEntities = allEntities.filter((e) => e.rental);
+  const summaryLabel = formatSummaryTime(prefs.summaryTime);
 
   return (
     <div className="container py-4 md:py-8 max-w-2xl space-y-4 md:space-y-6">
@@ -187,12 +189,30 @@ export default function Notifications() {
         </div>
       </Card>
 
+      {/* Horário do resumo diário */}
+      <Card className="p-4 md:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-semibold">Horário do resumo diário</p>
+            <p className="text-sm text-muted-foreground">Agenda do dia, vencimentos, recebimentos e reservas.</p>
+          </div>
+          <Select value={prefs.summaryTime} onValueChange={(summaryTime) => save({ ...prefs, summaryTime })}>
+            <SelectTrigger className="h-11 md:h-9 w-[100px] shrink-0"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {SUMMARY_TIME_OPTIONS.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </Card>
+
       {/* Agenda */}
       <PrefSection
         icon={<Calendar className="h-5 w-5" />}
         color="#1a67c2"
         title="Compromissos da agenda"
-        description="Lembrete antes de cada compromisso com horário e a agenda do dia às 7h."
+        description={`Lembrete antes de cada compromisso com horário e a agenda do dia às ${summaryLabel}.`}
         prefs={prefs.agenda}
         entities={allEntities}
         onChange={(agenda) => save({ ...prefs, agenda: { ...prefs.agenda, ...agenda } })}
@@ -227,7 +247,7 @@ export default function Notifications() {
         icon={<TrendingDown className="h-5 w-5" />}
         color="#c0392b"
         title="Vencimentos (contas a pagar)"
-        description={`Resumo às ${DAILY_SUMMARY_HOUR}h com as contas que vencem.`}
+        description={`Resumo às ${summaryLabel} com as contas que vencem.`}
         prefs={prefs.expenses}
         entities={allEntities}
         onChange={(expenses) => save({ ...prefs, expenses: { ...prefs.expenses, ...expenses } })}
@@ -240,7 +260,7 @@ export default function Notifications() {
         icon={<TrendingUp className="h-5 w-5" />}
         color="#1a6b45"
         title="Recebimentos (contas a receber)"
-        description={`Resumo às ${DAILY_SUMMARY_HOUR}h com os recebimentos previstos.`}
+        description={`Resumo às ${summaryLabel} com os recebimentos previstos.`}
         prefs={prefs.income}
         entities={allEntities}
         onChange={(income) => save({ ...prefs, income: { ...prefs.income, ...income } })}
@@ -254,7 +274,7 @@ export default function Notifications() {
           icon={<HomeIcon className="h-5 w-5" />}
           color="#8A6A00"
           title="Reservas"
-          description={`Nova reserva na hora; check-ins e check-outs no resumo das ${DAILY_SUMMARY_HOUR}h.`}
+          description={`Nova reserva na hora; check-ins e check-outs no resumo das ${summaryLabel}.`}
           prefs={prefs.rentals}
           entities={rentalEntities}
           onChange={(rentals) => save({ ...prefs, rentals: { ...prefs.rentals, ...rentals } })}

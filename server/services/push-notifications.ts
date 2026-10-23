@@ -5,7 +5,7 @@
  *   geradas uma vez e guardadas em app_settings (sobrevivem a novos deploys).
  * - runNotificationTick() roda a cada 5 min (server/cron.ts):
  *     • lembretes de compromissos com horário (antecedência configurável)
- *     • resumo diário às 7h (São Paulo): agenda do dia, contas a pagar,
+ *     • resumo diário no horário escolhido (padrão 7h, São Paulo): agenda do dia, contas a pagar,
  *       contas a receber, check-ins/check-outs
  *     • nova reserva criada por outro membro da entidade
  * - Cada aviso passa por notification_log (userId + dedupeKey) antes do envio,
@@ -24,7 +24,6 @@ import {
   transactions,
 } from "../../drizzle/schema";
 import {
-  DAILY_SUMMARY_HOUR,
   normalizeNotificationPreferences,
   type NotificationPreferences,
 } from "@shared/notifications";
@@ -268,7 +267,12 @@ export async function runNotificationTick(now = new Date()) {
       }));
       await notifyAgendaReminders(userId, prefs, entities, now);
       await notifyNewRentals(userId, prefs, entities, now);
-      if (localParts(now).hh >= DAILY_SUMMARY_HOUR && localParts(now).hh < DAILY_SUMMARY_HOUR + 3) {
+      // Janela de 3h a partir do horário escolhido: cobre ticks perdidos (deploy/reinício);
+      // a deduplicação por dia garante um único resumo.
+      const { hh, mm } = localParts(now);
+      const [sh, sm] = prefs.summaryTime.split(":").map(Number);
+      const sinceSummary = hh * 60 + mm - (sh * 60 + sm);
+      if (sinceSummary >= 0 && sinceSummary < 3 * 60) {
         await notifyDailySummary(userId, prefs, entities, now);
       }
     } catch (err) {
