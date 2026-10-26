@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { User, Lock, Mail, Eye, EyeOff, KeyRound, PlayCircle, ShieldCheck, ShieldOff, Smartphone, MessageCircle, CheckCircle2, XCircle, Loader2, Link2, Unlink } from "lucide-react";
 import { RestartOnboardingButton } from "@/components/OnboardingTour";
+import { BiometricSettings } from "@/components/BiometricSettings";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 export default function UserProfile() {
@@ -605,6 +606,9 @@ export default function UserProfile() {
             ) : null}
           </CardContent>
         </Card>
+
+        {/* Face ID / digital (aparece só em aparelhos compatíveis) */}
+        <BiometricSettings />
 
         {/* WhatsApp Bot */}
         <Card>

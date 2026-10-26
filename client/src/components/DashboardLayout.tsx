@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ModeToggle } from "@/components/mode-toggle";
+import { BiometricLock } from "@/components/BiometricLock";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1056,6 +1057,7 @@ function DashboardLayoutContent({
         <main className="app-main flex-1 min-w-0 px-4 pt-1 pb-10 md:px-[38px] md:pt-[30px] md:pb-14">{children}</main>
       </SidebarInset>
       <OnboardingTour />
+      {user && <BiometricLock userId={user.id} userName={user.name} onSignOut={logout} />}
     </>
   );
 }

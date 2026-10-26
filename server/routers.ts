@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 import { treasurySelic } from "../drizzle/schema";
 import { getDb } from "./db";
 import * as push from "./services/push-notifications";
+import * as biometric from "./services/biometric-unlock";
 
 export const appRouter = router({
   system: systemRouter,
@@ -3457,6 +3458,46 @@ Regras:
         await dbInstance.update(creditCardInvoiceAttachments)
           .set({ type: input.type })
           .where(eq(creditCardInvoiceAttachments.id, input.id));
+        return { success: true };
+      }),
+  }),
+
+  // ─── Desbloqueio com Face ID / digital (WebAuthn) ─────────────────────────
+  biometric: router({
+    registrationOptions: protectedProcedure.mutation(async ({ ctx }) => {
+      return await biometric.registrationOptions(ctx.user);
+    }),
+
+    register: protectedProcedure
+      .input(z.object({ response: z.any(), deviceName: z.string().max(255).optional() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await biometric.verifyRegistration(ctx.user.id, input.response, input.deviceName);
+        } catch (err: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: err?.message || "Não foi possível ativar a biometria." });
+        }
+      }),
+
+    unlockOptions: protectedProcedure
+      .input(z.object({ credentialId: z.string().max(1024) }))
+      .mutation(async ({ ctx, input }) => {
+        return { options: await biometric.authenticationOptions(ctx.user.id, input.credentialId) };
+      }),
+
+    unlock: protectedProcedure
+      .input(z.object({ response: z.any() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return { verified: await biometric.verifyAuthentication(ctx.user.id, input.response) };
+        } catch {
+          return { verified: false };
+        }
+      }),
+
+    remove: protectedProcedure
+      .input(z.object({ credentialId: z.string().max(1024) }))
+      .mutation(async ({ ctx, input }) => {
+        await biometric.removeCredential(ctx.user.id, input.credentialId);
         return { success: true };
       }),
   }),

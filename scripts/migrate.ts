@@ -190,6 +190,21 @@ const migrations: { name: string; sql: string }[] = [
       "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL
     )`,
   },
+  // ─── Desbloqueio com Face ID / digital (WebAuthn) ─────────────────────────
+  {
+    name: "create_webauthn_credentials_table",
+    sql: `CREATE TABLE IF NOT EXISTS webauthn_credentials (
+      id SERIAL PRIMARY KEY,
+      "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "credentialId" TEXT NOT NULL UNIQUE,
+      "publicKey" TEXT NOT NULL,
+      counter INTEGER NOT NULL DEFAULT 0,
+      transports TEXT,
+      "deviceName" VARCHAR(255),
+      "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+      "lastUsedAt" TIMESTAMP
+    )`,
+  },
 ];
 
 async function runMigrations() {

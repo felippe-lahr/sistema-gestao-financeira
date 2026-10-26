@@ -899,3 +899,18 @@ export const appSettings = pgTable("app_settings", {
   value: text("value").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
+
+/**
+ * WebAuthn Credentials - Face ID / digital para desbloquear o app no aparelho
+ */
+export const webauthnCredentials = pgTable("webauthn_credentials", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  credentialId: text("credentialId").notNull().unique(), // base64url
+  publicKey: text("publicKey").notNull(), // base64url (COSE)
+  counter: integer("counter").default(0).notNull(),
+  transports: text("transports"), // JSON array
+  deviceName: varchar("deviceName", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastUsedAt: timestamp("lastUsedAt"),
+});
