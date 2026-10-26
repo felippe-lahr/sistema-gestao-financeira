@@ -1,4 +1,4 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS, SESSION_DEFAULT_MS, SESSION_REMEMBER_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
@@ -75,11 +75,8 @@ export function registerPasswordAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
-      // Criar sessao com duração baseada em rememberMe
-      // 30 minutos (1800000 ms) por padrão, 24 horas (86400000 ms) se rememberMe = true
-      const THIRTY_MINUTES_MS = 30 * 60 * 1000;
-      const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-      const sessionDuration = rememberMe ? TWENTY_FOUR_HOURS_MS : THIRTY_MINUTES_MS;
+      // 30 min por padrão; "Manter conectado neste aparelho" = 30 dias renováveis
+      const sessionDuration = rememberMe ? SESSION_REMEMBER_MS : SESSION_DEFAULT_MS;
       
       console.log("[Password Auth] Login - rememberMe:", rememberMe);
       console.log("[Password Auth] Login - sessionDuration (ms):", sessionDuration);
@@ -313,9 +310,7 @@ export function registerPasswordAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
-      const THIRTY_MINUTES_MS = 30 * 60 * 1000;
-      const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-      const sessionDuration = rememberMe ? TWENTY_FOUR_HOURS_MS : THIRTY_MINUTES_MS;
+      const sessionDuration = rememberMe ? SESSION_REMEMBER_MS : SESSION_DEFAULT_MS;
 
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || "",

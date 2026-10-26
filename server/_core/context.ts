@@ -3,7 +3,7 @@ import type { User, Organization } from "../../drizzle/schema";
 import * as db from "../db";
 import { sdk } from "./sdk";
 import { ENV } from "./env";
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, SESSION_DEFAULT_MS, SESSION_REMEMBER_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./cookies";
 
 export type TrpcContext = {
@@ -41,15 +41,26 @@ export async function createContext(
             let cookieValue = sessionCookie;
 
             if (session.rememberMe === true) {
-              // SESSÃO FIXA (24h): mantém a expiração original do login.
-              maxAge = expiresInSeconds * 1000;
+              // "MANTER CONECTADO NESTE APARELHO": 30 dias renovados a cada uso.
+              // Re-emite no máximo 1x por dia para não gerar Set-Cookie a cada request.
+              const totalS = SESSION_REMEMBER_MS / 1000;
+              if (totalS - expiresInSeconds > 24 * 60 * 60) {
+                cookieValue = await sdk.createSessionToken(user.openId, {
+                  expiresInMs: SESSION_REMEMBER_MS,
+                  name: (session as any).name || user.name || "",
+                  rememberMe: true,
+                });
+                maxAge = SESSION_REMEMBER_MS;
+              } else {
+                maxAge = expiresInSeconds * 1000;
+              }
             } else {
               // SESSÃO DESLIZANTE (30min de INATIVIDADE): re-emite o token com
               // 30min completos a partir de agora, para que a sessão só expire
               // após 30min SEM atividade — e não 30min após o login.
               // Throttle: só re-emite se passou > 5min desde a última emissão,
               // evitando gerar token/Set-Cookie a cada requisição.
-              const THIRTY_MINUTES_S = 30 * 60;
+              const THIRTY_MINUTES_S = SESSION_DEFAULT_MS / 1000;
               const elapsedSeconds = THIRTY_MINUTES_S - expiresInSeconds;
               if (elapsedSeconds > 300) {
                 cookieValue = await sdk.createSessionToken(user.openId, {

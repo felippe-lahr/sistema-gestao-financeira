@@ -8,8 +8,10 @@ export default function GoogleAuthSuccess() {
   useEffect(() => {
     // Definir valores financeiros como ocultos por padrão (mesmo comportamento do login por senha)
     localStorage.setItem("showFinancialValues", JSON.stringify(false));
-    // Google OAuth não tem "lembrar-me" — usar comportamento padrão (sem rememberMe)
-    localStorage.setItem("rememberMe", JSON.stringify(false));
+    // "Manter conectado" marcado antes de ir ao Google (ver DashboardLayout)
+    const remember = localStorage.getItem("pendingRememberMe") === "true";
+    localStorage.removeItem("pendingRememberMe");
+    localStorage.setItem("rememberMe", JSON.stringify(remember));
     // Redirecionar para o dashboard
     window.location.href = "/";
   }, []);

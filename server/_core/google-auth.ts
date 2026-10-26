@@ -20,11 +20,11 @@ import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
 import { sdk } from "./sdk";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS, SESSION_DEFAULT_MS, SESSION_REMEMBER_MS } from "@shared/const";
 import { syncAllTasksToGoogleCalendar } from "../services/google-calendar";
 
 const GOOGLE_STATE_COOKIE = "google_oauth_state";
-const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+const GOOGLE_REMEMBER_COOKIE = "google_oauth_remember";
 
 function getOAuth2Client(): OAuth2Client {
   const redirectUri = `${ENV.appUrl}/api/auth/google/callback`;
@@ -74,6 +74,12 @@ export function registerGoogleAuthRoutes(app: Express) {
       maxAge: 15 * 60 * 1000, // 15 minutos
       httpOnly: true,
     });
+    // "Manter conectado neste aparelho" marcado na tela de login (?remember=1)
+    if (req.query.remember === "1") {
+      res.cookie(GOOGLE_REMEMBER_COOKIE, "1", { ...cookieOptions, maxAge: 15 * 60 * 1000, httpOnly: true });
+    } else {
+      res.clearCookie(GOOGLE_REMEMBER_COOKIE);
+    }
 
     const client = getOAuth2Client();
     const authUrl = client.generateAuthUrl({
@@ -216,16 +222,20 @@ export function registerGoogleAuthRoutes(app: Express) {
         console.log(`[Google Auth] Novo usuário criado via Google: ${email}`);
       }
 
-      // Criar sessão interna (30 minutos por padrão, sem "lembrar")
+      // Sessão interna: 30 min, ou 30 dias renováveis com "Manter conectado"
+      const rememberMe = req.cookies?.[GOOGLE_REMEMBER_COOKIE] === "1";
+      res.clearCookie(GOOGLE_REMEMBER_COOKIE);
+      const sessionDuration = rememberMe ? SESSION_REMEMBER_MS : SESSION_DEFAULT_MS;
       const sessionToken = await sdk.createSessionToken(openId, {
         name: name || "",
-        expiresInMs: THIRTY_MINUTES_MS,
+        expiresInMs: sessionDuration,
+        rememberMe,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, {
         ...cookieOptions,
-        maxAge: THIRTY_MINUTES_MS,
+        maxAge: sessionDuration,
       });
 
       // Definir valores financeiros como ocultos por padrão (via redirect com script)

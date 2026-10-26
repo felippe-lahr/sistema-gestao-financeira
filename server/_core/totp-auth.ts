@@ -12,7 +12,7 @@ import { type Express, type Request, type Response } from "express";
 import { generateSecret, generateURI, verifySync } from "otplib";
 import QRCode from "qrcode";
 import * as db from "../db";
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, SESSION_DEFAULT_MS, SESSION_REMEMBER_MS } from "@shared/const";
 
 const APP_NAME = "UnifiquePro";
 
@@ -254,9 +254,7 @@ export function registerTotpRoutes(app: Express) {
         return;
       }
 
-      const THIRTY_MINUTES_MS = 30 * 60 * 1000;
-      const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-      const sessionDuration = rememberMe ? TWENTY_FOUR_HOURS_MS : THIRTY_MINUTES_MS;
+      const sessionDuration = rememberMe ? SESSION_REMEMBER_MS : SESSION_DEFAULT_MS;
 
       const sessionToken = await sdk.createSessionToken(openId, {
         name: user.name || "",

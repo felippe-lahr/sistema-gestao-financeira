@@ -504,7 +504,8 @@ function LoginForm() {
 
           {/* Botão Google */}
           <a
-            href="/api/auth/google"
+            href={rememberMe ? "/api/auth/google?remember=1" : "/api/auth/google"}
+            onClick={() => { try { localStorage.setItem("pendingRememberMe", String(rememberMe)); } catch {} }}
             className="flex items-center justify-center gap-3 w-full transition-all border border-[#E4E4E8] dark:border-[#2C2C3C] rounded-[12px] hover:bg-[#F6F6F8] dark:hover:bg-[#252532]"
             style={{
               height: 50,
@@ -578,7 +579,7 @@ function LoginForm() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -588,7 +589,7 @@ function LoginForm() {
                   style={{ width: 16, height: 16, borderRadius: 4, border: '1px solid #E4E4E8', accentColor: '#1a67c2', cursor: 'pointer' }}
                 />
                 <Label htmlFor="rememberMe" className="text-[13px] font-normal text-[#5C5C66] dark:text-[#A0A0B8] cursor-pointer">
-                  Lembrar-me
+                  Manter conectado neste aparelho
                 </Label>
               </div>
               <a
@@ -732,11 +733,11 @@ export default function DashboardLayout({
   }, [sidebarWidth]);
 
   useEffect(() => {
-    // Verificar se o usuário marcou "Manter conectado por 24h"
+    // "Manter conectado neste aparelho" marcado no login
     const rememberMe = JSON.parse(localStorage.getItem('rememberMe') || 'false');
 
-    // Se rememberMe está ativo, não aplicar timer de inatividade
-    // A sessão será controlada apenas pelo JWT (24h fixas)
+    // Com rememberMe não há timer de inatividade: a sessão é controlada pelo
+    // JWT (30 dias, renovados a cada uso — server/_core/context.ts)
     if (rememberMe) {
       console.log('[Auth] RememberMe ativo - timer de inatividade desabilitado');
       return;
