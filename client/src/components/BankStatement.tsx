@@ -77,14 +77,15 @@ export default function BankStatement({ entityId }: { entityId: number }) {
   return (
     <div className="space-y-4">
       {/* ── Filtros ── */}
-      <Card className="rounded-2xl">
-        <CardContent className="p-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <Card className="rounded-2xl gap-0 p-4 md:p-5 shadow-none border-[#ECECEF] dark:border-[#2C2C3C]">
+        <CardContent className="p-0 space-y-4">
+          {/* Conta em linha inteira; período/status lado a lado (também no celular) */}
+          <div className="grid grid-cols-2 gap-3">
             {/* Conta */}
-            <div className="space-y-1.5">
+            <div className="col-span-2 space-y-1.5 sm:col-span-1">
               <Label className="text-xs">Conta</Label>
               <Select value={String(accountId)} onValueChange={(v) => setAccountId(v === "all" ? "all" : Number(v))}>
-                <SelectTrigger className="rounded-xl">
+                <SelectTrigger className="w-full h-11 md:h-9 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -105,7 +106,7 @@ export default function BankStatement({ entityId }: { entityId: number }) {
             <div className="space-y-1.5">
               <Label className="text-xs">Período</Label>
               <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-                <SelectTrigger className="rounded-xl">
+                <SelectTrigger className="w-full h-11 md:h-9 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -135,7 +136,7 @@ export default function BankStatement({ entityId }: { entityId: number }) {
             <div className="space-y-1.5">
               <Label className="text-xs">Status</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-                <SelectTrigger className="rounded-xl">
+                <SelectTrigger className="w-full h-11 md:h-9 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -166,47 +167,43 @@ export default function BankStatement({ entityId }: { entityId: number }) {
       {isLoading ? (
         <Skeleton className="h-40 w-full rounded-2xl" />
       ) : summary ? (
-        <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white shadow-lg space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm font-medium">Saldo projetado ao fim do período</p>
-              <p className="text-3xl font-bold">{formatCurrency(summary.projectedBalance)}</p>
+        <div className="rounded-2xl border border-[#ECECEF] dark:border-[#2C2C3C] bg-white dark:bg-[#1C1C24] p-4 md:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[13px] text-[#6B6B75] dark:text-gray-400">Saldo projetado ao fim do período</p>
+              <p className={`text-[28px] font-bold tabular-nums leading-tight ${summary.projectedBalance < 0 ? "text-red-600" : "text-[#16161A] dark:text-gray-100"}`}>
+                {formatCurrency(summary.projectedBalance)}
+              </p>
             </div>
-            <Wallet className="h-8 w-8 text-blue-200" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E8F0FB] text-[#1661B5] dark:bg-blue-900/30 dark:text-blue-300">
+              <Wallet className="h-5 w-5" />
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl bg-white/10 p-3">
-              <p className="text-blue-100 text-xs">Saldo inicial do período</p>
-              <p className="font-semibold">{formatCurrency(summary.openingBalance)}</p>
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[#ECECEF] dark:border-[#2C2C3C] pt-3">
+            <div className="min-w-0">
+              <p className="text-[12px] text-[#8A8A92]">Saldo inicial do período</p>
+              <p className="text-[15px] font-semibold tabular-nums text-[#16161A] dark:text-gray-100 truncate">{formatCurrency(summary.openingBalance)}</p>
             </div>
-            <div className="rounded-xl bg-white/10 p-3">
-              <p className="text-blue-100 text-xs">Saldo realizado (até agora)</p>
-              <p className="font-semibold">{formatCurrency(summary.realizedBalance)}</p>
+            <div className="min-w-0">
+              <p className="text-[12px] text-[#8A8A92]">Realizado até agora</p>
+              <p className="text-[15px] font-semibold tabular-nums text-[#16161A] dark:text-gray-100 truncate">{formatCurrency(summary.realizedBalance)}</p>
             </div>
-            <div className="rounded-xl bg-white/10 p-3">
-              <p className="text-blue-100 text-xs flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Entradas</p>
-              <p className="font-semibold">
-                +{formatCurrency(summary.paidIn)}
-                {summary.pendingIn > 0 && (
-                  <span className="text-blue-200 font-normal text-xs"> (+{formatCurrency(summary.pendingIn)} prev.)</span>
-                )}
-              </p>
+            <div className="min-w-0">
+              <p className="flex items-center gap-1 text-[12px] text-[#8A8A92]"><TrendingUp className="h-3 w-3" /> Entradas</p>
+              <p className="text-[15px] font-semibold tabular-nums text-[#1a6b45] truncate">+{formatCurrency(summary.paidIn)}</p>
+              {summary.pendingIn > 0 && <p className="text-[12px] text-[#8A8A92] truncate">+{formatCurrency(summary.pendingIn)} previsto</p>}
             </div>
-            <div className="rounded-xl bg-white/10 p-3">
-              <p className="text-blue-100 text-xs flex items-center gap-1"><TrendingDown className="h-3 w-3" /> Saídas</p>
-              <p className="font-semibold">
-                -{formatCurrency(summary.paidOut)}
-                {summary.pendingOut > 0 && (
-                  <span className="text-blue-200 font-normal text-xs"> (-{formatCurrency(summary.pendingOut)} prev.)</span>
-                )}
-              </p>
+            <div className="min-w-0">
+              <p className="flex items-center gap-1 text-[12px] text-[#8A8A92]"><TrendingDown className="h-3 w-3" /> Saídas</p>
+              <p className="text-[15px] font-semibold tabular-nums text-[#c0392b] truncate">-{formatCurrency(summary.paidOut)}</p>
+              {summary.pendingOut > 0 && <p className="text-[12px] text-[#8A8A92] truncate">-{formatCurrency(summary.pendingOut)} previsto</p>}
             </div>
           </div>
         </div>
       ) : null}
 
       {/* ── Extrato ── */}
-      <Card className="rounded-2xl">
+      <Card className="rounded-2xl gap-0 p-0 overflow-hidden">
         <CardContent className="p-0">
           {/* Linha de saldo inicial */}
           {summary && (

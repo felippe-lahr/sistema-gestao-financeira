@@ -40,7 +40,9 @@ import {
   Banknote,
   Landmark,
   Star,
+  MoreVertical,
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -137,18 +139,17 @@ export default function BankAccounts() {
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      {/* Header — padrão igual a Transações */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Contas Bancárias</h1>
-          <p className="text-muted-foreground">
-            Gerencie suas contas, importe extratos OFX e acompanhe o saldo da entidade.
+    <div className="container mx-auto py-4 pb-28 md:py-8 md:pb-8 space-y-4 md:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold">Contas Bancárias</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Saldos, extratos OFX e conciliação por entidade.
           </p>
         </div>
-        {/* Tabs + botão Nova Conta ficam no header em desktop */}
         <div className="flex items-center gap-3">
-          <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <div className="grid flex-1 grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-800 md:flex-none">
             {([
               { key: "accounts", label: "Contas" },
               { key: "statement", label: "Extrato" },
@@ -156,9 +157,9 @@ export default function BankAccounts() {
               <button
                 key={tab.key}
                 onClick={() => setView(tab.key)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`h-9 md:h-8 px-5 rounded-lg text-sm font-medium transition-all ${
                   view === tab.key
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                    ? "bg-white dark:bg-gray-700 text-[#1661B5] dark:text-white shadow-sm"
                     : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 }`}
               >
@@ -168,11 +169,8 @@ export default function BankAccounts() {
           </div>
           {canWrite && view === "accounts" && selectedEntityId && (
             <Button
-              className="bg-[#1a67c2] hover:bg-[#155fa0]"
-              onClick={() => {
-                /* sinal para BankAccountsList abrir o sheet */
-                setOpenCreate(c => c + 1);
-              }}
+              className="hidden md:inline-flex bg-[#1661B5] hover:bg-[#12539C]"
+              onClick={() => setOpenCreate(c => c + 1)}
             >
               <Plus className="h-4 w-4 mr-2" />
               Nova Conta Bancária
@@ -181,23 +179,36 @@ export default function BankAccounts() {
         </div>
       </div>
 
-      {/* Seletor de entidade */}
+      {/* Seletor de entidade — rolagem horizontal no celular */}
       {entities.length > 1 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
           {entities.map((e) => (
             <button
               key={e.id}
               onClick={() => setSelectedEntityId(e.id)}
-              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              className={`h-9 shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-medium transition-all ${
                 selectedEntityId === e.id
-                  ? "bg-[#1a67c2] text-white shadow-sm"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  ? "bg-[#1661B5] text-white shadow-sm"
+                  : "bg-white dark:bg-gray-800 border border-[#E4E4E8] dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
               }`}
             >
               {e.name}
             </button>
           ))}
         </div>
+      )}
+
+      {/* Mobile: botão flutuante de nova conta */}
+      {canWrite && view === "accounts" && selectedEntityId && (
+        <button
+          type="button"
+          onClick={() => setOpenCreate(c => c + 1)}
+          aria-label="Nova conta bancária"
+          className="md:hidden fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_8px_24px_rgba(22,97,181,0.45)] active:scale-95 transition-transform"
+          style={{ background: "#1661B5", bottom: "calc(20px + env(safe-area-inset-bottom))" }}
+        >
+          <Plus className="h-7 w-7" />
+        </button>
       )}
 
       {selectedEntityId && view === "accounts" && (
@@ -361,50 +372,35 @@ function BankAccountsList({
 
   return (
     <div className="space-y-4">
-      {/* Card de resumo — padrão igual a Transações */}
-      {accounts && accounts.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-2">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Saldo em contas</span>
-              <Landmark className="h-4 w-4 text-blue-600" />
+      {/* Resumo — card destaque da marca */}
+      {accounts && accounts.length > 0 && (() => {
+        const def = accounts.find(a => a.isDefault);
+        return (
+          <div className="rounded-2xl border border-[#ECECEF] dark:border-[#2C2C3C] bg-white dark:bg-[#1C1C24] p-4 md:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[13px] text-[#6B6B75] dark:text-gray-400">Saldo em contas</p>
+                <p className={`text-[28px] md:text-3xl font-bold tabular-nums leading-tight ${totalCurrentBalance < 0 ? "text-red-600" : "text-[#16161A] dark:text-gray-100"}`}>
+                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalCurrentBalance)}
+                </p>
+              </div>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E8F0FB] text-[#1661B5] dark:bg-blue-900/30 dark:text-blue-300">
+                <Landmark className="h-5 w-5" />
+              </div>
             </div>
-            <p className={`text-2xl font-bold ${totalCurrentBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalCurrentBalance)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              {accounts.length} conta{accounts.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Saldo inicial total</span>
-              <Banknote className="h-4 w-4 text-gray-400" />
+            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-[#ECECEF] dark:border-[#2C2C3C] pt-3">
+              <div className="min-w-0">
+                <p className="text-[12px] text-[#8A8A92]">Saldo inicial</p>
+                <p className="text-[15px] font-semibold tabular-nums text-[#16161A] dark:text-gray-100 truncate">{formatCurrency(totalInitialBalance)}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[12px] text-[#8A8A92]">{accounts.length} conta{accounts.length !== 1 ? "s" : ""} · padrão</p>
+                <p className="text-[15px] font-semibold text-[#16161A] dark:text-gray-100 truncate">{def ? def.name : "Nenhuma"}</p>
+              </div>
             </div>
-            <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalInitialBalance / 100)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">Saldo de abertura</p>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Conta padrão</span>
-              <Star className="h-4 w-4 text-yellow-500" />
-            </div>
-            {(() => {
-              const def = accounts.find(a => a.isDefault);
-              return def ? (
-                <>
-                  <p className="text-base font-bold text-gray-900 dark:text-white truncate">{def.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{def.bank || "Sem banco definido"}</p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">Nenhuma definida</p>
-              );
-            })()}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Lista de contas */}
       {!accounts || accounts.length === 0 ? (
@@ -424,108 +420,96 @@ function BankAccountsList({
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {accounts.map((account) => (
-            <Card
-              key={account.id}
-              className="border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all"
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start gap-4">
-                  {/* Ícone colorido */}
+        <div className="grid gap-3 md:grid-cols-2">
+          {accounts.map((account) => {
+            const summary = balanceSummary?.find(s => s.id === account.id);
+            const current = summary ? summary.currentBalance : account.balance / 100;
+            const details = [account.bank, account.accountNumber && `Ag. ${account.accountNumber}`].filter(Boolean).join(" · ");
+            return (
+              <div key={account.id} className="rounded-2xl border border-[#ECECEF] dark:border-[#2C2C3C] bg-white dark:bg-[#1C1C24] p-4 transition-colors">
+                {/* Topo: identificação + menu */}
+                <div className="flex items-center gap-3">
                   <div
-                    className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm"
                     style={{ backgroundColor: account.color || "#2563EB" }}
                   >
                     <Banknote className="h-5 w-5 text-white" />
                   </div>
-
-                  {/* Informações */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                          {account.name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {account.bank && `${account.bank}`}
-                          {account.bank && account.accountNumber && " • "}
-                          {account.accountNumber && `Ag. ${account.accountNumber}`}
-                          {!account.bank && !account.accountNumber && "Sem dados bancários"}
-                        </p>
-                      </div>
-                      {!account.isActive && (
-                        <Badge variant="secondary" className="text-xs flex-shrink-0">Inativa</Badge>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="truncate text-[15px] font-semibold leading-5 text-[#16161A] dark:text-gray-100">{account.name}</h3>
+                      {account.isDefault && (
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#FFF6DB] px-1.5 py-0.5 text-[11px] font-semibold text-[#8A6A00] dark:bg-yellow-900/30 dark:text-yellow-400">
+                          <Star className="h-3 w-3 fill-current" />Padrão
+                        </span>
                       )}
+                      {!account.isActive && <Badge variant="secondary" className="shrink-0 text-[11px]">Inativa</Badge>}
                     </div>
-
-                    {/* Saldo + ações */}
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex gap-6">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Saldo atual</p>
-                          <p className="text-lg font-bold text-gray-900 dark:text-white">
-                            {(() => {
-                              const summary = balanceSummary?.find(s => s.id === account.id);
-                              const val = summary ? summary.currentBalance : account.balance / 100;
-                              return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
-                            })()}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Saldo inicial</p>
-                          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                            {formatCurrency(account.balance)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Ações */}
-                      <div className="flex items-center gap-1">
+                    <p className="truncate text-[13px] text-[#6B6B75] dark:text-gray-400">{details || "Sem dados bancários"}</p>
+                  </div>
+                  {(canWrite || canDelete) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="-mr-2 h-10 w-10 shrink-0 text-gray-500" aria-label="Ações da conta">
+                          <MoreVertical className="h-5 w-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
                         {canWrite && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`h-8 w-8 ${account.isDefault ? "text-yellow-500" : "text-gray-300 hover:text-yellow-400"}`}
-                            onClick={() => setDefaultMutation.mutate({ id: account.id, entityId })}
-                            title={account.isDefault ? "Conta padrão" : "Definir como padrão"}
-                          >
-                            <Star className={`h-4 w-4 ${account.isDefault ? "fill-yellow-500" : ""}`} />
-                          </Button>
+                          <DropdownMenuItem onClick={() => setOfxAccountId(account.id)}>
+                            <Upload className="h-4 w-4 mr-2" />Importar extrato OFX
+                          </DropdownMenuItem>
+                        )}
+                        {canWrite && !account.isDefault && (
+                          <DropdownMenuItem onClick={() => setDefaultMutation.mutate({ id: account.id, entityId })}>
+                            <Star className="h-4 w-4 mr-2" />Definir como padrão
+                          </DropdownMenuItem>
                         )}
                         {canWrite && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
-                            onClick={() => setOfxAccountId(account.id)}
-                          >
-                            <Upload className="h-4 w-4 mr-1.5" />
-                            <span className="text-xs font-medium">Importar OFX</span>
-                          </Button>
-                        )}
-                        {canWrite && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(account)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                          <DropdownMenuItem onClick={() => handleEdit(account)}>
+                            <Pencil className="h-4 w-4 mr-2" />Editar conta
+                          </DropdownMenuItem>
                         )}
                         {canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteId(account.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteId(account.id)}>
+                              <Trash2 className="h-4 w-4 mr-2" />Excluir conta
+                            </DropdownMenuItem>
+                          </>
                         )}
-                      </div>
-                    </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+
+                {/* Saldos */}
+                <div className="mt-4 flex items-end justify-between gap-3 border-t border-[#ECECEF] pt-3 dark:border-[#2C2C3C]">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Saldo atual</p>
+                    <p className={`truncate text-xl font-bold tabular-nums ${current < 0 ? "text-red-600" : "text-gray-900 dark:text-white"}`}>
+                      {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(current)}
+                    </p>
+                  </div>
+                  <div className="min-w-0 text-right">
+                    <p className="text-xs text-muted-foreground">Saldo inicial</p>
+                    <p className="truncate text-sm font-medium tabular-nums text-gray-500 dark:text-gray-400">{formatCurrency(account.balance)}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                {/* Ação principal visível */}
+                {canWrite && (
+                  <Button
+                    variant="outline"
+                    className="mt-3 h-11 md:h-9 w-full rounded-2xl border-dashed border-[#C9C9CF] dark:border-[#3A3A48] text-[#1661B5] dark:text-blue-300 hover:bg-[#F6F6F8] dark:hover:bg-[#252532]"
+                    onClick={() => setOfxAccountId(account.id)}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />Importar extrato OFX
+                  </Button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
