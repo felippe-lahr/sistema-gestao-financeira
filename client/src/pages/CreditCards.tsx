@@ -36,7 +36,9 @@ import {
   Check,
   Star,
   Copy,
+  MoreVertical,
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -108,27 +110,30 @@ export default function CreditCards() {
     );
   }
   return (
-    <div className="py-4 md:p-6 space-y-6">
+    <div className="py-4 pb-28 md:p-6 md:pb-6 space-y-4 md:space-y-6">
       {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Cartões de Crédito</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Gerencie seus cartões e acompanhe os limites</p>
-        </div>
-        {/* Seletor de entidade */}
-        {entities.length > 1 && (
-          <Select value={String(selectedEntityId)} onValueChange={(v) => setSelectedEntityId(Number(v))}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Selecione a entidade" />
-            </SelectTrigger>
-            <SelectContent>
-              {entities.map((e) => (
-                <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+      <div className="min-w-0">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Cartões de Crédito</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Limites, faturas e importação por entidade.</p>
       </div>
+      {/* Seletor de entidade — rolagem horizontal no celular */}
+      {entities.length > 1 && (
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+          {entities.map((e) => (
+            <button
+              key={e.id}
+              onClick={() => setSelectedEntityId(e.id)}
+              className={`h-9 shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-medium transition-all ${
+                selectedEntityId === e.id
+                  ? "bg-[#1661B5] text-white shadow-sm"
+                  : "bg-white dark:bg-gray-800 border border-[#E4E4E8] dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              {e.name}
+            </button>
+          ))}
+        </div>
+      )}
       {selectedEntityId && (
         <CreditCardsContent entityId={selectedEntityId} />
       )}
@@ -575,32 +580,41 @@ function CreditCardsContent({ entityId }: { entityId: number }) {
   return (
     <>
       {/* Botões de ação */}
-      <div className="flex justify-end gap-2 mb-2">
+      <div className="grid grid-cols-2 gap-2 md:flex md:justify-end">
         <Button
           variant="outline"
-          size="sm"
-          onClick={() => setDupSheetOpen(true)}
-          className="flex items-center gap-2"
+          onClick={() => { setPdfSheetOpen(true); setPdfStep("upload"); }}
+          className="h-11 md:h-9 rounded-xl text-[#1661B5] dark:text-blue-300"
         >
-          <Copy className="h-4 w-4" />
-          Verificar duplicatas
+          <FileUp className="h-4 w-4 mr-2" />
+          Importar fatura
         </Button>
         <Button
           variant="outline"
-          size="sm"
-          onClick={() => { setPdfSheetOpen(true); setPdfStep("upload"); }}
-          className="flex items-center gap-2"
+          onClick={() => setDupSheetOpen(true)}
+          className="h-11 md:h-9 rounded-xl"
         >
-          <FileUp className="h-4 w-4" />
-          Importar Fatura
+          <Copy className="h-4 w-4 mr-2" />
+          Duplicatas
         </Button>
       </div>
+
+      {/* Mobile: botão flutuante de novo cartão */}
+      <button
+        type="button"
+        onClick={openCreate}
+        aria-label="Novo cartão"
+        className="md:hidden fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_8px_24px_rgba(22,97,181,0.45)] active:scale-95 transition-transform"
+        style={{ background: "#1661B5", bottom: "calc(20px + env(safe-area-inset-bottom))" }}
+      >
+        <Plus className="h-7 w-7" />
+      </button>
       {/* Grid de cartões */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Botão de adicionar */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+        {/* Botão de adicionar (desktop; no celular é o botão flutuante) */}
         <button
           onClick={openCreate}
-          className="h-52 rounded-2xl border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30 transition-all flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary group"
+          className="hidden md:flex h-52 rounded-2xl border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30 transition-all flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary group"
         >
           <div className="h-10 w-10 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
             <Plus className="h-5 w-5" />
@@ -1290,48 +1304,59 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
     });
   }
   return (
-    <div className="rounded-2xl overflow-hidden shadow-md border border-border/50 flex flex-col">
+    <div className="rounded-2xl overflow-hidden border border-[#ECECEF] dark:border-[#2C2C3C] bg-white dark:bg-[#1C1C24] flex flex-col">
       {/* Topo colorido — visual do cartão */}
       <div
-        className="h-32 p-4 flex flex-col justify-between text-white relative"
-        style={{ background: `linear-gradient(135deg, ${card.color}dd, ${card.color}88)` }}
+        className="min-h-[120px] p-4 flex flex-col justify-between gap-4 text-white"
+        style={{ background: `linear-gradient(135deg, ${card.color}, ${card.color}b3)` }}
       >
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold opacity-80 uppercase tracking-wider">{BRAND_LABELS[card.brand]}</span>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setDefaultMutation.mutate({ id: card.id, entityId })}
-              className="h-6 w-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
-              title={card.isDefault ? "Cartão padrão" : "Definir como padrão"}
-            >
-              <Star className={`h-3 w-3 ${card.isDefault ? "fill-yellow-300 text-yellow-300" : ""}`} />
-            </button>
-            <button
-              onClick={onEdit}
-              className="h-6 w-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
-            >
-              <Pencil className="h-3 w-3" />
-            </button>
-            <button
-              onClick={onDelete}
-              className="h-6 w-6 rounded-full bg-white/20 hover:bg-red-500/60 flex items-center justify-center transition-colors"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wider opacity-90">{BRAND_LABELS[card.brand]}</span>
+            {card.isDefault && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-white/25 px-1.5 py-0.5 text-[11px] font-semibold">
+                <Star className="h-3 w-3 fill-current" />Padrão
+              </span>
+            )}
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Ações do cartão"
+                className="-mr-1 -mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {!card.isDefault && (
+                <DropdownMenuItem onClick={() => setDefaultMutation.mutate({ id: card.id, entityId })}>
+                  <Star className="h-4 w-4 mr-2" />Definir como padrão
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="h-4 w-4 mr-2" />Editar cartão
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />Excluir cartão
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <div>
-          <p className="text-sm font-bold tracking-wider opacity-90">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold tracking-[0.2em] opacity-90">
             {card.lastFourDigits ? `•••• ${card.lastFourDigits}` : "••••"}
           </p>
-          <p className="text-sm font-semibold mt-0.5">{card.name}</p>
+          <p className="truncate text-[15px] font-semibold mt-0.5">{card.name}</p>
         </div>
       </div>
       {/* Corpo — informações de limite */}
-      <div className="p-4 space-y-3 bg-card flex-1">
+      <div className="p-4 space-y-3 flex-1">
         {/* Barra de uso */}
         <div className="space-y-1">
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="flex justify-between text-[13px] text-[#6B6B75] dark:text-gray-400">
             <span>Limite usado</span>
             <span className="font-medium text-foreground">{usagePercent}%</span>
           </div>
@@ -1343,35 +1368,35 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
           </div>
         </div>
         {/* Valores */}
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <p className="text-xs text-muted-foreground">Utilizado</p>
-            <p className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(usedAmount)}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="min-w-0">
+            <p className="text-[12px] text-[#8A8A92]">Utilizado</p>
+            <p className="truncate text-[17px] font-bold tabular-nums text-[#c0392b] dark:text-red-400">{formatCurrency(usedAmount)}</p>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Disponível</p>
-            <p className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(availableLimit)}</p>
+          <div className="min-w-0 text-right">
+            <p className="text-[12px] text-[#8A8A92]">Disponível</p>
+            <p className="truncate text-[17px] font-bold tabular-nums text-[#1a6b45] dark:text-green-400">{formatCurrency(availableLimit)}</p>
           </div>
         </div>
         {/* Vencimento próxima fatura */}
         {dueDate && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t border-border/50">
-            <Clock className="h-3 w-3" />
+          <div className="flex items-center gap-1.5 text-[13px] text-[#6B6B75] dark:text-gray-400 pt-3 border-t border-[#ECECEF] dark:border-[#2C2C3C]">
+            <Clock className="h-3.5 w-3.5" />
             <span>Próxima fatura vence em {format(dueDate, "dd 'de' MMMM", { locale: ptBR })}</span>
           </div>
         )}
         {/* Botão para ver faturas por mês */}
         {invoices && invoices.length > 0 && (
-          <div className="pt-1 border-t border-border/50">
+          <div className="border-t border-[#ECECEF] dark:border-[#2C2C3C]">
             <button
               onClick={() => setShowInvoices(!showInvoices)}
-              className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
+              className="flex h-11 items-center justify-between w-full text-[13px] font-semibold text-[#1661B5] dark:text-blue-300 transition-colors"
             >
               <span>Faturas por mês ({invoices.length})</span>
               <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showInvoices ? "rotate-90" : ""}`} />
             </button>
             {showInvoices && (
-              <div className="mt-2 space-y-1.5">
+              <div className="space-y-2">
                 {invoices.map((inv: any) => {
                   // Usar UTC para evitar problema de fuso (GMT-3 subtrairia 1 dia)
                   const _invDueRaw = new Date(inv.dueDate);
@@ -1381,7 +1406,7 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
                   return (
                     <div
                       key={`${inv.year}-${inv.month}`}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
+                      className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[13px] ${
                         isPaid
                           ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
                           : isCurrentMonth
@@ -1402,7 +1427,7 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
                           {isCurrentMonth && !isPaid && <span className="ml-1 text-primary">(atual)</span>}
                           {isPaid && <span className="ml-1 text-green-600 dark:text-green-400">(paga)</span>}
                         </span>
-                        <span className="text-muted-foreground flex-shrink-0">{inv.count} compra{inv.count !== 1 ? "s" : ""}</span>
+                        <span className="hidden sm:inline text-muted-foreground flex-shrink-0">{inv.count} compra{inv.count !== 1 ? "s" : ""}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                         <span className={`font-semibold ${
@@ -1413,7 +1438,7 @@ function CreditCardCard({ card, entityId, onEdit, onDelete }: { card: any; entit
                         {!isPaid && (
                           <button
                             onClick={() => openPaySheet(inv)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-600 hover:bg-green-700 text-white transition-colors"
+                            className="inline-flex h-9 items-center gap-1 px-3 rounded-lg text-[13px] font-semibold bg-[#1a6b45] hover:bg-[#15573a] text-white transition-colors"
                           >
                             <Banknote className="h-3 w-3" />
                             Pagar
