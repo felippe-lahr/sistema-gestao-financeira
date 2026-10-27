@@ -4,14 +4,16 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Fingerprint, Loader2, ScanFace } from "lucide-react";
+import { Fingerprint, Loader2, ScanFace, ShieldCheck } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 /**
  * Bloqueio do app com Face ID / digital (WebAuthn, verificado no servidor).
  *
  * Configuração por aparelho (localStorage): qual credencial usar e após
  * quanto tempo fora do app ele bloqueia. O instante da última atividade é
- * gravado quando o app vai para segundo plano.
+ * gravado quando o app vai para segundo plano. Fora por 24h ou mais, o
+ * desbloqueio pede o código do autenticador (2FA) em vez da biometria.
  */
 const CONFIG_KEY = "biometricLock";
 const LAST_ACTIVE_KEY = "biometricLastActiveAt";
@@ -25,6 +27,7 @@ export const BIOMETRIC_DELAY_OPTIONS = [
   { value: 15, label: "Após 15 minutos fora" },
   { value: 60, label: "Após 1 hora fora" },
   { value: 240, label: "Após 4 horas fora" },
+  { value: 1440, label: "Após 24 horas fora" },
 ];
 const DEFAULT_DELAY_MINUTES = 15;
 
@@ -48,14 +51,47 @@ function markActive() {
   try { localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())); } catch {}
 }
 
-function shouldLock(config: BiometricConfig | null): boolean {
-  if (!config) return false;
+/** Fora do app por 24h ou mais: o desbloqueio pede o código do autenticador (2FA). */
+const STRONG_AUTH_AFTER_MS = 24 * 60 * 60 * 1000;
+/** "Sempre ao voltar": ignora saídas muito curtas (Face ID, câmera, seletor de arquivos). */
+const MIN_AWAY_MS = 10 * 1000;
+/** Desbloqueado nesta sessão do app (sobrevive ao reload das atualizações automáticas). */
+const UNLOCKED_SESSION_KEY = "biometricUnlockedSession";
+
+type LockLevel = "none" | "biometric" | "strong";
+
+function awayMs(): number {
   try {
-    const last = Number(localStorage.getItem(LAST_ACTIVE_KEY) || 0);
-    return Date.now() - last >= config.delayMinutes * 60 * 1000;
+    return Date.now() - Number(localStorage.getItem(LAST_ACTIVE_KEY) || 0);
   } catch {
-    return false;
+    return 0;
   }
+}
+
+function lockLevelFor(config: BiometricConfig | null, away: number): LockLevel {
+  if (!config) return "none";
+  if (away >= STRONG_AUTH_AFTER_MS) return "strong";
+  return away >= Math.max(config.delayMinutes * 60 * 1000, MIN_AWAY_MS) ? "biometric" : "none";
+}
+
+// Estado do bloqueio compartilhado entre montagens: cada tela monta o layout de
+// novo, então o bloqueio não pode ser recalculado a cada navegação.
+let sharedLock: LockLevel | null = null;
+const lockListeners = new Set<(l: LockLevel) => void>();
+function setSharedLock(level: LockLevel) {
+  sharedLock = level;
+  try {
+    if (level === "none") sessionStorage.setItem(UNLOCKED_SESSION_KEY, "1");
+    else sessionStorage.removeItem(UNLOCKED_SESSION_KEY);
+  } catch {}
+  lockListeners.forEach((fn) => fn(level));
+}
+function initialLock(): LockLevel {
+  if (sharedLock !== null) return sharedLock;
+  let unlockedThisSession = false;
+  try { unlockedThisSession = sessionStorage.getItem(UNLOCKED_SESSION_KEY) === "1"; } catch {}
+  sharedLock = unlockedThisSession ? "none" : lockLevelFor(getBiometricConfig(), awayMs());
+  return sharedLock;
 }
 
 /** Face ID / Touch ID / digital disponível neste aparelho? */
@@ -88,29 +124,46 @@ export function useEnableBiometric(userId?: number) {
 }
 
 export function BiometricLock({ userId, userName, onSignOut }: { userId: number; userName?: string | null; onSignOut: () => void }) {
-  // Configuração de outro usuário (troca de conta no mesmo aparelho) é descartada
-  const [locked, setLocked] = useState(() => {
+  const [lock, setLock] = useState<LockLevel>(() => {
+    // Configuração de outro usuário (troca de conta no mesmo aparelho) é descartada
     const config = getBiometricConfig();
     if (config && config.userId !== undefined && config.userId !== userId) {
       setBiometricConfig(null);
-      return false;
+      sharedLock = "none";
     }
-    return shouldLock(config);
+    return initialLock();
   });
   const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState("");
   const [offerOpen, setOfferOpen] = useState(false);
   const optionsMutation = trpc.biometric.unlockOptions.useMutation();
   const unlockMutation = trpc.biometric.unlock.useMutation();
+  const totpMutation = trpc.biometric.unlockWithTotp.useMutation();
+  const { data: security, refetch: refetchSecurity } = trpc.biometric.securityInfo.useQuery(undefined, { enabled: false });
   const enableBiometric = useEnableBiometric(userId);
+  // Sem 2FA ativo na conta, o bloqueio de 24h usa só a biometria
+  const needsCode = lock === "strong" && security?.totpEnabled === true;
+  const locked = lock !== "none";
+
+  // Status do 2FA consultado a cada bloqueio de 24h (pode ter mudado no Perfil)
+  useEffect(() => {
+    if (lock === "strong") refetchSecurity();
+  }, [lock]);
+
+  useEffect(() => {
+    lockListeners.add(setLock);
+    return () => { lockListeners.delete(setLock); };
+  }, []);
 
   // Bloqueia ao voltar para o app depois do tempo configurado
   useEffect(() => {
     if (!locked) markActive();
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
-        if (!locked) markActive();
-      } else if (shouldLock(getBiometricConfig())) {
-        setLocked(true);
+        if (sharedLock === "none") markActive();
+      } else if (sharedLock === "none" && !busy) {
+        const level = lockLevelFor(getBiometricConfig(), awayMs());
+        if (level !== "none") setSharedLock(level);
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
@@ -119,7 +172,13 @@ export function BiometricLock({ userId, userName, onSignOut }: { userId: number;
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", onVisibility);
     };
-  }, [locked]);
+  }, [locked, busy]);
+
+  const finishUnlock = () => {
+    markActive();
+    setCode("");
+    setSharedLock("none");
+  };
 
   // Convite único após entrar com "Manter conectado" num aparelho compatível
   useEffect(() => {
@@ -135,26 +194,42 @@ export function BiometricLock({ userId, userName, onSignOut }: { userId: number;
 
   const unlock = async () => {
     const config = getBiometricConfig();
-    if (!config) return setLocked(false);
+    if (!config) return finishUnlock();
     setBusy(true);
     try {
       const { options } = await optionsMutation.mutateAsync({ credentialId: config.credentialId });
       if (!options) {
         // Credencial removida no servidor: desliga o bloqueio neste aparelho
         setBiometricConfig(null);
-        setLocked(false);
+        finishUnlock();
         return;
       }
       const response = await startAuthentication({ optionsJSON: options });
       const { verified } = await unlockMutation.mutateAsync({ response });
       if (verified) {
-        markActive();
-        setLocked(false);
+        finishUnlock();
       } else {
         toast.error("Não foi possível confirmar. Tente novamente.");
       }
     } catch (err: any) {
       if (err?.name !== "NotAllowedError") toast.error("Não foi possível usar a biometria agora.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unlockWithCode = async () => {
+    if (code.length !== 6) return;
+    setBusy(true);
+    try {
+      const { verified } = await totpMutation.mutateAsync({ code });
+      if (verified) finishUnlock();
+      else {
+        toast.error("Código incorreto. Verifique o aplicativo e tente novamente.");
+        setCode("");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Não foi possível verificar o código.");
     } finally {
       setBusy(false);
     }
@@ -191,24 +266,54 @@ export function BiometricLock({ userId, userName, onSignOut }: { userId: number;
           <img src="/logo-unifique-pro-white.png" alt="UnifiquePro" className="h-9 w-auto" />
           <div className="flex flex-col items-center gap-5 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/15">
-              <Icon className="h-10 w-10" />
+              {needsCode ? <ShieldCheck className="h-10 w-10" /> : <Icon className="h-10 w-10" />}
             </div>
             <div>
               <p className="text-xl font-semibold">{userName ? `Olá, ${userName.split(" ")[0]}` : "App bloqueado"}</p>
-              <p className="mt-1 text-sm text-white/80">Use {biometricLabel()} para desbloquear</p>
+              <p className="mt-1 max-w-xs text-sm text-white/80">
+                {needsCode
+                  ? "Faz mais de 24 horas desde o último acesso. Digite o código do Google Authenticator."
+                  : `Use ${biometricLabel()} para desbloquear`}
+              </p>
             </div>
-            <Button
-              onClick={unlock}
-              disabled={busy}
-              className="h-12 w-64 rounded-xl bg-white text-[#1661B5] text-base font-semibold hover:bg-white/90"
-            >
-              {busy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Icon className="mr-2 h-5 w-5" />}
-              Desbloquear
-            </Button>
+            {needsCode ? (
+              <div className="flex flex-col items-center gap-4">
+                <InputOTP
+                  maxLength={6}
+                  value={code}
+                  onChange={setCode}
+                  autoFocus
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  onKeyDown={(e) => { if (e.key === "Enter") unlockWithCode(); }}
+                >
+                  <InputOTPGroup className="[&_[data-slot=input-otp-slot]]:bg-white [&_[data-slot=input-otp-slot]]:text-[#16161A]">
+                    {[0, 1, 2, 3, 4, 5].map((i) => <InputOTPSlot key={i} index={i} />)}
+                  </InputOTPGroup>
+                </InputOTP>
+                <Button
+                  onClick={unlockWithCode}
+                  disabled={busy || code.length !== 6}
+                  className="h-12 w-64 rounded-xl bg-white text-[#1661B5] text-base font-semibold hover:bg-white/90"
+                >
+                  {busy && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                  Verificar e desbloquear
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={unlock}
+                disabled={busy}
+                className="h-12 w-64 rounded-xl bg-white text-[#1661B5] text-base font-semibold hover:bg-white/90"
+              >
+                {busy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Icon className="mr-2 h-5 w-5" />}
+                Desbloquear
+              </Button>
+            )}
           </div>
           <button
             type="button"
-            onClick={() => { setBiometricConfig(null); setLocked(false); onSignOut(); }}
+            onClick={() => { setBiometricConfig(null); setSharedLock("none"); onSignOut(); }}
             className="text-sm text-white/80 underline-offset-4 hover:underline"
           >
             Sair e entrar com outra conta

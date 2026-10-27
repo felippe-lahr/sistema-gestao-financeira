@@ -14,6 +14,10 @@ import { treasurySelic } from "../drizzle/schema";
 import { getDb } from "./db";
 import * as push from "./services/push-notifications";
 import * as biometric from "./services/biometric-unlock";
+import { verifyTotpCode } from "./_core/totp-auth";
+
+// Tentativas erradas do código 2FA na tela de bloqueio (userId → instantes)
+const totpUnlockFailures = new Map<number, number[]>();
 
 export const appRouter = router({
   system: systemRouter,
@@ -3499,6 +3503,30 @@ Regras:
       .mutation(async ({ ctx, input }) => {
         await biometric.removeCredential(ctx.user.id, input.credentialId);
         return { success: true };
+      }),
+
+    // Após 24h fora do app, o desbloqueio pede o código do autenticador (2FA)
+    securityInfo: protectedProcedure.query(async ({ ctx }) => {
+      const totp = await db.getUserTotpData(ctx.user.id);
+      return { totpEnabled: !!(totp?.totpEnabled && totp.totpSecret) };
+    }),
+
+    unlockWithTotp: protectedProcedure
+      .input(z.object({ code: z.string().max(12) }))
+      .mutation(async ({ ctx, input }) => {
+        // Máx. 5 códigos errados a cada 15 min por usuário
+        const now = Date.now();
+        const attempts = (totpUnlockFailures.get(ctx.user.id) ?? []).filter((t) => now - t < 15 * 60 * 1000);
+        if (attempts.length >= 5) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Muitas tentativas. Aguarde 15 minutos ou saia e entre novamente." });
+        }
+        const totp = await db.getUserTotpData(ctx.user.id);
+        if (!totp?.totpEnabled || !totp.totpSecret) return { verified: false };
+        const code = input.code.replace(/[\s-]/g, "");
+        const verified = code.length === 6 && verifyTotpCode(code, totp.totpSecret);
+        if (verified) totpUnlockFailures.delete(ctx.user.id);
+        else totpUnlockFailures.set(ctx.user.id, [...attempts, now]);
+        return { verified };
       }),
   }),
 

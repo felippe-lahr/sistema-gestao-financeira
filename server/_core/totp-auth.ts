@@ -23,7 +23,7 @@ const APP_NAME = "UnifiquePro";
  * com pequena diferença de relógio do celular.
  * O verifySync do otplib v13 retorna { valid: boolean }, não um booleano direto.
  */
-function verifyTotpCode(token: string, secret: string): boolean {
+export function verifyTotpCode(token: string, secret: string): boolean {
   const result = verifySync({ token, secret, strategy: "totp", epochTolerance: 30 });
   // otplib v13 retorna { valid: boolean } ou boolean dependendo da versão
   if (typeof result === "object" && result !== null && "valid" in result) {
