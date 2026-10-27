@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ModeToggle } from "@/components/mode-toggle";
 import { BiometricLock } from "@/components/BiometricLock";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1054,6 +1055,7 @@ function DashboardLayoutContent({
         )}
         {/* Mobile: borda única de 16px aqui; páginas não somam a delas (ver
             `.app-main .container` em index.css e os wrappers `py-4 md:p-6`). */}
+        {isMobile && <PullToRefresh />}
         <main className="app-main flex-1 min-w-0 px-4 pt-1 pb-10 md:px-[38px] md:pt-[30px] md:pb-14">{children}</main>
       </SidebarInset>
       <OnboardingTour />
