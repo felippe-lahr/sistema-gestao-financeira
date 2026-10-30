@@ -25,6 +25,7 @@ import { uploadFile, deleteFile } from "@/lib/storage";
 import { CurrencyInput, parseCurrency, formatCurrency } from "@/components/CurrencyInput";
 import { getHolidayByDate, getHolidaysByMonth } from "@/lib/holidays";
 import { DatePicker } from "@/components/ui/date-picker";
+import { RentalMonthSummary } from "@/components/RentalMonthSummary";
 
 type RentalAttachment = {
   id: number;
@@ -41,6 +42,20 @@ export default function Rentals() {
   const entityId = params?.entityId || "";
   const [, setLocation] = useLocation();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Mostrar/ocultar valores — mesma preferência da tela inicial
+  const [showValues, setShowValues] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("showFinancialValues");
+      return saved === null ? true : JSON.parse(saved) === true;
+    } catch {
+      return true;
+    }
+  });
+  const toggleShowValues = () => {
+    const next = !showValues;
+    setShowValues(next);
+    try { localStorage.setItem("showFinancialValues", JSON.stringify(next)); } catch {}
+  };
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingRental, setEditingRental] = useState(null);
@@ -339,46 +354,70 @@ export default function Rentals() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-4">
-        {/* Linha superior: botão voltar e título */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <Button onClick={() => setLocation(`/dashboard/${entityId}`)} variant="ghost" className="gap-2 self-start">
-            <ChevronLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Voltar para Dashboard</span>
-            <span className="sm:hidden">Voltar</span>
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Reservas</h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">Gerencie suas reservas e bloqueios de temporada</p>
+      <div className="space-y-3">
+        <Button onClick={() => setLocation(`/dashboard/${entityId}`)} variant="ghost" className="-ml-2 gap-2 hidden md:inline-flex">
+          <ChevronLeft className="w-4 h-4" />
+          Voltar para Dashboard
+        </Button>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Reservas</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              {currentEntity?.name ?? "Reservas"}<span className="hidden sm:inline"> · reservas e bloqueios de temporada</span>
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button onClick={() => setLocation(`/reports/${entityId}`)} variant="outline" className="h-11 md:h-9 gap-2 px-3">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Relatórios</span>
+            </Button>
+            {canWrite && (
+              <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="hidden md:inline-flex bg-[#1661B5] hover:bg-[#12539C] gap-2">
+                <Plus className="h-4 w-4" />
+                Nova Reserva
+              </Button>
+            )}
           </div>
         </div>
-        {/* Linha inferior: botões de ação */}
-        <div className="flex flex-wrap gap-2 sm:gap-3">
-          <Button onClick={() => setLocation(`/reports/${entityId}`)} variant="outline" className="gap-2 flex-1 sm:flex-none">
-            <BarChart3 className="w-4 h-4" />
-            <span>Relatórios</span>
-          </Button>
-          {canWrite && (
-            <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="bg-blue-600 hover:bg-blue-700 gap-2 flex-1 sm:flex-none">
-              <Plus className="h-4 w-4" />
-              <span>Nova Reserva</span>
-            </Button>
-          )}
-        </div>
       </div>
+
+      {/* Mobile: botão flutuante de nova reserva */}
+      {canWrite && (
+        <button
+          type="button"
+          onClick={() => { resetForm(); setIsCreateOpen(true); }}
+          aria-label="Nova reserva"
+          className="md:hidden fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_8px_24px_rgba(22,97,181,0.45)] active:scale-95 transition-transform"
+          style={{ background: "#1661B5", bottom: "calc(20px + env(safe-area-inset-bottom))" }}
+        >
+          <Plus className="h-7 w-7" />
+        </button>
+      )}
+
+      {/* Resumo do mês exibido no calendário */}
+      {!rentalsLoading && (
+        <RentalMonthSummary
+          rentals={rentals as any}
+          month={currentMonth}
+          showValues={showValues}
+          onToggleValues={toggleShowValues}
+        />
+      )}
 
       {/* Calendário */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>{format(currentMonth, "MMMM yyyy", { locale: ptBR })}</CardTitle>
-              <CardDescription>Visualize suas reservas mês a mês</CardDescription>
+              <CardTitle className="first-letter:uppercase">{format(currentMonth, "MMMM yyyy", { locale: ptBR })}</CardTitle>
+              <CardDescription className="hidden sm:block">Visualize suas reservas mês a mês</CardDescription>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
+                className="h-10 w-10 md:h-8 md:w-auto"
+                aria-label="Mês anterior"
                 onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -386,6 +425,8 @@ export default function Rentals() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-10 w-10 md:h-8 md:w-auto"
+                aria-label="Próximo mês"
                 onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
               >
                 <ChevronRight className="h-4 w-4" />
@@ -585,9 +626,10 @@ export default function Rentals() {
                             borderRadius = "0px 6px 6px 0px"; // Apenas fim
                           }
 
-                          const totalFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((rental.totalAmount || 0) / 100);
-                          const dailyFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((rental.dailyRate || 0) / 100);
-                          const extraFeeFormatted = rental.extraFeeAmount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.extraFeeAmount / 100) : 'N/A';
+                          const brlOrHidden = (cents: number) => showValues ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100) : "R$ ••••••";
+                          const totalFormatted = brlOrHidden(rental.totalAmount || 0);
+                          const dailyFormatted = brlOrHidden(rental.dailyRate || 0);
+                          const extraFeeFormatted = rental.extraFeeAmount ? brlOrHidden(rental.extraFeeAmount) : 'N/A';
 
                           const popoverId = `${rental.id}-${weekIndex}`;
                           return (
@@ -604,7 +646,7 @@ export default function Rentals() {
                                     borderRadius: borderRadius,
                                   }}
                                 >
-                                  {rental.guestName || getSourceLabel(rental.source)} - {totalFormatted}
+                                  {rental.guestName || getSourceLabel(rental.source)}{showValues && rental.source !== "BLOCKED" ? ` - ${totalFormatted}` : ""}
                                 </button>
                               </PopoverTrigger>
                               <PopoverContent side="top" align="center" className="w-80 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border dark:border-gray-700-gray-200 z-[9999]" onMouseEnter={() => setOpenPopoverId(popoverId)} onMouseLeave={() => setOpenPopoverId(null)}>

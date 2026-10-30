@@ -214,6 +214,11 @@ export function localDateKey(d: Date): string {
   return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+export /** Reservas são gravadas à meia-noite UTC (data "pura"): ler a data em UTC. */
+function rentalDateKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
 export function addDaysKey(key: string, days: number): string {
   const [y, m, d] = key.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
@@ -344,7 +349,7 @@ async function notifyNewRentals(userId: number, prefs: NotificationPreferences, 
     );
   const names = new Map(entities.map((e) => [e.id, e.name]));
   for (const r of rows) {
-    const period = `${shortDate(localDateKey(r.startDate))} a ${shortDate(localDateKey(r.endDate))}`;
+    const period = `${shortDate(rentalDateKey(r.startDate))} a ${shortDate(rentalDateKey(r.endDate))}`;
     const parts = [period, r.guestName, r.source === "AIRBNB" ? "Airbnb" : "Direta"];
     if (prefs.showValues && r.totalAmount) parts.push(money(r.totalAmount));
     await sendOnce(userId, `rental-new:${r.id}`, {
@@ -448,9 +453,9 @@ async function notifyDailySummary(userId: number, prefs: NotificationPreferences
       for (const entity of targets) {
         const mine = rows.filter((r) => r.entityId === entity.id);
         const guest = (r: (typeof rows)[number]) => r.guestName || (r.source === "AIRBNB" ? "Hóspede Airbnb" : "Hóspede");
-        const checkInToday = mine.filter((r) => localDateKey(r.startDate) === today);
-        const checkOutToday = mine.filter((r) => localDateKey(r.endDate) === today);
-        const checkInTomorrow = mine.filter((r) => localDateKey(r.startDate) === tomorrow);
+        const checkInToday = mine.filter((r) => rentalDateKey(r.startDate) === today);
+        const checkOutToday = mine.filter((r) => rentalDateKey(r.endDate) === today);
+        const checkInTomorrow = mine.filter((r) => rentalDateKey(r.startDate) === tomorrow);
         const lines: string[] = [];
         if (checkInToday.length)
           lines.push(`Check-in hoje: ${checkInToday.map((r) => `${guest(r)}${r.checkInTime ? ` (${r.checkInTime})` : ""}`).join(", ")}`);
