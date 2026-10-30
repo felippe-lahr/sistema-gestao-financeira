@@ -959,7 +959,7 @@ function DashboardLayoutContent({
             </SidebarMenu>
           </SidebarContent>
 
-          <SidebarFooter style={{ padding: '12px 10px 16px' }}>
+          <SidebarFooter style={{ padding: '12px 10px calc(16px + env(safe-area-inset-bottom))' }}>
             {/* Version + date */}
             <div className="group-data-[collapsible=icon]:hidden px-2 mb-2">
               <p className="text-[11px] text-center select-none text-[#8A8A92] dark:text-[#60607A]">
@@ -967,12 +967,15 @@ function DashboardLayoutContent({
               </p>
             </div>
 
-            <LiveClock />
+            {/* Celular: relógio e tema ficam de fora (o tema está na barra do topo) */}
+            {!isMobile && <LiveClock />}
 
             {/* Mode toggle */}
-            <div className="flex items-center justify-center my-2">
-              <ModeToggle />
-            </div>
+            {!isMobile && (
+              <div className="flex items-center justify-center my-2">
+                <ModeToggle />
+              </div>
+            )}
 
             {/* User avatar card */}
             <DropdownMenu>
