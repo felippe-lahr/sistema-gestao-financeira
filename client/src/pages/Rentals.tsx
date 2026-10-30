@@ -394,9 +394,10 @@ export default function Rentals() {
         </button>
       )}
 
-      {/* Resumo do mês exibido no calendário */}
+      {/* Resumo do mês — celular: acima do calendário */}
       {!rentalsLoading && (
         <RentalMonthSummary
+          className="md:hidden"
           rentals={rentals as any}
           month={currentMonth}
           showValues={showValues}
@@ -726,6 +727,17 @@ export default function Rentals() {
               </div>
             </div>
       </Card>
+
+      {/* Resumo do mês — desktop: abaixo do calendário */}
+      {!rentalsLoading && (
+        <RentalMonthSummary
+          className="hidden md:block"
+          rentals={rentals as any}
+          month={currentMonth}
+          showValues={showValues}
+          onToggleValues={toggleShowValues}
+        />
+      )}
 
       {/* Dialog de Criar Reserva */}
       <Sheet open={isCreateOpen} onOpenChange={setIsCreateOpen}>
