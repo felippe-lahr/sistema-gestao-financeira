@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -110,17 +110,50 @@ export async function isBiometricAvailable(): Promise<boolean> {
 const isApple = () => /iphone|ipad|ipod|macintosh/i.test(navigator.userAgent);
 export const biometricLabel = () => (isApple() ? "Face ID" : "biometria");
 
-/** Registra a biometria do aparelho e ativa o bloqueio. */
+/** Desafio do servidor fica válido 5 min; reaproveitamos por até 4. */
+const OPTIONS_MAX_AGE_MS = 4 * 60 * 1000;
+
+/** Mensagem legível para falhas do Face ID / WebAuthn (antes eram ignoradas). */
+export function biometricErrorMessage(err: any): string {
+  const name = err?.name || "";
+  if (name === "NotAllowedError") return `${biometricLabel()} cancelado ou não permitido pelo aparelho. Toque de novo para tentar.`;
+  if (name === "InvalidStateError") return `Este aparelho já está cadastrado. Desative e ative o ${biometricLabel()} novamente no Perfil.`;
+  if (name === "SecurityError") return "O endereço do app não confere com o servidor (domínio). Avise o suporte.";
+  if (name === "NotSupportedError") return `Este aparelho não suporta ${biometricLabel()} pelo app.`;
+  return err?.message ? `Não foi possível usar ${biometricLabel()}: ${err.message}` : `Não foi possível usar ${biometricLabel()} agora.`;
+}
+
+/**
+ * Registra a biometria do aparelho e ativa o bloqueio.
+ *
+ * O iPhone só abre o Face ID se a chamada acontecer logo após o toque: por isso
+ * o desafio é buscado ANTES (prepare) e o toque chama o Face ID na hora (enable).
+ */
 export function useEnableBiometric(userId?: number) {
   const optionsMutation = trpc.biometric.registrationOptions.useMutation();
   const registerMutation = trpc.biometric.register.useMutation();
-  return useCallback(async (delayMinutes = DEFAULT_DELAY_MINUTES) => {
-    const optionsJSON = await optionsMutation.mutateAsync();
+  const prepared = useRef<{ options: any; at: number } | null>(null);
+
+  const prepare = useCallback(async () => {
+    try {
+      const options = await optionsMutation.mutateAsync();
+      prepared.current = { options, at: Date.now() };
+    } catch {
+      prepared.current = null;
+    }
+  }, [optionsMutation]);
+
+  const enable = useCallback(async (delayMinutes = DEFAULT_DELAY_MINUTES) => {
+    const fresh = prepared.current && Date.now() - prepared.current.at < OPTIONS_MAX_AGE_MS;
+    const optionsJSON = fresh ? prepared.current!.options : await optionsMutation.mutateAsync();
+    prepared.current = null;
     const response = await startRegistration({ optionsJSON });
     const { credentialId } = await registerMutation.mutateAsync({ response, deviceName: navigator.userAgent.slice(0, 255) });
     setBiometricConfig({ credentialId, delayMinutes, userId });
     markActive();
   }, [optionsMutation, registerMutation, userId]);
+
+  return { prepare, enable };
 }
 
 export function BiometricLock({ userId, userName, onSignOut }: { userId: number; userName?: string | null; onSignOut: () => void }) {
@@ -140,7 +173,9 @@ export function BiometricLock({ userId, userName, onSignOut }: { userId: number;
   const unlockMutation = trpc.biometric.unlock.useMutation();
   const totpMutation = trpc.biometric.unlockWithTotp.useMutation();
   const { data: security, refetch: refetchSecurity } = trpc.biometric.securityInfo.useQuery(undefined, { enabled: false });
-  const enableBiometric = useEnableBiometric(userId);
+  const { prepare: prepareEnable, enable: enableBiometric } = useEnableBiometric(userId);
+  // Desafio de desbloqueio buscado ao bloquear (o toque chama o Face ID na hora)
+  const unlockPrepared = useRef<{ options: any; at: number } | null>(null);
   // Sem 2FA ativo na conta, o bloqueio de 24h usa só a biometria
   const needsCode = lock === "strong" && security?.totpEnabled === true;
   const locked = lock !== "none";
@@ -174,6 +209,26 @@ export function BiometricLock({ userId, userName, onSignOut }: { userId: number;
     };
   }, [locked, busy]);
 
+  const prepareUnlock = async () => {
+    const config = getBiometricConfig();
+    if (!config) return;
+    try {
+      const { options } = await optionsMutation.mutateAsync({ credentialId: config.credentialId });
+      unlockPrepared.current = options ? { options, at: Date.now() } : null;
+      if (!options) {
+        // Credencial removida no servidor: desliga o bloqueio neste aparelho
+        setBiometricConfig(null);
+        finishUnlock();
+      }
+    } catch {
+      unlockPrepared.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (lock === "biometric" || (lock === "strong" && security?.totpEnabled === false)) prepareUnlock();
+  }, [lock, security?.totpEnabled]);
+
   const finishUnlock = () => {
     markActive();
     setCode("");
@@ -181,28 +236,37 @@ export function BiometricLock({ userId, userName, onSignOut }: { userId: number;
   };
 
   // Convite único após entrar com "Manter conectado" num aparelho compatível
+  const { data: sessionInfo } = trpc.auth.sessionInfo.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   useEffect(() => {
+    if (!sessionInfo?.rememberMe) return;
     (async () => {
       try {
         if (getBiometricConfig()) return;
         if (localStorage.getItem(OFFER_DISMISSED_KEY)) return;
-        if (JSON.parse(localStorage.getItem("rememberMe") || "false") !== true) return;
-        if (await isBiometricAvailable()) setOfferOpen(true);
+        if (await isBiometricAvailable()) {
+          prepareEnable();
+          setOfferOpen(true);
+        }
       } catch {}
     })();
-  }, []);
+  }, [sessionInfo?.rememberMe]);
 
   const unlock = async () => {
     const config = getBiometricConfig();
     if (!config) return finishUnlock();
     setBusy(true);
     try {
-      const { options } = await optionsMutation.mutateAsync({ credentialId: config.credentialId });
+      let options = unlockPrepared.current && Date.now() - unlockPrepared.current.at < OPTIONS_MAX_AGE_MS
+        ? unlockPrepared.current.options
+        : null;
+      unlockPrepared.current = null;
       if (!options) {
-        // Credencial removida no servidor: desliga o bloqueio neste aparelho
-        setBiometricConfig(null);
-        finishUnlock();
-        return;
+        ({ options } = await optionsMutation.mutateAsync({ credentialId: config.credentialId }));
+        if (!options) {
+          setBiometricConfig(null);
+          finishUnlock();
+          return;
+        }
       }
       const response = await startAuthentication({ optionsJSON: options });
       const { verified } = await unlockMutation.mutateAsync({ response });
@@ -210,9 +274,11 @@ export function BiometricLock({ userId, userName, onSignOut }: { userId: number;
         finishUnlock();
       } else {
         toast.error("Não foi possível confirmar. Tente novamente.");
+        prepareUnlock();
       }
     } catch (err: any) {
-      if (err?.name !== "NotAllowedError") toast.error("Não foi possível usar a biometria agora.");
+      toast.error(biometricErrorMessage(err));
+      prepareUnlock();
     } finally {
       setBusy(false);
     }
@@ -241,7 +307,7 @@ export function BiometricLock({ userId, userName, onSignOut }: { userId: number;
       await enableBiometric();
       toast.success(`Desbloqueio com ${biometricLabel()} ativado neste aparelho`);
     } catch (err: any) {
-      if (err?.name !== "NotAllowedError") toast.error("Não foi possível ativar agora. Você pode ativar depois no Perfil.");
+      toast.error(`${biometricErrorMessage(err)} Você pode ativar depois no Perfil.`);
     }
   };
 

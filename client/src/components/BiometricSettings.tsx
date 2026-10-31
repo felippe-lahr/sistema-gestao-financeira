@@ -13,6 +13,7 @@ import {
   isBiometricAvailable,
   setBiometricConfig,
   useEnableBiometric,
+  biometricErrorMessage,
 } from "./BiometricLock";
 
 /** Card do Perfil: ativar/desativar o desbloqueio com Face ID / digital neste aparelho. */
@@ -21,10 +22,14 @@ export function BiometricSettings() {
   const [config, setConfig] = useState(getBiometricConfig);
   const [busy, setBusy] = useState(false);
   const { user } = useAuth();
-  const enableBiometric = useEnableBiometric(user?.id);
+  const { prepare, enable: enableBiometric } = useEnableBiometric(user?.id);
   const removeMutation = trpc.biometric.remove.useMutation();
 
   useEffect(() => { isBiometricAvailable().then(setAvailable); }, []);
+  // Deixa o desafio pronto para o toque abrir o Face ID na hora (exigência do iPhone)
+  useEffect(() => {
+    if (available && !config) prepare();
+  }, [available, !!config]);
 
   if (!available) return null;
 
@@ -41,7 +46,8 @@ export function BiometricSettings() {
       }
       setConfig(getBiometricConfig());
     } catch (err: any) {
-      if (err?.name !== "NotAllowedError") toast.error("Não foi possível alterar agora. Tente novamente.");
+      toast.error(biometricErrorMessage(err));
+      if (!getBiometricConfig()) prepare();
     } finally {
       setBusy(false);
     }

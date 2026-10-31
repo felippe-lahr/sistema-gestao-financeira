@@ -11,6 +11,8 @@ export type TrpcContext = {
   res: CreateExpressContextOptions["res"];
   user: User | null;
   organization: Organization | null;
+  /** Sessão "Manter conectado neste aparelho" (30 dias renováveis). */
+  sessionRememberMe?: boolean;
 };
 
 export async function createContext(
@@ -18,6 +20,7 @@ export async function createContext(
 ): Promise<TrpcContext> {
   let user: User | null = null;
   let organization: Organization | null = null;
+  let sessionRememberMe = false;
 
   try {
     user = await sdk.authenticateRequest(opts.req);
@@ -30,6 +33,7 @@ export async function createContext(
       if (sessionCookie) {
         // Verificar sessão para obter tempo de expiração
         const session = await sdk.verifySession(sessionCookie);
+        sessionRememberMe = session?.rememberMe === true;
         
         if (session && session.exp) {
           const cookieOptions = getSessionCookieOptions(opts.req);
@@ -122,5 +126,6 @@ export async function createContext(
     res: opts.res,
     user,
     organization,
+    sessionRememberMe,
   };
 }

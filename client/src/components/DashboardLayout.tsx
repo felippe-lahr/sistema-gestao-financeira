@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ModeToggle } from "@/components/mode-toggle";
+import { trpc } from "@/lib/trpc";
 import { BiometricLock } from "@/components/BiometricLock";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import {
@@ -729,14 +730,19 @@ export default function DashboardLayout({
   const { loading, user, logout } = useAuth();
   const [, setLocation] = useLocation();
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Tipo real da sessão vem do servidor (a marcação local pode se perder:
+  // login pelo Google, dados limpos, outro contexto do iPhone)
+  const { data: sessionInfo } = trpc.auth.sessionInfo.useQuery(undefined, { enabled: !!user, staleTime: 5 * 60 * 1000 });
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
   useEffect(() => {
+    if (!user || !sessionInfo) return; // aguarda saber o tipo da sessão
     // "Manter conectado neste aparelho" marcado no login
-    const rememberMe = JSON.parse(localStorage.getItem('rememberMe') || 'false');
+    const rememberMe = sessionInfo.rememberMe;
+    try { localStorage.setItem('rememberMe', JSON.stringify(rememberMe)); } catch {}
 
     // Com rememberMe não há timer de inatividade: a sessão é controlada pelo
     // JWT (30 dias, renovados a cada uso — server/_core/context.ts)
@@ -762,7 +768,7 @@ export default function DashboardLayout({
       events.forEach(event => window.removeEventListener(event, resetTimer));
       if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     };
-  }, [logout, setLocation]);
+  }, [logout, setLocation, user, sessionInfo?.rememberMe]);
 
   if (loading) {
     return <DashboardLayoutSkeleton />

@@ -27,9 +27,21 @@ const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
 const challenges = new Map<string, { challenge: string; expiresAt: number }>();
 
+/**
+ * RP ID = domínio de APP_URL. Origens aceitas: APP_URL + ALLOWED_ORIGINS
+ * (ex.: com e sem "www", domínio do Railway), para o Face ID não falhar só
+ * porque o app foi aberto por outro endereço configurado.
+ */
 function rp() {
-  const origin = new URL(ENV.appUrl).origin;
-  return { origin, rpID: new URL(origin).hostname };
+  const main = new URL(ENV.appUrl).origin;
+  const rpID = new URL(main).hostname;
+  const extra = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean)
+    .map((o) => { try { return new URL(o).origin; } catch { return null; } })
+    .filter((o): o is string => !!o && (new URL(o).hostname === rpID || new URL(o).hostname.endsWith(`.${rpID}`)));
+  return { origin: Array.from(new Set([main, ...extra])), rpID };
 }
 
 function putChallenge(key: string, challenge: string) {
@@ -86,7 +98,10 @@ export async function verifyRegistration(userId: number, response: RegistrationR
     expectedRPID: rpID,
     requireUserVerification: true,
   });
-  if (!verification.verified || !verification.registrationInfo) throw new Error("Não foi possível confirmar a biometria.");
+  if (!verification.verified || !verification.registrationInfo) {
+    console.warn(`[Biometric] Registro não verificado para userId=${userId}`);
+    throw new Error("Não foi possível confirmar a biometria.");
+  }
 
   const { credential } = verification.registrationInfo;
   const db = await getDb();
@@ -149,7 +164,10 @@ export async function verifyAuthentication(userId: number, response: Authenticat
       transports: parseTransports(cred.transports),
     },
   });
-  if (!verification.verified) return false;
+  if (!verification.verified) {
+    console.warn(`[Biometric] Desbloqueio não verificado para userId=${userId}`);
+    return false;
+  }
   await db
     .update(webauthnCredentials)
     .set({ counter: verification.authenticationInfo.newCounter, lastUsedAt: new Date() })

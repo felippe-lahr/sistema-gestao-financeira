@@ -24,6 +24,8 @@ export const appRouter = router({
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+    // Tipo da sessão atual (o app usa para não aplicar o logout por inatividade)
+    sessionInfo: protectedProcedure.query(({ ctx }) => ({ rememberMe: !!ctx.sessionRememberMe })),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -3478,6 +3480,7 @@ Regras:
         try {
           return await biometric.verifyRegistration(ctx.user.id, input.response, input.deviceName);
         } catch (err: any) {
+          console.error(`[Biometric] Falha ao registrar (userId=${ctx.user.id}):`, err?.message);
           throw new TRPCError({ code: "BAD_REQUEST", message: err?.message || "Não foi possível ativar a biometria." });
         }
       }),
@@ -3493,7 +3496,8 @@ Regras:
       .mutation(async ({ ctx, input }) => {
         try {
           return { verified: await biometric.verifyAuthentication(ctx.user.id, input.response) };
-        } catch {
+        } catch (err: any) {
+          console.error(`[Biometric] Falha ao desbloquear (userId=${ctx.user.id}):`, err?.message);
           return { verified: false };
         }
       }),
