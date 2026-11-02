@@ -46,6 +46,70 @@ const PRIORITY_HEX: Record<string, string> = {
   HIGH: "#EF4444",
 };
 
+type ChecklistItem = { id: string; text: string; done: boolean };
+
+/** Editor do checklist — usado no cadastro e na edição da tarefa. */
+function ChecklistEditor({ items, onChange, hint }: { items: ChecklistItem[]; onChange: (items: ChecklistItem[]) => void; hint?: string }) {
+  const [text, setText] = useState("");
+  const add = () => {
+    const t = text.trim();
+    if (!t) return;
+    onChange([...items, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text: t, done: false }]);
+    setText("");
+  };
+  const done = items.filter((i) => i.done).length;
+  const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+  return (
+    <div>
+      <Label className="mb-2 block">Checklist de ações</Label>
+      {hint && <p className="mb-2 text-xs text-muted-foreground">{hint}</p>}
+      {items.length > 0 && (
+        <div className="mb-2">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+            <span>{done}/{items.length} concluídos</span>
+            <span>{pct}%</span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+            <div className="h-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      )}
+      <div className="space-y-1.5">
+        {items.map((item) => (
+          <div key={item.id} className="flex min-h-9 items-center gap-2 group">
+            <Checkbox
+              checked={item.done}
+              onCheckedChange={() => onChange(items.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)))}
+            />
+            <span className={`flex-1 text-sm ${item.done ? "line-through text-gray-400" : ""}`}>{item.text}</span>
+            <button
+              type="button"
+              aria-label="Remover item"
+              onClick={() => onChange(items.filter((i) => i.id !== item.id))}
+              className="flex h-8 w-8 items-center justify-center text-gray-300 hover:text-red-500 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-2">
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          placeholder="Adicionar item..."
+          className="h-10"
+        />
+        <Button type="button" variant="outline" className="h-10" onClick={add}>Adicionar</Button>
+      </div>
+      {items.length > 0 && items.every((i) => i.done) && (
+        <p className="text-xs text-green-600 dark:text-green-400 mt-2">✅ Todos os itens concluídos — tarefa marcada como concluída.</p>
+      )}
+    </div>
+  );
+}
+
 type AgendaView = "day" | "week" | "month";
 const VIEW_STORAGE_KEY = "agenda-view";
 
@@ -239,7 +303,6 @@ export default function Agenda() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [checklistItems, setChecklistItems] = useState<{ id: string; text: string; done: boolean }[]>([]);
-  const [newChecklistText, setNewChecklistText] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<number | null>(null);
   const [taskToDeleteIsRecurring, setTaskToDeleteIsRecurring] = useState(false);
@@ -498,6 +561,7 @@ export default function Agenda() {
       isRecurring: formData.isRecurring,
       recurrenceCount: formData.isRecurring ? parseInt(formData.recurrenceCount) : undefined,
       recurrenceFrequency: formData.isRecurring ? formData.recurrenceFrequency : undefined,
+      checklist: checklistItems.length > 0 ? checklistItems : undefined,
     });
   };
 
@@ -549,6 +613,7 @@ export default function Agenda() {
       priority: formData.priority,
       entityId: formData.entityId && formData.entityId !== "none" ? parseInt(formData.entityId) : null,
       color: formData.color || null,
+      checklist: checklistItems,
       updateAll: updateAll,
     });
     
@@ -574,7 +639,6 @@ export default function Agenda() {
     let cl: any[] = [];
     try { cl = task.checklist ? JSON.parse(task.checklist) : []; } catch { cl = []; }
     setChecklistItems(Array.isArray(cl) ? cl : []);
-    setNewChecklistText("");
     setIsEditOpen(true);
   };
 
@@ -594,22 +658,10 @@ export default function Agenda() {
       toast.error(error.message || "Erro ao atualizar checklist");
     }
   };
-  const addChecklistItem = () => {
-    const text = newChecklistText.trim();
-    if (!text) return;
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-    persistChecklist([...checklistItems, { id, text, done: false }]);
-    setNewChecklistText("");
-  };
-  const toggleChecklistItem = (id: string) => {
-    persistChecklist(checklistItems.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
-  };
-  const deleteChecklistItem = (id: string) => {
-    persistChecklist(checklistItems.filter((i) => i.id !== id));
-  };
 
   const openCreateSheet = (date?: Date) => {
     resetForm();
+    setChecklistItems([]);
     if (date) {
       setFormData(prev => ({
         ...prev,
@@ -1298,6 +1350,9 @@ export default function Agenda() {
                 />
               </div>
 
+              {/* Checklist já no cadastro (vale para todas as repetições) */}
+              <ChecklistEditor items={checklistItems} onChange={setChecklistItems} />
+
               <div>
                 <Label className="mb-2 block">Entidade (opcional)</Label>
                 <Select value={formData.entityId || undefined} onValueChange={(v) => setFormData({ ...formData, entityId: v })}>
@@ -1570,52 +1625,13 @@ export default function Agenda() {
               </div>
 
               {/* Checklist de ações — 100% conclui a tarefa automaticamente */}
-              <div>
-                <Label className="mb-2 block">Checklist de ações</Label>
-                {checklistItems.length > 0 && (() => {
-                  const done = checklistItems.filter((i) => i.done).length;
-                  const pct = Math.round((done / checklistItems.length) * 100);
-                  return (
-                    <div className="mb-2">
-                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                        <span>{done}/{checklistItems.length} concluídos</span>
-                        <span>{pct}%</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                        <div className="h-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })()}
-                <div className="space-y-1.5">
-                  {checklistItems.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2 group">
-                      <Checkbox checked={item.done} onCheckedChange={() => toggleChecklistItem(item.id)} />
-                      <span className={`flex-1 text-sm ${item.done ? "line-through text-gray-400" : ""}`}>{item.text}</span>
-                      <button
-                        type="button"
-                        onClick={() => deleteChecklistItem(item.id)}
-                        className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    value={newChecklistText}
-                    onChange={(e) => setNewChecklistText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addChecklistItem(); } }}
-                    placeholder="Adicionar item..."
-                    className="h-9"
-                  />
-                  <Button type="button" variant="outline" className="h-9" onClick={addChecklistItem}>Adicionar</Button>
-                </div>
-                {checklistItems.length > 0 && checklistItems.every((i) => i.done) && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-2">✅ Todos os itens concluídos — tarefa marcada como concluída.</p>
-                )}
-              </div>
+              <ChecklistEditor
+                items={checklistItems}
+                onChange={persistChecklist}
+                hint={editingTask && (editingTask.isRecurring || editingTask.parentTaskId)
+                  ? "Para levar o checklist às outras repetições, toque em Salvar e escolha aplicar a todas."
+                  : undefined}
+              />
             </div>
           </div>
 

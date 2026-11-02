@@ -2090,12 +2090,17 @@ Regras:
           isRecurring: z.boolean().optional(),
           recurrenceCount: z.number().optional(),
           recurrenceFrequency: z.enum(["DAY", "WEEK", "MONTH", "YEAR"]).optional(),
+          checklist: z.array(z.object({ id: z.string(), text: z.string(), done: z.boolean() })).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
         if (input.entityId) {
           await requireEntityAccess(input.entityId, ctx.user.id, "VIEWER");
         }
+        // Checklist já no cadastro: cada ocorrência recebe os mesmos itens (desmarcados)
+        const checklistJson = input.checklist && input.checklist.length > 0
+          ? JSON.stringify(input.checklist.map((i) => ({ ...i, done: false })))
+          : null;
         // Se for recorrente, criar múltiplas tarefas
         if (input.isRecurring && input.recurrenceCount && input.recurrenceFrequency) {
           const tasks = [];
@@ -2118,6 +2123,7 @@ Regras:
             status: input.status,
             color: input.color,
             reminderMinutes: input.reminderMinutes,
+            checklist: checklistJson,
             isRecurring: true,
             recurrencePattern: JSON.stringify({ frequency, interval: 1, count }),
             parentTaskId: null,
@@ -2173,6 +2179,7 @@ Regras:
               status: input.status,
               color: input.color,
               reminderMinutes: input.reminderMinutes,
+              checklist: checklistJson,
               isRecurring: false,
               recurrencePattern: null,
               parentTaskId: parentTaskId,
@@ -2208,6 +2215,7 @@ Regras:
             status: input.status,
             color: input.color,
             reminderMinutes: input.reminderMinutes,
+            checklist: checklistJson,
             isRecurring: false,
             recurrencePattern: null,
             parentTaskId: null,
@@ -2274,13 +2282,29 @@ Regras:
           const parentId = task.parentTaskId || task.id;
           // Buscar todas as tarefas relacionadas
           const relatedTasks = await db.getTasksByParentId(parentId);
-          
-          // Atualizar tarefa pai
-          await db.updateTask(parentId, updateData);
-          
-          // Atualizar todas as tarefas filhas
-          for (const relatedTask of relatedTasks) {
-            await db.updateTask(relatedTask.id, updateData);
+
+          // As demais ocorrências mantêm as PRÓPRIAS datas e o próprio status
+          // (antes a data da tarefa aberta era copiada para todas). O checklist
+          // vai para todas com os mesmos itens; o progresso de cada uma é
+          // preservado (itens que já existiam mantêm o "feito").
+          const { dueDate: _d, endDate: _e, status: _s, completedAt: _c, checklist: _cl, ...shared } = updateData;
+          const forOccurrence = (occ: any) => {
+            const data: any = { ...shared };
+            if (checklist !== undefined) {
+              let current: { id: string; done: boolean }[] = [];
+              try { current = occ.checklist ? JSON.parse(occ.checklist) : []; } catch { current = []; }
+              const doneIds = new Set(current.filter((i) => i.done).map((i) => i.id));
+              data.checklist = checklist && checklist.length > 0
+                ? JSON.stringify(checklist.map((i) => ({ ...i, done: doneIds.has(i.id) })))
+                : null;
+            }
+            return data;
+          };
+
+          const parentTask = parentId === id ? task : await db.getTaskById(parentId);
+          for (const occ of [parentTask, ...relatedTasks]) {
+            if (!occ) continue;
+            await db.updateTask(occ.id, occ.id === id ? updateData : forOccurrence(occ));
           }
         } else {
           // Atualizar apenas a tarefa atual
