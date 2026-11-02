@@ -200,7 +200,33 @@ function getChecklistProgress(task: any): { done: number; total: number } | null
 }
 
 // Barra de tarefa (contínua, pode ocupar vários dias) na visão semanal
-function TaskBar({ item, onOpen }: { item: any; onOpen: (t: any) => void }) {
+// ── Sigla da entidade nas barras (Semana/Mês) ──
+const NAME_STOPWORDS = new Set(["de", "da", "do", "das", "dos", "e", "a", "o"]);
+/** "Casa Gaiúba" → "CG"; "Fazenda Santo Antonio da Barra" → "FS"; "Burgos" → "BU". */
+export function entityInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter((w) => w && !NAME_STOPWORDS.has(w.toLowerCase()));
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+type EntityBadgeInfo = { initials: string; color: string; name: string } | null;
+
+/** Círculo branco com a sigla na cor da entidade — legível sobre qualquer cor de barra. */
+function EntityBadge({ info, size = 16 }: { info: EntityBadgeInfo; size?: number }) {
+  if (!info) return null;
+  return (
+    <span
+      title={info.name}
+      className="inline-flex shrink-0 items-center justify-center rounded-full bg-white font-bold leading-none shadow-[0_0_0_1px_rgba(0,0,0,0.06)]"
+      style={{ width: size, height: size, fontSize: size <= 16 ? 8 : 9, color: info.color, letterSpacing: "-0.02em" }}
+    >
+      {info.initials}
+    </span>
+  );
+}
+
+function TaskBar({ item, onOpen, entity }: { item: any; onOpen: (t: any) => void; entity?: EntityBadgeInfo }) {
   const task = item.task;
   const cp = getChecklistProgress(task);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -221,10 +247,13 @@ function TaskBar({ item, onOpen }: { item: any; onOpen: (t: any) => void }) {
         gridRow: item.row + 1,
         ...(bg ? { backgroundColor: bg } : {}),
       }}
-      title={task.title}
-      className={`pointer-events-auto self-start text-left rounded-md px-2 py-1 text-xs font-medium truncate text-white touch-none cursor-grab active:cursor-grabbing ${bg ? "" : priorityClass} ${isDragging ? "opacity-40" : ""} ${done ? "opacity-60 line-through" : ""} ${item.clipLeft ? "rounded-l-none" : ""} ${item.clipRight ? "rounded-r-none" : ""}`}
+      title={entity ? `${task.title} · ${entity.name}` : task.title}
+      className={`pointer-events-auto self-start flex items-center gap-1.5 text-left rounded-md px-1.5 py-1 text-xs font-medium text-white touch-none cursor-grab active:cursor-grabbing ${bg ? "" : priorityClass} ${isDragging ? "opacity-40" : ""} ${done ? "opacity-60" : ""} ${item.clipLeft ? "rounded-l-none" : ""} ${item.clipRight ? "rounded-r-none" : ""}`}
     >
-      {cp ? `☑ ${cp.done}/${cp.total} ` : ""}{task.title}{!task.allDay && task.dueTime ? ` · ${task.dueTime}` : ""}
+      <EntityBadge info={entity ?? null} />
+      <span className={`truncate ${done ? "line-through" : ""}`}>
+        {cp ? `☑ ${cp.done}/${cp.total} ` : ""}{task.title}{!task.allDay && task.dueTime ? ` · ${task.dueTime}` : ""}
+      </span>
     </button>
   );
 }
@@ -327,7 +356,26 @@ export default function Agenda() {
   });
 
   const { data: entities = [] } = trpc.entities.list.useQuery(undefined, { refetchInterval: 60_000 });
-  const { data: tasks = [], refetch: refetchTasks } = trpc.tasks.list.useQuery();
+  const { data: allTasks = [], refetch: refetchTasks } = trpc.tasks.list.useQuery();
+  // Filtro por entidade ("all" = todas; "none" = pessoais/sem entidade), lembrado no aparelho
+  const [entityFilter, setEntityFilterState] = useState<string>(() => {
+    try { return localStorage.getItem("agenda-entity-filter") || "all"; } catch { return "all"; }
+  });
+  const setEntityFilter = (v: string) => {
+    setEntityFilterState(v);
+    try { localStorage.setItem("agenda-entity-filter", v); } catch {}
+  };
+  // Entidade do filtro salvo não existe mais (removida/sem acesso) → volta para "Todas"
+  useEffect(() => {
+    if (entities.length && entityFilter !== "all" && entityFilter !== "none" && !entities.some((e: any) => String(e.id) === entityFilter)) {
+      setEntityFilter("all");
+    }
+  }, [entities, entityFilter]);
+  const tasks = useMemo(() => {
+    if (entityFilter === "all") return allTasks;
+    if (entityFilter === "none") return allTasks.filter((t: any) => !t.entityId);
+    return allTasks.filter((t: any) => String(t.entityId) === entityFilter);
+  }, [allTasks, entityFilter]);
   const { data: currentUser, refetch: refetchUser } = trpc.auth.me.useQuery();
   const syncGoogleCalendar = trpc.tasks.syncGoogleCalendar.useMutation({
     onSuccess: (result) => {
@@ -869,6 +917,13 @@ export default function Agenda() {
     setSelectedDate(now);
   };
 
+  const entityBadge = (entityId: number | null): EntityBadgeInfo => {
+    if (!entityId) return null;
+    const entity = entities.find((e: any) => e.id === entityId);
+    if (!entity) return null;
+    return { initials: entityInitials(entity.name), color: entity.color || "#1661B5", name: entity.name };
+  };
+
   const getEntityName = (entityId: number | null) => {
     if (!entityId) return null;
     const entity = entities.find(e => e.id === entityId);
@@ -984,6 +1039,40 @@ export default function Agenda() {
       >
         <Plus className="h-7 w-7" />
       </button>
+
+      {/* Filtro por entidade */}
+      {entities.length > 0 && (
+        <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+          {[
+            { key: "all", label: "Todas", color: null as string | null, initials: null as string | null },
+            ...entities.map((e: any) => ({ key: String(e.id), label: e.name, color: e.color || "#1661B5", initials: entityInitials(e.name) })),
+            ...(allTasks.some((t: any) => !t.entityId) ? [{ key: "none", label: "Pessoais", color: null, initials: null }] : []),
+          ].map((f) => {
+            const active = entityFilter === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setEntityFilter(f.key)}
+                className={`flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full pr-3.5 text-sm font-medium transition-all ${f.initials ? "pl-2" : "pl-3.5"} ${
+                  active
+                    ? "bg-[#1661B5] text-white shadow-sm"
+                    : "bg-white dark:bg-gray-800 border border-[#E4E4E8] dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                {f.initials && (
+                  <span
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold"
+                    style={active ? { background: "#fff", color: f.color! } : { background: f.color!, color: "#fff" }}
+                  >
+                    {f.initials}
+                  </span>
+                )}
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Calendário - Largura total */}
       <Card className="mb-6 gap-3 p-3 md:gap-6 md:py-5 md:px-[22px]">
@@ -1144,7 +1233,7 @@ export default function Agenda() {
                         style={{ gridAutoRows: "26px" }}
                       >
                         {weekLayout.items.map((item) => (
-                          <TaskBar key={item.task.id} item={item} onOpen={openEditSheet} />
+                          <TaskBar key={item.task.id} item={item} onOpen={openEditSheet} entity={entityBadge(item.task.entityId)} />
                         ))}
                       </div>
                     </div>
@@ -1243,7 +1332,7 @@ export default function Agenda() {
                         <div
                           key={task.id}
                           className={`
-                            text-xs px-1 py-0.5 truncate text-white h-5 absolute left-0
+                            flex items-center gap-1 text-xs px-1 py-0.5 text-white h-5 absolute left-0
                             ${PRIORITY_COLORS[task.priority as keyof typeof PRIORITY_COLORS]}
                             ${isStart ? "rounded-l" : ""}
                             ${isEnd || (dayOfWeek + span - 1 >= 6) ? "rounded-r" : ""}
@@ -1254,9 +1343,12 @@ export default function Agenda() {
                             top: `${rowOf(task) * 22}px`,
                             zIndex: 10,
                           }}
-                          title={`${task.title}${task.duration > 1 ? ` (${format(task.startDate, "dd/MM")} - ${format(task.endDate, "dd/MM")})` : ""}`}
+                          title={`${task.title}${task.duration > 1 ? ` (${format(task.startDate, "dd/MM")} - ${format(task.endDate, "dd/MM")})` : ""}${getEntityName(task.entityId) ? ` · ${getEntityName(task.entityId)}` : ""}`}
                         >
-                          {(() => { const cp = getChecklistProgress(task); return cp ? `☑${cp.done}/${cp.total} ` : ""; })()}{task.title}
+                          <EntityBadge info={entityBadge(task.entityId)} size={14} />
+                          <span className="truncate">
+                            {(() => { const cp = getChecklistProgress(task); return cp ? `☑${cp.done}/${cp.total} ` : ""; })()}{task.title}
+                          </span>
                         </div>
                       );
                     })}
