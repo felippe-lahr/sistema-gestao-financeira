@@ -4,6 +4,7 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { trpc } from "@/lib/trpc";
 import { BiometricLock } from "@/components/BiometricLock";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { PushResync } from "@/components/PushResync";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1069,6 +1070,7 @@ function DashboardLayoutContent({
       </SidebarInset>
       <OnboardingTour />
       {user && <BiometricLock userId={user.id} userName={user.name} onSignOut={logout} />}
+      {user && <PushResync />}
     </>
   );
 }
